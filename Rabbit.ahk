@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, 2024 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2005 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -206,6 +206,9 @@ RegisterHotKeys() {
             ; Hotkey("$+^!#" . key, ProcessKey.Bind(key, shift | ctrl | alt | win), "S0")
         }
     }
+
+    ; Special handling
+    Hotkey("$Space Up", ProcessKey.Bind("Space", up), "S0")
 
     ; Read the hotkey to suspend / resume Rabbit
     if !RabbitConfig.suspend_hotkey
@@ -433,7 +436,15 @@ ProcessKey(key, mask, this_hotkey) {
         local ctrl := (mask & KeyDef.mask["Ctrl"]) ? "^" : ""
         local alt := (mask & KeyDef.mask["Alt"]) ? "!" : ""
         local win := (mask & KeyDef.mask["Win"]) ? "#" : ""
-        SendInput(shift . ctrl . alt . win . "{" . key . "}")
+
+        local isUp := mask & KeyDef.mask["Up"]
+        local hasModifier := mask & (KeyDef.mask["Shift"] | KeyDef.mask["Ctrl"] | KeyDef.mask["Alt"] | KeyDef.mask["Win"])
+
+        if key == "Space" and not hasModifier {
+            Send("{Blind}{" . key . (isUp ? " Up" : " Down") . "}")
+        } else {
+            SendInput(shift . ctrl . alt . win . "{" . key . "}")
+        }
     }
 }
 
