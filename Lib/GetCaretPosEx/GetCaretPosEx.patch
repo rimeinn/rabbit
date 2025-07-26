@@ -1,7 +1,19 @@
 diff --git a/Lib/GetCaretPosEx/GetCaretPosEx.ahk b/Lib/GetCaretPosEx/GetCaretPosEx.ahk
-index ff9a7f7..b3ee558 100644
+index ff9a7f7..92f5109 100644
 --- a/Lib/GetCaretPosEx/GetCaretPosEx.ahk
 +++ b/Lib/GetCaretPosEx/GetCaretPosEx.ahk
+@@ -14,6 +14,11 @@ GetCaretPosEx(&left?, &top?, &right?, &bottom?, useHook := false) {
+         className := WinGetClass(hwnd)
+     catch
+         className := ""
++
++    ; adobe typing mode is not a normal input mode, exclude it
++    if className == "PSViewC" or className == "DroverLord - Window Class"
++        return false
++
+     if className ~= "^(?:Windows|Microsoft)\.UI\..+"
+         funcs := [getCaretPosFromUIA, getCaretPosFromHook, getCaretPosFromMSAA]
+     else if className ~= "^HwndWrapper\[PowerShell_ISE\.exe;;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]"
 @@ -332,8 +332,12 @@ end:
      }
  

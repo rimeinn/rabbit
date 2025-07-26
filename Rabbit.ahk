@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2005 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -352,7 +352,7 @@ ProcessKey(key, mask, this_hotkey) {
         else
             last_is_hide := false
         SendText(commit.text)
-        ToolTip()
+        ; ToolTip()
         box.Show("Hide")
         rime.free_commit(commit)
     } else
@@ -416,15 +416,21 @@ ProcessKey(key, mask, this_hotkey) {
                 prev_x := new_x
                 prev_y := new_y
             } else if !show_at_left_top {
-                has_selected := GetCompositionText(context.composition, &pre_selected, &selected, &post_selected)
-                preedit_text := pre_selected
-                if has_selected
-                    preedit_text := preedit_text . "[" . selected "]" . post_selected
-                ToolTip(preedit_text . "`r`n" . GetMenuText(context.menu))
+                ; has_selected := GetCompositionText(context.composition, &pre_selected, &selected, &post_selected)
+                ; preedit_text := pre_selected
+                ; if has_selected
+                ;     preedit_text := preedit_text . "[" . selected "]" . post_selected
+                ; ToolTip(preedit_text . "`r`n" . GetMenuText(context.menu))
+                backup_mouse_ref := A_CoordModeMouse
+                CoordMode("Mouse", "Screen")
+                MouseGetPos(&mouse_x, &mouse_y)
+                CoordMode("Mouse", backup_mouse_ref)
+                box.Build(context, &box_width, &box_height)
+                box.Show("AutoSize NA x" . mouse_x . " y" . mouse_y)
             }
             prev_show := true
         } else {
-            ToolTip()
+            ; ToolTip()
             box.Show("Hide")
             prev_show := false
         }

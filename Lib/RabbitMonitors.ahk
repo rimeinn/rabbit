@@ -131,7 +131,7 @@ class MonitorInfoEx extends MonitorInfo {
     static struct_size := MonitorInfoEx.device_offset + A_WCharSize * CCHDEVICENAME
 
     device {
-        get => StrGet(this + MonitorInfoEx.device_offset, CCHDEVICENAME)
+        get => StrGet(this.Ptr + MonitorInfoEx.device_offset, CCHDEVICENAME)
     }
 } ; MonitorInfoEx
 
