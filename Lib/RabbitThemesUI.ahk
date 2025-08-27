@@ -17,14 +17,9 @@
  */
 
 #Include <RabbitUIStyle>
-#Include <Gdip_All>
+#Include <Gdip/Gdip_All>
 
 class CandidatePreview {
-	borderWidth := 2
-	cornerRadius := 4
-	lineSpacing := 6
-	padding := 8
-
 	pToken := 0
 	pBitmap := 0
 	hBitmap := 0
@@ -42,6 +37,13 @@ class CandidatePreview {
 		}
 		this.imgCtrl := ctrl
 		this.dpiSacle := GUIUtilities.GetMonitorDpiScale()
+
+		this.borderWidth := UIStyle.border_width
+		this.borderColor := UIStyle.border_color
+		this.cornerRadius := UIStyle.corner_radius
+		this.lineSpacing := UIStyle.margin_y
+		this.padding := UIStyle.margin_x
+
 		; only use one font to preview
 		this.fontName := theme.HasOwnProp("font_face") ? theme.font_face : UIStyle.font_face
 		this.fontSize := theme.HasOwnProp("font_point") ? theme.font_point : UIStyle.font_point
@@ -94,6 +96,7 @@ class CandidatePreview {
 		this.pBitmap := Gdip_CreateBitmap(this.previewWidth, this.previewHeight)
 		this.pGraphics := Gdip_GraphicsFromImage(this.pBitmap)
 		Gdip_SetSmoothingMode(this.pGraphics, AntiAlias := 4)
+		Gdip_SetTextRenderingHint(this.pGraphics, AntiAlias := 4)
 
 		; Draw border
 		if (this.borderWidth > 0) {
@@ -211,7 +214,6 @@ class CandidatePreview {
 		this.pBrush := Gdip_BrushCreateSolid(color)
 		CreateRectF(&RC, textRect.x, textRect.y, textRect.w, textRect.h)
 		Gdip_DrawString(pGraphics, text, this.hFont, this.hFormat, this.pBrush, &RC)
-		Gdip_SetTextRenderingHint(this.pGraphics, AntiAlias := 4)
 		Gdip_DeleteBrush(this.pBrush)
 	}
 

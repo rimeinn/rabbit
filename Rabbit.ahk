@@ -385,12 +385,12 @@ ProcessKey(key, mask, this_hotkey) {
                 info := MonitorManage.GetMonitorInfo(hMon)
                 show_at_left_top := !!info
                 if show_at_left_top && !last_is_hide {
-                    box.Build(&context, &box_width, &box_height)
+                    box.Build(context, &box_width, &box_height)
                     box.Show(info.work.left + 4, info.work.top + 4)
                 }
             }
             if !show_at_left_top && GetCaretPos(&caret_x, &caret_y, &caret_w, &caret_h) {
-                box.Build(&context, &box_width, &box_height)
+                box.Build(context, &box_width, &box_height)
                 if RabbitConfig.fix_candidate_box && prev_show {
                     new_x := prev_x
                     new_y := prev_y
@@ -424,7 +424,7 @@ ProcessKey(key, mask, this_hotkey) {
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&mouse_x, &mouse_y)
                 CoordMode("Mouse", backup_mouse_ref)
-                box.Build(&context, &box_width, &box_height)
+                box.Build(context, &box_width, &box_height)
                 box.Show(mouse_x, mouse_y)
             }
             prev_show := true

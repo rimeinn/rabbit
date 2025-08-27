@@ -28,10 +28,13 @@ class UIStyle {
     static comment_font_point := 14
     static label_format := "{}. "
 
-    static margin_x := 5
-    static margin_y := 5
+    static border_width := 2
+    static corner_radius := 6
+    static margin_x := 6
+    static margin_y := 6
     static min_width := 160
 
+    static border_color := 0xffe0e0e0
     static text_color := 0xff000000
     static back_color := 0xffeeeeec
     static candidate_text_color := 0xff000000
@@ -45,7 +48,7 @@ class UIStyle {
     static hilited_label_color := 0xffffffff
     static hilited_comment_text_color   := 0xff000000
 
-    static Update(&config, initialize) {
+    static Update(config, initialize) {
         global rime
         if !rime || !config
             return
@@ -70,6 +73,8 @@ class UIStyle {
             UIStyle.comment_font_point := 14
         if rime.config_test_get_string(config, "style/label_format", &fmt) && fmt
             UIStyle.label_format := fmt
+        if rime.config_test_get_int(config, "style/layout/corner_radius", &r) && r >= 0
+            UIStyle.corner_radius := r
         if rime.config_test_get_int(config, "style/layout/margin_x", &mx) && mx >= 0
             UIStyle.margin_x := mx
         if rime.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0
@@ -77,10 +82,10 @@ class UIStyle {
         if rime.config_test_get_int(config, "style/layout/min_width", &w) && w >= 0
             UIStyle.min_width := w
         if initialize and color := rime.config_get_string(config, "style/color_scheme")
-            UIStyle.UpdateColor(&config, color)
+            UIStyle.UpdateColor(config, color)
     }
 
-    static UpdateColor(&config, color) {
+    static UpdateColor(config, color) {
         global rime
         if color or (buffer := rime.config_get_string(config, "style/color_scheme")) {
             local prefix := "preset_color_schemes/" . (color ? color : buffer)
@@ -90,18 +95,19 @@ class UIStyle {
                     fmt := cfmt
             }
 
-            UIStyle.text_color := UIStyle.GetColor(&config, prefix . "/text_color", fmt, 0xff000000)
-            UIStyle.back_color := UIStyle.GetColor(&config, prefix . "/back_color", fmt, 0xffeceeee)
-            UIStyle.candidate_text_color := UIStyle.GetColor(&config, prefix . "/candidate_text_color", fmt, UIStyle.text_color)
-            UIStyle.candidate_back_color := UIStyle.GetColor(&config, prefix . "/candidate_back_color", fmt, UIStyle.back_color)
-            UIStyle.label_color := UIStyle.GetColor(&config, prefix . "/label_color", fmt, UIStyle.BlendColors(UIStyle.candidate_text_color, UIStyle.candidate_back_color))
-            UIStyle.comment_text_color := UIStyle.GetColor(&config, prefix . "/comment_text_color", fmt, UIStyle.label_color)
-            UIStyle.hilited_text_color := UIStyle.GetColor(&config, prefix . "/hilited_text_color", fmt, UIStyle.text_color)
-            UIStyle.hilited_back_color := UIStyle.GetColor(&config, prefix . "/hilited_back_color", fmt, UIStyle.back_color)
-            UIStyle.hilited_candidate_text_color := UIStyle.GetColor(&config, prefix . "/hilited_candidate_text_color", fmt, UIStyle.hilited_text_color)
-            UIStyle.hilited_candidate_back_color := UIStyle.GetColor(&config, prefix . "/hilited_candidate_back_color", fmt, UIStyle.hilited_back_color)
-            UIStyle.hilited_label_color := UIStyle.GetColor(&config, prefix . "/hilited_label_color", fmt, UIStyle.BlendColors(UIStyle.hilited_candidate_text_color, UIStyle.hilited_candidate_back_color))
-            UIStyle.hilited_comment_text_color := UIStyle.GetColor(&config, prefix . "/hilited_comment_text_color", fmt, UIStyle.hilited_label_color)
+            UIStyle.border_color := UIStyle.GetColor(config, prefix . "/border_color", fmt, 0xffe0e0e0)
+            UIStyle.text_color := UIStyle.GetColor(config, prefix . "/text_color", fmt, 0xff000000)
+            UIStyle.back_color := UIStyle.GetColor(config, prefix . "/back_color", fmt, 0xffeceeee)
+            UIStyle.candidate_text_color := UIStyle.GetColor(config, prefix . "/candidate_text_color", fmt, UIStyle.text_color)
+            UIStyle.candidate_back_color := UIStyle.GetColor(config, prefix . "/candidate_back_color", fmt, UIStyle.back_color)
+            UIStyle.label_color := UIStyle.GetColor(config, prefix . "/label_color", fmt, UIStyle.BlendColors(UIStyle.candidate_text_color, UIStyle.candidate_back_color))
+            UIStyle.comment_text_color := UIStyle.GetColor(config, prefix . "/comment_text_color", fmt, UIStyle.label_color)
+            UIStyle.hilited_text_color := UIStyle.GetColor(config, prefix . "/hilited_text_color", fmt, UIStyle.text_color)
+            UIStyle.hilited_back_color := UIStyle.GetColor(config, prefix . "/hilited_back_color", fmt, UIStyle.back_color)
+            UIStyle.hilited_candidate_text_color := UIStyle.GetColor(config, prefix . "/hilited_candidate_text_color", fmt, UIStyle.hilited_text_color)
+            UIStyle.hilited_candidate_back_color := UIStyle.GetColor(config, prefix . "/hilited_candidate_back_color", fmt, UIStyle.hilited_back_color)
+            UIStyle.hilited_label_color := UIStyle.GetColor(config, prefix . "/hilited_label_color", fmt, UIStyle.BlendColors(UIStyle.hilited_candidate_text_color, UIStyle.hilited_candidate_back_color))
+            UIStyle.hilited_comment_text_color := UIStyle.GetColor(config, prefix . "/hilited_comment_text_color", fmt, UIStyle.hilited_label_color)
 
             return true
         }
@@ -132,7 +138,7 @@ class UIStyle {
         return (Integer(retAlpha) * 255 << 24) | (retR << 16) | (retG << 8) | retB
     }
 
-    static GetColor(&config, key, fmt, fallback) {
+    static GetColor(config, key, fmt, fallback) {
         global rime
         if not rime.config_test_get_string(config, key, &color)
             return fallback
@@ -208,10 +214,10 @@ OnColorChange(wParam, lParam, msg, hWnd) {
     IS_DARK_MODE := RabbitIsUserDarkMode()
     if old_dark != IS_DARK_MODE {
         if config := rime.config_open("rabbit") {
-            UIStyle.Update(&config, true)
+            UIStyle.Update(config, true)
             if IS_DARK_MODE {
                 if color_name := rime.config_get_string(config, "style/color_scheme_dark")
-                    UIStyle.use_dark := UIStyle.UpdateColor(&config, color_name)
+                    UIStyle.use_dark := UIStyle.UpdateColor(config, color_name)
             }
 
             rime.config_close(config)

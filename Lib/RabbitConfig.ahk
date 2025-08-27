@@ -59,10 +59,10 @@ class RabbitConfig {
         if rime.config_test_get_bool(config, "fix_candidate_box", &result)
             RabbitConfig.fix_candidate_box := !!result
 
-        UIStyle.Update(&config, true)
+        UIStyle.Update(config, true)
         if IS_DARK_MODE := RabbitIsUserDarkMode() {
             if color_name := rime.config_get_string(config, "style/color_scheme_dark")
-                UIStyle.use_dark := UIStyle.UpdateColor(&config, color_name)
+                UIStyle.use_dark := UIStyle.UpdateColor(config, color_name)
             DarkMode.set(IS_DARK_MODE)
         }
 
