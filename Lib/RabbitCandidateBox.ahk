@@ -47,7 +47,7 @@ class CandidateBox {
                 ExitApp
             }
         }
-        ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOPMOST
+        ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
         this.gui := Gui("-Caption +E0x8080088 +LastFound -DPIScale +AlwaysOnTop", "CandidateBox")
         this.dpiSacle := GUIUtilities.GetMonitorDpiScale()
 
@@ -89,7 +89,7 @@ class CandidateBox {
 
     Build(context, &calcW, &calcH) {
         local menu := context.menu
-        this.cands := menu.candidates
+        local cands := menu.candidates
         this.num_candidates := menu.num_candidates
         this.hilited_index := menu.highlighted_candidate_index + 1
 
@@ -97,6 +97,7 @@ class CandidateBox {
         this.prdSelTxt := pre_selected
         this.prdHlSelTxt := selected
         this.prdHlUnselTxt := post_selected
+        this.candsTxtArray := []
 
         this.hFamily := Gdip_FontFamilyCreate(this.fontName)
         this.hFont := Gdip_FontCreate(this.hFamily, this.fontSize * this.dpiSacle, regular := 0)
@@ -118,9 +119,12 @@ class CandidateBox {
         totalHeight := this.prdHlSelSize.h + this.lineSpacing
 
         Loop this.num_candidates {
-            textToMeasure := A_Index . ". " . this.cands[A_Index].text
+            commentText := cands[A_Index].comment
+            commentText ? Format("  {}", commentText) : ""
+            textToMeasure := A_Index . ". " . cands[A_Index].text . commentText
             rowSize := this.MeasureString(pGraphics, textToMeasure, this.hFont, this.hFormat, &RC)
 
+            this.candsTxtArray.Push(textToMeasure)
             this.candRowSizes.Push(rowSize)
             if (rowSize.w > this.maxRowWidth) {
                 this.maxRowWidth := rowSize.w
@@ -194,7 +198,7 @@ class CandidateBox {
                 Gdip_DeleteBrush(pBrsh_hlCandBg)
             }
 
-            textToDraw := A_Index . ". " . this.cands[A_Index].text
+            textToDraw := this.candsTxtArray[A_Index]
             candidateRowRect := { x: this.padding + this.borderWidth, y: currentY, w: this.maxRowWidth, h: rowSize.h }
             this.DrawText(this.pGraphics, textToDraw, candidateRowRect, candFg)
             currentY += rowSize.h + this.lineSpacing
