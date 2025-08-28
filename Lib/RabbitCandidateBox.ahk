@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- */
+*/
 
 #Include <RabbitUIStyle>
 #Include <RabbitThemesUI>
@@ -24,7 +24,7 @@ global LVM_GETCOLUMNWIDTH := 0x101D
 ; https://learn.microsoft.com/windows/win32/winmsg/extended-window-styles
 global WS_EX_NOACTIVATE := "+E0x8000000"
 global WS_EX_COMPOSITED := "+E0x02000000"
-global WS_EX_LAYERED    := "+E0x00080000"
+global WS_EX_LAYERED := "+E0x00080000"
 
 class CandidateBox {
     pToken := 0
@@ -81,10 +81,10 @@ class CandidateBox {
         this.candBgColor := UIStyle.candidate_back_color
 
         ; some color schemes have no these colors
-        ; this.labelColor := UIStyle.label_color
-        ; this.hlLabelColor := UIStyle.hilited_label_color
-        ; this.commentFg := UIStyle.comment_text_color
-        ; this.hlCommentFg := UIStyle.hilited_comment_text_color
+        this.labelColor := UIStyle.label_color
+        this.hlLabelColor := UIStyle.hilited_label_color
+        this.commentTxtColor := UIStyle.comment_text_color
+        this.hlCommentTxtColor := UIStyle.hilited_comment_text_color
     }
 
     Build(context, &calcW, &calcH) {
@@ -97,7 +97,9 @@ class CandidateBox {
         this.prdSelTxt := pre_selected
         this.prdHlSelTxt := selected
         this.prdHlUnselTxt := post_selected
-        this.candsTxtArray := []
+        this.labelsInfoArray := []
+        this.candsInfoArray := []
+        this.commentsInfoArray := []
 
         this.hFamily := Gdip_FontFamilyCreate(this.fontName)
         this.hFont := Gdip_FontCreate(this.hFamily, this.fontSize * this.dpiSacle, regular := 0)
@@ -115,27 +117,49 @@ class CandidateBox {
 
         ; Measure candidate texts
         this.candRowSizes := []
-        this.maxRowWidth := this.prdSelSize.w + this.padding + this.prdHlSelSize.w + this.prdHlUnselSize.w
+        maxRowWidth := this.prdSelSize.w + this.padding + this.prdHlSelSize.w + this.prdHlUnselSize.w
         totalHeight := this.prdHlSelSize.h + this.lineSpacing
 
-        Loop this.num_candidates {
-            commentText := cands[A_Index].comment
-            commentText ? Format("  {}", commentText) : ""
-            textToMeasure := A_Index . ". " . cands[A_Index].text . commentText
-            rowSize := this.MeasureString(pGraphics, textToMeasure, this.hFont, this.hFormat, &RC)
+        has_label := !!context.select_labels[0]
+        select_keys := menu.select_keys
+        num_select_keys := StrLen(select_keys)
 
-            this.candsTxtArray.Push(textToMeasure)
-            this.candRowSizes.Push(rowSize)
-            if (rowSize.w > this.maxRowWidth) {
-                this.maxRowWidth := rowSize.w
+        Loop this.num_candidates {
+            labelText := String(A_Index)
+            if A_Index <= menu.page_size && has_label
+                labelText := context.select_labels[A_Index] || labelText
+            else if A_Index <= num_select_keys
+                labelText := SubStr(select_keys, A_Index, 1)
+            labelText := Format(UIStyle.label_format, labelText)
+            labelInfo := this.MeasureString(pGraphics, labelText, this.hFont, this.hFormat, &RC)
+            labelInfo.text := labelText
+            this.labelsInfoArray.Push(labelInfo)
+
+            candText := cands[A_Index].text
+            candInfo := this.MeasureString(pGraphics, candText, this.hFont, this.hFormat, &RC)
+            candInfo.text := candText
+            this.candsInfoArray.Push(candInfo)
+
+            commentText := cands[A_Index].comment
+            commentInfo := this.MeasureString(pGraphics, commentText, this.hFont, this.hFormat, &RC)
+            commentInfo.text := commentText
+            this.commentsInfoArray.Push(commentInfo)
+
+            rowSize := {
+                w: labelInfo.w + candInfo.w + (commentText ? this.padding * 2 + commentInfo.w : 0),
+                h: candInfo.h
             }
-            totalHeight += rowSize.h + this.lineSpacing
+            this.candRowSizes.Push(rowSize)
+            if (rowSize.w > maxRowWidth) {
+                maxRowWidth := rowSize.w
+            }
+            totalHeight += candInfo.h + this.lineSpacing
         }
 
         Gdip_DeleteGraphics(pGraphics)
         ReleaseDC(hDC, this.gui.Hwnd)
 
-        this.boxWidth := Ceil(this.maxRowWidth) + this.padding * 2 + this.borderWidth * 2
+        this.boxWidth := Max((Ceil(maxRowWidth) + this.padding * 2 + this.borderWidth * 2), UIStyle.min_width)
         this.boxHeight := Ceil(totalHeight) + this.padding * 2 + this.borderWidth * 2
         calcW := this.boxWidth
         calcH := this.boxHeight
@@ -186,9 +210,13 @@ class CandidateBox {
         ; Draw candidates
         Loop this.num_candidates {
             rowSize := this.candRowSizes[A_Index]
+            labelFg := this.labelColor
             candFg := this.candTxtColor
+            commentFg := this.commentTxtColor
             if (A_Index == this.hilited_index) { ; Draw highlight if selected
+                labelFg := this.hlLabelColor
                 candFg := this.hlCandTxtColor
+                commentFg := this.hlCommentTxtColor
                 pBrsh_hlCandBg := Gdip_BrushCreateSolid(this.hlCandBgColor)
                 highlightX := this.borderWidth + this.padding / 2
                 highlightY := currentY - this.lineSpacing / 2
@@ -198,9 +226,15 @@ class CandidateBox {
                 Gdip_DeleteBrush(pBrsh_hlCandBg)
             }
 
-            textToDraw := this.candsTxtArray[A_Index]
-            candidateRowRect := { x: this.padding + this.borderWidth, y: currentY, w: this.maxRowWidth, h: rowSize.h }
-            this.DrawText(this.pGraphics, textToDraw, candidateRowRect, candFg)
+            labelRect := { x: this.padding + this.borderWidth, y: currentY, w: this.labelsInfoArray[A_Index].w, h: rowSize.h }
+            candRect := { x: labelRect.x + labelRect.w, y: currentY, w: this.candsInfoArray[A_Index].w, h: rowSize.h }
+            this.DrawText(this.pGraphics, this.labelsInfoArray[A_Index].text, labelRect, labelFg)
+            this.DrawText(this.pGraphics, this.candsInfoArray[A_Index].text, candRect, candFg)
+
+            commentRect := { x: candRect.x + candRect.w + this.padding * 2, y: currentY, w: this.commentsInfoArray[A_Index].w, h: rowSize.h }
+            if commentRect.w > 0
+                this.DrawText(this.pGraphics, this.commentsInfoArray[A_Index].text, commentRect, commentFg)
+
             currentY += rowSize.h + this.lineSpacing
         }
 
