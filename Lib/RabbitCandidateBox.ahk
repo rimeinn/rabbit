@@ -24,7 +24,7 @@ global LVM_GETCOLUMNWIDTH := 0x101D
 ; https://learn.microsoft.com/windows/win32/winmsg/extended-window-styles
 global WS_EX_NOACTIVATE := "+E0x8000000"
 global WS_EX_COMPOSITED := "+E0x02000000"
-global WS_EX_LAYERED := "+E0x00080000"
+global WS_EX_LAYERED    := "+E0x00080000"
 
 class CandidateBox {
     pToken := 0
@@ -61,7 +61,8 @@ class CandidateBox {
     UpdateUIStyle() {
         this.borderWidth := UIStyle.border_width
         this.borderColor := UIStyle.border_color
-        this.cornerRadius := UIStyle.corner_radius
+        this.boxCornerR := UIStyle.corner_radius
+        this.hlCornerR := UIStyle.round_corner
         this.lineSpacing := UIStyle.margin_y
         this.padding := UIStyle.margin_x
 
@@ -156,11 +157,16 @@ class CandidateBox {
             totalHeight += candInfo.h + this.lineSpacing
         }
 
+        ; get better spacing to align comments
+        Loop this.num_candidates {
+            this.commentsInfoArray[A_Index].spacing := maxRowWidth - this.labelsInfoArray[A_Index].w - this.candsInfoArray[A_Index].w - this.commentsInfoArray[A_Index].w
+        }
+
         Gdip_DeleteGraphics(pGraphics)
         ReleaseDC(hDC, this.gui.Hwnd)
 
         this.boxWidth := Max((Ceil(maxRowWidth) + this.padding * 2 + this.borderWidth * 2), UIStyle.min_width)
-        this.boxHeight := Ceil(totalHeight) + this.padding * 2 + this.borderWidth * 2
+        this.boxHeight := Ceil(totalHeight) + this.padding * 2 + this.borderWidth * 2 - Round(this.lineSpacing / 2)
         calcW := this.boxWidth
         calcH := this.boxHeight
     }
@@ -181,7 +187,7 @@ class CandidateBox {
         ; Draw border
         if (this.borderWidth > 0) {
             pBrushBorder := Gdip_BrushCreateSolid(this.borderColor)
-            this.FillRoundedRect(this.pGraphics, pBrushBorder, 0, 0, this.boxWidth, this.boxHeight, this.cornerRadius)
+            this.FillRoundedRect(this.pGraphics, pBrushBorder, 0, 0, this.boxWidth, this.boxHeight, this.boxCornerR)
             Gdip_DeleteBrush(pBrushBorder)
         }
 
@@ -190,18 +196,19 @@ class CandidateBox {
         bgX := this.borderWidth, bgY := this.borderWidth
         bgW := this.boxWidth - this.borderWidth * 2
         bgH := this.boxHeight - this.borderWidth * 2
-        bgCornerRadius := this.cornerRadius > this.borderWidth ? this.cornerRadius - this.borderWidth : 0
+        bgCornerRadius := this.boxCornerR > this.borderWidth ? this.boxCornerR - this.borderWidth : 0
         this.FillRoundedRect(this.pGraphics, pBrushBg, bgX, bgY, bgW, bgH, bgCornerRadius)
         Gdip_DeleteBrush(pBrushBg)
 
         ; Draw preedit
+        rectShrink := 2
         currentY := this.padding + this.borderWidth
         prdSelTxtRc := { x: this.padding + this.borderWidth, y: currentY, w: this.prdSelSize.w, h: this.prdSelSize.h }
-        prdHlSelTxtRc := { x: this.padding * 2 + this.prdSelSize.w, y: currentY, w: this.prdHlSelSize.w, h: this.prdHlSelSize.h }
+        prdHlSelTxtRc := { x: prdSelTxtRc.x + prdSelTxtRc.w + this.padding, y: currentY, w: this.prdHlSelSize.w, h: this.prdHlSelSize.h }
         prdHlUnselTxtRc := { x: prdHlSelTxtRc.x + prdHlSelTxtRc.w, y: currentY, w: this.prdHlUnselSize.w, h: this.prdHlUnselSize.h }
         this.DrawText(this.pGraphics, this.prdSelTxt, prdSelTxtRc, this.textColor)
         pBrsh_hlSelBg := Gdip_BrushCreateSolid(this.hlBgColor)
-        Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlSelBg, prdHlSelTxtRc.x, prdHlSelTxtRc.y, prdHlSelTxtRc.w, prdHlSelTxtRc.h - 2, r := 2)
+        Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlSelBg, prdHlSelTxtRc.x - rectShrink, prdHlSelTxtRc.y, prdHlSelTxtRc.w, prdHlSelTxtRc.h - rectShrink, this.hlCornerR)
         Gdip_DeleteBrush(pBrsh_hlSelBg)
         this.DrawText(this.pGraphics, this.prdHlSelTxt, prdHlSelTxtRc, this.hlTxtColor)
         this.DrawText(this.pGraphics, this.prdHlUnselTxt, prdHlUnselTxtRc, this.textColor)
@@ -221,8 +228,8 @@ class CandidateBox {
                 highlightX := this.borderWidth + this.padding / 2
                 highlightY := currentY - this.lineSpacing / 2
                 highlightW := this.boxWidth - this.borderWidth * 2 - this.padding
-                highlightH := rowSize.h + this.lineSpacing - 2
-                Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlCandBg, highlightX, highlightY, highlightW, highlightH, r := 4)
+                highlightH := rowSize.h + this.lineSpacing - rectShrink
+                Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlCandBg, highlightX, highlightY, highlightW, highlightH, this.hlCornerR)
                 Gdip_DeleteBrush(pBrsh_hlCandBg)
             }
 
@@ -231,9 +238,11 @@ class CandidateBox {
             this.DrawText(this.pGraphics, this.labelsInfoArray[A_Index].text, labelRect, labelFg)
             this.DrawText(this.pGraphics, this.candsInfoArray[A_Index].text, candRect, candFg)
 
-            commentRect := { x: candRect.x + candRect.w + this.padding * 2, y: currentY, w: this.commentsInfoArray[A_Index].w, h: rowSize.h }
-            if commentRect.w > 0
+            commentW := this.commentsInfoArray[A_Index].w
+            if commentW > 0 {
+                commentRect := { x: candRect.x + candRect.w + this.commentsInfoArray[A_Index].spacing, y: currentY, w: commentW, h: rowSize.h }
                 this.DrawText(this.pGraphics, this.commentsInfoArray[A_Index].text, commentRect, commentFg)
+            }
 
             currentY += rowSize.h + this.lineSpacing
         }

@@ -30,6 +30,7 @@ class UIStyle {
 
     static border_width := 2
     static corner_radius := 6
+    static round_corner := 4
     static margin_x := 6
     static margin_y := 6
     static min_width := 160
@@ -73,8 +74,10 @@ class UIStyle {
             UIStyle.comment_font_point := 14
         if rime.config_test_get_string(config, "style/label_format", &fmt) && fmt
             UIStyle.label_format := fmt
-        if rime.config_test_get_int(config, "style/layout/corner_radius", &r) && r >= 0
-            UIStyle.corner_radius := r
+        if rime.config_test_get_int(config, "style/layout/corner_radius", &cr) && cr >= 0
+            UIStyle.corner_radius := cr
+        if rime.config_test_get_int(config, "style/layout/round_corner", &r) && r >= 0
+            UIStyle.round_corner := r
         if rime.config_test_get_int(config, "style/layout/margin_x", &mx) && mx >= 0
             UIStyle.margin_x := mx
         if rime.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0
