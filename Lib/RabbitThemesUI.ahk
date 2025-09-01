@@ -25,6 +25,7 @@ class CandidatePreview {
 	hBitmap := 0
 	pGraphics := 0
 	hFont := 0
+	hFamily := 0
 	hFormat := 0
 
 	__New(ctrl, theme, &calcW, &calcH) {
@@ -154,12 +155,18 @@ class CandidatePreview {
 	}
 
 	ReleaseFont() {
-		if (this.hFont)
+		if (this.hFont) {
 			Gdip_DeleteFont(this.hFont)
-		if (this.hFamily)
+			this.hFont := 0
+		}
+		if (this.hFamily) {
 			Gdip_DeleteFontFamily(this.hFamily)
-		if (this.hFormat)
+			this.hFamily := 0
+		}
+		if (this.hFormat) {
 			Gdip_DeleteStringFormat(this.hFormat)
+			this.hFormat := 0
+		}
 	}
 
 	ReleaseDrawingSurface() {

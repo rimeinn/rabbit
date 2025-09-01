@@ -34,9 +34,9 @@ class CandidateBox {
     hBitmap := 0
     oBitmap := 0
     pGraphics := 0
-    hFont := 0
-    hFamily := 0
-    hFormat := 0
+    mainFontObj := { hFamily: 0, hFont: 0, hFormat: 0 }
+    labFontObj := { hFamily: 0, hFont: 0, hFormat: 0 }
+    commentFontObj := { hFamily: 0, hFont: 0, hFormat: 0 }
 
     static isHidden := 1
 
@@ -67,9 +67,9 @@ class CandidateBox {
         this.lineSpacing := UIStyle.margin_y
         this.padding := UIStyle.margin_x
 
-        ; only use one font to show
-        this.fontName := UIStyle.font_face
-        this.fontSize := UIStyle.font_point
+        this.mainFontObj := this.CreateFontObj(UIStyle.font_face, UIStyle.font_point)
+        this.labFontObj := this.CreateFontObj(UIStyle.label_font_face, UIStyle.label_font_point)
+        this.commentFontObj := this.CreateFontObj(UIStyle.comment_font_face, UIStyle.comment_font_point)
 
         ; preedite style
         this.textColor := UIStyle.text_color
@@ -89,6 +89,17 @@ class CandidateBox {
         this.hlCommentTxtColor := UIStyle.hilited_comment_text_color
     }
 
+    CreateFontObj(name, size) {
+        local em2pt := 96.0 / 72.0
+        hFamily := Gdip_FontFamilyCreate(name)
+        hFont := Gdip_FontCreate(hFamily, size * em2pt * this.dpiSacle, regular := 0)
+        hFormat := Gdip_StringFormatCreate(0x0001000 | 0x0004000) ; nowrap and noclip
+        Gdip_SetStringFormatAlign(hFormat, left := 0) ; left:0, center:1, right:2
+        ; vertical align(top:0, center:1, bottom:2)
+        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int",  vCenter := 1)
+        return { hFamily: hFamily, hFont: hFont, hFormat: hFormat }
+    }
+
     Build(context, &calcW, &calcH) {
         local menu := context.menu
         local cands := menu.candidates
@@ -103,20 +114,14 @@ class CandidateBox {
         this.candsInfoArray := []
         this.commentsInfoArray := []
 
-        local em2pt := 96.0 / 72.0
-        this.hFamily := Gdip_FontFamilyCreate(this.fontName)
-        this.hFont := Gdip_FontCreate(this.hFamily, this.fontSize * em2pt * this.dpiSacle, regular := 0)
-        this.hFormat := Gdip_StringFormatCreate(0x0001000 | 0x0004000) ; nowrap and noclip
-        Gdip_SetStringFormatAlign(this.hFormat, left := 0) ; left:0, center:1, right:2
-
         local hDC := GetDC(this.gui.Hwnd)
         local pGraphics := Gdip_GraphicsFromHDC(hDC)
 
         CreateRectF(&RC, 0, 0, 0, 0)
         ; Measure preedit texts
-        this.prdSelSize := this.MeasureString(pGraphics, this.prdSelTxt, this.hFont, this.hFormat, &RC)
-        this.prdHlSelSize := this.MeasureString(pGraphics, this.prdHlSelTxt, this.hFont, this.hFormat, &RC)
-        this.prdHlUnselSize := this.MeasureString(pGraphics, this.prdHlUnselTxt, this.hFont, this.hFormat, &RC)
+        this.prdSelSize := this.MeasureString(pGraphics, this.prdSelTxt, this.mainFontObj.hFont, this.mainFontObj.hFormat, &RC)
+        this.prdHlSelSize := this.MeasureString(pGraphics, this.prdHlSelTxt, this.mainFontObj.hFont, this.mainFontObj.hFormat, &RC)
+        this.prdHlUnselSize := this.MeasureString(pGraphics, this.prdHlUnselTxt, this.mainFontObj.hFont, this.mainFontObj.hFormat, &RC)
 
         ; Measure candidate texts
         this.candRowSizes := []
@@ -134,23 +139,23 @@ class CandidateBox {
             else if A_Index <= num_select_keys
                 labelText := SubStr(select_keys, A_Index, 1)
             labelText := Format(UIStyle.label_format, labelText)
-            labelInfo := this.MeasureString(pGraphics, labelText, this.hFont, this.hFormat, &RC)
+            labelInfo := this.MeasureString(pGraphics, labelText, this.labFontObj.hFont, this.labFontObj.hFormat, &RC)
             labelInfo.text := labelText
             this.labelsInfoArray.Push(labelInfo)
 
             candText := cands[A_Index].text
-            candInfo := this.MeasureString(pGraphics, candText, this.hFont, this.hFormat, &RC)
+            candInfo := this.MeasureString(pGraphics, candText, this.mainFontObj.hFont, this.mainFontObj.hFormat, &RC)
             candInfo.text := candText
             this.candsInfoArray.Push(candInfo)
 
             commentText := cands[A_Index].comment
-            commentInfo := this.MeasureString(pGraphics, commentText, this.hFont, this.hFormat, &RC)
+            commentInfo := this.MeasureString(pGraphics, commentText, this.commentFontObj.hFont, this.commentFontObj.hFormat, &RC)
             commentInfo.text := commentText
             this.commentsInfoArray.Push(commentInfo)
 
             rowSize := {
                 w: labelInfo.w + candInfo.w + (commentText ? this.padding * 2 + commentInfo.w : 0),
-                h: candInfo.h
+                h: Max(labelInfo.h, candInfo.h, commentInfo.h)
             }
             this.candRowSizes.Push(rowSize)
             if (rowSize.w > maxRowWidth) {
@@ -213,14 +218,14 @@ class CandidateBox {
         prdSelTxtRc := { x: this.padding + this.borderWidth, y: currentY, w: this.prdSelSize.w, h: this.prdSelSize.h }
         prdHlSelTxtRc := { x: prdSelTxtRc.x + prdSelTxtRc.w + this.padding, y: currentY, w: this.prdHlSelSize.w, h: this.prdHlSelSize.h }
         prdHlUnselTxtRc := { x: prdHlSelTxtRc.x + prdHlSelTxtRc.w, y: currentY, w: this.prdHlUnselSize.w, h: this.prdHlUnselSize.h }
-        this.DrawText(this.pGraphics, this.prdSelTxt, prdSelTxtRc, this.textColor)
+        this.DrawText(this.pGraphics, this.mainFontObj, this.prdSelTxt, prdSelTxtRc, this.textColor)
         if this.prdHlSelTxt {
             pBrsh_hlSelBg := Gdip_BrushCreateSolid(this.hlBgColor)
             Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlSelBg, prdHlSelTxtRc.x - rectShrink, prdHlSelTxtRc.y, prdHlSelTxtRc.w, prdHlSelTxtRc.h - rectShrink, this.hlCornerR)
             Gdip_DeleteBrush(pBrsh_hlSelBg)
         }
-        this.DrawText(this.pGraphics, this.prdHlSelTxt, prdHlSelTxtRc, this.hlTxtColor)
-        this.DrawText(this.pGraphics, this.prdHlUnselTxt, prdHlUnselTxtRc, this.textColor)
+        this.DrawText(this.pGraphics, this.mainFontObj, this.prdHlSelTxt, prdHlSelTxtRc, this.hlTxtColor)
+        this.DrawText(this.pGraphics, this.mainFontObj, this.prdHlUnselTxt, prdHlUnselTxtRc, this.textColor)
         currentY += this.prdHlSelSize.h + this.lineSpacing
 
         ; Draw candidates
@@ -244,13 +249,13 @@ class CandidateBox {
 
             labelRect := { x: this.padding + this.borderWidth, y: currentY, w: this.labelsInfoArray[A_Index].w, h: rowSize.h }
             candRect := { x: labelRect.x + labelRect.w, y: currentY, w: this.candsInfoArray[A_Index].w, h: rowSize.h }
-            this.DrawText(this.pGraphics, this.labelsInfoArray[A_Index].text, labelRect, labelFg)
-            this.DrawText(this.pGraphics, this.candsInfoArray[A_Index].text, candRect, candFg)
+            this.DrawText(this.pGraphics, this.labFontObj, this.labelsInfoArray[A_Index].text, labelRect, labelFg)
+            this.DrawText(this.pGraphics, this.mainFontObj, this.candsInfoArray[A_Index].text, candRect, candFg)
 
             commentW := this.commentsInfoArray[A_Index].w
             if commentW > 0 {
                 commentRect := { x: candRect.x + candRect.w + this.commentsInfoArray[A_Index].spacing + this.commentOffset, y: currentY, w: commentW, h: rowSize.h }
-                this.DrawText(this.pGraphics, this.commentsInfoArray[A_Index].text, commentRect, commentFg)
+                this.DrawText(this.pGraphics, this.commentFontObj, this.commentsInfoArray[A_Index].text, commentRect, commentFg)
             }
 
             currentY += rowSize.h + this.lineSpacing
@@ -268,13 +273,19 @@ class CandidateBox {
         }
     }
 
-    ReleaseFont() {
-        if (this.hFont)
-            Gdip_DeleteFont(this.hFont)
-        if (this.hFamily)
-            Gdip_DeleteFontFamily(this.hFamily)
-        if (this.hFormat)
-            Gdip_DeleteStringFormat(this.hFormat)
+    ReleaseFonts() {
+        DeleteFont(this.mainFontObj)
+        DeleteFont(this.labFontObj)
+        DeleteFont(this.commentFontObj)
+
+        DeleteFont(oFnt) {
+            if (oFnt.hFont)
+                Gdip_DeleteFont(oFnt.hFont), oFnt.hFont := 0
+            if (oFnt.hFamily)
+                Gdip_DeleteFontFamily(oFnt.hFamily), oFnt.hFamily := 0
+            if (oFnt.hFormat)
+                Gdip_DeleteStringFormat(oFnt.hFormat), oFnt.hFormat := 0
+        }
     }
 
     ReleaseDrawingSurface() {
@@ -282,19 +293,16 @@ class CandidateBox {
             Gdip_DeleteGraphics(this.pGraphics)
             this.pGraphics := 0
         }
-        if (this.hBitmap) {
-            DeleteObject(this.hBitmap)
-            this.hBitmap := 0
-        }
-        if (this.hDC) {
-            SelectObject(this.hDC, this.oBitmap)
+        if (this.hDC && this.hBitmap) {
+            SelectObject(this.hDC, this.oBitmap), DeleteObject(this.hBitmap)
             DeleteDC(this.hDC)
+            this.oBitmap := 0, this.hBitmap := 0
             this.hDC := 0
         }
     }
 
     ReleaseAll() {
-        this.ReleaseFont()
+        this.ReleaseFonts()
         this.ReleaseDrawingSurface()
 
         if (this.pToken) {
@@ -331,10 +339,10 @@ class CandidateBox {
         return { w: NumGet(rc.Ptr, 8, "Float"), h: NumGet(rc.Ptr, 12, "Float") }
     }
 
-    DrawText(pGraphics, text, textRect, color) {
+    DrawText(pGraphics, fontObj, text, textRect, color) {
         this.pBrush := Gdip_BrushCreateSolid(color)
         CreateRectF(&RC, textRect.x, textRect.y, textRect.w, textRect.h)
-        Gdip_DrawString(pGraphics, text, this.hFont, this.hFormat, this.pBrush, &RC)
+        Gdip_DrawString(pGraphics, text, fontObj.hFont, fontObj.hFormat, this.pBrush, &RC)
         Gdip_DeleteBrush(this.pBrush)
     }
 
