@@ -15,7 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- */
+*/
 
 #Include <RabbitUIStyle>
 #Include <RabbitThemesUI>
@@ -24,7 +24,7 @@
 ; https://learn.microsoft.com/windows/win32/winmsg/extended-window-styles
 global WS_EX_NOACTIVATE := "+E0x8000000"
 global WS_EX_COMPOSITED := "+E0x02000000"
-global WS_EX_LAYERED    := "+E0x00080000"
+global WS_EX_LAYERED := "+E0x00080000"
 
 class CandidateBox {
     pToken := 0
@@ -96,7 +96,7 @@ class CandidateBox {
         hFormat := Gdip_StringFormatCreate(0x0001000 | 0x0004000) ; nowrap and noclip
         Gdip_SetStringFormatAlign(hFormat, left := 0) ; left:0, center:1, right:2
         ; vertical align(top:0, center:1, bottom:2)
-        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int",  vCenter := 1)
+        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int", vCenter := 1)
         return { hFamily: hFamily, hFont: hFont, hFormat: hFormat }
     }
 
@@ -126,7 +126,7 @@ class CandidateBox {
         ; Measure candidate texts
         this.candRowSizes := []
         maxRowWidth := this.prdSelSize.w + this.padding + this.prdHlSelSize.w + this.prdHlUnselSize.w
-        totalHeight := this.prdHlSelSize.h + this.lineSpacing
+        totalHeight := Max(this.prdSelSize.h, this.prdHlSelSize.h, this.prdHlUnselSize.h) + this.lineSpacing
 
         has_label := !!context.select_labels[0]
         select_keys := menu.select_keys
@@ -161,8 +161,9 @@ class CandidateBox {
             if (rowSize.w > maxRowWidth) {
                 maxRowWidth := rowSize.w
             }
-            totalHeight += candInfo.h + this.lineSpacing
+            totalHeight += rowSize.h + this.lineSpacing
         }
+        totalHeight -= this.lineSpacing ; remove extra line spacing
 
         ; get better spacing to align comments
         Loop this.num_candidates {
@@ -226,7 +227,7 @@ class CandidateBox {
         }
         this.DrawText(this.pGraphics, this.mainFontObj, this.prdHlSelTxt, prdHlSelTxtRc, this.hlTxtColor)
         this.DrawText(this.pGraphics, this.mainFontObj, this.prdHlUnselTxt, prdHlUnselTxtRc, this.textColor)
-        currentY += this.prdHlSelSize.h + this.lineSpacing
+        currentY += Max(this.prdSelSize.h, this.prdHlSelSize.h, this.prdHlUnselSize.h) + this.lineSpacing
 
         ; Draw candidates
         Loop this.num_candidates {
@@ -316,7 +317,7 @@ class CandidateBox {
 
     MeasureString(pGraphics, text, hFont, hFormat, &RectF) {
         if !text
-            return { w: 0, h: 32 }
+            return { w: 0, h: 0 }
 
         rc := Buffer(16)
         ; !Notice, this way gets incorrect dim in test
@@ -355,11 +356,10 @@ class CandidateBox {
     }
 }
 
-/*
-class CandidateBox {
+class LegacyCandidateBox {
     static dbg := false
     static gui := 0
-    static border := CandidateBox.dbg ? "+border" : 0
+    static border := LegacyCandidateBox.dbg ? "+border" : 0
 
     __New() {
         this.UpdateUIStyle()
@@ -370,67 +370,67 @@ class CandidateBox {
         del_opaque(color) {
             return color & 0xffffff
         }
-        CandidateBox.text_color := del_opaque(UIStyle.text_color)
-        CandidateBox.back_color := del_opaque(UIStyle.back_color)
-        CandidateBox.candidate_text_color := del_opaque(UIStyle.candidate_text_color)
-        CandidateBox.candidate_back_color := del_opaque(UIStyle.candidate_back_color)
-        CandidateBox.label_color := del_opaque(UIStyle.label_color)
-        CandidateBox.comment_text_color := del_opaque(UIStyle.comment_text_color)
-        CandidateBox.hilited_text_color := del_opaque(UIStyle.hilited_text_color)
-        CandidateBox.hilited_back_color := del_opaque(UIStyle.hilited_back_color)
-        CandidateBox.hilited_candidate_text_color := del_opaque(UIStyle.hilited_candidate_text_color)
-        CandidateBox.hilited_candidate_back_color := del_opaque(UIStyle.hilited_candidate_back_color)
-        CandidateBox.hilited_label_color := del_opaque(UIStyle.hilited_label_color)
-        CandidateBox.hilited_comment_text_color := del_opaque(UIStyle.hilited_comment_text_color)
+        LegacyCandidateBox.text_color := del_opaque(UIStyle.text_color)
+        LegacyCandidateBox.back_color := del_opaque(UIStyle.back_color)
+        LegacyCandidateBox.candidate_text_color := del_opaque(UIStyle.candidate_text_color)
+        LegacyCandidateBox.candidate_back_color := del_opaque(UIStyle.candidate_back_color)
+        LegacyCandidateBox.label_color := del_opaque(UIStyle.label_color)
+        LegacyCandidateBox.comment_text_color := del_opaque(UIStyle.comment_text_color)
+        LegacyCandidateBox.hilited_text_color := del_opaque(UIStyle.hilited_text_color)
+        LegacyCandidateBox.hilited_back_color := del_opaque(UIStyle.hilited_back_color)
+        LegacyCandidateBox.hilited_candidate_text_color := del_opaque(UIStyle.hilited_candidate_text_color)
+        LegacyCandidateBox.hilited_candidate_back_color := del_opaque(UIStyle.hilited_candidate_back_color)
+        LegacyCandidateBox.hilited_label_color := del_opaque(UIStyle.hilited_label_color)
+        LegacyCandidateBox.hilited_comment_text_color := del_opaque(UIStyle.hilited_comment_text_color)
 
-        CandidateBox.base_opt := Format("c{:x} Background{:x} {}", CandidateBox.text_color, CandidateBox.back_color, CandidateBox.border)
-        CandidateBox.candidate_opt := Format("c{:x} Background{:x} {}", CandidateBox.candidate_text_color, CandidateBox.candidate_back_color, CandidateBox.border)
-        CandidateBox.label_opt := Format("c{:x} Background{:x} {}", CandidateBox.label_color, CandidateBox.candidate_back_color, CandidateBox.border)
-        CandidateBox.comment_opt := Format("c{:x} Background{:x} {}", CandidateBox.comment_text_color, CandidateBox.candidate_back_color, CandidateBox.border)
-        CandidateBox.hilited_opt := Format("c{:x} Background{:x} {}", CandidateBox.hilited_text_color, CandidateBox.hilited_back_color, CandidateBox.border)
-        CandidateBox.hilited_candidate_opt := Format("c{:x} Background{:x} {}", CandidateBox.hilited_candidate_text_color, CandidateBox.hilited_candidate_back_color, CandidateBox.border)
-        CandidateBox.hilited_label_opt := Format("c{:x} Background{:x} {}", CandidateBox.hilited_label_color, CandidateBox.hilited_candidate_back_color, CandidateBox.border)
-        CandidateBox.hilited_comment_opt := Format("c{:x} Background{:x} {}", CandidateBox.hilited_comment_text_color, CandidateBox.hilited_candidate_back_color, CandidateBox.border)
+        LegacyCandidateBox.base_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.text_color, LegacyCandidateBox.back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.candidate_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.candidate_text_color, LegacyCandidateBox.candidate_back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.label_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.label_color, LegacyCandidateBox.candidate_back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.comment_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.comment_text_color, LegacyCandidateBox.candidate_back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.hilited_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_text_color, LegacyCandidateBox.hilited_back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.hilited_candidate_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_candidate_text_color, LegacyCandidateBox.hilited_candidate_back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.hilited_label_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_label_color, LegacyCandidateBox.hilited_candidate_back_color, LegacyCandidateBox.border)
+        LegacyCandidateBox.hilited_comment_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_comment_text_color, LegacyCandidateBox.hilited_candidate_back_color, LegacyCandidateBox.border)
 
-        CandidateBox.base_font_opt := Format("s{} q5", UIStyle.font_point)
-        CandidateBox.label_font_opt := Format("s{} q5", UIStyle.label_font_point)
-        CandidateBox.comment_font_opt := Format("s{} q5", UIStyle.comment_font_point)
+        LegacyCandidateBox.base_font_opt := Format("s{} q5", UIStyle.font_point)
+        LegacyCandidateBox.label_font_opt := Format("s{} q5", UIStyle.label_font_point)
+        LegacyCandidateBox.comment_font_opt := Format("s{} q5", UIStyle.comment_font_point)
 
-        if CandidateBox.gui {
-            CandidateBox.gui.BackColor := CandidateBox.back_color
-            CandidateBox.gui.MarginX := UIStyle.margin_x
-            CandidateBox.gui.MarginY := UIStyle.margin_y
+        if LegacyCandidateBox.gui {
+            LegacyCandidateBox.gui.BackColor := LegacyCandidateBox.back_color
+            LegacyCandidateBox.gui.MarginX := UIStyle.margin_x
+            LegacyCandidateBox.gui.MarginY := UIStyle.margin_y
 
-            if HasProp(CandidateBox.gui, "pre") && CandidateBox.gui.pre
-                CandidateBox.gui.pre.Opt(CandidateBox.base_opt)
-            if HasProp(CandidateBox.gui, "sel") && CandidateBox.gui.sel
-                CandidateBox.gui.sel.Opt(CandidateBox.hilited_opt)
-            if HasProp(CandidateBox.gui, "post") && CandidateBox.gui.post
-                CandidateBox.gui.post.Opt(CandidateBox.base_opt)
+            if HasProp(LegacyCandidateBox.gui, "pre") && LegacyCandidateBox.gui.pre
+                LegacyCandidateBox.gui.pre.Opt(LegacyCandidateBox.base_opt)
+            if HasProp(LegacyCandidateBox.gui, "sel") && LegacyCandidateBox.gui.sel
+                LegacyCandidateBox.gui.sel.Opt(LegacyCandidateBox.hilited_opt)
+            if HasProp(LegacyCandidateBox.gui, "post") && LegacyCandidateBox.gui.post
+                LegacyCandidateBox.gui.post.Opt(LegacyCandidateBox.base_opt)
         }
     }
 
-    Build(&context, &width, &height) {
-        if !CandidateBox.gui || !CandidateBox.gui.built
-            CandidateBox.gui := CandidateBox.BoxGui(&context)
+    Build(context, &width, &height) {
+        if !LegacyCandidateBox.gui || !LegacyCandidateBox.gui.built
+            LegacyCandidateBox.gui := LegacyCandidateBox.BoxGui(context)
         else
-            CandidateBox.gui.Update(&context)
-        width := CandidateBox.gui.max_width
-        height := CandidateBox.gui.max_height
+            LegacyCandidateBox.gui.Update(context)
+        width := LegacyCandidateBox.gui.max_width
+        height := LegacyCandidateBox.gui.max_height
     }
 
     Show(x, y) {
-        CandidateBox.gui.Show(Format("AutoSize NA x{} y{}", x, y))
+        LegacyCandidateBox.gui.Show(Format("AutoSize NA x{} y{}", x, y))
     }
 
     Hide() {
-        if CandidateBox.gui && HasMethod(CandidateBox.gui, "Show")
-            CandidateBox.gui.Show("Hide")
+        if LegacyCandidateBox.gui && HasMethod(LegacyCandidateBox.gui, "Show")
+            LegacyCandidateBox.gui.Show("Hide")
     }
 
     class BoxGui extends Gui {
         built := false
-        __New(&context, &pre?, &sel?, &post?, &menu?) {
+        __New(context, &pre?, &sel?, &post?, &menu?) {
             super.__New(, , this)
 
             menu := context.menu
@@ -438,11 +438,11 @@ class CandidateBox {
             local num_candidates := menu.num_candidates
             local hilited_index := menu.highlighted_candidate_index + 1
             local composition := context.composition
-            GetCompositionText(&composition, &pre, &sel, &post)
+            GetCompositionText(composition, &pre, &sel, &post)
 
             this.Opt(Format("-DPIScale -Caption +Owner +AlwaysOnTop {} {} {}", WS_EX_NOACTIVATE, WS_EX_COMPOSITED, WS_EX_LAYERED))
-            this.BackColor := CandidateBox.back_color
-            this.SetFont(CandidateBox.base_font_opt, UIStyle.font_face)
+            this.BackColor := LegacyCandidateBox.back_color
+            this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
             this.MarginX := UIStyle.margin_x
             this.MarginY := UIStyle.margin_y
             this.num_candidates := num_candidates
@@ -451,12 +451,12 @@ class CandidateBox {
             ; build preedit
             this.max_width := 0
             this.preedit_height := 0
-            local head_position := Format("x{} y{} section {}", this.MarginX, this.MarginY, CandidateBox.border)
+            local head_position := Format("x{} y{} section {}", this.MarginX, this.MarginY, LegacyCandidateBox.border)
             local position := head_position
             if pre {
                 this.pre := this.AddText(position, pre)
-                this.pre.Opt(CandidateBox.base_opt)
-                position := Format("x+{} ys {}", this.MarginX, CandidateBox.border)
+                this.pre.Opt(LegacyCandidateBox.base_opt)
+                position := Format("x+{} ys {}", this.MarginX, LegacyCandidateBox.border)
                 this.pre.GetPos(, , &w, &h)
                 this.preedit_height := max(this.preedit_height, h)
                 this.pre_width := w
@@ -464,8 +464,8 @@ class CandidateBox {
             }
             if sel {
                 this.sel := this.AddText(position, sel)
-                this.sel.Opt(CandidateBox.hilited_opt)
-                position := Format("x+{} ys {}", this.MarginX, CandidateBox.border)
+                this.sel.Opt(LegacyCandidateBox.hilited_opt)
+                position := Format("x+{} ys {}", this.MarginX, LegacyCandidateBox.border)
                 this.sel.GetPos(, , &w, &h)
                 this.preedit_height := max(this.preedit_height, h)
                 this.sel_width := w
@@ -473,7 +473,7 @@ class CandidateBox {
             }
             if post {
                 this.post := this.AddText(position, post)
-                this.post.Opt(CandidateBox.base_opt)
+                this.post.Opt(LegacyCandidateBox.base_opt)
                 this.post.GetPos(, , &w, &h)
                 this.preedit_height := max(this.preedit_height, h)
                 this.post_width := w
@@ -489,42 +489,42 @@ class CandidateBox {
             local select_keys := menu.select_keys
             local num_select_keys := StrLen(select_keys)
             loop num_candidates {
-                position := Format("xs y+{} section {}", this.MarginY, CandidateBox.border)
+                position := Format("xs y+{} section {}", this.MarginY, LegacyCandidateBox.border)
                 local label_text := String(A_Index)
                 if A_Index <= menu.page_size && has_label
                     label_text := context.select_labels[A_Index]
                 else if A_Index <= num_select_keys
                     label_text := SubStr(select_keys, A_Index, 1)
                 label_text := Format(UIStyle.label_format, label_text)
-                this.SetFont(CandidateBox.label_font_opt, UIStyle.label_font_face)
+                this.SetFont(LegacyCandidateBox.label_font_opt, UIStyle.label_font_face)
                 local label := this.AddText(Format("Right {} vL{}", position, A_Index), label_text)
                 label.GetPos(, , &w, &h1)
                 this.max_label_width := max(this.max_label_width, w + this.MarginX)
 
-                position := Format("x+{} ys {}", this.MarginX, CandidateBox.border)
-                this.SetFont(CandidateBox.base_font_opt, UIStyle.font_face)
+                position := Format("x+{} ys {}", this.MarginX, LegacyCandidateBox.border)
+                this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
                 local candidate := this.AddText(Format("{} vC{}", position, A_Index), cands[A_Index].text)
                 candidate.GetPos(, , &w, &h2)
                 this.max_candidate_width := max(this.max_candidate_width, w + this.MarginX)
 
                 if comment_text := cands[A_Index].comment
                     this.has_comment := true
-                this.SetFont(CandidateBox.comment_font_opt, UIStyle.comment_font_face)
+                this.SetFont(LegacyCandidateBox.comment_font_opt, UIStyle.comment_font_face)
                 local comment := this.AddText(Format("{} vM{}", position, A_Index), comment_text)
                 comment.GetPos(, , &w, &h3)
-                comment.Opt(Format("c{:x}", CandidateBox.comment_text_color))
+                comment.Opt(Format("c{:x}", LegacyCandidateBox.comment_text_color))
                 comment.Visible := this.has_comment
                 this.max_comment_width := max(this.max_comment_width, w)
                 this.candidate_height := max(this.candidate_height, h1, h2, h3)
 
                 if A_Index == hilited_index {
-                    label.Opt(CandidateBox.hilited_label_opt)
-                    candidate.Opt(CandidateBox.hilited_candidate_opt)
-                    comment.Opt(CandidateBox.hilited_comment_opt)
+                    label.Opt(LegacyCandidateBox.hilited_label_opt)
+                    candidate.Opt(LegacyCandidateBox.hilited_candidate_opt)
+                    comment.Opt(LegacyCandidateBox.hilited_comment_opt)
                 } else {
-                    label.Opt(CandidateBox.label_opt)
-                    candidate.Opt(CandidateBox.candidate_opt)
-                    comment.Opt(CandidateBox.comment_opt)
+                    label.Opt(LegacyCandidateBox.label_opt)
+                    candidate.Opt(LegacyCandidateBox.candidate_opt)
+                    comment.Opt(LegacyCandidateBox.comment_opt)
                 }
             }
 
@@ -561,11 +561,11 @@ class CandidateBox {
             this.built := true
         }
 
-        Update(&context) {
-            local fake_gui := CandidateBox.BoxGui(&context, &pre, &sel, &post, &menu)
+        Update(context) {
+            local fake_gui := LegacyCandidateBox.BoxGui(context, &pre, &sel, &post, &menu)
             local num_candidates := menu.num_candidates
             local hilited_index := menu.highlighted_candidate_index + 1
-            this.SetFont(CandidateBox.base_font_opt, UIStyle.font_face)
+            this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
             this.num_candidates := max(this.num_candidates, num_candidates)
             this.max_width := fake_gui.max_width
             this.max_height := fake_gui.max_height
@@ -610,17 +610,17 @@ class CandidateBox {
                 local fake_label := fake_gui["L" . A_Index]
                 local fake_candidate := fake_gui["C" . A_Index]
                 local fake_comment := fake_gui["M" . A_Index]
-                this.SetFont(CandidateBox.label_font_opt, UIStyle.label_font_face)
+                this.SetFont(LegacyCandidateBox.label_font_opt, UIStyle.label_font_face)
                 try
                     local label := this["L" . A_Index]
                 catch
                     local label := this.AddText(Format("vL{}", A_Index), fake_label.Value)
-                this.SetFont(CandidateBox.base_font_opt, UIStyle.font_face)
+                this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
                 try
                     local candidate := this["C" . A_Index]
                 catch
                     local candidate := this.AddText(Format("vC{}", A_Index), fake_candidate.Value)
-                this.SetFont(CandidateBox.comment_font_opt, UIStyle.comment_font_face)
+                this.SetFont(LegacyCandidateBox.comment_font_opt, UIStyle.comment_font_face)
                 try
                     local comment := this["M" . A_Index]
                 catch
@@ -636,13 +636,13 @@ class CandidateBox {
                 comment.Move(x, y, w, h)
 
                 if A_Index == hilited_index {
-                    label.Opt(CandidateBox.hilited_label_opt)
-                    candidate.Opt(CandidateBox.hilited_candidate_opt)
-                    comment.Opt(CandidateBox.hilited_comment_opt)
+                    label.Opt(LegacyCandidateBox.hilited_label_opt)
+                    candidate.Opt(LegacyCandidateBox.hilited_candidate_opt)
+                    comment.Opt(LegacyCandidateBox.hilited_comment_opt)
                 } else {
-                    label.Opt(CandidateBox.label_opt)
-                    candidate.Opt(CandidateBox.candidate_opt)
-                    comment.Opt(CandidateBox.comment_opt)
+                    label.Opt(LegacyCandidateBox.label_opt)
+                    candidate.Opt(LegacyCandidateBox.candidate_opt)
+                    comment.Opt(LegacyCandidateBox.comment_opt)
                 }
                 local visible := (A_Index <= num_candidates)
                 label.Visible := visible
@@ -655,7 +655,6 @@ class CandidateBox {
         }
     }
 }
-*/
 
 GetCompositionText(composition, &pre_selected, &selected, &post_selected) {
     pre_selected := ""

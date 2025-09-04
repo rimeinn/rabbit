@@ -100,7 +100,10 @@ RabbitMain(args) {
 
     CleanOldLogs()
     RabbitConfig.load()
-    box := CandidateBox()
+    if RabbitConfig.use_legacy_candidate_box
+        box := LegacyCandidateBox()
+    else
+        box := CandidateBox()
     RegisterHotKeys()
     UpdateStateLabels()
     if status := rime.get_status(session_id) {

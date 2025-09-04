@@ -11,9 +11,7 @@
 ## 下载体验
 
 > [!NOTE]
-> 发现程序漏洞请在 [Issues](https://github.com/rimeinn/rabbit/issues/new/choose) 反馈。
-> 使用问题可以在 [Discussions](https://github.com/rimeinn/rabbit/discussions) 讨论，
-> 或者加入 [Telegram 群聊](https://t.me/rime_rabbit)。
+> 发现程序漏洞请在 [Issues](https://github.com/rimeinn/rabbit/issues/new/choose) 反馈。使用问题可以在 [Discussions](https://github.com/rimeinn/rabbit/discussions) 讨论，或者加入 [Telegram 群聊](https://t.me/rime_rabbit)。
 
 ### Release 版
 
@@ -26,11 +24,9 @@ scoop bucket add siku https://github.com/amorphobia/siku
 scoop install siku/rabbit
 ```
 
-### Action 版
+### 每夜构建版本 (Nightly)
 
-需要先登录你的 GitHub 账号。
-
-前往 [Actions 页面](https://github.com/rimeinn/rabbit/actions) 找到最近成功构建的一次，在生成的 Artifacts 中点击 `Rabbit-Full` 下载，将压缩包内容解压到一个新建目录中，运行 `Rabbit.exe` 即可。之后更新时，可只下载 `Rabbit` 或 `Data` 覆盖相应的文件。
+每夜构建版本可在 [`latest` 标签](https://github.com/rimeinn/rabbit/releases/tag/latest)页面下载。
 
 ## 脚本编译
 

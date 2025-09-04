@@ -27,6 +27,7 @@ class RabbitConfig {
     static preset_process_ascii := Map()
     static schema_icon := Map()
     static fix_candidate_box := false
+    static use_legacy_candidate_box := false
 
     static load() {
         global rime, IS_DARK_MODE
@@ -58,6 +59,8 @@ class RabbitConfig {
 
         if rime.config_test_get_bool(config, "fix_candidate_box", &result)
             RabbitConfig.fix_candidate_box := !!result
+        if rime.config_test_get_bool(config, "use_legacy_candidate_box", &result)
+            RabbitConfig.use_legacy_candidate_box := !!result
 
         UIStyle.Update(config, true)
         if IS_DARK_MODE := RabbitIsUserDarkMode() {
