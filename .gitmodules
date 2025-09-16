@@ -7,3 +7,6 @@
 [submodule "Lib/Gdip"]
 	path = Lib/Gdip
 	url = https://github.com/buliasz/AHKv2-Gdip
+[submodule "Lib/Direct2D"]
+	path = Lib/Direct2D
+	url = https://github.com/rawbx/AHK-Direct2D
