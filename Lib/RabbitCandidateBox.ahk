@@ -19,7 +19,7 @@
 
 #Include <RabbitUIStyle>
 #Include <RabbitThemesUI>
-#Include <Gdip/Gdip_All>
+#Include <Direct2D/Direct2D>
 
 ; https://learn.microsoft.com/windows/win32/winmsg/extended-window-styles
 global WS_EX_NOACTIVATE := "+E0x8000000"
@@ -27,32 +27,24 @@ global WS_EX_COMPOSITED := "+E0x02000000"
 global WS_EX_LAYERED    := "+E0x00080000"
 
 class CandidateBox {
-    pToken := 0
     gui := 0
-    hDC := 0
-    pBitmap := 0
-    hBitmap := 0
-    oBitmap := 0
-    pGraphics := 0
+    d2d := 0
+
     static isHidden := 1
 
     __New() {
-        if !this.pToken {
-            this.pToken := Gdip_Startup()
-            if !this.pToken {
-                MsgBox("GDI+ failed to start.")
-                ExitApp
-            }
-        }
         ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
-        this.gui := Gui("-Caption +E0x8080088 +LastFound -DPIScale +AlwaysOnTop", "CandidateBox")
-        this.dpiScale := GUIUtilities.GetMonitorDpiScale()
+        this.gui := Gui("-Caption +E0x8080088 -DPIScale")
+
+        this.d2d := Direct2D(this.gui.Hwnd)
+        this.dpiScale := this.d2d.GetDesktopDpiScale()
 
         this.UpdateUIStyle()
     }
 
     __Delete() {
-        this.ReleaseAll()
+        if this.gui
+            this.gui.Destroy()
     }
 
     UpdateUIStyle() {
@@ -63,12 +55,9 @@ class CandidateBox {
         this.lineSpacing := UIStyle.margin_y
         this.padding := UIStyle.margin_x
 
-        this.mainFontHs := this.CreateFontObj(UIStyle.font_face, UIStyle.font_point)
-        this.labFontHs := this.CreateFontObj(UIStyle.label_font_face, UIStyle.label_font_point)
-        this.commentFontHs := this.CreateFontObj(UIStyle.comment_font_face, UIStyle.comment_font_point)
-        ; fallback fonts
-        this.emojiFontHs := this.CreateFontObj("Segoe UI Emoji", UIStyle.font_point)
-        this.symbolFontHs := this.CreateFontObj("Segoe UI Symbol", UIStyle.font_point)
+        this.mainFont := this.CreateFontObj(UIStyle.font_face, UIStyle.font_point)
+        this.labFont := this.CreateFontObj(UIStyle.label_font_face, UIStyle.label_font_point)
+        this.commentFont := this.CreateFontObj(UIStyle.comment_font_face, UIStyle.comment_font_point)
 
         ; preedite style
         this.textColor := UIStyle.text_color
@@ -90,13 +79,8 @@ class CandidateBox {
 
     CreateFontObj(name, size) {
         local em2pt := 96.0 / 72.0
-        hFamily := Gdip_FontFamilyCreate(name)
-        hFont := Gdip_FontCreate(hFamily, size * em2pt * this.dpiScale, regular := 0)
-        hFormat := Gdip_StringFormatCreate(0x0001000 | 0x0004000) ; nowrap and noclip
-        Gdip_SetStringFormatAlign(hFormat, left := 0) ; left:0, center:1, right:2
-        ; vertical align(top:0, center:1, bottom:2)
-        DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", hFormat, "int", vCenter := 1)
-        return { hFamily: hFamily, hFont: hFont, hFormat: hFormat }
+        local px := size * em2pt * this.dpiScale
+        return { name: name, size: px }
     }
 
     Build(context, &winW, &winH) { ; build text layout
@@ -106,33 +90,25 @@ class CandidateBox {
         this.hilited_index := menu.highlighted_candidate_index + 1
 
         GetCompositionText(context.composition, &pre_selected, &selected, &post_selected)
-        this.prdSelTxt := pre_selected
-        this.prdHlSelTxt := selected
-        this.prdHlUnselTxt := post_selected
 
-        local hDC := GetDC(this.gui.Hwnd)
-        local pGraphics := Gdip_GraphicsFromHDC(hDC)
-
-        CreateRectF(&RC, 0, 0, 0, 0)
         ; Build preedit layout
         baseX := this.borderWidth + this.padding
         baseY := this.borderWidth + this.lineSpacing
-        prdSelTxtSlicedInfo := this.MakeSlicedStrsInfo(pGraphics, baseX, baseY, this.prdSelTxt, this.mainFontHs, &prdSelTxtBoxSize, &RC)
-        prdHlSelTxtSize := this.MeasureString(pGraphics, this.prdHlSelTxt, this.mainFontHs, &RC)
-        prdHlSelTxtX := baseX + prdSelTxtBoxSize.w + this.padding
-        prdHlUnSelTxtSize := this.MeasureString(pGraphics, this.prdHlUnselTxt, this.mainFontHs, &RC)
-        prdHlUnSelTxtX := prdHlSelTxtX + prdHlSelTxtSize.w
+        prd0 := this.GetTextMetrics(pre_selected, this.mainFont)
+        prd1 := this.GetTextMetrics(selected, this.mainFont)
+        prd2 := this.GetTextMetrics(post_selected, this.mainFont)
+        prd1X := baseX + prd0.w + this.padding
+        prd2X := prd1X + prd1.w
         this.preeditLayout := {
-            selBox: { size: prdSelTxtBoxSize, sliced: prdSelTxtSlicedInfo }, ; prdSelTxt may contains unicode symbols
-            hlSelBox: { size: prdHlSelTxtSize, rect: { x: prdHlSelTxtX, y: baseY,
-                w: prdHlSelTxtSize.w, h: prdHlSelTxtSize.h } },
-            hlUnSelBox: { size: prdHlUnSelTxtSize, rect: { x: prdHlUnSelTxtX, y: baseY, w: prdHlUnSelTxtSize.w, h: prdHlUnSelTxtSize.h } },
+            selBox: { x: baseX, y: baseY, w: prd0.w, h: prd0.h, text: pre_selected },
+            hlSelBox: { x: prd1X, y: baseY, w: prd1.w, h: prd1.h, text: selected },
+            hlUnSelBox: { x: prd2X, y: baseY, w: prd2.w, h: prd2.h, text: post_selected },
             left: baseX,
             top: baseY,
-            width: prdSelTxtBoxSize.w + this.padding + prdHlSelTxtSize.w + prdHlUnSelTxtSize.w,
-            height: Max(prdSelTxtBoxSize.h, prdHlSelTxtSize.h, prdHlUnSelTxtSize.h)
+            width: prd0.w + this.padding + prd1.w + prd2.w,
+            height: Max(prd0.h, prd1.h, prd2.h)
         }
-        this.maxRowWidth := this.preeditLayout.width
+        maxRowWidth := this.preeditLayout.width
 
         ; Build candidates layout
         totalRowsHeight := this.preeditLayout.height + this.lineSpacing
@@ -142,8 +118,6 @@ class CandidateBox {
         has_label := !!context.select_labels[0]
         select_keys := menu.select_keys
         num_select_keys := StrLen(select_keys)
-
-        ; candidates may contain unicode symbols
         Loop this.num_candidates {
             labelText := String(A_Index)
             if A_Index <= menu.page_size && has_label
@@ -151,36 +125,33 @@ class CandidateBox {
             else if A_Index <= num_select_keys
                 labelText := SubStr(select_keys, A_Index, 1)
             labelText := Format(UIStyle.label_format, labelText)
-            labelSlicedInfo := this.MakeSlicedStrsInfo(pGraphics, baseX, baseY, labelText, this.labFontHs, &labelBoxSize, &RC)
-            this.candidatesLayout.labels.Push({ size: labelBoxSize, sliced: labelSlicedInfo })
+            labelBox := this.GetTextMetrics(labelText, this.labFont)
+            this.candidatesLayout.labels.Push({ x: baseX, y: baseY, w: labelBox.w, h: labelBox.h, text: labelText })
 
             candText := cands[A_Index].text
-            candSlicedInfo := this.MakeSlicedStrsInfo(pGraphics, baseX + labelBoxSize.w, baseY, candText, this.mainFontHs, &candBoxSize, &RC)
-            this.candidatesLayout.cands.Push({ size: candBoxSize, sliced: candSlicedInfo })
+            candBox := this.GetTextMetrics(candText, this.mainFont)
+            this.candidatesLayout.cands.Push({ x: baseX + labelBox.w + this.padding, y: baseY, w: candBox.w, h: candBox.h, text: candText })
 
             commentText := cands[A_Index].comment
-            commentSlicedInfo := this.MakeSlicedStrsInfo(pGraphics, baseX + labelBoxSize.w + candBoxSize.w, baseY, commentText, this.commentFontHs, &commentBoxSize, &RC)
-            this.candidatesLayout.comments.Push({ size: commentBoxSize, sliced: commentSlicedInfo })
+            commentBox := this.GetTextMetrics(commentText, this.commentFont)
+            this.candidatesLayout.comments.Push({ x: baseX + labelBox.w + candBox.w, y: baseY, w: commentBox.w, h: commentBox.h, text: commentText })
 
             rowRect := {
                 x: baseX, y: baseY,
-                w: labelBoxSize.w + candBoxSize.w + (commentText ? this.padding * 2 + commentBoxSize.w : 0),
-                h: Max(labelBoxSize.h, candBoxSize.h, commentBoxSize.h)
+                w: labelBox.w + this.padding + candBox.w + (commentText ? this.padding * 2 + commentBox.w : 0),
+                h: Max(labelBox.h, candBox.h, commentBox.h)
             }
             this.candidatesLayout.rows.Push(rowRect)
-            if (rowRect.w > this.maxRowWidth) {
-                this.maxRowWidth := rowRect.w
+            if (rowRect.w > maxRowWidth) {
+                maxRowWidth := rowRect.w
             }
             increment := rowRect.h + this.lineSpacing
             baseY += increment, totalRowsHeight += increment
         }
         totalRowsHeight -= this.lineSpacing ; remove extra line spacing
 
-        Gdip_DeleteGraphics(pGraphics)
-        ReleaseDC(hDC, this.gui.Hwnd)
-
         this.commentOffset := 0
-        this.boxWidth := Ceil(this.maxRowWidth) + (this.borderWidth + this.padding) * 2
+        this.boxWidth := Ceil(maxRowWidth) + (this.borderWidth + this.padding) * 2
         if this.boxWidth < UIStyle.min_width {
             this.commentOffset := UIStyle.min_width - this.boxWidth
             this.boxWidth := UIStyle.min_width
@@ -191,57 +162,50 @@ class CandidateBox {
 
         ; get better spacing to align comments
         loop this.num_candidates {
-            labelW := this.candidatesLayout.labels[A_Index].size.w
-            candW := this.candidatesLayout.cands[A_Index].size.w
-            commentW := this.candidatesLayout.comments[A_Index].size.w
-            if commentW > 0 {
-                alignCommentGap := this.maxRowWidth - labelW - candW - commentW
-                for _, info in this.candidatesLayout.comments[A_Index].sliced
-                    info.x := info.x + alignCommentGap + this.commentOffset
+            labelW := this.candidatesLayout.labels[A_Index].w
+            candW := this.candidatesLayout.cands[A_Index].w
+            comment := this.candidatesLayout.comments[A_Index]
+
+            if comment.w > 0 {
+                alignCommentGap := maxRowWidth - labelW - candW - comment.w - this.padding
+                comment.x += alignCommentGap
             }
         }
     }
 
     Show(x, y) {
-        if (this.gui && CandidateBox.isHidden) {
+        if (CandidateBox.isHidden) {
             this.gui.Show("NA")
             CandidateBox.isHidden := 0
         }
 
-        this.hDC := CreateCompatibleDC()
-        this.hBitmap := CreateDIBSection(this.boxWidth, this.boxHeight)
-        this.oBitmap := SelectObject(this.hDC, this.hBitmap)
-        this.pGraphics := Gdip_GraphicsFromHDC(this.hDC)
-        Gdip_SetTextRenderingHint(this.pGraphics, AntiAliasGridFit := 3)
-        Gdip_SetSmoothingMode(this.pGraphics, AntiAlias := 4)
+        this.d2d.SetPosition(x, y, this.boxWidth, this.boxHeight)
+        this.d2d.BeginDraw()
 
-        ; Draw border
         if (this.borderWidth > 0) {
-            pBrushBorder := Gdip_BrushCreateSolid(this.borderColor)
-            this.FillRoundedRect(this.pGraphics, pBrushBorder, 0, 0, this.boxWidth, this.boxHeight, this.boxCornerR)
-            Gdip_DeleteBrush(pBrushBorder)
+            ; Draw outer border as filled rounded rectangle (border color)
+            this.d2d.FillRoundedRectangle(0, 0, this.boxWidth, this.boxHeight, this.boxCornerR, this.boxCornerR, this.borderColor)
+            ; Draw inner background next
+            bgX := this.borderWidth, bgY := this.borderWidth
+            bgW := this.boxWidth - this.borderWidth * 2
+            bgH := this.boxHeight - this.borderWidth * 2
+            bgR := this.boxCornerR > this.borderWidth ? this.boxCornerR - this.borderWidth : 0
+            this.d2d.FillRoundedRectangle(bgX, bgY, bgW, bgH, bgR, bgR, this.backgroundColor)
+        } else {
+            this.d2d.FillRoundedRectangle(0, 0, this.boxWidth, this.boxHeight, this.boxCornerR, this.boxCornerR, this.backgroundColor)
         }
-
-        ; Draw background
-        pBrushBg := Gdip_BrushCreateSolid(this.backgroundColor)
-        bgX := this.borderWidth, bgY := this.borderWidth
-        bgW := this.boxWidth - this.borderWidth * 2, bgH := this.boxHeight - this.borderWidth * 2
-        bgCornerRadius := this.boxCornerR > this.borderWidth ? this.boxCornerR - this.borderWidth : 0
-        this.FillRoundedRect(this.pGraphics, pBrushBg, bgX, bgY, bgW, bgH, bgCornerRadius)
-        Gdip_DeleteBrush(pBrushBg)
 
         ; Draw preedit
-        rectShrink := 2
-        this.DrawSlicedTexts(this.pGraphics, this.mainFontHs, this.preeditLayout.height, this.preeditLayout.selBox.sliced, this.textColor)
-        prdHlSelTxtRc := this.preeditLayout.hlSelBox.rect
-        prdHlUnselTxtRc := this.preeditLayout.hlUnSelBox.rect
-        if this.prdHlSelTxt {
-            pBrsh_hlSelBg := Gdip_BrushCreateSolid(this.hlBgColor)
-            Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlSelBg, prdHlSelTxtRc.x - rectShrink, prdHlSelTxtRc.y, prdHlSelTxtRc.w, prdHlSelTxtRc.h - rectShrink, this.hlCornerR)
-            Gdip_DeleteBrush(pBrsh_hlSelBg)
+        if (this.preeditLayout.hlSelBox.text) {
+            ; highlight background for preedit selection
+            this.d2d.FillRoundedRectangle(
+                this.preeditLayout.hlSelBox.x, this.preeditLayout.hlSelBox.y,
+                this.preeditLayout.hlSelBox.w, this.preeditLayout.hlSelBox.h,
+                this.hlCornerR, this.hlCornerR, this.hlBgColor)
         }
-        this.DrawText(this.pGraphics, this.mainFontHs, this.prdHlSelTxt, prdHlSelTxtRc, this.hlTxtColor)
-        this.DrawText(this.pGraphics, this.mainFontHs, this.prdHlUnselTxt, prdHlUnselTxtRc, this.textColor)
+        this.d2d.DrawText(this.preeditLayout.selBox.text, this.preeditLayout.selBox.x, this.preeditLayout.selBox.y, this.mainFont.size, this.textColor, this.mainFont.name)
+        this.d2d.DrawText(this.preeditLayout.hlSelBox.text, this.preeditLayout.hlSelBox.x, this.preeditLayout.hlSelBox.y, this.mainFont.size, this.hlTxtColor, this.mainFont.name)
+        this.d2d.DrawText(this.preeditLayout.hlUnSelBox.text, this.preeditLayout.hlUnSelBox.x, this.preeditLayout.hlUnSelBox.y, this.mainFont.size, this.textColor, this.mainFont.name)
 
         hiliteW := this.boxWidth - this.borderWidth * 2 - this.padding * 2
         ; Draw candidates
@@ -254,266 +218,38 @@ class CandidateBox {
                 labelFg := this.hlLabelColor
                 candFg := this.hlCandTxtColor
                 commentFg := this.hlCommentTxtColor
-                pBrsh_hlCandBg := Gdip_BrushCreateSolid(this.hlCandBgColor)
-                Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlCandBg, rowRect.x, rowRect.y, hiliteW, rowRect.h, this.hlCornerR)
-                Gdip_DeleteBrush(pBrsh_hlCandBg)
+                this.d2d.FillRoundedRectangle(rowRect.x, rowRect.y, hiliteW, rowRect.h, this.hlCornerR, this.hlCornerR, this.hlCandBgColor)
             }
 
-            this.DrawSlicedTexts(this.pGraphics, this.labFontHs, rowRect.h, this.candidatesLayout.labels[A_Index].sliced, labelFg)
-            this.DrawSlicedTexts(this.pGraphics, this.mainFontHs, rowRect.h, this.candidatesLayout.cands[A_Index].sliced, candFg)
+            label := this.candidatesLayout.labels[A_Index]
+            this.d2d.DrawText(label.text, label.x, label.y, this.labFont.size, labelFg, this.labFont.name)
 
-            commentLayout := this.candidatesLayout.comments[A_Index]
-            if commentLayout.size.w > 0 {
-                this.DrawSlicedTexts(this.pGraphics, this.commentFontHs, rowRect.h, commentLayout.sliced, commentFg)
+            cand := this.candidatesLayout.cands[A_Index]
+            this.d2d.DrawText(cand.text, cand.x, cand.y, this.mainFont.size, candFg, this.mainFont.name)
+
+            comment := this.candidatesLayout.comments[A_Index]
+            if comment.w > 0 {
+                this.d2d.DrawText(comment.text, comment.x, comment.y, this.commentFont.size, commentFg, this.commentFont.name)
             }
         }
 
-        UpdateLayeredWindow(this.gui.Hwnd, this.hDC, x, y, this.boxWidth, this.boxHeight)
-        this.ReleaseDrawingSurface()
+        this.d2d.EndDraw()
     }
 
     Hide() {
-        if (this.gui && !CandidateBox.isHidden) {
-            this.gui.Show("Hide")
+        if (!CandidateBox.isHidden) {
+            this.d2d.EndDraw()
+            this.d2d.Clear()
+            this.gui.Hide()
             CandidateBox.isHidden := 1
         }
     }
 
-    ReleaseFonts() {
-        DeleteFont(this.mainFontHs)
-        DeleteFont(this.labFontHs)
-        DeleteFont(this.commentFontHs)
-        DeleteFont(this.emojiFontHs)
-        DeleteFont(this.symbolFontHs)
-
-        DeleteFont(fntHs) {
-            if (fntHs.hFont)
-                Gdip_DeleteFont(fntHs.hFont), fntHs.hFont := 0
-            if (fntHs.hFamily)
-                Gdip_DeleteFontFamily(fntHs.hFamily), fntHs.hFamily := 0
-            if (fntHs.hFormat)
-                Gdip_DeleteStringFormat(fntHs.hFormat), fntHs.hFormat := 0
-        }
-    }
-
-    ReleaseDrawingSurface() {
-        if (this.pGraphics) {
-            Gdip_DeleteGraphics(this.pGraphics)
-            this.pGraphics := 0
-        }
-        if (this.hDC && this.hBitmap) {
-            SelectObject(this.hDC, this.oBitmap), DeleteObject(this.hBitmap)
-            DeleteDC(this.hDC)
-            this.oBitmap := 0, this.hBitmap := 0
-            this.hDC := 0
-        }
-    }
-
-    ReleaseAll() {
-        this.ReleaseFonts()
-        this.ReleaseDrawingSurface()
-
-        if (this.pToken) {
-            Gdip_Shutdown(this.pToken)
-            this.pToken := 0
-        }
-        if (this.gui) {
-            this.gui.Destroy()
-        }
-    }
-
-    MeasureString(pGraphics, text, fontHs, &RectF) {
+    GetTextMetrics(text, fontObj) {
         if !text
             return { w: 0, h: 0 }
 
-        rc := Buffer(16)
-        DllCall("gdiplus\GdipMeasureString",
-            "Ptr", pGraphics,
-            "WStr", text,
-            "Int", -1,
-            "Ptr", fontHs.hFont,
-            "Ptr", RectF.Ptr,
-            "Ptr", fontHs.hFormat,
-            "Ptr", rc.Ptr,
-            "UInt*", 0,
-            "UInt*", 0,
-            "Int")
-
-        return { w: NumGet(rc.Ptr, 8, "Float"), h: NumGet(rc.Ptr, 12, "Float") }
-    }
-
-    MakeSymbolsInfo(pGraphics, xOffset, yOffset, sType, cpArr, &symsBoxSize, &RectF) {
-        symsInfoArr := []
-        totalSymRowW := 0, maxSymRowH := 0
-        curX := xOffset, rowY := yOffset
-        isEmoji := sType == 2
-        loop cpArr.Length {
-            curCP := cpArr[A_Index]
-            symSize := this.MeasureString(pGraphics, curCP, isEmoji ? this.emojiFontHs : this.symbolFontHs, &RectF)
-
-            totalSymRowW += symSize.w
-            if (symSize.h > maxSymRowH)
-                maxSymRowH := symSize.h
-
-            symsInfoArr.Push({
-                x: curX,
-                y: rowY,
-                w: symSize.w,
-                h: symSize.h,
-                isEmoji: isEmoji
-            })
-
-            curX += symSize.w
-        }
-
-        symsBoxSize := { w: totalSymRowW, h: maxSymRowH }
-        return symsInfoArr
-    }
-
-    MakeSlicedStrsInfo(pGraphics, xOffset, yOffset, text, fontHs, &textBoxSize, &RC) {
-        if !text {
-            textBoxSize := { w: 0, h: 0 }
-            return []
-        }
-
-        ; slice text to pieces by emojis and special Symbols
-        pattern := "([\x{1F000}-\x{1FAFF}\x{1F900}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1D400}-\x{1D7FF}\x{200D}\x{FE0F}\x{FE0E}]+)"
-
-        pieces := []
-        pos := 1
-        while (RegExMatch(text, pattern, &m, pos)) {
-            start := m.Pos(1), length := m.Len(1)
-            ; group normal text
-            if (start > pos) {
-                normal := SubStr(text, pos, start - pos)
-                if (normal != "")
-                    pieces.Push({ sType: 0, value: normal })
-            }
-            ; group emoji/unicode symbols with codePoints
-            cpArr := getCodePoints(m[1])
-            if RegExMatch(m[1], "^[\x{1F300}-\x{1FAFF}\x{1F900}-\x{1F9FF}\x{200D}\x{FE0F}\x{FE0E}]$") {
-                pieces.Push({ sType: 2, value: cpArr })
-            } else {
-                pieces.Push({ sType: 1, value: cpArr })
-            }
-
-            pos := start + length
-        }
-        ; group remaining normal text
-        if (pos <= StrLen(text)) {
-            rest := SubStr(text, pos)
-            if (rest != "")
-                pieces.Push({ sType: 0, value: rest })
-        }
-
-        ; build sliced strings info
-        slicedInfo := []
-        totalRowW := 0, maxRowH := 0
-        curX := xOffset, curY := yOffset
-        for i, p in pieces {
-            sType := p.sType
-            content := p.value
-            slicedSize := { w: 0, h: 0 }
-            slicedSymsInfo := []
-            if sType {
-                slicedSymsInfo := this.MakeSymbolsInfo(pGraphics, curX, curY, sType, content, &symsBoxSize, &RC)
-                slicedSize := symsBoxSize
-            } else {
-                slicedSize := this.MeasureString(pGraphics, content, fontHs, &RC)
-            }
-            totalRowW += slicedSize.w
-            if (slicedSize.h > maxRowH)
-                maxRowH := slicedSize.h
-
-            slicedInfo.Push({
-                x: curX,
-                y: curY,
-                w: slicedSize.w,
-                h: slicedSize.h,
-                sType: sType,
-                slicedSymsInfo: slicedSymsInfo,
-                value: content
-            })
-
-            curX += slicedSize.w
-        }
-
-        textBoxSize := { w: totalRowW, h: maxRowH }
-        return slicedInfo
-
-        getCodePoints(str) {
-            arr := []
-            i := 1, len := StrLen(str)
-
-            ; skip ZWJ, VS15/VS16 as GDI does not support color fonts
-            while (i <= len) {
-                cp := Ord(SubStr(str, i, 1))
-                if (cp = 0x200D or cp = 0xFE0F or cp = 0xFE0E) {
-                    i++
-                } else if cp >= 0xD800 && cp <= 0xDBFF && i < len {
-                    low := Ord(SubStr(str, i + 1, 1))
-                    if (low >= 0xDC00 && low <= 0xDFFF) {
-                        arr.Push(Chr(0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00)))
-                        i += 2
-                    } else {
-                        arr.Push(Chr(cp))
-                        i++
-                    }
-                } else {
-                    arr.Push(Chr(cp))
-                    i++
-                }
-            }
-
-            return arr
-        }
-    }
-
-    DrawText(pGraphics, fontHs, text, textRect, color) {
-        this.pBrush := Gdip_BrushCreateSolid(color)
-        CreateRectF(&RC, textRect.x, textRect.y, textRect.w, textRect.h)
-        Gdip_DrawString(pGraphics, text, fontHs.hFont, fontHs.hFormat, this.pBrush, &RC)
-        Gdip_DeleteBrush(this.pBrush)
-    }
-
-    DrawSlicedTexts(pGraphics, fontHs, rowMaxH, slicedStrsInfo, color) {
-        this.pBrush := Gdip_BrushCreateSolid(color)
-        loop slicedStrsInfo.Length {
-            info := slicedStrsInfo[A_Index]
-            info.h := rowMaxH
-            if info.sType
-                drawEmojiAndSymbols(this.pGraphics, this.pBrush, info)
-            else
-                drawNormalText(this.pGraphics, this.pBrush, fontHs, info)
-        }
-        Gdip_DeleteBrush(this.pBrush)
-
-        drawNormalText(pGraphics, pBrush, fontHs, textInfo) {
-            CreateRectF(&RC, textInfo.x, textInfo.y, textInfo.w, textInfo.h)
-            Gdip_DrawString(pGraphics, textInfo.value, fontHs.hFont, fontHs.hFormat, pBrush, &RC)
-        }
-
-        drawEmojiAndSymbols(pGraphics, pBrush, textInfo) {
-            cpArr := textInfo.value
-            uSymsMaxH := textInfo.h
-            uSymsInfo := textInfo.slicedSymsInfo
-            loop cpArr.Length {
-                CreateRectF(&RC, uSymsInfo[A_Index].x, uSymsInfo[A_Index].y, uSymsInfo[A_Index].w, uSymsMaxH)
-                if uSymsInfo[A_Index].isEmoji
-                    Gdip_DrawString(pGraphics, cpArr[A_Index], this.emojiFontHs.hFont, this.emojiFontHs.hFormat, pBrush, &RC)
-                else { ; is unicode Symbols
-                    Gdip_DrawString(pGraphics, cpArr[A_Index], this.symbolFontHs.hFont, this.symbolFontHs.hFormat, pBrush, &RC)
-                }
-            }
-        }
-    }
-
-    FillRoundedRect(pGraphics, pBrush, x, y, w, h, r) {
-        if (r <= 0) {
-            Gdip_FillRectangle(pGraphics, pBrush, x, y, w, h)
-        } else {
-            Gdip_FillRoundedRectangle(pGraphics, pBrush, x, y, w, h, r)
-        }
+        return this.d2d.GetMetrics(text, fontObj.name, fontObj.size)
     }
 }
 
