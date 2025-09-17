@@ -600,6 +600,7 @@ class UIStyleSettingsDialog extends Gui {
         this.AddGroupBox(Format("x+{} yp-8 w{} h{}", this.preview_offset, this.preview_width, this.list_height + 8), "预览")
         ; 0xE(SS_BITMAP) or 0x4E (Bitmap and Resizable, but text is unclear)
         this.preview_img := this.AddPicture("xp+50 yp+50 w180 h180 0xE BackgroundWhite")
+        this.candidate_box := CandidatePreview(this.preview_img)
 
         this.set_font := this.AddButton(Format("xs ys+{} w120", this.list_height + this.MarginY), "设置字体")
         this.set_font.Opt("+Disabled") ; TODO: implement font setting
@@ -644,13 +645,13 @@ class UIStyleSettingsDialog extends Gui {
         if index <= 0 || index > this.preset.Length
             return
         local info := this.preset[index]
-        local candidate_box := CandidatePreview(this.preview_img, info, &box_width, &box_height)
-        box_width := box_width / candidate_box.dpiSacle
-        box_height := box_height / candidate_box.dpiSacle
+        this.candidate_box.Build(info, &box_width, &box_height)
+        box_width := box_width / this.candidate_box.dpiScale
+        box_height := box_height / this.candidate_box.dpiScale
         local box_x := this.MarginX + this.color_schemes_width + this.preview_offset + Round((this.preview_width - box_width) / 2)
         local box_y := this.MarginY + this.title_height + 8 + Round((this.list_height - box_height) / 2)
         this.preview_img.Move(box_x, box_y, box_width, box_height)
-        candidate_box.Render(["输入法", "输入", "数", "书", "输"], 1)
+        this.candidate_box.Render(["输入法", "输入", "数", "书", "输"], 1)
     }
 
     OnOK() {

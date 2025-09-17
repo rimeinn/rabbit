@@ -17,37 +17,34 @@
  */
 
 #Include <RabbitUIStyle>
-#Include <Gdip/Gdip_All>
+#Include <Direct2D\Direct2D>
 
 class CandidatePreview {
-	pToken := 0
-	pBitmap := 0
 	hBitmap := 0
-	pGraphics := 0
-	hFont := 0
-	hFamily := 0
-	hFormat := 0
 
-	__New(ctrl, theme, &calcW, &calcH) {
-		if !this.pToken {
-			this.pToken := Gdip_Startup()
-			if !this.pToken {
-				MsgBox("GDI+ failed to start.")
-				ExitApp
-			}
-		}
+	__New(ctrl) {
 		this.imgCtrl := ctrl
-		this.dpiSacle := GUIUtilities.GetMonitorDpiScale()
+		this.d2d := Direct2D()
+		this.dpiScale := this.d2d.GetDesktopDpiScale()
+	}
 
+	__Delete() {
+		if this.hBitmap
+			DllCall("DeleteObject", "UPtr", this.hBitmap), this.hBitmap := 0
+	}
+
+	Build(theme, &calcW, &calcH) {
 		this.borderWidth := UIStyle.border_width
 		this.borderColor := UIStyle.border_color
-		this.cornerRadius := UIStyle.corner_radius
+		this.boxCornerR := UIStyle.corner_radius
+		this.hlCornerR := UIStyle.round_corner
 		this.lineSpacing := UIStyle.margin_y
 		this.padding := UIStyle.margin_x
 
 		; only use one font to preview
 		this.fontName := theme.HasOwnProp("font_face") ? theme.font_face : UIStyle.font_face
 		this.fontSize := theme.HasOwnProp("font_point") ? theme.font_point : UIStyle.font_point
+		this.fontSize *= (em2pt := (96.0 / 72.0))
 		; preedite style
 		this.borderColor := theme.border_color
 		this.textColor := theme.text_color
@@ -59,176 +56,70 @@ class CandidatePreview {
 		this.hlCandBgColor := theme.hilited_candidate_back_color
 		this.candTxtColor := theme.candidate_text_color
 		this.candBgColor := theme.candidate_back_color
-		this.CalcSize(&calcW, &calcH)
-	}
 
-	__Delete() {
-		this.ReleaseAll()
-	}
-
-	CalcSize(&calcW, &calcH) {
-		this.hFamily := Gdip_FontFamilyCreate(this.fontName)
-		this.hFont := Gdip_FontCreate(this.hFamily, this.fontSize * this.dpiSacle, regular := 0)
-		this.hFormat := Gdip_StringFormatCreate(0x0001000 | 0x0004000)
-		Gdip_SetStringFormatAlign(this.hFormat, left := 0) ; left:0, center:1, right:2
-
-		hDC := GetDC(this.imgCtrl.Hwnd)
-		pGraphics := Gdip_GraphicsFromHDC(hDC)
-
-		CreateRectF(&RC, 0, 0, 0, 0)
-		this.prdSelSize := this.MeasureString(pGraphics, "RIME", this.hFont, this.hFormat, &RC)
-		this.prdHlSize := this.MeasureString(pGraphics, "shu ru fa", this.hFont, this.hFormat, &RC)
-		this.candSize := this.MeasureString(pGraphics, "1. 输入法", this.hFont, this.hFormat, &RC)
-
+		this.prdSelSize := this.d2d.GetMetrics("RIME", this.fontName, this.fontSize)
+		this.prdHlSize := this.d2d.GetMetrics("shu ru fa", this.fontName, this.fontSize)
+		this.candSize := this.d2d.GetMetrics("1. 输入法", this.fontName, this.fontSize)
 		this.maxRowWidth := this.prdSelSize.w + this.padding + this.prdHlSize.w
-		totalHeight := (this.prdSelSize.h + this.lineSpacing) * 6
-
-		Gdip_DeleteGraphics(pGraphics)
-		ReleaseDC(hDC, this.imgCtrl.Hwnd)
-
 		this.previewWidth := Ceil(this.maxRowWidth) + this.padding * 2 + this.borderWidth * 2
-		this.previewHeight := Ceil(totalHeight) + this.padding * 2 + this.borderWidth * 2 - this.lineSpacing ; Remove last line spacing
+		this.previewHeight := Ceil((this.candSize.h + this.lineSpacing) * 6) + this.lineSpacing * 2 + this.borderWidth * 2 - this.lineSpacing ; Remove last line spacing
 		calcW := this.previewWidth
 		calcH := this.previewHeight
 	}
 
 	Render(candsArray, selIndex) {
-		; Create a bitmap in memory that matches the size of preview
-		this.pBitmap := Gdip_CreateBitmap(this.previewWidth, this.previewHeight)
-		this.pGraphics := Gdip_GraphicsFromImage(this.pBitmap)
-		Gdip_SetSmoothingMode(this.pGraphics, AntiAlias := 4)
-		Gdip_SetTextRenderingHint(this.pGraphics, AntiAlias := 4)
+		d2d1WicRt := this.d2d.SetRenderTarget("wic", this.previewWidth, this.previewHeight)
+		this.d2d.BeginDraw()
 
-		; Draw border
 		if (this.borderWidth > 0) {
-			pBrushBorder := Gdip_BrushCreateSolid(this.borderColor)
-			this.FillRoundedRect(this.pGraphics, pBrushBorder, 0, 0, this.previewWidth, this.previewHeight, this.cornerRadius)
-			Gdip_DeleteBrush(pBrushBorder)
+			; Draw outer border as filled rounded rectangle (border color)
+			this.d2d.FillRoundedRectangle(0, 0, this.previewWidth, this.previewHeight, this.boxCornerR, this.boxCornerR, this.borderColor)
+			; Draw inner background next
+			bgX := this.borderWidth, bgY := this.borderWidth
+			bgW := this.previewWidth - this.borderWidth * 2
+			bgH := this.previewHeight - this.borderWidth * 2
+			bgR := this.boxCornerR > this.borderWidth ? this.boxCornerR - this.borderWidth : 0
+			this.d2d.FillRoundedRectangle(bgX, bgY, bgW, bgH, bgR, bgR, this.backgroundColor)
+		} else {
+			this.d2d.FillRoundedRectangle(0, 0, this.previewWidth, this.previewHeight, this.boxCornerR, this.boxCornerR, this.backgroundColor)
 		}
-
-		; Draw background
-		pBrushBg := Gdip_BrushCreateSolid(this.backgroundColor)
-		bgX := this.borderWidth
-		bgY := this.borderWidth
-		bgW := this.previewWidth - this.borderWidth * 2
-		bgH := this.previewHeight - this.borderWidth * 2
-		bgCornerRadius := this.cornerRadius > this.borderWidth ? this.cornerRadius - this.borderWidth : 0
-		this.FillRoundedRect(this.pGraphics, pBrushBg, bgX, bgY, bgW, bgH, bgCornerRadius)
-		Gdip_DeleteBrush(pBrushBg)
 
 		; Draw preedit
 		currentY := this.padding + this.borderWidth
-		prdSelTextRect := { x: this.padding + this.borderWidth, y: currentY, w: this.prdSelSize.w, h: this.prdSelSize.h }
-		prdHlTextRect := { x: this.padding * 2 + this.prdSelSize.w, y: currentY, w: this.prdHlSize.w, h: this.prdHlSize.h }
-		this.DrawText(this.pGraphics, "RIME", prdSelTextRect, this.textColor)
-		pBrsh_hlBg := Gdip_BrushCreateSolid(this.hlBgColor)
-		Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlBg, prdHlTextRect.x, prdHlTextRect.y, prdHlTextRect.w, prdHlTextRect.h - 2, r := 2)
-		Gdip_DeleteBrush(pBrsh_hlBg)
-		this.DrawText(this.pGraphics, "shu ru fa", prdHlTextRect, this.hlTxtColor)
-		currentY += this.prdSelSize.h + this.lineSpacing
+		prdSelTextRect := {text: "RIME", x: this.padding + this.borderWidth, y: currentY, w: this.prdSelSize.w, h: this.prdSelSize.h }
+		prdHlTextRect := {text: "shu ru fa", x: this.padding + this.borderWidth + this.padding + this.prdSelSize.w, y: currentY, w: this.prdHlSize.w, h: this.prdHlSize.h }
+		; highlight background for preedit selection
+		this.d2d.FillRoundedRectangle(prdHlTextRect.x, prdHlTextRect.y, prdHlTextRect.w, prdHlTextRect.h,
+				this.hlCornerR, this.hlCornerR, this.hlBgColor)
+		this.d2d.DrawText(prdSelTextRect.text, prdSelTextRect.x, prdSelTextRect.y, this.fontSize, this.textColor, this.fontName)
+		this.d2d.DrawText(prdHlTextRect.text, prdHlTextRect.x, prdHlTextRect.y, this.fontSize, this.hlTxtColor, this.fontName)
+		currentY += Max(this.prdSelSize.h, this.prdHlSize) + this.lineSpacing
+
 
 		; Draw candidates
 		for i, candidate in candsArray {
-			textColor := this.candTxtColor
-			if (i == selIndex) { ; Draw highlight if selected
-				textColor := this.hlCandTxtColor
-				pBrsh_hlCandBg := Gdip_BrushCreateSolid(this.hlCandBgColor)
+			candFg := this.candTxtColor
+			if (A_Index == selIndex) { ; Draw highlight if selected
+				candFg := this.hlCandTxtColor
 				highlightX := this.borderWidth + this.padding / 2
 				highlightY := currentY - this.lineSpacing / 2
 				highlightW := this.previewWidth - this.borderWidth * 2 - this.padding
 				highlightH := this.candSize.h + this.lineSpacing
-				Gdip_FillRoundedRectangle(this.pGraphics, pBrsh_hlCandBg, highlightX, highlightY, highlightW, highlightH, r := 4)
-				Gdip_DeleteBrush(pBrsh_hlCandBg)
+				this.d2d.FillRoundedRectangle(highlightX, highlightY, highlightW, highlightH, this.hlCornerR, this.hlCornerR, this.hlCandBgColor)
 			}
 
 			textToDraw := i . ". " . candidate
 			candidateRowRect := { x: this.padding + this.borderWidth, y: currentY, w: this.maxRowWidth, h: this.candSize.h }
-			this.DrawText(this.pGraphics, textToDraw, candidateRowRect, textColor)
+			this.d2d.DrawText(textToDraw, candidateRowRect.x, candidateRowRect.y, this.fontSize, candFg, this.fontName)
 			currentY += this.candSize.h + this.lineSpacing
 		}
+		this.d2d.EndDraw()
 
-		; Replace preview image with hBitmap
-		this.hBitmap := Gdip_CreateHBITMAPFromBitmap(this.pBitmap)
-		SendMessage(STM_SETIMAGE := 0x0172, IMAGE_BITMAP := 0, this.hBitmap, this.imgCtrl.Hwnd)
-
-		this.ReleaseDrawingSurface()
-	}
-
-	ReleaseFont() {
-		if (this.hFont) {
-			Gdip_DeleteFont(this.hFont)
-			this.hFont := 0
-		}
-		if (this.hFamily) {
-			Gdip_DeleteFontFamily(this.hFamily)
-			this.hFamily := 0
-		}
-		if (this.hFormat) {
-			Gdip_DeleteStringFormat(this.hFormat)
-			this.hFormat := 0
-		}
-	}
-
-	ReleaseDrawingSurface() {
-		if (this.pGraphics) {
-			Gdip_DeleteGraphics(this.pGraphics)
-			this.pGraphics := 0
-		}
-		if (this.pBitmap) {
-			Gdip_DisposeImage(this.pBitmap)
-			this.pBitmap := 0
-		}
-		if (this.hBitmap) {
-			DeleteObject(this.hBitmap)
-			this.hBitmap := 0
-		}
-	}
-
-	ReleaseAll() {
-		this.ReleaseFont()
-		this.ReleaseDrawingSurface()
-
-		if (this.pToken) {
-			Gdip_Shutdown(this.pToken)
-			this.pToken := 0
-		}
-	}
-
-	MeasureString(pGraphics, text, hFont, hFormat, &RectF) {
-		rc := Buffer(16)
-		; !Notice, this way gets incorrect dim in test
-		; dim := Gdip_MeasureString(pGraphics, text, hFont, hFormat, &rc)
-		; rect := StrSplit(dim, "|")
-		; return { w: Round(rect[3]), h: Round(rect[4]) }
-
-		DllCall("gdiplus\GdipMeasureString",
-			"Ptr", pGraphics,
-			"WStr", text,
-			"Int", -1,
-			"Ptr", hFont,
-			"Ptr", RectF.Ptr,
-			"Ptr", hFormat,
-			"Ptr", rc.Ptr,
-			"UInt*", 0,
-			"UInt*", 0,
-			"Int")
-
-		return { x: NumGet(rc.Ptr, 0, "Float"), y: NumGet(rc.Ptr, 4, "Float"),
-			w: NumGet(rc.Ptr, 8, "Float"), h: NumGet(rc.Ptr, 12, "Float") }
-	}
-
-	DrawText(pGraphics, text, textRect, color) {
-		this.pBrush := Gdip_BrushCreateSolid(color)
-		CreateRectF(&RC, textRect.x, textRect.y, textRect.w, textRect.h)
-		Gdip_DrawString(pGraphics, text, this.hFont, this.hFormat, this.pBrush, &RC)
-		Gdip_DeleteBrush(this.pBrush)
-	}
-
-	FillRoundedRect(pGraphics, pBrush, x, y, w, h, r) {
-		if (r <= 0) {
-			Gdip_FillRectangle(pGraphics, pBrush, x, y, w, h)
-		} else {
-			Gdip_FillRoundedRectangle(pGraphics, pBrush, x, y, w, h, r)
+		if this.hBitmap := d2d1WicRt.GetHBitmapFromWICBitmap() {
+			; Replace preview image with hBitmap
+			SendMessage(STM_SETIMAGE := 0x0172, IMAGE_BITMAP := 0, this.hBitmap, this.imgCtrl.Hwnd)
+			DllCall("DeleteObject", "UPtr", this.hBitmap)
+			this.d2d.Clear()
 		}
 	}
 }
@@ -269,6 +160,7 @@ class ThemesGUI {
 		this.gui.AddGroupBox(Format("x+{:d} yp-8 w{:d} h{:d} Section", this.previewGroupOffset, this.previewGroupW, this.previewGroupH), "预览")
 		; 0xE(SS_BITMAP) or 0x4E (Bitmap and Resizable, but text is unclear)
 		this.previewImg := this.gui.AddPicture("xp+50 yp+50 w180 h300 0xE BackgroundWhite")
+		this.candidateBox := CandidatePreview(this.previewImg)
 
 		this.currentTheme := this.colorSchemeMap[this.themeListBox.Text]
 		this.SetPreviewCandsBox(this.currentTheme, this.previewFontName, this.previewFontSize)
@@ -334,11 +226,11 @@ class ThemesGUI {
 		this.previewStyle := this.GetThemeColor(theme)
 		this.previewStyle.font_face := fontName
 		this.previewStyle.font_point := fontSize
-		candidateBox := CandidatePreview(this.previewImg, this.previewStyle, &candidateBoxW, &candidateBoxH)
+		this.candidateBox.Build(this.previewStyle, &candidateBoxW, &candidateBoxH)
 		previewCandsBoxX := this.gui.MarginX + this.themeListBoxW + this.previewGroupOffset + Round((this.previewGroupW - candidateBoxW) / 2)
 		previewCandsBoxY := this.gui.MarginY + this.titleH + Round((this.previewGroupH - candidateBoxH) / 2)
 		this.previewImg.Move(previewCandsBoxX, previewCandsBoxY, candidateBoxW, candidateBoxH)
-		candidateBox.Render(this.candsArray, 1)
+		this.candidateBox.Render(this.candsArray, 1)
 	}
 
 	GetPresetStylesMap() {

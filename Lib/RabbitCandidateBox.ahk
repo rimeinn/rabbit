@@ -18,7 +18,6 @@
  */
 
 #Include <RabbitUIStyle>
-#Include <RabbitThemesUI>
 #Include <Direct2D/Direct2D>
 
 ; https://learn.microsoft.com/windows/win32/winmsg/extended-window-styles
@@ -28,13 +27,11 @@ global WS_EX_LAYERED    := "+E0x00080000"
 
 class CandidateBox {
     gui := 0
-    d2d := 0
-
     static isHidden := 1
 
     __New() {
         ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
-        this.gui := Gui("-Caption +E0x8080088 -DPIScale")
+        this.gui := Gui("-Caption -DPIScale +E0x8080088")
 
         this.d2d := Direct2D(this.gui.Hwnd)
         this.dpiScale := this.d2d.GetDesktopDpiScale()
@@ -43,6 +40,7 @@ class CandidateBox {
     }
 
     __Delete() {
+        this.Hide()
         if this.gui
             this.gui.Destroy()
     }
