@@ -2,6 +2,7 @@ Rime
 Data
 dist
 test.ahk
+rime-install.bat
 *.exe
 *.dll
 *.ico
