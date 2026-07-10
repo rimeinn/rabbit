@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,6 +62,10 @@ global ASCII_PUNCT_FALSE_LABEL_ABBR := "。"
 global ASCII_PUNCT_TRUE_LABEL_ABBR := "."
 
 global ERROR_ALREADY_EXISTS := 183 ; https://learn.microsoft.com/windows/win32/debug/system-error-codes--0-499-
+
+IsOldWindows() {
+    return VerCompare(A_OSVersion, "< 10")
+}
 
 class RabbitGlobals {
     static process_ascii := Map()

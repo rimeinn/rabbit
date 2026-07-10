@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -651,6 +651,8 @@ class UIStyleSettingsDialog extends Gui {
         local box_x := this.MarginX + this.color_schemes_width + this.preview_offset + Round((this.preview_width - box_width) / 2)
         local box_y := this.MarginY + this.title_height + 8 + Round((this.list_height - box_height) / 2)
         this.preview_img.Move(box_x, box_y, box_width, box_height)
+        if IsOldWindows()
+            return
         this.candidate_box.Render(["输入法", "输入", "数", "书", "输"], 1)
     }
 

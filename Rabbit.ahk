@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -101,7 +101,7 @@ RabbitMain(args) {
     CleanOldLogs()
     CleanMisPlacedConfigs()
     RabbitConfig.load()
-    if RabbitConfig.use_legacy_candidate_box
+    if RabbitConfig.use_legacy_candidate_box || IsOldWindows()
         box := LegacyCandidateBox()
     else
         box := CandidateBox()
