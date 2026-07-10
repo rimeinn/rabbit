@@ -14,10 +14,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Dependencies
-        uses: MinoruSekine/setup-scoop@v4.0.1
+        uses: MinoruSekine/setup-scoop@v5
         with:
           buckets: extras
           apps: rcedit autohotkey@2.0.19 imagemagick
@@ -36,7 +36,7 @@ jobs:
           Move-Item "assets/AutoHotkey32.exe","assets/AutoHotkey64.exe","assets/rabbit.ico","assets/rabbit-alt.ico","assets/rabbit-ascii.ico" .
 
       - name: Upload Icon
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Icon
           path: |
@@ -45,7 +45,7 @@ jobs:
             rabbit-ascii.ico
 
       - name: Upload AutoHotkey
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: AutoHotkey
           path: |
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: 'recursive'
 
@@ -86,7 +86,7 @@ jobs:
             rm -rf librime.7z dist
 
       - name: Upload Rime
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Rime
           path: |
@@ -105,7 +105,7 @@ jobs:
           cp -r ${WORK}/opencc ${rime_dir}/
 
       - name: Upload Data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Data
           path: Data
@@ -122,12 +122,12 @@ jobs:
     needs: [ prepare-dependency, prepare-autohotkey-binaries ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: 'recursive'
 
       - name: Download Dependencies
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Copy Artifacts and Apply Patches
         run: |
@@ -151,7 +151,7 @@ jobs:
           sed -i -E 's/global RABBIT_VERSION := .+/global RABBIT_VERSION := \"'"$VER"'\"/' Lib/RabbitCommon.ahk
 
       - name: Upload Rabbit ${{ matrix.target }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Rabbit-${{ matrix.target }}
           path: |
@@ -172,7 +172,7 @@ jobs:
             rime-install.bat
 
       - name: Upload Full Zip of Rabbit ${{ matrix.target }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Rabbit-Full-${{ matrix.target }}
           path: |
@@ -200,10 +200,10 @@ jobs:
     needs: build-rabbit
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download x64
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Rabbit-Full-x64
           path: x64
@@ -214,7 +214,7 @@ jobs:
           mkdir Rime && zip -r -q ../rabbit-nightly-x64.zip *
 
       - name: Download x86
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Rabbit-Full-x86
           path: x86
@@ -242,10 +242,10 @@ jobs:
     needs: build-rabbit
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
 
   upload-release:
     strategy:
@@ -256,10 +256,10 @@ jobs:
     needs: create-release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Rabbit-Full-${{ matrix.target }}
           path: release
@@ -270,7 +270,7 @@ jobs:
           mkdir Rime && zip -r -q ../rabbit-${{ github.ref_name }}-${{ matrix.target }}.zip *
 
       - name: Upload Assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           prerelease: true
           files: |
