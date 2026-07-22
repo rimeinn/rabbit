@@ -597,10 +597,18 @@ class UIStyleSettingsDialog extends Gui {
         this.color_schemes.OnEvent("Change", (ctrl, info) => this.OnColorSchemeSelChange())
         this.color_schemes.GetPos(, , , &h)
         this.list_height := h
-        this.AddGroupBox(Format("x+{} yp-8 w{} h{}", this.preview_offset, this.preview_width, this.list_height + 8), "预览")
+        this.preview_group := this.AddGroupBox(Format("x+{} yp-8 w{} h{}", this.preview_offset, this.preview_width, this.list_height + 8), "预览")
         ; 0xE(SS_BITMAP) or 0x4E (Bitmap and Resizable, but text is unclear)
         this.preview_img := this.AddPicture("xp+50 yp+50 w180 h180 0xE BackgroundWhite")
-        this.candidate_box := CandidatePreview(this.preview_img)
+        if IsOldWindows() {
+            this.preview_img.Visible := false
+            this.preview_group.GetPos(&group_x, &group_y, &group_width, &group_height)
+            this.AddText(Format("x{} y{} w{} h{} Center +0x200", group_x + 10, group_y + 20,
+                group_width - 20, group_height - 30), "旧版 Windows 暂不支持预览")
+            this.candidate_box := 0
+        } else {
+            this.candidate_box := CandidatePreview(this.preview_img)
+        }
 
         this.set_font := this.AddButton(Format("xs ys+{} w120", this.list_height + this.MarginY), "设置字体")
         this.set_font.Opt("+Disabled") ; TODO: implement font setting
@@ -642,7 +650,7 @@ class UIStyleSettingsDialog extends Gui {
     }
 
     Preview(index) {
-        if index <= 0 || index > this.preset.Length
+        if !this.candidate_box || index <= 0 || index > this.preset.Length
             return
         local info := this.preset[index]
         this.candidate_box.Build(info, &box_width, &box_height)
@@ -651,8 +659,6 @@ class UIStyleSettingsDialog extends Gui {
         local box_x := this.MarginX + this.color_schemes_width + this.preview_offset + Round((this.preview_width - box_width) / 2)
         local box_y := this.MarginY + this.title_height + 8 + Round((this.list_height - box_height) / 2)
         this.preview_img.Move(box_x, box_y, box_width, box_height)
-        if IsOldWindows()
-            return
         this.candidate_box.Render(["输入法", "输入", "数", "书", "输"], 1)
     }
 
