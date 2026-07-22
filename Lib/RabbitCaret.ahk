@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
  * with MIT License
  */
 
+#Include <RabbitConfig>
 #Include <GetCaretPosEx\GetCaretPosEx>
 
 /**
@@ -37,7 +38,7 @@ GetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?) {
     caret_w := 0
     caret_h := 0
 
-    if GetCaretPosEx(&left, &top, &right, &bottom, true) {
+    if GetCaretPosEx(&left, &top, &right, &bottom, RabbitConfig.use_caret_hook) {
         if !IsSet(left) || !IsSet(top) || !IsSet(right) || !IsSet(bottom)
             return GetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
 

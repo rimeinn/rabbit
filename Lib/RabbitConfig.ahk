@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2025, 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ class RabbitConfig {
     static schema_icon := Map()
     static fix_candidate_box := false
     static use_legacy_candidate_box := false
+    static use_caret_hook := true
     static send_by_clipboard_length := 8
 
     static load() {
@@ -68,6 +69,8 @@ class RabbitConfig {
             RabbitConfig.fix_candidate_box := !!result
         if rime.config_test_get_bool(config, "use_legacy_candidate_box", &result)
             RabbitConfig.use_legacy_candidate_box := !!result
+        if rime.config_test_get_bool(config, "use_caret_hook", &result)
+            RabbitConfig.use_caret_hook := !!result
 
         UIStyle.Update(config, true)
         if IS_DARK_MODE := RabbitIsUserDarkMode() {

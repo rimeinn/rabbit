@@ -28,6 +28,14 @@ global_ascii: false
 # Always show candidate box at top-left corner
 fix_candidate_box: false
 
+# Whether to use the legacy candidate box
+# The legacy candidate box is always used on Windows versions earlier than Windows 10
+use_legacy_candidate_box: false
+
+# Whether to use the hook method to get the caret position
+# This may trigger alerts from some antivirus software
+use_caret_hook: true
+
 style:
   color_scheme: aqua
   font_face: Microsoft YaHei UI
