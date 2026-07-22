@@ -20,7 +20,7 @@ jobs:
         uses: MinoruSekine/setup-scoop@v5
         with:
           buckets: extras
-          apps: rcedit autohotkey@2.0.19 imagemagick
+          apps: rcedit autohotkey@2.0.19
 
       - name: Prepare binaries
         run: |
