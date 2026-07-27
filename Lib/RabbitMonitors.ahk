@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, 2024 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -161,6 +161,8 @@ class MonitorManage extends Class {
     }
 
     static GetMonitorInfo(hMon) {
+        local info, res
+
         info := MonitorInfoEx()
         res := DllCall("GetMonitorInfo", "Ptr", hMon, "Ptr", info)
         return res ? info : 0

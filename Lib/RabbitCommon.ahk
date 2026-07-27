@@ -18,7 +18,7 @@
 
 global RABBIT_VERSION := "dev"
 ;@Ahk2Exe-SetCompanyName rimeinn
-;@Ahk2Exe-SetCopyright Copyright (c) 2023 - 2025 Xuesong Peng
+;@Ahk2Exe-SetCopyright Copyright (c) 2023 - 2026 Xuesong Peng
 ;@Ahk2Exe-SetDescription 由 AutoHotkey 实现的 Rime 输入法
 ;@Ahk2Exe-Let U_version = %A_PriorLine~U)^(.+"){1}(.+)".*$~$2%
 ;@Ahk2Exe-SetVersion %U_version%
@@ -95,6 +95,7 @@ class RabbitMutex {
 }
 
 CreateTraits() {
+    local traits
     traits := RimeTraits()
     traits.distribution_name := RABBIT_IME_NAME
     traits.distribution_code_name := RABBIT_CODE_NAME
@@ -109,6 +110,7 @@ CreateTraits() {
 }
 
 RabbitUserDataPath() {
+    local size, path
     if FileExist(A_ScriptDir . "\.portable") {
         RabbitDebug("run in portable mode.", Format("RabbitCommon.ahk:{}", A_LineNumber), 1)
         return A_ScriptDir . "\Rime"
@@ -130,13 +132,16 @@ RabbitSharedDataPath() {
 }
 
 RabbitLogPath() {
+    local path
     path := A_Temp . "\rime.rabbit"
-    if !DirExist(path)
+    if !DirExist(path) {
         DirCreate(path)
+    }
     return path
 }
 
 OnRimeMessage(context_object, session_id, message_type, message_value) {
+    local msg_type, msg_value
     msg_type := StrGet(message_type, "UTF-8")
     msg_value := StrGet(message_value, "UTF-8")
     if msg_type = "deploy" {
@@ -156,18 +161,19 @@ OnRimeMessage(context_object, session_id, message_type, message_value) {
 }
 
 CleanOldLogs() {
+    local app_name, dir, files, file
     app_name := "rime.rabbit"
     dir := RabbitLogPath()
-    if !DirExist(dir)
+    if !DirExist(dir) {
         return
-
+    }
     files := []
     try {
         loop files dir, "R" {
             if InStr(A_LoopFileAttrib, "N") && !InStr(A_LoopFileAttrib, "L")
-                    && SubStr(A_LoopFileName, 1, StrLen(app_name)) == app_name
-                    && SubStr(A_LoopFileName, -4) == ".log"
-                    && !InStr(A_LoopFileName, A_YYYY A_MM A_DD) {
+                && SubStr(A_LoopFileName, 1, StrLen(app_name)) == app_name
+                && SubStr(A_LoopFileName, -4) == ".log"
+                && !InStr(A_LoopFileName, A_YYYY . A_MM . A_DD) {
                 files.Push(A_LoopFileFullPath)
             }
         }
@@ -181,12 +187,13 @@ CleanOldLogs() {
 }
 
 CleanMisPlacedConfigs() {
+    local shared, user
     shared := RabbitSharedDataPath()
     user := RabbitUserDataPath()
 
-    if shared == user
+    if shared == user {
         return
-
+    }
     if FileExist(user . "\default.yaml") {
         RabbitWarn(Format("renaming unnecessary file {}\default.yaml", user), Format("RabbitCommon.ahk:{}", A_LineNumber))
         FileMove(user . "\default.yaml", user . "\default.yaml.old", 1)
@@ -204,29 +211,35 @@ RabbitLog(text) {
 }
 RabbitLogLimit(text, label, limit := 1) {
     static labels := Map()
-    if !labels.Has(label)
+    if !labels.Has(label) {
         labels[label] := 0
+    }
     if limit < 0 || labels[label] < limit {
         RabbitLog(text)
         labels[label] := labels[label] + 1
     }
 }
 RabbitError(text, location, limit := -1) {
+    local msg
     msg := Format("E{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
     RabbitLogLimit(msg, location, limit)
 }
 RabbitWarn(text, location, limit := -1) {
+    local msg
     msg := Format("W{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
     RabbitLogLimit(msg, location, limit)
 }
 RabbitInfo(text, location, limit := -1) {
+    local msg
     msg := Format("I{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
     RabbitLogLimit(msg, location, limit)
 }
 RabbitDebug(text, location, limit := -1) {
+    local msg
     global RABBIT_VERSION
-    if !SubStr(RABBIT_VERSION, 1, 3) = "dev"
+    if !SubStr(RABBIT_VERSION, 1, 3) = "dev" {
         return
+    }
     msg := Format("D{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
     RabbitLogLimit(msg, location, limit)
 }

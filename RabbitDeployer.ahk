@@ -39,10 +39,12 @@ RabbitDeployerMain(A_Args)
 ; args[1]: command
 ; args[2]: keyboard layout
 RabbitDeployerMain(args) {
-    if args.Length >= 2
+    local layout, command, conf, res, opt
+    if args.Length >= 2 {
         layout := Number(args[2])
-    else
+    } else {
         layout := 0
+    }
     IN_MAINTENANCE := true
     UpdateTrayIcon()
     TrayTip()
@@ -68,10 +70,11 @@ RabbitDeployerMain(args) {
     }
 
     if args.Length > 1 {
-        if A_IsCompiled
+        if A_IsCompiled {
             Run(Format("`"{}\Rabbit.exe`" {} {} {}", A_ScriptDir, opt, res, layout))
-        else
+        } else {
             Run(Format("{} `"{}\Rabbit.ahk`" {} {} {}", A_AhkPath, A_ScriptDir, opt, res, layout))
+        }
         ExitApp()
     }
     return res

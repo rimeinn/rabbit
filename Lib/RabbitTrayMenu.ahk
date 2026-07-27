@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -70,22 +70,26 @@ SetupTrayMenu() {
 }
 
 RunDeployer(cmd, argv*) {
+    local args, arg
     args := ""
-    for arg in argv
+    for arg in argv {
         args .= " " . arg
+    }
     args := LTrim(args, " ")
     ; MsgBox(cmd . " " . args)
-    if A_IsCompiled
+    if A_IsCompiled {
         Run(Format("`"{}\RabbitDeployer.exe`" {} {}", A_ScriptDir, cmd, args))
-    else
+    } else {
         Run(Format("{} `"{}\RabbitDeployer.ahk`" {} {}", A_AhkPath, A_ScriptDir, cmd, args))
+    }
     ExitApp(1)
 }
 
 ToggleSuspend() {
     global rime, session_id, box, STATUS_TOOLTIP
-    if box && HasMethod(box, "Hide")
+    if box && HasMethod(box, "Hide") {
         box.Hide()
+    }
     rime.clear_composition(session_id)
     Suspend(-1)
     UpdateTrayTip()
@@ -98,8 +102,10 @@ ToggleSuspend() {
 }
 
 ClickHandler(wParam, lParam, msg, hWnd) {
-    if !rime || !IsSet(session_id) || !session_id || A_IsSuspended
+    local status_text
+    if !rime || !IsSet(session_id) || !session_id || A_IsSuspended {
         return
+    }
     if lParam == WM_LBUTTONDOWN {
         RabbitGlobals.on_tray_icon_click := true
     } else if lParam == WM_LBUTTONUP {
@@ -135,10 +141,12 @@ UpdateTrayTip(schema_name := TRAY_SCHEMA_NAME, ascii_mode := TRAY_ASCII_MODE, fu
 }
 
 UpdateTrayIcon() {
+    local icon_path, icon_num
     global TRAY_ASCII_MODE
     icon_path := RabbitGlobals.current_schema_icon
-    if !IsSet(icon_path) || !icon_path
+    if !IsSet(icon_path) || !icon_path {
         icon_path := "Lib\rabbit.ico"
+    }
     if A_IsCompiled {
         icon_num := IN_MAINTENANCE ? 3 : (TRAY_ASCII_MODE ? 2 : (RabbitGlobals.current_schema_icon ? 0 : 1))
         if icon_num {
@@ -146,11 +154,13 @@ UpdateTrayIcon() {
         } else {
             TraySetIcon(RabbitGlobals.current_schema_icon)
         }
-    } else
+    } else {
         TraySetIcon((A_IsSuspended || IN_MAINTENANCE) ? "Lib\rabbit-alt.ico" : (TRAY_ASCII_MODE ? "Lib\rabbit-ascii.ico" : icon_path), , true)
+    }
 }
 
 CheckNewVersion() {
+    local http, url, status, response_text, match, down, arch
     if !IsDigit(SubStr(RABBIT_VERSION, 1, 1)) {
         MsgBox("非正式版本，请前往仓库检查新版本", "玉兔毫输入法")
         return
@@ -169,17 +179,18 @@ CheckNewVersion() {
         http.WaitForResponse()
 
         status := http.Status
-        if (status != 200) {
+        if status != 200 {
             MsgBox("无法获取最新版本信息，请检查网络连接", "玉兔毫输入法")
             return
         }
 
-        responseText := http.ResponseText
-        if RegExMatch(responseText, '"name"\s*:\s*"(.*?)"', &match) {
-            if SubStr(match[1], 1, 1) == "v"
+        response_text := http.ResponseText
+        if RegExMatch(response_text, '"name"\s*:\s*"(.*?)"', &match) {
+            if SubStr(match[1], 1, 1) == "v" {
                 ver := SubStr(match[1], 2)
-            else
+            } else {
                 ver := match[1]
+            }
         } else {
             MsgBox("无法解析版本字段，请稍后再试", "玉兔毫输入法")
             return

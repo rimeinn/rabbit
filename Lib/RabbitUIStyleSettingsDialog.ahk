@@ -22,6 +22,7 @@
 
 class UIStyleSettingsDialog extends Gui {
     __New(settings, result) {
+        local h, group_x, group_y, group_width, group_height
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】界面风格设定", this)
         this.settings := settings
         this.loaded := false
@@ -64,16 +65,19 @@ class UIStyleSettingsDialog extends Gui {
     }
 
     Populate() {
-        if !this.settings
+        local i, info
+        if !this.settings {
             return
+        }
         local active := this.settings.GetActiveColorScheme()
         local active_index := 0
         this.preset := this.settings.GetPresetColorSchemes()
         local names := []
         for i, info in this.preset {
             names.Push(info.name)
-            if info.color_scheme_id = active
+            if info.color_scheme_id = active {
                 active_index := i
+            }
         }
         this.color_schemes.Opt("-Redraw")
         this.color_schemes.Add(names)
@@ -95,8 +99,10 @@ class UIStyleSettingsDialog extends Gui {
     }
 
     Preview(index) {
-        if !this.candidate_box || index <= 0 || index > this.preset.Length
+        local box_width, box_height
+        if !this.candidate_box || index <= 0 || index > this.preset.Length {
             return
+        }
         local info := this.preset[index]
         this.candidate_box.Build(info, &box_width, &box_height)
         box_width := box_width / this.candidate_box.dpiScale

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,28 +33,32 @@ class RabbitConfig {
 
     static load() {
         global rime, IS_DARK_MODE
-        if !rime || !config := rime.config_open("rabbit")
-            return
+        local config, result, iter, proc_name, color_name, schema_list, schema, icon, icon_path
 
+        if !rime || !(config := rime.config_open("rabbit")) {
+            return
+        }
         RabbitConfig.suspend_hotkey := rime.config_get_string(config, "suspend_hotkey")
-        if rime.config_test_get_bool(config, "show_tips", &result)
+        if rime.config_test_get_bool(config, "show_tips", &result) {
             RabbitConfig.show_tips := !!result
+        }
         if rime.config_test_get_int(config, "show_tips_time", &result) {
             RabbitConfig.show_tips_time := Abs(result)
-            if result == 0
+            if result == 0 {
                 RabbitConfig.show_tips := false
+            }
         }
 
-        if rime.config_test_get_int(config, "send_by_clipboard_length", &result)
+        if rime.config_test_get_int(config, "send_by_clipboard_length", &result) {
             ; 0: always send by clipboard
             ; >0: send by clipboard if length >= value
             ; <0: never send by clipboard (65535 is large enough for candidates)
             RabbitConfig.send_by_clipboard_length := result >= 0 ? result : 65535
-
-        if rime.config_test_get_bool(config, "global_ascii", &result)
+        }
+        if rime.config_test_get_bool(config, "global_ascii", &result) {
             RabbitConfig.global_ascii := !!result
-
-        if iter := rime.config_begin_map(config, "app_options") {
+        }
+        if (iter := rime.config_begin_map(config, "app_options")) {
             while rime.config_next(iter) {
                 proc_name := StrLower(iter.key)
                 if rime.config_test_get_bool(config, "app_options/" . proc_name . "/ascii_mode", &result) {
@@ -65,38 +69,42 @@ class RabbitConfig {
             rime.config_end(iter)
         }
 
-        if rime.config_test_get_bool(config, "fix_candidate_box", &result)
+        if rime.config_test_get_bool(config, "fix_candidate_box", &result) {
             RabbitConfig.fix_candidate_box := !!result
-        if rime.config_test_get_bool(config, "use_legacy_candidate_box", &result)
+        }
+        if rime.config_test_get_bool(config, "use_legacy_candidate_box", &result) {
             RabbitConfig.use_legacy_candidate_box := !!result
-        if rime.config_test_get_bool(config, "use_caret_hook", &result)
+        }
+        if rime.config_test_get_bool(config, "use_caret_hook", &result) {
             RabbitConfig.use_caret_hook := !!result
-
+        }
         UIStyle.Update(config, true)
-        if IS_DARK_MODE := RabbitIsUserDarkMode() {
-            if color_name := rime.config_get_string(config, "style/color_scheme_dark")
+        if (IS_DARK_MODE := RabbitIsUserDarkMode()) {
+            if (color_name := rime.config_get_string(config, "style/color_scheme_dark")) {
                 UIStyle.use_dark := UIStyle.UpdateColor(config, color_name)
+            }
             DarkMode.set(IS_DARK_MODE)
         }
 
         rime.config_close(config)
 
-        if !schema_list := rime.get_schema_list()
+        if !(schema_list := rime.get_schema_list()) {
             return
-
+        }
         Loop schema_list.size {
             local item := schema_list.list[A_Index]
-            if !schema := rime.schema_open(item.schema_id)
+            if !(schema := rime.schema_open(item.schema_id)) {
                 continue
-
+            }
             if rime.config_test_get_string(schema, "schema/icon", &icon) {
                 icon_path := RabbitUserDataPath() . "\" . LTrim(icon, "\")
-                if !FileExist(icon_path)
+                if !FileExist(icon_path) {
                     icon_path := RabbitSharedDataPath() . "\" . LTrim(icon, "\")
+                }
                 RabbitConfig.schema_icon[item.schema_id] := FileExist(icon_path) ? icon_path : ""
-            } else
+            } else {
                 RabbitConfig.schema_icon[item.schema_id] := ""
-
+            }
             rime.config_close(schema)
         }
 

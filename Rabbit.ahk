@@ -42,9 +42,11 @@ RabbitMain(A_Args)
 ; args[2]: deployer result
 ; args[3]: keyboard layout
 RabbitMain(args) {
+    local layout, fail_count, status
     global box, rabbit_traits
-    if args.Length >= 3
+    if args.Length >= 3 {
         layout := Number(args[3])
+    }
     if !IsSet(layout) || layout == 0 {
         layout := DllCall("GetKeyboardLayout", "UInt", 0)
     }
@@ -52,7 +54,7 @@ RabbitMain(args) {
     SetDefaultKeyboard()
 
     fail_count := 0
-    while not mutex.Create() {
+    while !mutex.Create() {
         mutex.Close()
         fail_count++
         if fail_count > 500 {
@@ -65,10 +67,10 @@ RabbitMain(args) {
 
     ; TODO: better handling of first run
     local first_run := !FileExist(RabbitUserDataPath() . "\default.custom.yaml")
-                    || !FileExist(RabbitUserDataPath() . "\rabbit.custom.yaml")
-                    || !FileExist(RabbitUserDataPath() . "\user.yaml")
-                    || !FileExist(RabbitUserDataPath() . "\installation.yaml")
-                    || !FileExist(RabbitUserDataPath() . "\build\rabbit.yaml") ; in staging dir
+        || !FileExist(RabbitUserDataPath() . "\rabbit.custom.yaml")
+        || !FileExist(RabbitUserDataPath() . "\user.yaml")
+        || !FileExist(RabbitUserDataPath() . "\installation.yaml")
+        || !FileExist(RabbitUserDataPath() . "\build\rabbit.yaml") ; in staging dir
 
     rabbit_traits := CreateTraits()
     global rime
@@ -82,8 +84,9 @@ RabbitMain(args) {
         UpdateTrayIcon()
         if first_run {
             RunDeployer("install", RabbitGlobals.keyboard_layout)
-        } else if rime.start_maintenance(m == RABBIT_FULL_MAINTENANCE)
+        } else if rime.start_maintenance(m == RABBIT_FULL_MAINTENANCE) {
             rime.join_maintenance_thread()
+        }
     } else {
         TrayTip()
         TrayTip("维护完成", RABBIT_IME_NAME)
@@ -92,7 +95,7 @@ RabbitMain(args) {
     IN_MAINTENANCE := false
 
     global session_id := rime.create_session()
-    if not session_id {
+    if !session_id {
         SetDefaultKeyboard(RabbitGlobals.keyboard_layout)
         rime.finalize()
         throw Error("未能成功创建 RIME 会话。")
@@ -101,13 +104,14 @@ RabbitMain(args) {
     CleanOldLogs()
     CleanMisPlacedConfigs()
     RabbitConfig.load()
-    if RabbitConfig.use_legacy_candidate_box || IsOldWindows()
+    if RabbitConfig.use_legacy_candidate_box || IsOldWindows() {
         box := LegacyCandidateBox()
-    else
+    } else {
         box := CandidateBox()
+    }
     RegisterHotKeys()
     UpdateStateLabels()
-    if status := rime.get_status(session_id) {
+    if (status := rime.get_status(session_id)) {
         local schema_id := status.schema_id
         local schema_name := status.schema_name
         local ascii_mode := status.is_ascii_mode
@@ -117,39 +121,45 @@ RabbitMain(args) {
 
         UpdateTrayTip(schema_name, ascii_mode, full_shape, ascii_punct)
 
-        if RabbitConfig.schema_icon.Has(schema_id)
-            if RabbitGlobals.current_schema_icon := RabbitConfig.schema_icon[schema_id]
+        if RabbitConfig.schema_icon.Has(schema_id) {
+            if (RabbitGlobals.current_schema_icon := RabbitConfig.schema_icon[schema_id]) {
                 UpdateTrayIcon()
+            }
+        }
     }
     SetupTrayMenu()
     box.UpdateUIStyle()
     OnMessage(AHK_NOTIFYICON, ClickHandler.Bind())
     OnMessage(WM_SETTINGCHANGE, OnColorChange.Bind())
     OnMessage(WM_DWMCOLORIZATIONCOLORCHANGED, OnColorChange.Bind())
-    if !RabbitConfig.global_ascii
+    if !RabbitConfig.global_ascii {
         SetTimer(UpdateWinAscii)
-
+    }
     OnExit(ExitRabbit.Bind(RabbitGlobals.keyboard_layout))
 }
 
 ; https://www.autohotkey.com/boards/viewtopic.php?f=76&t=101183
 SetDefaultKeyboard(locale_id := 0x0409) {
-    if FileExist(RabbitUserDataPath() . "\.lang")
+    local lang, WM_INPUTLANGCHANGEREQUEST, HWND_BROADCAST
+    if FileExist(RabbitUserDataPath() . "\.lang") {
         return
+    }
     local locale_id_hex := Format("{:08x}", locale_id & 0xffff)
     lang := DllCall("LoadKeyboardLayout", "Str", locale_id_hex, "Int", 0)
     PostMessage(WM_INPUTLANGCHANGEREQUEST := 0x0050, 0, lang, HWND_BROADCAST := 0xffff)
 }
 
 ExitRabbit(layout, reason, code) {
-    if code == 0
+    if code == 0 {
         SetDefaultKeyboard(layout)
+    }
     TrayTip()
     ToolTip(, , , STATUS_TOOLTIP)
     if session_id {
         rime.destroy_session(session_id)
         rime.finalize()
     }
-    if mutex
+    if mutex {
         mutex.Close()
+    }
 }

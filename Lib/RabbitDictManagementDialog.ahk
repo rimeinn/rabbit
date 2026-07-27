@@ -43,10 +43,11 @@ class DictManagementDialog extends Gui {
     }
 
     Populate() {
-        if !iter := this.api.user_dict_iterator_init() {
+        local iter, dict
+        if !(iter := this.api.user_dict_iterator_init()) {
             return
         }
-        while dict := this.api.next_user_dict(iter) {
+        while (dict := this.api.next_user_dict(iter)) {
             this.dict_list.Add([dict])
         }
         this.api.user_dict_iterator_destroy(iter)
@@ -54,6 +55,7 @@ class DictManagementDialog extends Gui {
     }
 
     OnBackup() {
+        local file
         local sel := this.dict_list.Value
         if sel <= 0 || sel > ControlGetItems(this.dict_list).Length {
             MsgBox("请在左列选择要导出的词典名称。", ":-(", "Ok Iconi")
@@ -83,12 +85,14 @@ class DictManagementDialog extends Gui {
     }
 
     OnRestore() {
+        local selected_path
         local filter := "词典快照 (*.userdb.txt; *.userdb.kct.snapshot)"
-        if selected_path := FileSelect("1", , "打开", filter) { ; file must exist
-            if !this.api.restore_user_dict(selected_path)
+        if (selected_path := FileSelect("1", , "打开", filter)) { ; file must exist
+            if !this.api.restore_user_dict(selected_path) {
                 MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
-            else
+            } else {
                 MsgBox("完成了。", ":-)", "Ok Iconi")
+            }
         }
     }
 
@@ -102,15 +106,16 @@ class DictManagementDialog extends Gui {
         local dict_name := this.dict_list.Text
         local file_name := dict_name . "_export.txt"
         local filter := "文本文档 (*.txt)"
-        if selected_path := FileSelect("S18", file_name, "另存为", filter) { ; path must exist + warning on overwriting
-            if SubStr(selected_path, -4) != ".txt"
+        if (selected_path := FileSelect("S18", file_name, "另存为", filter)) { ; path must exist + warning on overwriting
+            if SubStr(selected_path, -4) != ".txt" {
                 selected_path .= ".txt"
+            }
             local result := this.api.export_user_dict(dict_name, selected_path)
-            if result < 0
+            if result < 0 {
                 MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
-            else if !FileExist(selected_path)
+            } else if !FileExist(selected_path) {
                 MsgBox("咦，导出的文件找不着了。", ":-(", "Ok Iconx")
-            else {
+            } else {
                 MsgBox("导出了 " . result . " 条记录。", ":-)", "Ok Iconi")
                 Run(A_ComSpec . " /c explorer.exe /select,`"" . selected_path . "`"", , "Hide")
             }
@@ -121,12 +126,13 @@ class DictManagementDialog extends Gui {
         local dict_name := this.dict_list.Text
         local file_name := dict_name . "_export.txt"
         local filter := "文本文档 (*.txt)"
-        if selected_path := FileSelect("1", file_name, "打开", filter) { ; file must exist
+        if (selected_path := FileSelect("1", file_name, "打开", filter)) { ; file must exist
             local result := this.api.import_user_dict(dict_name, selected_path)
-            if result < 0
+            if result < 0 {
                 MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
-            else
+            } else {
                 MsgBox("导入了 " . result . " 条记录。", ":-)", "Ok Iconi")
+            }
         }
     }
 

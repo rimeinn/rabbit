@@ -23,20 +23,26 @@
 #Include <RabbitUIStyleSettingsDialog>
 
 CreateFileIfNotExist(filename) {
+    local user_data_dir, filepath
     user_data_dir := RabbitUserDataPath() . "\"
-    if not InStr(DirExist(user_data_dir), "D")
+    if !InStr(DirExist(user_data_dir), "D") {
         DirCreate(user_data_dir)
+    }
     filepath := user_data_dir . filename
-    if not InStr(FileExist(filepath), "N")
+    if !InStr(FileExist(filepath), "N") {
         FileAppend("", filepath)
+    }
 }
 
 ConfigureSwitcher(levers, switcher_settings, &reconfigured) {
-    if !IsSet(reconfigured)
+    local result, dialog
+    if !IsSet(reconfigured) {
         reconfigured := false
-    if not levers.load_settings(switcher_settings)
+    }
+    if !levers.load_settings(switcher_settings) {
         return false
     ; To mimic a dialog
+    }
     result := {
         yes : false
     }
@@ -45,19 +51,23 @@ ConfigureSwitcher(levers, switcher_settings, &reconfigured) {
     WinWaitClose(dialog)
 
     if result.yes {
-        if levers.save_settings(switcher_settings)
+        if levers.save_settings(switcher_settings) {
             reconfigured := true
+        }
         return true
     }
     return false
 }
 
 ConfigureUI(levers, ui_style_settings, &reconfigured) {
-    if !IsSet(reconfigured)
+    local result, dialog
+    if !IsSet(reconfigured) {
         reconfigured := false
+    }
     local settings := ui_style_settings.settings
-    if !levers.load_settings(settings)
+    if !levers.load_settings(settings) {
         return false
+    }
     result := {
         yes : false
     }
@@ -66,8 +76,9 @@ ConfigureUI(levers, ui_style_settings, &reconfigured) {
     WinWaitClose(dialog)
 
     if result.yes {
-        if levers.save_settings(settings)
+        if levers.save_settings(settings) {
             reconfigured := true
+        }
         return true
     }
     return false
@@ -87,33 +98,37 @@ class Configurator extends Class {
     }
 
     Run(installing) {
+        local levers, switcher_settings, ui_style_settings, skip_switcher_settings, skip_ui_style_settings
+        local reconfigured
         levers := RimeLeversApi()
-        if not levers
+        if !levers {
             return 1
-
+        }
         switcher_settings := levers.switcher_settings_init()
         ui_style_settings := UIStyleSettings()
         skip_switcher_settings := installing && !levers.is_first_run(switcher_settings)
         skip_ui_style_settings := installing && !levers.is_first_run(ui_style_settings.settings)
 
         if !skip_switcher_settings {
-            if !ConfigureSwitcher(levers, switcher_settings, &reconfigured)
+            if !ConfigureSwitcher(levers, switcher_settings, &reconfigured) {
                 skip_ui_style_settings := true ; user cancelled
+            }
         }
-        if !skip_ui_style_settings
+        if !skip_ui_style_settings {
             ConfigureUI(levers, ui_style_settings, &reconfigured)
-
+        }
         levers.custom_settings_destroy(switcher_settings)
 
-        if installing || reconfigured
+        if installing || reconfigured {
             return this.UpdateWorkspace()
-
+        }
         return 0
     }
 
     UpdateWorkspace(report_errors := false) {
+        local mutex
         mutex := RabbitMutex()
-        if not mutex.Create() {
+        if !mutex.Create() {
             ; TODO: log error
             return 1
         }
@@ -138,8 +153,9 @@ class Configurator extends Class {
     }
 
     DictManagement() {
+        local mutex, dialog
         mutex := RabbitMutex()
-        if not mutex.Create() {
+        if !mutex.Create() {
             ; TODO: log error
             return 1
         }
@@ -166,8 +182,9 @@ class Configurator extends Class {
     }
 
     SyncUserData() {
+        local mutex
         mutex := RabbitMutex()
-        if not mutex.Create() {
+        if !mutex.Create() {
             ; TODO: log error
             return 1
         }
@@ -180,7 +197,7 @@ class Configurator extends Class {
         }
 
         {
-            if not rime.sync_user_data() {
+            if !rime.sync_user_data() {
                 mutex.Close()
                 return 1
             }

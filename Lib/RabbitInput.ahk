@@ -25,6 +25,7 @@
 #Include <RabbitTrayMenu>
 
 RegisterHotKeys() {
+    local modifier, _, key, k
     global rime
     global suspend_hotkey_mask := 0
     global suspend_hotkey := ""
@@ -36,8 +37,10 @@ RegisterHotKeys() {
 
     ; Modifiers
     for modifier, _ in KeyDef.modifier_code {
-        if modifier == "LWin" or modifier == "RWin" or modifier == "LAlt" or modifier == "RAlt"
-            continue ; do not register Win / Alt keys for now
+        if modifier == "LWin" || modifier == "RWin" || modifier == "LAlt" || modifier == "RAlt" {
+            ; Win and Alt modifiers are intentionally unsupported for now.
+            continue
+        }
         local mask := KeyDef.mask[modifier]
         Hotkey("$" . modifier, ProcessKey.Bind(modifier, mask), "S0")
         Hotkey("$" . modifier . " Up", ProcessKey.Bind(modifier, mask | up), "S0")
@@ -48,10 +51,10 @@ RegisterHotKeys() {
         local key_map := A_Index = 1 ? KeyDef.plain_keycode : KeyDef.other_keycode
         for key, _ in key_map {
             Hotkey("$" . key, ProcessKey.Bind(key, 0), "S0")
-            ; need specify left/right to prevent fallback to modifier down/up hotkeys
+            ; Specify left/right to prevent fallback to modifier down/up hotkeys.
             Hotkey("$<^" . key, ProcessKey.Bind(key, ctrl), "S0")
-            ; do not register Alt + single key now
-            ; if not key = "Tab" {
+            ; Alt plus a single key is intentionally unsupported for now.
+            ; if key != "Tab" {
             ;     Hotkey("$<!" . key, ProcessKey.Bind(key, alt), "S0")
             ;     Hotkey("$>!" . key, ProcessKey.Bind(key, alt), "S0")
             ; }
@@ -59,7 +62,7 @@ RegisterHotKeys() {
             Hotkey("$^!" . key, ProcessKey.Bind(key, ctrl | alt), "S0")
             Hotkey("$!#" . key, ProcessKey.Bind(key, alt | win), "S0")
 
-            ; Do not register Win keys for now
+            ; Win-key combinations are intentionally unsupported for now.
             ; Hotkey("$<#" . key, ProcessKey.Bind(key, win), "S0")
             ; Hotkey("$>#" . key, ProcessKey.Bind(key, win), "S0")
             ; Hotkey("$^#" . key, ProcessKey.Bind(key, ctrl | win), "S0")
@@ -74,11 +77,12 @@ RegisterHotKeys() {
             Hotkey("$<+" . key, ProcessKey.Bind(key, shift), "S0")
             Hotkey("$>+" . key, ProcessKey.Bind(key, shift), "S0")
             Hotkey("$+^" . key, ProcessKey.Bind(key, shift | ctrl), "S0")
-            if not key == "Tab"
+            if !key == "Tab" {
                 Hotkey("$+!" . key, ProcessKey.Bind(key, shift | alt), "S0")
+            }
             Hotkey("$+^!" . key, ProcessKey.Bind(key, shift | ctrl | alt), "S0")
 
-            ; Do not register Win keys for now
+            ; Win-key combinations are intentionally unsupported for now.
             ; Hotkey("$+#" . key, ProcessKey.Bind(key, shift | win), "S0")
             ; Hotkey("$+^#" . key, ProcessKey.Bind(key, shift | ctrl | win), "S0")
             ; Hotkey("$+!#" . key, ProcessKey.Bind(key, shift | alt | win), "S0")
@@ -90,8 +94,9 @@ RegisterHotKeys() {
     Hotkey("$Space Up", ProcessKey.Bind("Space", up), "S0")
 
     ; Read the hotkey to suspend / resume Rabbit
-    if !RabbitConfig.suspend_hotkey
+    if !RabbitConfig.suspend_hotkey {
         return
+    }
     local keys := StrSplit(RabbitConfig.suspend_hotkey, "+", " ", 4)
     local mask := 0
     local target_key := ""
@@ -106,14 +111,15 @@ RegisterHotKeys() {
         } else if k = "Shift" {
             num_modifiers += !(mask & shift)
             mask |= shift
-        } else if not target_key {
+        } else if !target_key {
             target_key := k
         }
     }
 
     if target_key {
-        if KeyDef.rime_to_ahk.Has(target_key)
+        if KeyDef.rime_to_ahk.Has(target_key) {
             target_key := KeyDef.rime_to_ahk[target_key]
+        }
         if num_modifiers = 1 {
             if mask & ctrl {
                 Hotkey("$<^" . target_key, , "S")
@@ -131,7 +137,7 @@ RegisterHotKeys() {
         }
     } else if keys.Length == 1 {
         if keys[1] = "Shift" {
-            ; do not support now
+            ; A standalone Shift key is intentionally unsupported for now.
             Hotkey("$LShift", , "S")
             Hotkey("$RShift", , "S")
             Hotkey("$LShift Up", , "S")
@@ -143,6 +149,9 @@ RegisterHotKeys() {
 }
 
 ProcessKey(key, mask, this_hotkey) {
+    local check_key, check_code, caps, status, processed, commit, context, hmon, info, box_width, box_height
+    local caret_x, caret_y, caret_w, caret_h, new_x, new_y, hwnd, workspace_width, workspace_height
+    local backup_mouse_ref, mouse_x, mouse_y
     global suspend_hotkey_mask, suspend_hotkey
     global last_is_hide
     local code := 0
@@ -166,18 +175,20 @@ ProcessKey(key, mask, this_hotkey) {
                 break
             }
         }
-        if code
+        if code {
             break
+        }
     }
-    if not code
+    if !code {
         return
-
-    if caps := GetKeyState("CapsLock", "T") {
-        if StrLen(key) == 1 and Ord(key) >= Ord("a") and Ord(key) <= Ord("z") ; small case letters
+    }
+    if (caps := GetKeyState("CapsLock", "T")) {
+        if StrLen(key) == 1 && Ord(key) >= Ord("a") && Ord(key) <= Ord("z") { ; small case letters
             code += (Ord("A") - Ord("a"))
+        }
     }
 
-    if status := rime.get_status(session_id) {
+    if (status := rime.get_status(session_id)) {
         local old_schema_id := status.schema_id
         local old_ascii_mode := status.is_ascii_mode
         local old_full_shape := status.is_full_shape
@@ -201,8 +212,9 @@ ProcessKey(key, mask, this_hotkey) {
 
     UpdateTrayTip(new_schema_name, new_ascii_mode, new_full_shape, new_ascii_punct)
     if old_schema_id !== new_schema_id && RabbitConfig.schema_icon.Has(new_schema_id) {
-        if RabbitGlobals.current_schema_icon := RabbitConfig.schema_icon[new_schema_id]
+        if (RabbitGlobals.current_schema_icon := RabbitConfig.schema_icon[new_schema_id]) {
             UpdateTrayIcon()
+        }
     }
 
     local status_text := ""
@@ -225,41 +237,43 @@ ProcessKey(key, mask, this_hotkey) {
         SetTimer(() => ToolTip(, , , STATUS_TOOLTIP), -RabbitConfig.show_tips_time)
     }
 
-    if commit := rime.get_commit(session_id) {
-        if ascii_changed
+    if (commit := rime.get_commit(session_id)) {
+        if ascii_changed {
             last_is_hide := true
-        else
+        } else {
             last_is_hide := false
-        if StrLen(commit.text) >= RabbitConfig.send_by_clipboard_length
+        }
+        if StrLen(commit.text) >= RabbitConfig.send_by_clipboard_length {
             SendTextByClipboard(commit.text)
-        else
+        } else {
             SendText(commit.text)
+        }
         box.Hide()
         rime.free_commit(commit)
-    } else
+    } else {
         last_is_hide := false
-
-    if (suspend_hotkey and suspend_hotkey_mask)
-            and (key = suspend_hotkey or SubStr(key, 2) = suspend_hotkey)
-            and (mask = suspend_hotkey_mask) {
+    }
+    if suspend_hotkey && suspend_hotkey_mask
+        && (key = suspend_hotkey || SubStr(key, 2) = suspend_hotkey)
+        && (mask = suspend_hotkey_mask) {
         ToggleSuspend()
         return
     }
 
-    if context := rime.get_context(session_id) {
+    if (context := rime.get_context(session_id)) {
         static prev_show := false
         static prev_x := 4
         static prev_y := 4
-        if (context.composition.length > 0 or context.menu.num_candidates > 0) {
+        if context.composition.length > 0 || context.menu.num_candidates > 0 {
             DetectHiddenWindows True
             local start_menu := WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe")
-                             || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
-                             || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
+                || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
+                || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
             DetectHiddenWindows False
             local show_at_left_top := false
             if start_menu {
-                hMon := MonitorManage.MonitorFromWindow(start_menu)
-                info := MonitorManage.GetMonitorInfo(hMon)
+                hmon := MonitorManage.MonitorFromWindow(start_menu)
+                info := MonitorManage.GetMonitorInfo(hmon)
                 show_at_left_top := !!info
                 if show_at_left_top && !last_is_hide {
                     box.Build(context, &box_width, &box_height)
@@ -275,25 +289,30 @@ ProcessKey(key, mask, this_hotkey) {
                     new_x := caret_x + caret_w
                     new_y := caret_y + caret_h + 4
 
-                    hWnd := WinExist("A")
-                    hMon := MonitorManage.MonitorFromWindow(hWnd)
-                    info := MonitorManage.GetMonitorInfo(hMon)
+                    hwnd := WinExist("A")
+                    hmon := MonitorManage.MonitorFromWindow(hwnd)
+                    info := MonitorManage.GetMonitorInfo(hmon)
                     if info {
-                        if new_x + box_width > info.work.right
+                        if new_x + box_width > info.work.right {
                             new_x := info.work.right - box_width
-                        if new_y + box_height > info.work.bottom
+                        }
+                        if new_y + box_height > info.work.bottom {
                             new_y := caret_y - 4 - box_height
+                        }
                     } else {
                         workspace_width := SysGet(16) ; SM_CXFULLSCREEN
                         workspace_height := SysGet(17) ; SM_CYFULLSCREEN
-                        if new_x + box_width > workspace_width
+                        if new_x + box_width > workspace_width {
                             new_x := workspace_width - box_width
-                        if new_y + box_height > workspace_height
+                        }
+                        if new_y + box_height > workspace_height {
                             new_y := caret_y - 4 - box_height
+                        }
                     }
                 }
-                if !last_is_hide
+                if !last_is_hide {
                     box.Show(new_x, new_y)
+                }
                 prev_x := new_x
                 prev_y := new_y
             } else if !show_at_left_top {
@@ -312,17 +331,17 @@ ProcessKey(key, mask, this_hotkey) {
         rime.free_context(context)
     }
 
-    if not processed {
+    if !processed {
         local shift := (mask & KeyDef.mask["Shift"]) ? "+" : ""
         local ctrl := (mask & KeyDef.mask["Ctrl"]) ? "^" : ""
         local alt := (mask & KeyDef.mask["Alt"]) ? "!" : ""
         local win := (mask & KeyDef.mask["Win"]) ? "#" : ""
 
-        local isUp := mask & KeyDef.mask["Up"]
-        local hasModifier := mask & (KeyDef.mask["Shift"] | KeyDef.mask["Ctrl"] | KeyDef.mask["Alt"] | KeyDef.mask["Win"])
+        local is_up := mask & KeyDef.mask["Up"]
+        local has_modifier := mask & (KeyDef.mask["Shift"] | KeyDef.mask["Ctrl"] | KeyDef.mask["Alt"] | KeyDef.mask["Win"])
 
-        if key == "Space" and not hasModifier {
-            Send("{Blind}{" . key . (isUp ? " Up" : " Down") . "}")
+        if key == "Space" && !has_modifier {
+            Send("{Blind}{" . key . (is_up ? " Up" : " Down") . "}")
         } else {
             SendInput(shift . ctrl . alt . win . "{" . key . "}")
         }
@@ -331,12 +350,14 @@ ProcessKey(key, mask, this_hotkey) {
 
 ; by rawbx (https://github.com/rimeinn/rabbit/issues/13#issuecomment-3072554342)
 SendTextByClipboard(text) {
+    local clip_prev
     clip_prev := A_Clipboard
     A_Clipboard := text
 
-    if ClipWait(0.5, 0)
-        Send('+{Insert}') ; or Send('^v')
+    if ClipWait(0.5, 0) {
+        Send("+{Insert}") ; Alternatively, Send("^v").
 
     ; Restore clipboard
+    }
     SetTimer(() => A_Clipboard := clip_prev, -50)
 }

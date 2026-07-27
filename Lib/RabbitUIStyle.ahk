@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,51 +51,70 @@ class UIStyle {
 
     static Update(config, initialize) {
         global rime
-        if !rime || !config
+        local fmt, cr, r, mx, my, w, color
+
+        if !rime || !config {
             return
+        }
         UIStyle.use_dark := false
         UIStyle.font_face := rime.config_get_string(config, "style/font_face")
-        if not UIStyle.font_face
+        if !UIStyle.font_face {
             UIStyle.font_face := "Microsoft YaHei UI"
+        }
         UIStyle.label_font_face := rime.config_get_string(config, "style/label_font_face")
-        if not UIStyle.label_font_face
+        if !UIStyle.label_font_face {
             UIStyle.label_font_face := "Microsoft YaHei UI"
+        }
         UIStyle.comment_font_face := rime.config_get_string(config, "style/comment_font_face")
-        if not UIStyle.comment_font_face
+        if !UIStyle.comment_font_face {
             UIStyle.comment_font_face := "Microsoft YaHei UI"
+        }
         UIStyle.font_point := rime.config_get_int(config, "style/font_point")
-        if UIStyle.font_point <= 0
+        if UIStyle.font_point <= 0 {
             UIStyle.font_point := 14
+        }
         UIStyle.label_font_point := rime.config_get_int(config, "style/label_font_point")
-        if UIStyle.label_font_point <= 0
+        if UIStyle.label_font_point <= 0 {
             UIStyle.label_font_point := 14
+        }
         UIStyle.comment_font_point := rime.config_get_int(config, "style/comment_font_point")
-        if UIStyle.comment_font_point <= 0
+        if UIStyle.comment_font_point <= 0 {
             UIStyle.comment_font_point := 14
-        if rime.config_test_get_string(config, "style/label_format", &fmt) && fmt
+        }
+        if rime.config_test_get_string(config, "style/label_format", &fmt) && fmt {
             UIStyle.label_format := fmt
-        if rime.config_test_get_int(config, "style/layout/corner_radius", &cr) && cr >= 0
+        }
+        if rime.config_test_get_int(config, "style/layout/corner_radius", &cr) && cr >= 0 {
             UIStyle.corner_radius := cr
-        if rime.config_test_get_int(config, "style/layout/round_corner", &r) && r >= 0
+        }
+        if rime.config_test_get_int(config, "style/layout/round_corner", &r) && r >= 0 {
             UIStyle.round_corner := r
-        if rime.config_test_get_int(config, "style/layout/margin_x", &mx) && mx >= 0
+        }
+        if rime.config_test_get_int(config, "style/layout/margin_x", &mx) && mx >= 0 {
             UIStyle.margin_x := mx
-        if rime.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0
+        }
+        if rime.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0 {
             UIStyle.margin_y := my
-        if rime.config_test_get_int(config, "style/layout/min_width", &w) && w >= 0
+        }
+        if rime.config_test_get_int(config, "style/layout/min_width", &w) && w >= 0 {
             UIStyle.min_width := w
-        if initialize and color := rime.config_get_string(config, "style/color_scheme")
+        }
+        if initialize && (color := rime.config_get_string(config, "style/color_scheme")) {
             UIStyle.UpdateColor(config, color)
+        }
     }
 
     static UpdateColor(config, color) {
         global rime
-        if color or (buffer := rime.config_get_string(config, "style/color_scheme")) {
+        local buffer, cfmt
+
+        if color || (buffer := rime.config_get_string(config, "style/color_scheme")) {
             local prefix := "preset_color_schemes/" . (color ? color : buffer)
             local fmt := "argb" ; different from Weasel
-            if cfmt := rime.config_get_string(config, prefix . "/color_format") {
-                if cfmt = "argb" or cfmt = "rgba" or cfmt = "abgr"
+            if (cfmt := rime.config_get_string(config, prefix . "/color_format")) {
+                if cfmt = "argb" || cfmt = "rgba" || cfmt = "abgr" {
                     fmt := cfmt
+                }
             }
 
             UIStyle.border_color := UIStyle.GetColor(config, prefix . "/border_color", fmt, 0xffe0e0e0)
@@ -118,47 +137,51 @@ class UIStyle {
     }
 
     static BlendColors(fcolor, bcolor) {
-        local fA := (fcolor >> 24) & 0xff
-        if fA == 0xff
+        local foreground_a := (fcolor >> 24) & 0xff
+        if foreground_a == 0xff {
             return fcolor
-        local fR := (fcolor >> 16) & 0xff
-        local fG := (fcolor >> 8) & 0xff
-        local fB := fcolor & 0xff
-        local bA := (bcolor >> 24) & 0xff
-        local bR := (bcolor >> 16) & 0xff
-        local bG := (bcolor >> 8) & 0xff
-        local bB := bcolor & 0xff
+        }
+        local foreground_r := (fcolor >> 16) & 0xff
+        local foreground_g := (fcolor >> 8) & 0xff
+        local foreground_b := fcolor & 0xff
+        local background_a := (bcolor >> 24) & 0xff
+        local background_r := (bcolor >> 16) & 0xff
+        local background_g := (bcolor >> 8) & 0xff
+        local background_b := bcolor & 0xff
 
-        local fAlpha := fA / 255.0
-        local bAlpha := bA / 255.0
+        local foreground_alpha := foreground_a / 255.0
+        local background_alpha := background_a / 255.0
 
-        local retAlpha := fAlpha + bAlpha * (1 - fAlpha)
+        local result_alpha := foreground_alpha + background_alpha * (1 - foreground_alpha)
 
-        local retR := Integer((fR * fAlpha + bR * bAlpha * (1 - fAlpha)) / retAlpha)
-        local retG := Integer((fG * fAlpha + bG * bAlpha * (1 - fAlpha)) / retAlpha)
-        local retB := Integer((fB * fAlpha + bB * bAlpha * (1 - fAlpha)) / retAlpha)
+        local result_r := Integer((foreground_r * foreground_alpha + background_r * background_alpha * (1 - foreground_alpha)) / result_alpha)
+        local result_g := Integer((foreground_g * foreground_alpha + background_g * background_alpha * (1 - foreground_alpha)) / result_alpha)
+        local result_b := Integer((foreground_b * foreground_alpha + background_b * background_alpha * (1 - foreground_alpha)) / result_alpha)
 
-        return (Integer(retAlpha) * 255 << 24) | (retR << 16) | (retG << 8) | retB
+        return (Integer(result_alpha) * 255 << 24) | (result_r << 16) | (result_g << 8) | result_b
     }
 
     static GetColor(config, key, fmt, fallback) {
         global rime
-        if not rime.config_test_get_string(config, key, &color)
-            return fallback
+        local color, tmp
 
+        if !rime.config_test_get_string(config, key, &color) {
+            return fallback
+        }
         local val := fallback
         make_opaque() {
             val := (fmt != "rgba") ? (val | 0xff000000) : ((val << 8) | 0x000000ff)
         }
         convert_color_to_argb(clr, format) {
-            if format = "argb"
+            if format = "argb" {
                 return clr & 0xffffffff
-            else if format = "abgr"
+            } else if format = "abgr" {
                 return ((clr & 0x00ff0000) >> 16) | (clr & 0x0000ff00) | ((clr & 0x000000ff) << 16) | (clr & 0xff000000)
-            else if format = "rgba"
+            } else if format = "rgba" {
                 return ((clr & 0x00ff00) << 8) | (clr & 0xff0000) | ((clr & 0x0000ff) >> 8) | (clr & 0xff000000)
-            else
+            } else {
                 return clr & 0xffffffff
+            }
         }
 
         if RegExMatch(color, "i)^0x[0-9a-f]+$") {
@@ -192,8 +215,9 @@ class UIStyle {
             }
         } else {
             tmp := 0
-            if not rime.config_test_get_int(config, key, &tmp)
+            if !rime.config_test_get_int(config, key, &tmp) {
                 return fallback
+            }
             val := tmp
             make_opaque()
         }
@@ -212,15 +236,17 @@ RabbitIsUserDarkMode() {
 }
 
 OnColorChange(wParam, lParam, msg, hWnd) {
+    local config, color_name
     global rime, IS_DARK_MODE, box
     local old_dark := IS_DARK_MODE
     IS_DARK_MODE := RabbitIsUserDarkMode()
     if old_dark != IS_DARK_MODE {
-        if config := rime.config_open("rabbit") {
+        if (config := rime.config_open("rabbit")) {
             UIStyle.Update(config, true)
             if IS_DARK_MODE {
-                if color_name := rime.config_get_string(config, "style/color_scheme_dark")
+                if (color_name := rime.config_get_string(config, "style/color_scheme_dark")) {
                     UIStyle.use_dark := UIStyle.UpdateColor(config, color_name)
+                }
             }
 
             rime.config_close(config)

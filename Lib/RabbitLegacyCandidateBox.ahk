@@ -30,7 +30,7 @@ class LegacyCandidateBox {
     }
 
     UpdateUIStyle() {
-        ; alpha not supported
+        ; Alpha is not supported.
         del_opaque(color) {
             return color & 0xffffff
         }
@@ -65,20 +65,24 @@ class LegacyCandidateBox {
             LegacyCandidateBox.gui.MarginX := UIStyle.margin_x
             LegacyCandidateBox.gui.MarginY := UIStyle.margin_y
 
-            if HasProp(LegacyCandidateBox.gui, "pre") && LegacyCandidateBox.gui.pre
+            if HasProp(LegacyCandidateBox.gui, "pre") && LegacyCandidateBox.gui.pre {
                 LegacyCandidateBox.gui.pre.Opt(LegacyCandidateBox.base_opt)
-            if HasProp(LegacyCandidateBox.gui, "sel") && LegacyCandidateBox.gui.sel
+            }
+            if HasProp(LegacyCandidateBox.gui, "sel") && LegacyCandidateBox.gui.sel {
                 LegacyCandidateBox.gui.sel.Opt(LegacyCandidateBox.hilited_opt)
-            if HasProp(LegacyCandidateBox.gui, "post") && LegacyCandidateBox.gui.post
+            }
+            if HasProp(LegacyCandidateBox.gui, "post") && LegacyCandidateBox.gui.post {
                 LegacyCandidateBox.gui.post.Opt(LegacyCandidateBox.base_opt)
+            }
         }
     }
 
     Build(context, &width, &height) {
-        if !LegacyCandidateBox.gui || !LegacyCandidateBox.gui.built
+        if !LegacyCandidateBox.gui || !LegacyCandidateBox.gui.built {
             LegacyCandidateBox.gui := LegacyCandidateBox.BoxGui(context)
-        else
+        } else {
             LegacyCandidateBox.gui.Update(context)
+        }
         width := LegacyCandidateBox.gui.max_width
         height := LegacyCandidateBox.gui.max_height
     }
@@ -88,13 +92,15 @@ class LegacyCandidateBox {
     }
 
     Hide() {
-        if LegacyCandidateBox.gui && HasMethod(LegacyCandidateBox.gui, "Show")
+        if LegacyCandidateBox.gui && HasMethod(LegacyCandidateBox.gui, "Show") {
             LegacyCandidateBox.gui.Show("Hide")
+        }
     }
 
     class BoxGui extends Gui {
         built := false
         __New(context, &pre?, &sel?, &post?, &menu?) {
+            local w, h, h1, h2, h3
             super.__New(, , this)
 
             menu := context.menu
@@ -155,10 +161,11 @@ class LegacyCandidateBox {
             loop num_candidates {
                 position := Format("xs y+{} section {}", this.MarginY, LegacyCandidateBox.border)
                 local label_text := String(A_Index)
-                if A_Index <= menu.page_size && has_label
+                if A_Index <= menu.page_size && has_label {
                     label_text := context.select_labels[A_Index]
-                else if A_Index <= num_select_keys
+                } else if A_Index <= num_select_keys {
                     label_text := SubStr(select_keys, A_Index, 1)
+                }
                 label_text := Format(UIStyle.label_format, label_text)
                 this.SetFont(LegacyCandidateBox.label_font_opt, UIStyle.label_font_face)
                 local label := this.AddText(Format("Right {} vL{}", position, A_Index), label_text)
@@ -171,8 +178,9 @@ class LegacyCandidateBox {
                 candidate.GetPos(, , &w, &h2)
                 this.max_candidate_width := max(this.max_candidate_width, w + this.MarginX)
 
-                if comment_text := cands[A_Index].comment
+                if (comment_text := cands[A_Index].comment) {
                     this.has_comment := true
+                }
                 this.SetFont(LegacyCandidateBox.comment_font_opt, UIStyle.comment_font_face)
                 local comment := this.AddText(Format("{} vM{}", position, A_Index), comment_text)
                 comment.GetPos(, , &w, &h3)
@@ -195,13 +203,15 @@ class LegacyCandidateBox {
             ; adjust width height
             local list_width := this.max_label_width + this.max_candidate_width + this.has_comment * this.max_comment_width
             local box_width := max(UIStyle.min_width, list_width)
-            if box_width > this.max_width && HasProp(this, "post") && this.post
+            if box_width > this.max_width && HasProp(this, "post") && this.post {
                 this.post.Move(, , this.post_width + box_width - this.max_width)
+            }
             this.max_width := max(box_width, this.max_width)
             if this.max_width > list_width {
                 this.max_candidate_width += this.max_width - list_width
-                loop num_candidates
+                loop num_candidates {
                     this["C" . A_Index].Move(, , this.max_candidate_width)
+                }
             }
             local y := 2 * this.MarginY + this.preedit_height
             loop num_candidates {
@@ -226,6 +236,7 @@ class LegacyCandidateBox {
         }
 
         Update(context) {
+            local x, y, w, h, width, height
             local fake_gui := LegacyCandidateBox.BoxGui(context, &pre, &sel, &post, &menu)
             local num_candidates := menu.num_candidates
             local hilited_index := menu.highlighted_candidate_index + 1
@@ -236,34 +247,40 @@ class LegacyCandidateBox {
 
             ; reset preedit
             if pre {
-                if !HasProp(this, "pre") || !this.pre
+                if !HasProp(this, "pre") || !this.pre {
                     this.pre := this.AddText(, pre)
+                }
                 this.pre.Value := fake_gui.pre.Value
                 fake_gui.pre.GetPos(&x, &y, &w, &h)
                 this.pre.Move(x, y, w, h)
             }
-            if HasProp(this, "pre") && this.pre
+            if HasProp(this, "pre") && this.pre {
                 this.pre.Visible := !!pre
+            }
             if sel {
-                if !HasProp(this, "sel") || !this.sel
+                if !HasProp(this, "sel") || !this.sel {
                     this.sel := this.AddText(, sel)
+                }
                 this.sel.Value := fake_gui.sel.Value
                 fake_gui.sel.GetPos(&x, &y, &w, &h)
                 this.sel.Move(x, y, w, h)
             }
-            if HasProp(this, "sel") && this.sel
+            if HasProp(this, "sel") && this.sel {
                 this.sel.Visible := !!sel
+            }
             if post {
-                if !HasProp(this, "post") || !this.post
+                if !HasProp(this, "post") || !this.post {
                     this.post := this.AddText(, post)
+                }
                 this.post.Value := fake_gui.post.Value
                 fake_gui.post.GetPos(&x, &y, &w, &h)
                 this.post.Move(x, y, w, h)
             }
-            if HasProp(this, "post") && this.post
+            if HasProp(this, "post") && this.post {
                 this.post.Visible := !!post
 
             ; reset candidates
+            }
             loop this.num_candidates {
                 if A_Index > num_candidates {
                     this["L" . A_Index].Visible := false
@@ -275,20 +292,23 @@ class LegacyCandidateBox {
                 local fake_candidate := fake_gui["C" . A_Index]
                 local fake_comment := fake_gui["M" . A_Index]
                 this.SetFont(LegacyCandidateBox.label_font_opt, UIStyle.label_font_face)
-                try
+                try {
                     local label := this["L" . A_Index]
-                catch
+                } catch {
                     local label := this.AddText(Format("vL{}", A_Index), fake_label.Value)
+                }
                 this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
-                try
+                try {
                     local candidate := this["C" . A_Index]
-                catch
+                } catch {
                     local candidate := this.AddText(Format("vC{}", A_Index), fake_candidate.Value)
+                }
                 this.SetFont(LegacyCandidateBox.comment_font_opt, UIStyle.comment_font_face)
-                try
+                try {
                     local comment := this["M" . A_Index]
-                catch
+                } catch {
                     local comment := this.AddText(Format("vM{}", A_Index), fake_comment.Value)
+                }
                 label.Value := fake_label.Value
                 fake_label.GetPos(&x, &y, &w, &h)
                 label.Move(x, y, w, h)

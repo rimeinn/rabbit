@@ -26,16 +26,20 @@ class UIStyleSettings {
     }
 
     GetPresetColorSchemes() {
+        local config, preset, name
         global rime
         local result := []
-        if !config := this.api.settings_get_config(this.settings)
+        if !(config := this.api.settings_get_config(this.settings)) {
             return result
-        if !rime || !preset := rime.config_begin_map(config, "preset_color_schemes")
+        }
+        if !rime || !(preset := rime.config_begin_map(config, "preset_color_schemes")) {
             return result
+        }
         while rime.config_next(preset) {
             local name_key := preset.path . "/name"
-            if !name := rime.config_get_cstring(config, name_key)
+            if !(name := rime.config_get_cstring(config, name_key)) {
                 continue
+            }
             local author_key := preset.path . "/author"
             local author := rime.config_get_cstring(config, author_key)
             UIStyle.UpdateColor(config, StrLower(preset.key))
@@ -60,11 +64,14 @@ class UIStyleSettings {
     }
 
     GetActiveColorScheme() {
+        local config, value
         global rime
-        if !config := this.api.settings_get_config(this.settings)
+        if !(config := this.api.settings_get_config(this.settings)) {
             return ""
-        if !rime || !value := rime.config_get_cstring(config, "style/color_scheme")
+        }
+        if !rime || !(value := rime.config_get_cstring(config, "style/color_scheme")) {
             return ""
+        }
         return value
     }
 

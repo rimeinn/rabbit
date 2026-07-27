@@ -20,6 +20,7 @@
 
 class SwitcherSettingsDialog extends Gui {
     __New(settings, result) {
+        local EM_SETCUEBANNER
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】方案选单设定", this)
         this.settings := settings
         this.loaded := false
@@ -53,8 +54,10 @@ class SwitcherSettingsDialog extends Gui {
     }
 
     Populate() {
-        if !this.settings
+        local item, info, row, txt
+        if !this.settings {
             return
+        }
         local available := this.api.get_available_schema_list(this.settings)
         local selected := this.api.get_selected_schema_list(this.settings)
         this.schema_list.Delete()
@@ -106,25 +109,32 @@ class SwitcherSettingsDialog extends Gui {
     }
 
     ShowDetails(info) {
-        if !info
+        local details, name, author, description
+        if !info {
             return
+        }
         details := ""
-        if name := this.api.get_schema_name(info)
+        if (name := this.api.get_schema_name(info)) {
             details .= name
-        if author := this.api.get_schema_author(info)
+        }
+        if (author := this.api.get_schema_author(info)) {
             details .= "`r`n`r`n" . author
-        if description := this.api.get_schema_description(info)
+        }
+        if (description := this.api.get_schema_description(info)) {
             details .= "`r`n`r`n" . description
+        }
         this.description.Value := details
     }
 
     OnOK() {
+        local selection, row, info
         if this.modified && !!this.settings && this.schema_list.GetCount() != 0 {
             selection := []
             row := 0
-            while row := this.schema_list.GetNext(row, "Checked") {
-                if info := this.item_data[row]
+            while (row := this.schema_list.GetNext(row, "Checked")) {
+                if (info := this.item_data[row]) {
                     selection.Push(this.api.get_schema_id(info))
+                }
             }
             if selection.Length == 0 {
                 MsgBox("至少要选用一项吧。", "玉兔毫不是这般用法", "Icon!")
@@ -154,7 +164,7 @@ class SwitcherSettingsDialog extends Gui {
         this.Opt("+Disabled")
         RunWait(Format("cmd.exe /k {}\rime-install.bat", A_ScriptDir), A_ScriptDir)
         this.Opt("-Disabled")
-        WinActivate("ahk_id " this.Hwnd)
+        WinActivate("ahk_id " . this.Hwnd)
         this.api.load_settings(this.settings)
         this.Populate()
     }
