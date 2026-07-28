@@ -18,62 +18,79 @@
  */
 
 #Include <RabbitUIStyle>
+#Include <RabbitCandidateBoxCommon>
 #Include <Direct2D/Direct2D>
-
-; https://learn.microsoft.com/windows/win32/winmsg/extended-window-styles
-global WS_EX_NOACTIVATE := "+E0x8000000"
-global WS_EX_COMPOSITED := "+E0x02000000"
-global WS_EX_LAYERED    := "+E0x00080000"
 
 class CandidateBox {
     gui := 0
-    static isHidden := 1
 
-    __New() {
-        ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
-        this.gui := Gui("-Caption -DPIScale +E0x8080088")
+    __New(style := UIStyle, d2d_constructor := Direct2D) {
+        this.gui := 0
+        this.d2d := 0
+        this.built := false
+        this.visible := false
+        this.disposed := false
 
-        this.d2d := Direct2D(this.gui.Hwnd)
-        this.dpiScale := this.d2d.GetDesktopDpiScale()
-
-        this.UpdateUIStyle()
-    }
-
-    __Delete() {
-        this.Hide()
-        if this.gui {
-            this.gui.Destroy()
+        try {
+            ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
+            this.gui := Gui("-Caption -DPIScale +E0x8080088")
+            this.d2d := d2d_constructor.Call(this.gui.Hwnd)
+            this.dpiScale := this.d2d.GetDesktopDpiScale()
+            this.UpdateStyle(style)
+        } catch as error {
+            this.Dispose()
+            throw error
         }
     }
 
-    UpdateUIStyle() {
-        this.borderWidth := UIStyle.border_width
-        this.borderColor := UIStyle.border_color
-        this.boxCornerR := UIStyle.corner_radius
-        this.hlCornerR := UIStyle.round_corner
-        this.lineSpacing := UIStyle.margin_y
-        this.padding := UIStyle.margin_x
+    __Delete() {
+        this.Dispose()
+    }
 
-        this.mainFont := this.CreateFontObj(UIStyle.font_face, UIStyle.font_point)
-        this.labFont := this.CreateFontObj(UIStyle.label_font_face, UIStyle.label_font_point)
-        this.commentFont := this.CreateFontObj(UIStyle.comment_font_face, UIStyle.comment_font_point)
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.Hide()
+        this.d2d := 0
+        if this.gui {
+            this.gui.Destroy()
+            this.gui := 0
+        }
+        this.built := false
+        this.disposed := true
+    }
+
+    UpdateStyle(style) {
+        this.AssertNotDisposed()
+        this.style := style
+        this.borderWidth := style.border_width
+        this.borderColor := style.border_color
+        this.boxCornerR := style.corner_radius
+        this.hlCornerR := style.round_corner
+        this.lineSpacing := style.margin_y
+        this.padding := style.margin_x
+
+        this.mainFont := this.CreateFontObj(style.font_face, style.font_point)
+        this.labFont := this.CreateFontObj(style.label_font_face, style.label_font_point)
+        this.commentFont := this.CreateFontObj(style.comment_font_face, style.comment_font_point)
 
         ; Preedit style
-        this.textColor := UIStyle.text_color
-        this.backgroundColor := UIStyle.back_color
-        this.hlTxtColor := UIStyle.hilited_text_color
-        this.hlBgColor := UIStyle.hilited_back_color
+        this.textColor := style.text_color
+        this.backgroundColor := style.back_color
+        this.hlTxtColor := style.hilited_text_color
+        this.hlBgColor := style.hilited_back_color
         ; Candidate style
-        this.hlCandTxtColor := UIStyle.hilited_candidate_text_color
-        this.hlCandBgColor := UIStyle.hilited_candidate_back_color
-        this.candTxtColor := UIStyle.candidate_text_color
-        this.candBgColor := UIStyle.candidate_back_color
+        this.hlCandTxtColor := style.hilited_candidate_text_color
+        this.hlCandBgColor := style.hilited_candidate_back_color
+        this.candTxtColor := style.candidate_text_color
+        this.candBgColor := style.candidate_back_color
 
         ; Some color schemes do not define these colors.
-        this.labelColor := UIStyle.label_color
-        this.hlLabelColor := UIStyle.hilited_label_color
-        this.commentTxtColor := UIStyle.comment_text_color
-        this.hlCommentTxtColor := UIStyle.hilited_comment_text_color
+        this.labelColor := style.label_color
+        this.hlLabelColor := style.hilited_label_color
+        this.commentTxtColor := style.comment_text_color
+        this.hlCommentTxtColor := style.hilited_comment_text_color
     }
 
     CreateFontObj(name, size) {
@@ -88,6 +105,7 @@ class CandidateBox {
         local total_rows_height, has_label, select_keys, num_select_keys, label_text, label_box, candidate_text
         local candidate_box
         local comment_text, comment_box, row_rect, increment, label_width, candidate_width, comment, comment_gap
+        this.AssertNotDisposed()
         local menu := context.menu
         local cands := menu.candidates
         this.num_candidates := menu.num_candidates
@@ -129,7 +147,7 @@ class CandidateBox {
             } else if A_Index <= num_select_keys {
                 label_text := SubStr(select_keys, A_Index, 1)
             }
-            label_text := Format(UIStyle.label_format, label_text)
+            label_text := Format(this.style.label_format, label_text)
             label_box := this.GetTextMetrics(label_text, this.labFont)
             this.candidatesLayout.labels.Push({ x: base_x, y: base_y, w: label_box.w, h: label_box.h, text: label_text })
 
@@ -157,13 +175,14 @@ class CandidateBox {
 
         this.commentOffset := 0
         this.boxWidth := Ceil(max_row_width) + (this.borderWidth + this.padding) * 2
-        if this.boxWidth < UIStyle.min_width {
-            this.commentOffset := UIStyle.min_width - this.boxWidth
-            this.boxWidth := UIStyle.min_width
+        if this.boxWidth < this.style.min_width {
+            this.commentOffset := this.style.min_width - this.boxWidth
+            this.boxWidth := this.style.min_width
         }
         this.boxHeight := Ceil(total_rows_height) + (this.borderWidth + this.padding) * 2
         win_w := this.boxWidth
         win_h := this.boxHeight
+        this.built := true
 
         ; get better spacing to align comments
         loop this.num_candidates {
@@ -181,9 +200,13 @@ class CandidateBox {
     Show(x, y) {
         local background_x, background_y, background_width, background_height, background_radius, highlight_width
         local row_rect, label_color, candidate_color, comment_color, label, cand, comment
-        if CandidateBox.isHidden {
+        this.AssertNotDisposed()
+        if !this.built {
+            throw Error("Candidate box must be built before it is shown.")
+        }
+        if !this.visible {
             this.gui.Show("NA")
-            CandidateBox.isHidden := 0
+            this.visible := true
         }
 
         this.d2d.SetPosition(x, y, this.boxWidth, this.boxHeight)
@@ -244,11 +267,20 @@ class CandidateBox {
     }
 
     Hide() {
-        if !CandidateBox.isHidden {
+        if this.disposed {
+            return
+        }
+        if this.visible {
             this.d2d.EndDraw()
             this.d2d.Clear()
             this.gui.Hide()
-            CandidateBox.isHidden := 1
+            this.visible := false
+        }
+    }
+
+    AssertNotDisposed() {
+        if this.disposed {
+            throw Error("Candidate box has been disposed.")
         }
     }
 
@@ -257,62 +289,5 @@ class CandidateBox {
             return { w: 0, h: 0 }
         }
         return this.d2d.GetMetrics(text, font_obj.name, font_obj.size)
-    }
-}
-
-GetCompositionText(composition, &pre_selected, &selected, &post_selected) {
-    local preedit, byte
-    pre_selected := ""
-    selected := ""
-    post_selected := ""
-    if !(preedit := composition.preedit) {
-        return false
-    }
-    static cursor_text := "‸" ; Alternative cursor: 𝙸
-    static cursor_size := StrPut(cursor_text, "UTF-8") - 1 ; Do not count the trailing null terminator.
-
-    local preedit_length := StrPut(preedit, "UTF-8")
-    local selected_start := composition.sel_start
-    local selected_end := composition.sel_end
-
-    local preedit_buffer ; insert caret text into preedit text if applicable
-    if 0 <= composition.cursor_pos && composition.cursor_pos <= preedit_length {
-        preedit_buffer := Buffer(preedit_length + cursor_size, 0)
-        local temp_preedit := Buffer(preedit_length, 0)
-        StrPut(preedit, temp_preedit, "UTF-8")
-        local src := temp_preedit.Ptr
-        local tgt := preedit_buffer.Ptr
-        Loop composition.cursor_pos {
-            byte := NumGet(src, A_Index - 1, "Char")
-            NumPut("Char", byte, tgt, A_Index - 1)
-        }
-        src := src + composition.cursor_pos
-        tgt := tgt + composition.cursor_pos
-        StrPut(cursor_text, tgt, "UTF-8")
-        tgt := tgt + cursor_size
-        Loop preedit_length - composition.cursor_pos {
-            byte := NumGet(src, A_Index - 1, "Char")
-            NumPut("Char", byte, tgt, A_Index - 1)
-        }
-        preedit_length := preedit_length + cursor_size
-        if selected_start >= composition.cursor_pos {
-            selected_start := selected_start + cursor_size
-        }
-        if selected_end > composition.cursor_pos {
-            selected_end := selected_end + cursor_size
-        }
-    } else {
-        preedit_buffer := Buffer(preedit_length, 0)
-        StrPut(preedit, preedit_buffer, "UTF-8")
-    }
-
-    if 0 <= selected_start && selected_start < selected_end && selected_end <= preedit_length {
-        pre_selected := StrGet(preedit_buffer, selected_start, "UTF-8")
-        selected := StrGet(preedit_buffer.Ptr + selected_start, selected_end - selected_start, "UTF-8")
-        post_selected := StrGet(preedit_buffer.Ptr + selected_end, "UTF-8")
-        return true
-    } else {
-        pre_selected := StrGet(preedit_buffer, "UTF-8")
-        return false
     }
 }

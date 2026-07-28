@@ -17,91 +17,146 @@
  *
  */
 
-#Include <RabbitCandidateBox>
+#Include <RabbitCandidateBoxCommon>
 #Include <RabbitUIStyle>
 
 class LegacyCandidateBox {
     static dbg := false
-    static gui := 0
-    static border := LegacyCandidateBox.dbg ? "+border" : 0
 
-    __New() {
-        this.UpdateUIStyle()
+    __New(style := UIStyle) {
+        this.gui := 0
+        this.built := false
+        this.visible := false
+        this.disposed := false
+        this.border := LegacyCandidateBox.dbg ? "+border" : 0
+
+        try {
+            this.UpdateStyle(style)
+        } catch as error {
+            this.Dispose()
+            throw error
+        }
     }
 
-    UpdateUIStyle() {
+    __Delete() {
+        this.Dispose()
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.Hide()
+        if this.gui {
+            this.gui.Destroy()
+            this.gui := 0
+        }
+        this.built := false
+        this.disposed := true
+    }
+
+    UpdateStyle(style) {
+        this.AssertNotDisposed()
+        this.style := style
         ; Alpha is not supported.
         del_opaque(color) {
             return color & 0xffffff
         }
-        LegacyCandidateBox.text_color := del_opaque(UIStyle.text_color)
-        LegacyCandidateBox.back_color := del_opaque(UIStyle.back_color)
-        LegacyCandidateBox.candidate_text_color := del_opaque(UIStyle.candidate_text_color)
-        LegacyCandidateBox.candidate_back_color := del_opaque(UIStyle.candidate_back_color)
-        LegacyCandidateBox.label_color := del_opaque(UIStyle.label_color)
-        LegacyCandidateBox.comment_text_color := del_opaque(UIStyle.comment_text_color)
-        LegacyCandidateBox.hilited_text_color := del_opaque(UIStyle.hilited_text_color)
-        LegacyCandidateBox.hilited_back_color := del_opaque(UIStyle.hilited_back_color)
-        LegacyCandidateBox.hilited_candidate_text_color := del_opaque(UIStyle.hilited_candidate_text_color)
-        LegacyCandidateBox.hilited_candidate_back_color := del_opaque(UIStyle.hilited_candidate_back_color)
-        LegacyCandidateBox.hilited_label_color := del_opaque(UIStyle.hilited_label_color)
-        LegacyCandidateBox.hilited_comment_text_color := del_opaque(UIStyle.hilited_comment_text_color)
+        this.text_color := del_opaque(style.text_color)
+        this.back_color := del_opaque(style.back_color)
+        this.candidate_text_color := del_opaque(style.candidate_text_color)
+        this.candidate_back_color := del_opaque(style.candidate_back_color)
+        this.label_color := del_opaque(style.label_color)
+        this.comment_text_color := del_opaque(style.comment_text_color)
+        this.hilited_text_color := del_opaque(style.hilited_text_color)
+        this.hilited_back_color := del_opaque(style.hilited_back_color)
+        this.hilited_candidate_text_color := del_opaque(style.hilited_candidate_text_color)
+        this.hilited_candidate_back_color := del_opaque(style.hilited_candidate_back_color)
+        this.hilited_label_color := del_opaque(style.hilited_label_color)
+        this.hilited_comment_text_color := del_opaque(style.hilited_comment_text_color)
 
-        LegacyCandidateBox.base_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.text_color, LegacyCandidateBox.back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.candidate_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.candidate_text_color, LegacyCandidateBox.candidate_back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.label_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.label_color, LegacyCandidateBox.candidate_back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.comment_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.comment_text_color, LegacyCandidateBox.candidate_back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.hilited_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_text_color, LegacyCandidateBox.hilited_back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.hilited_candidate_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_candidate_text_color, LegacyCandidateBox.hilited_candidate_back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.hilited_label_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_label_color, LegacyCandidateBox.hilited_candidate_back_color, LegacyCandidateBox.border)
-        LegacyCandidateBox.hilited_comment_opt := Format("c{:x} Background{:x} {}", LegacyCandidateBox.hilited_comment_text_color, LegacyCandidateBox.hilited_candidate_back_color, LegacyCandidateBox.border)
+        this.base_opt := Format("c{:x} Background{:x} {}", this.text_color, this.back_color, this.border)
+        this.candidate_opt := Format(
+            "c{:x} Background{:x} {}", this.candidate_text_color, this.candidate_back_color, this.border)
+        this.label_opt := Format(
+            "c{:x} Background{:x} {}", this.label_color, this.candidate_back_color, this.border)
+        this.comment_opt := Format(
+            "c{:x} Background{:x} {}", this.comment_text_color, this.candidate_back_color, this.border)
+        this.hilited_opt := Format(
+            "c{:x} Background{:x} {}", this.hilited_text_color, this.hilited_back_color, this.border)
+        this.hilited_candidate_opt := Format(
+            "c{:x} Background{:x} {}",
+            this.hilited_candidate_text_color, this.hilited_candidate_back_color, this.border)
+        this.hilited_label_opt := Format(
+            "c{:x} Background{:x} {}", this.hilited_label_color, this.hilited_candidate_back_color, this.border)
+        this.hilited_comment_opt := Format(
+            "c{:x} Background{:x} {}",
+            this.hilited_comment_text_color, this.hilited_candidate_back_color, this.border)
 
-        LegacyCandidateBox.base_font_opt := Format("s{} q5", UIStyle.font_point)
-        LegacyCandidateBox.label_font_opt := Format("s{} q5", UIStyle.label_font_point)
-        LegacyCandidateBox.comment_font_opt := Format("s{} q5", UIStyle.comment_font_point)
+        this.base_font_opt := Format("s{} q5", style.font_point)
+        this.label_font_opt := Format("s{} q5", style.label_font_point)
+        this.comment_font_opt := Format("s{} q5", style.comment_font_point)
 
-        if LegacyCandidateBox.gui {
-            LegacyCandidateBox.gui.BackColor := LegacyCandidateBox.back_color
-            LegacyCandidateBox.gui.MarginX := UIStyle.margin_x
-            LegacyCandidateBox.gui.MarginY := UIStyle.margin_y
+        if this.gui {
+            this.gui.BackColor := this.back_color
+            this.gui.MarginX := style.margin_x
+            this.gui.MarginY := style.margin_y
 
-            if HasProp(LegacyCandidateBox.gui, "pre") && LegacyCandidateBox.gui.pre {
-                LegacyCandidateBox.gui.pre.Opt(LegacyCandidateBox.base_opt)
+            if HasProp(this.gui, "pre") && this.gui.pre {
+                this.gui.pre.Opt(this.base_opt)
             }
-            if HasProp(LegacyCandidateBox.gui, "sel") && LegacyCandidateBox.gui.sel {
-                LegacyCandidateBox.gui.sel.Opt(LegacyCandidateBox.hilited_opt)
+            if HasProp(this.gui, "sel") && this.gui.sel {
+                this.gui.sel.Opt(this.hilited_opt)
             }
-            if HasProp(LegacyCandidateBox.gui, "post") && LegacyCandidateBox.gui.post {
-                LegacyCandidateBox.gui.post.Opt(LegacyCandidateBox.base_opt)
+            if HasProp(this.gui, "post") && this.gui.post {
+                this.gui.post.Opt(this.base_opt)
             }
         }
     }
 
     Build(context, &width, &height) {
-        if !LegacyCandidateBox.gui || !LegacyCandidateBox.gui.built {
-            LegacyCandidateBox.gui := LegacyCandidateBox.BoxGui(context)
+        this.AssertNotDisposed()
+        if !this.gui || !this.gui.built {
+            this.gui := LegacyCandidateBox.BoxGui(this, context)
         } else {
-            LegacyCandidateBox.gui.Update(context)
+            this.gui.Update(context)
         }
-        width := LegacyCandidateBox.gui.max_width
-        height := LegacyCandidateBox.gui.max_height
+        width := this.gui.max_width
+        height := this.gui.max_height
+        this.built := true
     }
 
     Show(x, y) {
-        LegacyCandidateBox.gui.Show(Format("AutoSize NA x{} y{}", x, y))
+        this.AssertNotDisposed()
+        if !this.built {
+            throw Error("Candidate box must be built before it is shown.")
+        }
+        this.gui.Show(Format("AutoSize NA x{} y{}", x, y))
+        this.visible := true
     }
 
     Hide() {
-        if LegacyCandidateBox.gui && HasMethod(LegacyCandidateBox.gui, "Show") {
-            LegacyCandidateBox.gui.Show("Hide")
+        if this.disposed {
+            return
+        }
+        if this.visible && this.gui && HasMethod(this.gui, "Show") {
+            this.gui.Show("Hide")
+            this.visible := false
+        }
+    }
+
+    AssertNotDisposed() {
+        if this.disposed {
+            throw Error("Candidate box has been disposed.")
         }
     }
 
     class BoxGui extends Gui {
         built := false
-        __New(context, &pre?, &sel?, &post?, &menu?) {
+        __New(owner, context, &pre?, &sel?, &post?, &menu?) {
             local w, h, h1, h2, h3
             super.__New(, , this)
+            this.owner := owner
 
             menu := context.menu
             local cands := menu.candidates
@@ -111,22 +166,23 @@ class LegacyCandidateBox {
             GetCompositionText(composition, &pre, &sel, &post)
 
             this.Opt(Format("-DPIScale -Caption +Owner +AlwaysOnTop {} {} {}", WS_EX_NOACTIVATE, WS_EX_COMPOSITED, WS_EX_LAYERED))
-            this.BackColor := LegacyCandidateBox.back_color
-            this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
-            this.MarginX := UIStyle.margin_x
-            this.MarginY := UIStyle.margin_y
+            this.BackColor := this.owner.back_color
+            this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
+            this.MarginX := this.owner.style.margin_x
+            this.MarginY := this.owner.style.margin_y
             this.num_candidates := num_candidates
             this.has_comment := false
 
             ; build preedit
             this.max_width := 0
             this.preedit_height := 0
-            local head_position := Format("x{} y{} section {}", this.MarginX, this.MarginY, LegacyCandidateBox.border)
+            local head_position := Format(
+                "x{} y{} section {}", this.MarginX, this.MarginY, this.owner.border)
             local position := head_position
             if pre {
                 this.pre := this.AddText(position, pre)
-                this.pre.Opt(LegacyCandidateBox.base_opt)
-                position := Format("x+{} ys {}", this.MarginX, LegacyCandidateBox.border)
+                this.pre.Opt(this.owner.base_opt)
+                position := Format("x+{} ys {}", this.MarginX, this.owner.border)
                 this.pre.GetPos(, , &w, &h)
                 this.preedit_height := max(this.preedit_height, h)
                 this.pre_width := w
@@ -134,8 +190,8 @@ class LegacyCandidateBox {
             }
             if sel {
                 this.sel := this.AddText(position, sel)
-                this.sel.Opt(LegacyCandidateBox.hilited_opt)
-                position := Format("x+{} ys {}", this.MarginX, LegacyCandidateBox.border)
+                this.sel.Opt(this.owner.hilited_opt)
+                position := Format("x+{} ys {}", this.MarginX, this.owner.border)
                 this.sel.GetPos(, , &w, &h)
                 this.preedit_height := max(this.preedit_height, h)
                 this.sel_width := w
@@ -143,7 +199,7 @@ class LegacyCandidateBox {
             }
             if post {
                 this.post := this.AddText(position, post)
-                this.post.Opt(LegacyCandidateBox.base_opt)
+                this.post.Opt(this.owner.base_opt)
                 this.post.GetPos(, , &w, &h)
                 this.preedit_height := max(this.preedit_height, h)
                 this.post_width := w
@@ -159,21 +215,21 @@ class LegacyCandidateBox {
             local select_keys := menu.select_keys
             local num_select_keys := StrLen(select_keys)
             loop num_candidates {
-                position := Format("xs y+{} section {}", this.MarginY, LegacyCandidateBox.border)
+                position := Format("xs y+{} section {}", this.MarginY, this.owner.border)
                 local label_text := String(A_Index)
                 if A_Index <= menu.page_size && has_label {
                     label_text := context.select_labels[A_Index]
                 } else if A_Index <= num_select_keys {
                     label_text := SubStr(select_keys, A_Index, 1)
                 }
-                label_text := Format(UIStyle.label_format, label_text)
-                this.SetFont(LegacyCandidateBox.label_font_opt, UIStyle.label_font_face)
+                label_text := Format(this.owner.style.label_format, label_text)
+                this.SetFont(this.owner.label_font_opt, this.owner.style.label_font_face)
                 local label := this.AddText(Format("Right {} vL{}", position, A_Index), label_text)
                 label.GetPos(, , &w, &h1)
                 this.max_label_width := max(this.max_label_width, w + this.MarginX)
 
-                position := Format("x+{} ys {}", this.MarginX, LegacyCandidateBox.border)
-                this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
+                position := Format("x+{} ys {}", this.MarginX, this.owner.border)
+                this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
                 local candidate := this.AddText(Format("{} vC{}", position, A_Index), cands[A_Index].text)
                 candidate.GetPos(, , &w, &h2)
                 this.max_candidate_width := max(this.max_candidate_width, w + this.MarginX)
@@ -181,28 +237,28 @@ class LegacyCandidateBox {
                 if (comment_text := cands[A_Index].comment) {
                     this.has_comment := true
                 }
-                this.SetFont(LegacyCandidateBox.comment_font_opt, UIStyle.comment_font_face)
+                this.SetFont(this.owner.comment_font_opt, this.owner.style.comment_font_face)
                 local comment := this.AddText(Format("{} vM{}", position, A_Index), comment_text)
                 comment.GetPos(, , &w, &h3)
-                comment.Opt(Format("c{:x}", LegacyCandidateBox.comment_text_color))
+                comment.Opt(Format("c{:x}", this.owner.comment_text_color))
                 comment.Visible := this.has_comment
                 this.max_comment_width := max(this.max_comment_width, w)
                 this.candidate_height := max(this.candidate_height, h1, h2, h3)
 
                 if A_Index == hilited_index {
-                    label.Opt(LegacyCandidateBox.hilited_label_opt)
-                    candidate.Opt(LegacyCandidateBox.hilited_candidate_opt)
-                    comment.Opt(LegacyCandidateBox.hilited_comment_opt)
+                    label.Opt(this.owner.hilited_label_opt)
+                    candidate.Opt(this.owner.hilited_candidate_opt)
+                    comment.Opt(this.owner.hilited_comment_opt)
                 } else {
-                    label.Opt(LegacyCandidateBox.label_opt)
-                    candidate.Opt(LegacyCandidateBox.candidate_opt)
-                    comment.Opt(LegacyCandidateBox.comment_opt)
+                    label.Opt(this.owner.label_opt)
+                    candidate.Opt(this.owner.candidate_opt)
+                    comment.Opt(this.owner.comment_opt)
                 }
             }
 
             ; adjust width height
             local list_width := this.max_label_width + this.max_candidate_width + this.has_comment * this.max_comment_width
-            local box_width := max(UIStyle.min_width, list_width)
+            local box_width := max(this.owner.style.min_width, list_width)
             if box_width > this.max_width && HasProp(this, "post") && this.post {
                 this.post.Move(, , this.post_width + box_width - this.max_width)
             }
@@ -237,10 +293,10 @@ class LegacyCandidateBox {
 
         Update(context) {
             local x, y, w, h, width, height
-            local fake_gui := LegacyCandidateBox.BoxGui(context, &pre, &sel, &post, &menu)
+            local fake_gui := LegacyCandidateBox.BoxGui(this.owner, context, &pre, &sel, &post, &menu)
             local num_candidates := menu.num_candidates
             local hilited_index := menu.highlighted_candidate_index + 1
-            this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
+            this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
             this.num_candidates := max(this.num_candidates, num_candidates)
             this.max_width := fake_gui.max_width
             this.max_height := fake_gui.max_height
@@ -291,19 +347,19 @@ class LegacyCandidateBox {
                 local fake_label := fake_gui["L" . A_Index]
                 local fake_candidate := fake_gui["C" . A_Index]
                 local fake_comment := fake_gui["M" . A_Index]
-                this.SetFont(LegacyCandidateBox.label_font_opt, UIStyle.label_font_face)
+                this.SetFont(this.owner.label_font_opt, this.owner.style.label_font_face)
                 try {
                     local label := this["L" . A_Index]
                 } catch {
                     local label := this.AddText(Format("vL{}", A_Index), fake_label.Value)
                 }
-                this.SetFont(LegacyCandidateBox.base_font_opt, UIStyle.font_face)
+                this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
                 try {
                     local candidate := this["C" . A_Index]
                 } catch {
                     local candidate := this.AddText(Format("vC{}", A_Index), fake_candidate.Value)
                 }
-                this.SetFont(LegacyCandidateBox.comment_font_opt, UIStyle.comment_font_face)
+                this.SetFont(this.owner.comment_font_opt, this.owner.style.comment_font_face)
                 try {
                     local comment := this["M" . A_Index]
                 } catch {
@@ -320,13 +376,13 @@ class LegacyCandidateBox {
                 comment.Move(x, y, w, h)
 
                 if A_Index == hilited_index {
-                    label.Opt(LegacyCandidateBox.hilited_label_opt)
-                    candidate.Opt(LegacyCandidateBox.hilited_candidate_opt)
-                    comment.Opt(LegacyCandidateBox.hilited_comment_opt)
+                    label.Opt(this.owner.hilited_label_opt)
+                    candidate.Opt(this.owner.hilited_candidate_opt)
+                    comment.Opt(this.owner.hilited_comment_opt)
                 } else {
-                    label.Opt(LegacyCandidateBox.label_opt)
-                    candidate.Opt(LegacyCandidateBox.candidate_opt)
-                    comment.Opt(LegacyCandidateBox.comment_opt)
+                    label.Opt(this.owner.label_opt)
+                    candidate.Opt(this.owner.candidate_opt)
+                    comment.Opt(this.owner.comment_opt)
                 }
                 local visible := (A_Index <= num_candidates)
                 label.Visible := visible

@@ -250,7 +250,7 @@ OnColorChange(wParam, lParam, msg, hWnd) {
             }
 
             rime.config_close(config)
-            box.UpdateUIStyle()
+            box.UpdateStyle(UIStyle)
         }
         DarkMode.set(IS_DARK_MODE)
     }

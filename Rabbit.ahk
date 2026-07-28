@@ -23,8 +23,7 @@
 ;@Ahk2Exe-SetOrigFilename Rabbit.ahk
 
 #Include <RabbitCommon>
-#Include <RabbitCandidateBox>
-#Include <RabbitLegacyCandidateBox>
+#Include <RabbitCandidateBoxFactory>
 #Include <RabbitInput>
 #Include <RabbitRuntimeState>
 #Include <RabbitTrayMenu>
@@ -104,11 +103,7 @@ RabbitMain(args) {
     CleanOldLogs()
     CleanMisPlacedConfigs()
     RabbitConfig.load()
-    if RabbitConfig.use_legacy_candidate_box || IsOldWindows() {
-        box := LegacyCandidateBox()
-    } else {
-        box := CandidateBox()
-    }
+    box := RabbitCandidateBoxFactory().Create(RabbitConfig.use_legacy_candidate_box)
     RegisterHotKeys()
     UpdateStateLabels()
     if (status := rime.get_status(session_id)) {
@@ -128,7 +123,7 @@ RabbitMain(args) {
         }
     }
     SetupTrayMenu()
-    box.UpdateUIStyle()
+    box.UpdateStyle(UIStyle)
     OnMessage(AHK_NOTIFYICON, ClickHandler.Bind())
     OnMessage(WM_SETTINGCHANGE, OnColorChange.Bind())
     OnMessage(WM_DWMCOLORIZATIONCOLORCHANGED, OnColorChange.Bind())
@@ -155,6 +150,9 @@ ExitRabbit(layout, reason, code) {
     }
     TrayTip()
     ToolTip(, , , STATUS_TOOLTIP)
+    if box && HasMethod(box, "Dispose") {
+        box.Dispose()
+    }
     if session_id {
         rime.destroy_session(session_id)
         rime.finalize()
