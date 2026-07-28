@@ -17,7 +17,10 @@
  */
 
 #Requires AutoHotkey v2.0
+#SingleInstance Off
 
 #Include <RabbitCandidateBoxFactory>
+#Include <RabbitShutdown>
 
 #Include tests\RabbitCandidateBoxTest.ahk
+#Include tests\RabbitShutdownTest.ahk

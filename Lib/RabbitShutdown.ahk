@@ -16,19 +16,24 @@
  *
  */
 
-#Include <RabbitCandidateBox>
-#Include <RabbitLegacyCandidateBox>
-
-class RabbitCandidateBoxFactory {
-    __New(style := UIStyle, modern_constructor := CandidateBox, legacy_constructor := LegacyCandidateBox) {
-        this.style := style
-        this.modern_constructor := modern_constructor
-        this.legacy_constructor := legacy_constructor
-    }
-
-    Create(use_legacy_candidate_box) {
-        local constructor
-        constructor := use_legacy_candidate_box ? this.legacy_constructor : this.modern_constructor
-        return constructor.Call(this.style)
+RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance) {
+    try {
+        if candidate_box && HasMethod(candidate_box, "Dispose") {
+            candidate_box.Dispose()
+        }
+    } finally {
+        try {
+            if session {
+                try {
+                    rime_api.destroy_session(session)
+                } finally {
+                    rime_api.finalize()
+                }
+            }
+        } finally {
+            if mutex_instance {
+                mutex_instance.Close()
+            }
+        }
     }
 }

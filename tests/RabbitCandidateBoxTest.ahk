@@ -26,6 +26,8 @@ if A_Args.Length {
             RunTest("configured legacy factory selection", TestConfiguredLegacyFactorySelection.Bind())
         case "factory-modern":
             RunTest("modern factory selection", TestModernFactorySelection.Bind())
+        case "legacy-build-no-direct2d":
+            RunTest("legacy build without Direct2D", TestLegacyBuildWithoutDirect2D.Bind())
         case "visual-modern":
             ShowVisualCandidate(CandidateBox(), candidate_context)
         case "visual-legacy":
@@ -83,34 +85,48 @@ RunTest(name, test) {
 }
 
 TestOldWindowsFactorySelection() {
-    TestCandidateFactorySelection(true, false, "Old Windows")
+    TestCandidateFactorySelection(true, "Old Windows")
 }
 
 TestConfiguredLegacyFactorySelection() {
-    TestCandidateFactorySelection(false, true, "The legacy setting")
+    TestCandidateFactorySelection(true, "The legacy setting")
 }
 
 TestModernFactorySelection() {
-    TestCandidateFactorySelection(false, false, "The modern path")
+    TestCandidateFactorySelection(false, "The modern path")
 }
 
-TestCandidateFactorySelection(is_old_windows, use_legacy_candidate_box, description) {
+TestCandidateFactorySelection(use_legacy_candidate_box, description) {
     local modern_count := { value: 0 }
     local legacy_count := { value: 0 }
     local direct2d_count := { value: 0 }
     local modern_constructor := CreateModernCandidate.Bind(modern_count, direct2d_count)
     local legacy_constructor := CreateLegacyCandidate.Bind(legacy_count)
-    local is_old_windows_probe := (*) => is_old_windows
-    local factory := RabbitCandidateBoxFactory(
-        UIStyle, is_old_windows_probe, modern_constructor, legacy_constructor)
+    local factory := RabbitCandidateBoxFactory(UIStyle, modern_constructor, legacy_constructor)
     local candidate_box := factory.Create(use_legacy_candidate_box)
 
-    local expected_modern := (is_old_windows || use_legacy_candidate_box) ? 0 : 1
+    local expected_modern := use_legacy_candidate_box ? 0 : 1
     local expected_legacy := expected_modern ? 0 : 1
     AssertEqual(expected_modern, modern_count.value, description . " selected the wrong modern backend count.")
     AssertEqual(expected_legacy, legacy_count.value, description . " selected the wrong legacy backend count.")
     AssertEqual(expected_modern, direct2d_count.value, description . " selected the wrong Direct2D count.")
     candidate_box.Dispose()
+}
+
+TestLegacyBuildWithoutDirect2D() {
+    local direct2d_count := { value: 0 }
+    local modern_constructor := CreateModernCandidate.Bind({ value: 0 }, direct2d_count)
+    local factory := RabbitCandidateBoxFactory(
+        UIStyle, modern_constructor, CreateLegacyCandidate.Bind({ value: 0 }))
+    local candidate_box := factory.Create(true)
+    local width, height
+    try {
+        candidate_box.Build(candidate_context, &width, &height)
+        AssertTrue(width > 0 && height > 0, "The legacy backend must build valid dimensions.")
+        AssertEqual(0, direct2d_count.value, "Building the legacy backend must not construct Direct2D.")
+    } finally {
+        candidate_box.Dispose()
+    }
 }
 
 CreateModernCandidate(modern_count, direct2d_count, style) {

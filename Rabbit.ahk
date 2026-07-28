@@ -26,6 +26,7 @@
 #Include <RabbitCandidateBoxFactory>
 #Include <RabbitInput>
 #Include <RabbitRuntimeState>
+#Include <RabbitShutdown>
 #Include <RabbitTrayMenu>
 #Include <RabbitUIStyle>
 #Include <RabbitConfig>
@@ -103,7 +104,8 @@ RabbitMain(args) {
     CleanOldLogs()
     CleanMisPlacedConfigs()
     RabbitConfig.load()
-    box := RabbitCandidateBoxFactory().Create(RabbitConfig.use_legacy_candidate_box)
+    local use_legacy_candidate_box := IsOldWindows() || RabbitConfig.use_legacy_candidate_box
+    box := RabbitCandidateBoxFactory().Create(use_legacy_candidate_box)
     RegisterHotKeys()
     UpdateStateLabels()
     if (status := rime.get_status(session_id)) {
@@ -150,14 +152,5 @@ ExitRabbit(layout, reason, code) {
     }
     TrayTip()
     ToolTip(, , , STATUS_TOOLTIP)
-    if box && HasMethod(box, "Dispose") {
-        box.Dispose()
-    }
-    if session_id {
-        rime.destroy_session(session_id)
-        rime.finalize()
-    }
-    if mutex {
-        mutex.Close()
-    }
+    RabbitShutdownRuntime(box, rime, session_id, mutex)
 }

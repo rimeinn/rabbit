@@ -569,12 +569,14 @@ Focused tests:
 | Phase 0 | `Rabbit.ahk 0 0 1033` source startup for five seconds | Pass; remained running with no captured exception |
 | Phase 0 | `RabbitDeployer.ahk` default source entry | Pass; opened its expected first-run configuration path |
 | Phase 0 | `RabbitDeployer.ahk deploy` | Pass; exit code 0 with no captured exception |
-| Phase 1 | factory selection in fresh processes | Pass; old-Windows and configured-legacy paths constructed 0 Direct2D renderers, modern constructed 1 |
+| Phase 1 | caller-resolved factory selection in fresh processes | Pass; old-Windows and configured-legacy choices constructed 0 Direct2D renderers, modern constructed 1 |
+| Phase 1 | configured legacy selection and build in a dedicated fresh process | Pass; valid dimensions were produced and the Direct2D wrapper seam remained at 0 constructions |
 | Phase 1 | candidate lifecycle and partial-construction cleanup contract tests | Pass for both backends, including repeated build, hide, and dispose |
 | Phase 1 | local dimension characterization | Pass; modern remained 160 x 101 and legacy remained 172 x 99 in the same environment |
 | Phase 1 | actual modern and configured-legacy input paths | Pass; preedit, candidates, comments, selection, and positioning rendered correctly |
 | Phase 1 | configured-legacy main-process module inspection | Pass; `gdiplus`, `d2d1`, and `dwrite` were not loaded |
 | Phase 1 | explicit main-application shutdown | Pass; the modern candidate renderer disposed without a captured exception |
+| Phase 1 | injected candidate disposal failure | Pass; Rime session destruction, finalization, and mutex closure still ran in order |
 | Phase 1 | deployer default UI and `deploy` command | Pass; the expected configuration window opened and deployment exited with code 0 |
 | Phase 1 | local caret-hook safety override cleanup | Pass; `rabbit.custom.yaml` was restored and no override entered the diff |
 
