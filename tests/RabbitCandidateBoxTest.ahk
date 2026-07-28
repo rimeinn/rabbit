@@ -115,18 +115,37 @@ TestCandidateFactorySelection(use_legacy_candidate_box, description) {
 
 TestLegacyBuildWithoutDirect2D() {
     local direct2d_count := { value: 0 }
-    local modern_constructor := CreateModernCandidate.Bind({ value: 0 }, direct2d_count)
-    local factory := RabbitCandidateBoxFactory(
-        UIStyle, modern_constructor, CreateLegacyCandidate.Bind({ value: 0 }))
-    local candidate_box := factory.Create(true)
+    local original_constructor := Direct2D.Prototype.GetOwnPropDesc("__New")
+    local original_destructor := Direct2D.Prototype.GetOwnPropDesc("__Delete")
+    Direct2D.Prototype.DefineProp(
+        "__New", { Call: CountDirect2DConstruction.Bind(direct2d_count) })
+    Direct2D.Prototype.DefineProp("__Delete", { Call: IgnoreDirect2DDestruction })
+    local candidate_box := 0
     local width, height
     try {
+        local construction_probe := Direct2D(0)
+        AssertEqual(1, direct2d_count.value, "The Direct2D construction probe must count its calibration call.")
+        construction_probe := 0
+        direct2d_count.value := 0
+
+        candidate_box := RabbitCandidateBoxFactory().Create(true)
         candidate_box.Build(candidate_context, &width, &height)
         AssertTrue(width > 0 && height > 0, "The legacy backend must build valid dimensions.")
-        AssertEqual(0, direct2d_count.value, "Building the legacy backend must not construct Direct2D.")
     } finally {
-        candidate_box.Dispose()
+        if candidate_box {
+            candidate_box.Dispose()
+        }
+        Direct2D.Prototype.DefineProp("__New", original_constructor)
+        Direct2D.Prototype.DefineProp("__Delete", original_destructor)
     }
+    AssertEqual(0, direct2d_count.value, "Building the legacy backend must not construct Direct2D.")
+}
+
+CountDirect2DConstruction(direct2d_count, instance, parameters*) {
+    direct2d_count.value++
+}
+
+IgnoreDirect2DDestruction(instance, parameters*) {
 }
 
 CreateModernCandidate(modern_count, direct2d_count, style) {

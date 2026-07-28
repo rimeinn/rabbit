@@ -570,7 +570,7 @@ Focused tests:
 | Phase 0 | `RabbitDeployer.ahk` default source entry | Pass; opened its expected first-run configuration path |
 | Phase 0 | `RabbitDeployer.ahk deploy` | Pass; exit code 0 with no captured exception |
 | Phase 1 | caller-resolved factory selection in fresh processes | Pass; old-Windows and configured-legacy choices constructed 0 Direct2D renderers, modern constructed 1 |
-| Phase 1 | configured legacy selection and build in a dedicated fresh process | Pass; valid dimensions were produced and the Direct2D wrapper seam remained at 0 constructions |
+| Phase 1 | configured legacy selection and build in a dedicated fresh process | Pass; a calibrated `Direct2D.__New()` probe observed 0 constructions while valid dimensions were produced |
 | Phase 1 | candidate lifecycle and partial-construction cleanup contract tests | Pass for both backends, including repeated build, hide, and dispose |
 | Phase 1 | local dimension characterization | Pass; modern remained 160 x 101 and legacy remained 172 x 99 in the same environment |
 | Phase 1 | actual modern and configured-legacy input paths | Pass; preedit, candidates, comments, selection, and positioning rendered correctly |
