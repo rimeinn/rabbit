@@ -156,7 +156,7 @@ confirmed defect until its current behavior is reproduced.
 |---|---|---|---|
 | `KeyDef.mask` and key-code maps | key translation tables | initialized once | conventionally immutable lookup data |
 | monitor structure offset statics | ABI offsets and sizes | initialized once | immutable scalar metadata |
-| `GetCompositionText.cursor_text` / `cursor_size` | cursor encoding constants | initialized once | immutable scalar metadata |
+| `RabbitGetCompositionText.cursor_text` / `cursor_size` | cursor encoding constants | initialized once | immutable scalar metadata |
 | `SetupTrayMenu.rabbit_script` / `rabbit_ico` | resolved source paths | initialized once | immutable scalar metadata |
 | remaining module globals | version/name, Windows messages, file attributes, monitor flags, window styles | initialized once | conventionally immutable constants |
 
@@ -204,7 +204,8 @@ startup and disposal.
 - Both receive raw librime context data through `Build()`.
 - `RabbitInput` owns context fetching, content building, placement policy, monitor correction, and visibility decisions.
 - `RabbitTrayMenu` and the color-change handler reach the global box directly.
-- `RabbitLegacyCandidateBox` includes `RabbitCandidateBox` only to reuse `GetCompositionText()`. This pulls the
+- In the Phase 0 snapshot, `RabbitLegacyCandidateBox` includes `RabbitCandidateBox` only to reuse the then-named
+  `GetCompositionText()`. This pulls the
   Direct2D implementation into a dependency that should be backend-neutral.
 - Modern visibility and legacy GUI/style state are class-static even though only the selected candidate instance should
   own them.
@@ -347,7 +348,7 @@ text, comments, and highlight state. Direct2D and legacy GUI code then own rende
 The factory receives an already resolved backend choice. It does not read Rime configuration:
 
 ```text
-legacy := IsOldWindows() || config.use_legacy_candidate_box
+legacy := RabbitIsOldWindows() || config.use_legacy_candidate_box
 candidate_box := factory.Create(legacy, style)
 ```
 
@@ -406,8 +407,21 @@ These findings are not classified as defects without a reproducible behavior or 
 | SR-008 | dialog result objects and destruction paths are inconsistent | clarify during deployer-context migration |
 | SR-009 | `ThemesGUI` has no first-party construction path | preserve until separately confirmed obsolete |
 | SR-010 | overlapping clipboard sends may queue restores with different captured clipboard values | reproduce separately before treating as a defect |
+| SR-011 | event, hotkey, tray, and workflow entry functions remain in AutoHotkey's global function namespace | migrate them into explicit owners during the main-app and deployer context phases |
 
 Confirmed defects are added to a separate defect section with reproduction steps and do not share a refactoring commit.
+
+### 9.1 Global function namespace scope
+
+The post-Phase 2 namespace cleanup is intentionally limited to reusable helper functions. These helpers use the
+`Rabbit` prefix, including caret lookup, platform detection, traits construction, configuration-file creation,
+candidate text conversion, and log cleanup.
+
+Event and workflow entry points such as `OnRimeMessage`, `RegisterHotKeys`, `ProcessKey`, `SetupTrayMenu`,
+`OnColorChange`, `ConfigureSwitcher`, `SetDefaultKeyboard`, and the application exit callbacks remain global for now.
+Renaming them alone would not establish ownership or reduce callback coupling. Phase 4 moves main-application entries
+behind runtime owners, and Phase 5 does the same for deployer and dialog workflows. Until those phases, new reusable
+helpers must use the `Rabbit` prefix and new global callback entry points should be avoided.
 
 ## 10. Confirmed defect register
 
