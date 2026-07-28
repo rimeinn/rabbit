@@ -151,11 +151,15 @@ UpdateTrayIcon() {
         icon_num := IN_MAINTENANCE ? 3 : (TRAY_ASCII_MODE ? 2 : (RabbitGlobals.current_schema_icon ? 0 : 1))
         if icon_num {
             TraySetIcon(A_ScriptFullPath, icon_num)
-        } else {
+        } else if FileExist(RabbitGlobals.current_schema_icon) {
             TraySetIcon(RabbitGlobals.current_schema_icon)
         }
     } else {
-        TraySetIcon((A_IsSuspended || IN_MAINTENANCE) ? "Lib\rabbit-alt.ico" : (TRAY_ASCII_MODE ? "Lib\rabbit-ascii.ico" : icon_path), , true)
+        icon_path := (A_IsSuspended || IN_MAINTENANCE) ? "Lib\rabbit-alt.ico"
+            : (TRAY_ASCII_MODE ? "Lib\rabbit-ascii.ico" : icon_path)
+        if FileExist(icon_path) {
+            TraySetIcon(icon_path, , true)
+        }
     }
 }
 
