@@ -1,6 +1,6 @@
 # Rabbit Runtime Architecture Refactoring
 
-Status: Phase 3 explicit style snapshots implemented and validated
+Status: Phase 4 main application context implemented and validated
 Last updated: 2026-07-28
 
 ## 1. Purpose
@@ -37,25 +37,23 @@ commit.
 
 ```text
 Rabbit.ahk
-  -> choose and load the keyboard layout
-  -> acquire the process-wide Rime mutex
-  -> create traits and initialize the global Rime API
-  -> run first-start deployment or Rime maintenance
-  -> create the Rime session
-  -> load RabbitConfig and publish a resolved UI style snapshot
-  -> choose and construct one candidate-box backend
-  -> register hotkeys
-  -> read state labels and initial Rime status
-  -> construct the tray menu and refresh the candidate style
-  -> register tray and Windows color-change messages
-  -> optionally start the per-window ASCII timer
-  -> register the exit callback
+  -> create the Rime API and RabbitApplication
+  -> RabbitApplication creates RabbitAppContext
+       -> choose and load the keyboard layout
+       -> acquire the process-wide Rime mutex
+       -> initialize Rime and create its session
+       -> run first-start deployment or Rime maintenance
+       -> load RabbitConfigSnapshot and RabbitUIStyleSnapshot
+       -> construct the selected candidate backend
+       -> construct input, runtime-state, tray, and appearance owners
+       -> register hotkeys, timers, tray messages, and appearance messages
   -> process input and UI events
-  -> on exit, restore the keyboard layout and finalize Rime
+  -> on exit, unregister callbacks and dispose the context in order
 ```
 
-Current ownership is implicit after startup. `RabbitMain()` constructs the mutex, Rime session, and candidate box, but
-callbacks in several modules access them as globals. The exit callback directly accesses the same globals.
+`RabbitApplication` coordinates startup and owns the top-level callbacks. `RabbitAppContext` owns process-lifetime
+resources and disposes input hotkeys, the runtime timer, appearance messages, the candidate box, the Rime session,
+Rime, and the mutex in order. Runtime components receive only their direct dependencies.
 
 ### 3.2 Deployer
 
@@ -92,37 +90,36 @@ lookup data. “Target owner” describes the planned boundary, not an implement
 
 | State | Current writers | Current readers | Lifetime | Target owner |
 |---|---|---|---|---|
-| `rime` | constructed by `RabbitCommon` | main, input, state, tray, config, style, deployer UI | process | app or deployer context |
-| `rabbit_traits` | main and `Configurator.Initialize()` | Rime setup lifetime | initialization/process | app or deployer context |
-| `session_id` | `RabbitMain()` | input, runtime state, tray, exit | Rime session | app context |
-| `mutex` | top-level `Rabbit.ahk` | startup and exit | main process | app context |
-| `box` | `RabbitMain()` | input, tray, color-change handler | main process UI | candidate UI coordinator |
-| `IN_MAINTENANCE` | common default and both entries | tray menu and icon | process/workflow | app/deployer runtime state |
-| `IS_DARK_MODE` | config load and color-change handler | config/style dark-mode logic | main process | resolved appearance state |
-| `last_is_hide` | top-level default, `ProcessKey()` | input processing | input interaction | input state |
-| `suspend_hotkey_mask` | `RegisterHotKeys()` | `ProcessKey()` | main process | hotkey/input state |
-| `suspend_hotkey` | `RegisterHotKeys()` | `ProcessKey()` | main process | hotkey/input state |
-| tray schema/mode fields | `UpdateTrayTip()` | tray icon and tooltip | Rime session | tray presentation state |
-| state-label globals | `UpdateStateLabels()` | status tooltip formatting | Rime session/schema | runtime label snapshot |
+| main `rime` | constructed by `Rabbit.ahk` | app context and narrow runtime owners | process | implemented app-context ownership |
+| deployer `rime` | constructed by `RabbitDeployer.ahk` | deployer UI | process | deployer context in Phase 5 |
+| `rabbit_traits` | app context and `Configurator.Initialize()` | Rime setup lifetime | initialization/process | app implemented; deployer Phase 5 |
+| `session_id` | `RabbitApplication` | input, runtime state, tray, shutdown | Rime session | implemented app-context ownership |
+| `mutex` | `RabbitApplication` | startup and shutdown | main process | implemented app-context ownership |
+| candidate box | `RabbitApplication` | input, tray, appearance, shutdown | main process UI | implemented app-context ownership |
+| maintenance state | application/deployer workflow | tray menu and icon | process/workflow | workflow coordinator |
+| active dark mode and style | appearance controller | appearance callback and candidate box | main process | implemented appearance ownership |
+| placement and suspend fields | input controller | input processing | main process | implemented input ownership |
+| tray schema/mode fields | tray controller | tray icon and tooltip | Rime session | implemented tray ownership |
+| state labels | runtime state | status tooltip formatting | Rime session/schema | implemented runtime-state ownership |
 
-### 4.2 `RabbitGlobals`
+### 4.2 Former `RabbitGlobals`
 
 | Property | Writers | Readers | Actual lifetime | Target owner |
 |---|---|---|---|---|
-| `process_ascii` | config load and `UpdateWinAscii()` | `UpdateWinAscii()` | main process | per-process input state |
-| `on_tray_icon_click` | tray click handler | `UpdateWinAscii()` | one tray interaction | tray/input coordination state |
-| `active_win` | `UpdateWinAscii()` | tray click handler | active-window interaction | per-process input state |
-| `current_schema_icon` | startup and input processing | tray icon update | Rime schema/session | tray presentation state |
-| `keyboard_layout` | `RabbitMain()` | deployer commands and exit | main process | app context |
+| `process_ascii` | runtime state | runtime state | main process | implemented runtime-state ownership |
+| `on_tray_icon_click` | tray controller | runtime state | one tray interaction | implemented runtime-state ownership |
+| `active_win` | runtime state | tray controller | active-window interaction | implemented runtime-state ownership |
+| `current_schema_icon` | tray controller | tray controller | Rime schema/session | implemented tray ownership |
+| `keyboard_layout` | application coordinator | tray and shutdown | main process | implemented app-context ownership |
 
-These properties do not share one useful lifecycle. `RabbitGlobals` is therefore a service-locator-like collection
-rather than a cohesive owner.
+These properties did not share one useful lifecycle. Phase 4 removed `RabbitGlobals` and moved each property to its
+cohesive owner.
 
 ### 4.3 Static configuration and resolved style state
 
 | Container | State | Writers | Readers | Target |
 |---|---|---|---|---|
-| `RabbitConfig` | hotkey, tips, ASCII, schema icons, candidate/caret options | `RabbitConfig.load()` | main runtime modules | `RabbitConfigSnapshot` |
+| `RabbitConfigSnapshot` | hotkey, tips, ASCII, schema icons, candidate/caret options | constructed by `RabbitConfigLoader` | main runtime modules | implemented snapshot |
 | `RabbitUIStyleSnapshot` | resolved fonts, geometry, colors, dark selection | constructed before publication | both boxes and previews | implemented snapshot |
 | `LegacyCandidateBox` | GUI, colors, font options, debug flag/border | constructor/style/build | all legacy instances | instance state or immutable diagnostic option |
 | `CandidateBox.isHidden` | `Show()` and `Hide()` | `Show()` and `Hide()` | candidate instance | instance state |
@@ -221,20 +218,21 @@ startup and disposal.
 
 ```text
 Rabbit.ahk
-  +-> RabbitInput
-  |     +-> global rime/session_id/box
-  |     +-> RabbitConfig
-  |     +-> RabbitRuntimeState
-  |     +-> RabbitTrayMenu
-  +-> RabbitTrayMenu
-  |     +-> global rime/session_id/box
-  |     +-> RabbitConfig
-  |     +-> RabbitGlobals
-  +-> RabbitConfig
-  |     +-> global rime/IS_DARK_MODE
-  |     +-> RabbitUIStyleSnapshot
-  +-> RabbitUIStyle
-        +-> global rime/IS_DARK_MODE/box/ui_style
+  +-> RabbitApplication
+        +-> RabbitAppContext
+        |     +-> rime/session/mutex/candidate/config
+        |     +-> ordered runtime disposal
+        +-> RabbitConfigLoader
+        |     +-> RabbitConfigSnapshot
+        |     +-> RabbitUIStyleSnapshot
+        +-> RabbitInputController
+        |     +-> rime/session/candidate/config/runtime state/tray
+        +-> RabbitRuntimeState
+        |     +-> rime/session/config and tray updates
+        +-> RabbitTrayController
+        |     +-> rime/session/candidate/config/runtime state
+        +-> RabbitAppearanceController
+              +-> rime/candidate/current style and dark mode
 
 RabbitDeployer.ahk
   +-> RabbitConfigurator
@@ -245,9 +243,9 @@ RabbitDeployer.ahk
               +-> RabbitUIStyleSnapshot
 ```
 
-The remaining major direction violations are callbacks reaching back into global entry-owned state and deployer
-workflows relying on process globals. Style parsing now publishes value snapshots, and the legacy backend is independent
-of the modern renderer.
+Main callbacks no longer reach back into global entry-owned state. The remaining major direction violations are in
+deployer workflows, which still rely on the explicit deployer-entry Rime and traits globals until Phase 5. Style and
+configuration parsing publish defensive value snapshots, and the legacy backend is independent of the modern renderer.
 
 ## 7. Target ownership model
 
@@ -394,13 +392,13 @@ These findings are not classified as defects without a reproducible behavior or 
 | SR-002 | modern candidate hidden state is class-static | move to instance ownership in candidate-boundary phase |
 | SR-003 | normal candidate disposal relies on `__Delete()` | add explicit idempotent disposal |
 | SR-004 | theme enumeration temporarily mutates shared `UIStyle` | resolved in Phase 3 with independent style snapshots |
-| SR-005 | message, hotkey, and timer registrations have no unified owner | assign owners during app-context migration |
-| SR-006 | `RabbitCommon` creates the Rime service and declares app state | separate constants/helpers from process ownership |
-| SR-007 | `RabbitInput` combines key translation, Rime processing, presentation, placement, and clipboard output | split only at stable behavioral seams |
+| SR-005 | message, hotkey, and timer registrations had no unified owner | resolved for the main app in Phase 4; deployer ownership remains in Phase 5 |
+| SR-006 | `RabbitCommon` created the Rime service and declared app state | resolved in Phase 4 |
+| SR-007 | `RabbitInput` combined key translation, Rime processing, presentation, placement, and clipboard output | controller ownership established in Phase 4; split further only at stable behavioral seams |
 | SR-008 | dialog result objects and destruction paths are inconsistent | clarify during deployer-context migration |
 | SR-009 | `ThemesGUI` has no first-party construction path | preserve until separately confirmed obsolete |
 | SR-010 | overlapping clipboard sends may queue restores with different captured clipboard values | reproduce separately before treating as a defect |
-| SR-011 | event, hotkey, tray, and workflow entry functions remain in AutoHotkey's global function namespace | migrate them into explicit owners during the main-app and deployer context phases |
+| SR-011 | event, hotkey, tray, and workflow entry functions remained in AutoHotkey's global function namespace | main-app entries resolved in Phase 4; deployer and dialog workflows remain for Phase 5 |
 
 Confirmed defects are added to a separate defect section with reproduction steps and do not share a refactoring commit.
 
@@ -410,10 +408,9 @@ The post-Phase 2 namespace cleanup is intentionally limited to reusable helper f
 `Rabbit` prefix, including caret lookup, platform detection, traits construction, configuration-file creation,
 candidate text conversion, and log cleanup.
 
-Event and workflow entry points such as `OnRimeMessage`, `RegisterHotKeys`, `ProcessKey`, `SetupTrayMenu`,
-`OnColorChange`, `ConfigureSwitcher`, `SetDefaultKeyboard`, and the application exit callbacks remain global for now.
-Renaming them alone would not establish ownership or reduce callback coupling. Phase 4 moves main-application entries
-behind runtime owners, and Phase 5 does the same for deployer and dialog workflows. Until those phases, new reusable
+Main-application event entries such as Rime notification handling, hotkey registration and processing, tray clicks,
+appearance messages, keyboard restoration, and exit handling are now methods on their runtime owners. Phase 5 performs
+the equivalent migration for deployer and dialog workflows such as `ConfigureSwitcher`. Until then, new reusable
 helpers must use the `Rabbit` prefix and new global callback entry points should be avoided.
 
 ## 10. Confirmed defect register
@@ -482,7 +479,7 @@ Characterization:
 - the main candidate hide contract still targets the active GUI instance, while the auxiliary native windows remain;
 - the legacy process continues to satisfy the no-Direct2D policy.
 
-No fix is included in the Phase 3 refactoring commit.
+No fix is included in the Phase 3 or Phase 4 refactoring commits.
 
 ## 11. Refactoring phases
 
@@ -573,6 +570,20 @@ Commit: `refactor(runtime): introduce application context`
 - give input, tray, appearance, timer, message, and hotkey owners narrow dependencies;
 - make normal shutdown explicit and ordered.
 
+Implementation result:
+
+- `Rabbit.ahk` constructs its Rime API and delegates startup to `RabbitApplication`;
+- `RabbitAppContext` owns the mutex, Rime lifecycle, session, candidate box, configuration, keyboard layout, and
+  disposable runtime controllers;
+- `RabbitConfigLoader` publishes `RabbitConfigSnapshot` and `RabbitUIStyleSnapshot` values without retaining mutable
+  configuration collection aliases;
+- input hotkeys and placement state, per-window ASCII and timer state, tray presentation, and appearance messages have
+  explicit instance owners;
+- normal shutdown unregisters the tray message before disposing hotkeys, the timer, appearance messages, the candidate
+  box, the Rime session, Rime, and the mutex;
+- the deployer constructs its own explicit Rime API for compatibility, while its context and workflow migration remain
+  Phase 5 work.
+
 ### Phase 5: Deployer context and dialog ownership
 
 Commit: `refactor(deployer): make workflow ownership explicit`
@@ -650,6 +661,15 @@ Focused tests:
 | Phase 3 | modern real-input path | Pass; `shuru`, `Down`, and `Esc` showed, updated, and hid a `160 x 190` candidate while Direct2D, DirectWrite, and GDI+ were loaded |
 | Phase 3 | configured legacy real-input path | Pass with BUG-003 recorded; the active `172 x 190` candidate showed, updated, and hid, and no Direct2D, DirectWrite, or GDI+ module loaded |
 | Phase 3 | local configuration restoration | Pass; `use_legacy_candidate_box: true` and `use_caret_hook: false` were restored and redeployed |
+| Phase 4 | config snapshot collection boundaries | Pass; constructor inputs and returned copies can be mutated without changing the published snapshot |
+| Phase 4 | application-context disposal and partial construction | Pass; every initialized owner is disposed in order and downstream cleanup continues after injected failures |
+| Phase 4 | input hotkey registration ownership | Pass; registered hotkeys are disabled by idempotent controller disposal |
+| Phase 4 | source validation and focused regression suite | Pass; both entries and both test entries validated, and all first-party fixtures passed |
+| Phase 4 | main source startup | Pass; configured-legacy startup remained running for five seconds without a captured exception |
+| Phase 4 | modern real-input path | Pass; `shuru`, `Down`, and `Esc` showed, updated, and hid a `160 x 190` candidate while Direct2D, DirectWrite, and GDI+ were loaded |
+| Phase 4 | configured legacy real-input path | Pass with BUG-003 unchanged; the active `172 x 190` candidate showed, updated, and hid, and no Direct2D, DirectWrite, or GDI+ module loaded |
+| Phase 4 | normal application shutdown | Pass; posting the normal close message exercised the exit callback and the process exited with code 0 |
+| Phase 4 | local configuration restoration | Pass; `use_legacy_candidate_box: true` and `use_caret_hook: false` were restored and redeployed |
 
 The local source checks used the available AutoHotkey v2.0.26 interpreter with `/ErrorStdOut`, with both standard output
 and standard error captured. A high-frequency visible-window probe was also used to identify the missing-icon exception

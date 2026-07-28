@@ -17,98 +17,95 @@
  */
 
 #Include <RabbitCommon>
+#Include <RabbitConfigSnapshot>
 #Include <RabbitUIStyle>
 #Include <RabbitUIStyleSnapshot>
 
-class RabbitConfig {
-    static suspend_hotkey := ""
-    static show_tips := true
-    static show_tips_time := 1200
-    static global_ascii := false
-    static preset_process_ascii := Map()
-    static schema_icon := Map()
-    static fix_candidate_box := false
-    static use_legacy_candidate_box := false
-    static use_caret_hook := true
-    static send_by_clipboard_length := 8
-
-    static load() {
-        global rime, IS_DARK_MODE
+class RabbitConfigLoader {
+    static Load(rime_api) {
         local config, result, iter, proc_name, schema_list, schema, icon, icon_path
+        local values := Map(
+            "preset_process_ascii", Map(),
+            "schema_icon", Map()
+        )
         local ui_style := RabbitUIStyleSnapshot()
+        local dark_mode := false
 
-        if !rime || !(config := rime.config_open("rabbit")) {
-            return ui_style
-        }
-        RabbitConfig.suspend_hotkey := rime.config_get_string(config, "suspend_hotkey")
-        if rime.config_test_get_bool(config, "show_tips", &result) {
-            RabbitConfig.show_tips := !!result
-        }
-        if rime.config_test_get_int(config, "show_tips_time", &result) {
-            RabbitConfig.show_tips_time := Abs(result)
-            if result == 0 {
-                RabbitConfig.show_tips := false
+        if !rime_api || !(config := rime_api.config_open("rabbit")) {
+            return {
+                config: RabbitConfigSnapshot(values),
+                style: ui_style,
+                dark_mode: dark_mode
             }
         }
 
-        if rime.config_test_get_int(config, "send_by_clipboard_length", &result) {
+        values["suspend_hotkey"] := rime_api.config_get_string(config, "suspend_hotkey")
+        if rime_api.config_test_get_bool(config, "show_tips", &result) {
+            values["show_tips"] := !!result
+        }
+        if rime_api.config_test_get_int(config, "show_tips_time", &result) {
+            values["show_tips_time"] := Abs(result)
+            if result == 0 {
+                values["show_tips"] := false
+            }
+        }
+        if rime_api.config_test_get_int(config, "send_by_clipboard_length", &result) {
             ; 0: always send by clipboard
             ; >0: send by clipboard if length >= value
             ; <0: never send by clipboard (65535 is large enough for candidates)
-            RabbitConfig.send_by_clipboard_length := result >= 0 ? result : 65535
+            values["send_by_clipboard_length"] := result >= 0 ? result : 65535
         }
-        if rime.config_test_get_bool(config, "global_ascii", &result) {
-            RabbitConfig.global_ascii := !!result
+        if rime_api.config_test_get_bool(config, "global_ascii", &result) {
+            values["global_ascii"] := !!result
         }
-        if (iter := rime.config_begin_map(config, "app_options")) {
-            while rime.config_next(iter) {
+        if (iter := rime_api.config_begin_map(config, "app_options")) {
+            while rime_api.config_next(iter) {
                 proc_name := StrLower(iter.key)
-                if rime.config_test_get_bool(config, "app_options/" . proc_name . "/ascii_mode", &result) {
-                    RabbitConfig.preset_process_ascii[proc_name] := !!result
-                    RabbitGlobals.process_ascii[proc_name] := !!result
+                if rime_api.config_test_get_bool(
+                    config, "app_options/" . proc_name . "/ascii_mode", &result) {
+                    values["preset_process_ascii"][proc_name] := !!result
                 }
             }
-            rime.config_end(iter)
+            rime_api.config_end(iter)
+        }
+        if rime_api.config_test_get_bool(config, "fix_candidate_box", &result) {
+            values["fix_candidate_box"] := !!result
+        }
+        if rime_api.config_test_get_bool(config, "use_legacy_candidate_box", &result) {
+            values["use_legacy_candidate_box"] := !!result
+        }
+        if rime_api.config_test_get_bool(config, "use_caret_hook", &result) {
+            values["use_caret_hook"] := !!result
         }
 
-        if rime.config_test_get_bool(config, "fix_candidate_box", &result) {
-            RabbitConfig.fix_candidate_box := !!result
-        }
-        if rime.config_test_get_bool(config, "use_legacy_candidate_box", &result) {
-            RabbitConfig.use_legacy_candidate_box := !!result
-        }
-        if rime.config_test_get_bool(config, "use_caret_hook", &result) {
-            RabbitConfig.use_caret_hook := !!result
-        }
-        IS_DARK_MODE := RabbitIsUserDarkMode()
-        ui_style := RabbitUIStyleSnapshot.FromConfig(rime, config, IS_DARK_MODE)
-        if IS_DARK_MODE {
-            DarkMode.set(IS_DARK_MODE)
-        }
+        dark_mode := RabbitIsUserDarkMode()
+        ui_style := RabbitUIStyleSnapshot.FromConfig(rime_api, config, dark_mode)
+        rime_api.config_close(config)
 
-        rime.config_close(config)
-
-        if !(schema_list := rime.get_schema_list()) {
-            return ui_style
-        }
-        Loop schema_list.size {
-            local item := schema_list.list[A_Index]
-            if !(schema := rime.schema_open(item.schema_id)) {
-                continue
-            }
-            if rime.config_test_get_string(schema, "schema/icon", &icon) {
-                icon_path := RabbitUserDataPath() . "\" . LTrim(icon, "\")
-                if !FileExist(icon_path) {
-                    icon_path := RabbitSharedDataPath() . "\" . LTrim(icon, "\")
+        if (schema_list := rime_api.get_schema_list()) {
+            Loop schema_list.size {
+                local item := schema_list.list[A_Index]
+                if !(schema := rime_api.schema_open(item.schema_id)) {
+                    continue
                 }
-                RabbitConfig.schema_icon[item.schema_id] := FileExist(icon_path) ? icon_path : ""
-            } else {
-                RabbitConfig.schema_icon[item.schema_id] := ""
+                if rime_api.config_test_get_string(schema, "schema/icon", &icon) {
+                    icon_path := RabbitUserDataPath() . "\" . LTrim(icon, "\")
+                    if !FileExist(icon_path) {
+                        icon_path := RabbitSharedDataPath() . "\" . LTrim(icon, "\")
+                    }
+                    values["schema_icon"][item.schema_id] := FileExist(icon_path) ? icon_path : ""
+                } else {
+                    values["schema_icon"][item.schema_id] := ""
+                }
+                rime_api.config_close(schema)
             }
-            rime.config_close(schema)
+            rime_api.free_schema_list(schema_list)
         }
 
-        rime.free_schema_list(schema_list)
-        return ui_style
+        return {
+            config: RabbitConfigSnapshot(values),
+            style: ui_style,
+            dark_mode: dark_mode
+        }
     }
 }

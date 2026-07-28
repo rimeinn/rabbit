@@ -15,17 +15,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#Requires AutoHotkey v2.0
-#SingleInstance Ignore
 
-;@Ahk2Exe-SetInternalName rabbit
-;@Ahk2Exe-SetProductName 玉兔毫
-;@Ahk2Exe-SetOrigFilename Rabbit.ahk
+#Include <RabbitConfigSnapshot>
+#Include <RabbitInput>
 
-#Include <RabbitApplication>
-#Include <RabbitCommon>
+RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 
-global rabbit_application := RabbitApplication(
-    RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
-)
-rabbit_application.Run(A_Args)
+TestInputHotkeyOwnership() {
+    local input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    input.RegisterHotKeys()
+    AssertTrue(input.registered_hotkeys.Length > 0, "The input owner did not record its hotkeys.")
+    input.Dispose()
+    input.Dispose()
+    Persistent(false)
+    AssertEqual(0, input.registered_hotkeys.Length, "The input owner did not release its hotkeys.")
+}

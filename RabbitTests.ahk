@@ -26,4 +26,9 @@
 #Include tests\RabbitCandidatePresentationTest.ahk
 #Include tests\RabbitCandidateBoxTest.ahk
 #Include tests\RabbitUIStyleSnapshotTest.ahk
+#Include tests\RabbitConfigSnapshotTest.ahk
+#Include tests\RabbitAppContextTest.ahk
+#Include tests\RabbitInputControllerTest.ahk
 #Include tests\RabbitShutdownTest.ahk
+
+ExitApp()

@@ -21,7 +21,6 @@
  * with MIT License
  */
 
-#Include <RabbitConfig>
 #Include <GetCaretPosEx\GetCaretPosEx>
 
 /**
@@ -32,14 +31,14 @@
  * @param W Value is set to the width of the caret
  * @param H Value is set to the height of the caret
  */
-RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?) {
+RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?, use_caret_hook := true) {
     local left, top, right, bottom
     caret_x := 0
     caret_y := 0
     caret_w := 0
     caret_h := 0
 
-    if GetCaretPosEx(&left, &top, &right, &bottom, RabbitConfig.use_caret_hook) {
+    if GetCaretPosEx(&left, &top, &right, &bottom, use_caret_hook) {
         if !IsSet(left) || !IsSet(top) || !IsSet(right) || !IsSet(bottom) {
             return RabbitGetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
         }

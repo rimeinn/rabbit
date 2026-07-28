@@ -28,7 +28,8 @@
 
 ;@Ahk2Exe-SetMainIcon Lib\rabbit-alt.ico
 global IN_MAINTENANCE := true
-global rime
+global rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
+global rabbit_traits
 global INVALID_FILE_ATTRIBUTES := -1
 global FILE_ATTRIBUTE_DIRECTORY := 0x00000010
 
@@ -46,10 +47,9 @@ RabbitDeployerMain(args) {
         layout := 0
     }
     IN_MAINTENANCE := true
-    UpdateTrayIcon()
     TrayTip()
     TrayTip("维护中", RABBIT_IME_NAME)
-    SetupTrayMenu()
+    RabbitSetupMaintenanceTray()
 
     command := args.Length > 0 ? args[1] : ""
     conf := Configurator()

@@ -23,6 +23,8 @@
 #Include <RabbitUIStyleSettings>
 #Include <RabbitUIStyleSettingsDialog>
 
+global rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
+
 RunUIStylePreviewTest()
 
 RunUIStylePreviewTest() {

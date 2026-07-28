@@ -17,202 +17,294 @@
  */
 
 #Include <RabbitCommon>
-#Include <RabbitConfig>
+#Include <RabbitConfigSnapshot>
 
 A_IconTip := "玉兔毫（维护中）"
 
-global TRAY_SCHEMA_NAME := ""
-global TRAY_ASCII_MODE := 0
-global TRAY_FULL_SHAPE := 0
-global TRAY_ASCII_PUNCT := 0
-
-UpdateTrayIcon()
-
-SetupTrayMenu() {
-    static rabbit_script := Format("`"{}\Rabbit.ahk`"", A_ScriptDir)
-    static rabbit_ico    := Format("{}\Lib\rabbit.ico", A_ScriptDir)
+RabbitSetupMaintenanceTray() {
     A_TrayMenu.Delete()
-    if !IN_MAINTENANCE {
-        A_TrayMenu.Add("输入法设定", (*) => RunDeployer("configure", RabbitGlobals.keyboard_layout))
-        A_TrayMenu.Add("用户词典管理", (*) => RunDeployer("dict", RabbitGlobals.keyboard_layout))
-        A_TrayMenu.Add("用户资料同步", (*) => RunDeployer("sync", RabbitGlobals.keyboard_layout))
-
-        A_TrayMenu.Add()
-
-        A_TrayMenu.Add("用户文件夹", (*) => Run(RabbitUserDataPath()))
-        A_TrayMenu.Add(A_IsCompiled ? "程序文件夹" : "脚本文件夹", (*) => Run(A_ScriptDir))
-        A_TrayMenu.Add("日志文件夹", (*) => Run(RabbitLogPath()))
-
-        A_TrayMenu.Add()
-
-        if FileExist(A_Startup . "\Rabbit.lnk") {
-            A_TrayMenu.Add("从开机启动删除", (*) => (FileDelete(A_Startup . "\Rabbit.lnk"), SetupTrayMenu()))
-        } else {
-            A_TrayMenu.Add("添加到开机启动", (*) => (FileCreateShortcut(A_AhkPath, A_Startup . "\Rabbit.lnk", A_ScriptDir, rabbit_script, "玉兔毫输入法", rabbit_ico), SetupTrayMenu()))
-        }
-        A_TrayMenu.Add("添加到桌面快捷方式", (*) => FileCreateShortcut(A_AhkPath, A_Desktop . "\Rabbit.lnk", A_ScriptDir, rabbit_script, "玉兔毫输入法", rabbit_ico))
-
-        A_TrayMenu.Add()
-
-        A_TrayMenu.Add("仓库主页", (*) => Run("https://github.com/rimeinn/rabbit"))
-        A_TrayMenu.Add("参加讨论", (*) => Run("https://github.com/rimeinn/rabbit/discussions"))
-        A_TrayMenu.Add("关于", (*) => MsgBox(Format("由 AutoHotkey 实现的 Rime 输入法引擎前端`r`n版本：{}{}", RABBIT_VERSION, A_IsCompiled ? "（已编译）" : ""), "玉兔毫输入法"))
-
-        A_TrayMenu.Add()
-
-        A_TrayMenu.Add("检查新版本", (*) => CheckNewVersion())
-        A_TrayMenu.Add("重新部署", (*) => RunDeployer("deploy", RabbitGlobals.keyboard_layout))
-
-        A_TrayMenu.Add()
-        A_TrayMenu.Add(A_IsSuspended ? "启用玉兔毫" : "禁用玉兔毫", (*) => ToggleSuspend())
-    }
     A_TrayMenu.Add("退出玉兔毫", (*) => ExitApp())
+    RabbitUpdateMaintenanceTrayIcon()
 }
 
-RunDeployer(cmd, argv*) {
-    local args, arg
-    args := ""
-    for arg in argv {
-        args .= " " . arg
-    }
-    args := LTrim(args, " ")
-    ; MsgBox(cmd . " " . args)
+RabbitUpdateMaintenanceTrayIcon() {
     if A_IsCompiled {
-        Run(Format("`"{}\RabbitDeployer.exe`" {} {}", A_ScriptDir, cmd, args))
+        TraySetIcon(A_ScriptFullPath, 3)
+    } else if FileExist("Lib\rabbit-alt.ico") {
+        TraySetIcon("Lib\rabbit-alt.ico", , true)
+    }
+}
+
+RabbitRunDeployer(command, args*) {
+    local arguments := ""
+    for argument in args {
+        arguments .= " " . argument
+    }
+    arguments := LTrim(arguments, " ")
+    if A_IsCompiled {
+        Run(Format("`"{}\RabbitDeployer.exe`" {} {}", A_ScriptDir, command, arguments))
     } else {
-        Run(Format("{} `"{}\RabbitDeployer.ahk`" {} {}", A_AhkPath, A_ScriptDir, cmd, args))
+        Run(Format("{} `"{}\RabbitDeployer.ahk`" {} {}", A_AhkPath, A_ScriptDir, command, arguments))
     }
     ExitApp(1)
 }
 
-ToggleSuspend() {
-    global rime, session_id, box, STATUS_TOOLTIP
-    if box && HasMethod(box, "Hide") {
-        box.Hide()
+class RabbitTrayController {
+    __New(rime_api, session_id, candidate_box, config, runtime_state, keyboard_layout) {
+        this.rime := rime_api
+        this.session_id := session_id
+        this.candidate_box := candidate_box
+        this.config := config
+        this.runtime_state := runtime_state
+        this.keyboard_layout := keyboard_layout
+        this.schema_name := ""
+        this.ascii_mode := false
+        this.full_shape := false
+        this.ascii_punct := false
+        this.current_schema_icon := ""
     }
-    rime.clear_composition(session_id)
-    Suspend(-1)
-    UpdateTrayTip()
-    UpdateTrayIcon()
-    if RabbitConfig.show_tips {
-        ToolTip(A_IsSuspended ? "禁用" : "启用", , , STATUS_TOOLTIP)
-        SetTimer(() => ToolTip(, , , STATUS_TOOLTIP), -RabbitConfig.show_tips_time)
-    }
-    SetupTrayMenu()
-}
 
-ClickHandler(wParam, lParam, msg, hWnd) {
-    local status_text
-    if !rime || !IsSet(session_id) || !session_id || A_IsSuspended {
-        return
-    }
-    if lParam == WM_LBUTTONDOWN {
-        RabbitGlobals.on_tray_icon_click := true
-    } else if lParam == WM_LBUTTONUP {
-        local old_ascii_mode := rime.get_option(session_id, "ascii_mode")
-        rime.set_option(session_id, "ascii_mode", !old_ascii_mode)
-        local new_ascii_mode := rime.get_option(session_id, "ascii_mode")
-        if IsSet(UpdateWinAscii) {
-            UpdateWinAscii(new_ascii_mode, true, RabbitGlobals.active_win, true)
+    SetupMenu() {
+        static rabbit_script := Format("`"{}\Rabbit.ahk`"", A_ScriptDir)
+        static rabbit_ico := Format("{}\Lib\rabbit.ico", A_ScriptDir)
+        A_TrayMenu.Delete()
+        A_TrayMenu.Add(
+            "输入法设定",
+            (*) => RabbitRunDeployer("configure", this.keyboard_layout)
+        )
+        A_TrayMenu.Add(
+            "用户词典管理",
+            (*) => RabbitRunDeployer("dict", this.keyboard_layout)
+        )
+        A_TrayMenu.Add(
+            "用户资料同步",
+            (*) => RabbitRunDeployer("sync", this.keyboard_layout)
+        )
+        A_TrayMenu.Add()
+        A_TrayMenu.Add("用户文件夹", (*) => Run(RabbitUserDataPath()))
+        A_TrayMenu.Add(A_IsCompiled ? "程序文件夹" : "脚本文件夹", (*) => Run(A_ScriptDir))
+        A_TrayMenu.Add("日志文件夹", (*) => Run(RabbitLogPath()))
+        A_TrayMenu.Add()
+
+        if FileExist(A_Startup . "\Rabbit.lnk") {
+            A_TrayMenu.Add(
+                "从开机启动删除",
+                (*) => (FileDelete(A_Startup . "\Rabbit.lnk"), this.SetupMenu())
+            )
+        } else {
+            A_TrayMenu.Add(
+                "添加到开机启动",
+                (*) => (
+                    FileCreateShortcut(
+                        A_AhkPath,
+                        A_Startup . "\Rabbit.lnk",
+                        A_ScriptDir,
+                        rabbit_script,
+                        "玉兔毫输入法",
+                        rabbit_ico
+                    ),
+                    this.SetupMenu()
+                )
+            )
         }
-        status_text := new_ascii_mode ? ASCII_MODE_TRUE_LABEL_ABBR : ASCII_MODE_FALSE_LABEL_ABBR
-        if RabbitConfig.show_tips {
-            ToolTip(status_text, , , STATUS_TOOLTIP)
-            SetTimer(() => ToolTip(, , , STATUS_TOOLTIP), -RabbitConfig.show_tips_time)
+        A_TrayMenu.Add(
+            "添加到桌面快捷方式",
+            (*) => FileCreateShortcut(
+                A_AhkPath,
+                A_Desktop . "\Rabbit.lnk",
+                A_ScriptDir,
+                rabbit_script,
+                "玉兔毫输入法",
+                rabbit_ico
+            )
+        )
+        A_TrayMenu.Add()
+        A_TrayMenu.Add("仓库主页", (*) => Run("https://github.com/rimeinn/rabbit"))
+        A_TrayMenu.Add("参加讨论", (*) => Run("https://github.com/rimeinn/rabbit/discussions"))
+        A_TrayMenu.Add(
+            "关于",
+            (*) => MsgBox(
+                Format(
+                    "由 AutoHotkey 实现的 Rime 输入法引擎前端`r`n版本：{}{}",
+                    RABBIT_VERSION,
+                    A_IsCompiled ? "（已编译）" : ""
+                ),
+                "玉兔毫输入法"
+            )
+        )
+        A_TrayMenu.Add()
+        A_TrayMenu.Add("检查新版本", (*) => this.CheckNewVersion())
+        A_TrayMenu.Add(
+            "重新部署",
+            (*) => RabbitRunDeployer("deploy", this.keyboard_layout)
+        )
+        A_TrayMenu.Add()
+        A_TrayMenu.Add(
+            A_IsSuspended ? "启用玉兔毫" : "禁用玉兔毫",
+            (*) => this.ToggleSuspend()
+        )
+        A_TrayMenu.Add("退出玉兔毫", (*) => ExitApp())
+    }
+
+    ToggleSuspend() {
+        if this.candidate_box && HasMethod(this.candidate_box, "Hide") {
+            this.candidate_box.Hide()
         }
-        WinActivate("ahk_exe " . RabbitGlobals.active_win)
-        RabbitGlobals.on_tray_icon_click := false
-    }
-}
-
-UpdateTrayTip(schema_name := TRAY_SCHEMA_NAME, ascii_mode := TRAY_ASCII_MODE, full_shape := TRAY_FULL_SHAPE, ascii_punct := TRAY_ASCII_PUNCT) {
-    global TRAY_SCHEMA_NAME, TRAY_ASCII_MODE, TRAY_FULL_SHAPE, TRAY_ASCII_PUNCT
-    TRAY_SCHEMA_NAME := schema_name ? schema_name : TRAY_SCHEMA_NAME
-    TRAY_ASCII_MODE := !!ascii_mode
-    TRAY_FULL_SHAPE := !!full_shape
-    TRAY_ASCII_PUNCT := !!ascii_punct
-    local ss := A_IsSuspended ? "（已禁用）" : ""
-    A_IconTip := Format(
-        "玉兔毫 {} {}`n左键切换模式，右键打开菜单`n{} | {} | {}", ss, TRAY_SCHEMA_NAME,
-        (TRAY_ASCII_MODE ? ASCII_MODE_TRUE_LABEL : ASCII_MODE_FALSE_LABEL),
-        (TRAY_FULL_SHAPE ? FULL_SHAPE_TRUE_LABEL : FULL_SHAPE_FALSE_LABEL),
-        (TRAY_ASCII_PUNCT ? ASCII_PUNCT_TRUE_LABEL : ASCII_PUNCT_FALSE_LABEL)
-    )
-}
-
-UpdateTrayIcon() {
-    local icon_path, icon_num
-    global TRAY_ASCII_MODE
-    icon_path := RabbitGlobals.current_schema_icon
-    if !IsSet(icon_path) || !icon_path {
-        icon_path := "Lib\rabbit.ico"
-    }
-    if A_IsCompiled {
-        icon_num := IN_MAINTENANCE ? 3 : (TRAY_ASCII_MODE ? 2 : (RabbitGlobals.current_schema_icon ? 0 : 1))
-        if icon_num {
-            TraySetIcon(A_ScriptFullPath, icon_num)
-        } else if FileExist(RabbitGlobals.current_schema_icon) {
-            TraySetIcon(RabbitGlobals.current_schema_icon)
+        this.rime.clear_composition(this.session_id)
+        Suspend(-1)
+        this.UpdateTip()
+        this.UpdateIcon()
+        if this.config.show_tips {
+            ToolTip(A_IsSuspended ? "禁用" : "启用", , , STATUS_TOOLTIP)
+            SetTimer(
+                () => ToolTip(, , , STATUS_TOOLTIP),
+                -this.config.show_tips_time
+            )
         }
-    } else {
-        icon_path := (A_IsSuspended || IN_MAINTENANCE) ? "Lib\rabbit-alt.ico"
-            : (TRAY_ASCII_MODE ? "Lib\rabbit-ascii.ico" : icon_path)
-        if FileExist(icon_path) {
-            TraySetIcon(icon_path, , true)
-        }
-    }
-}
-
-CheckNewVersion() {
-    local http, url, status, response_text, match, down, arch
-    if !IsDigit(SubStr(RABBIT_VERSION, 1, 1)) {
-        MsgBox("非正式版本，请前往仓库检查新版本", "玉兔毫输入法")
-        return
+        this.SetupMenu()
     }
 
-    http := ComObject("WinHttp.WinHttpRequest.5.1")
-    url := "https://api.github.com/repos/rimeinn/rabbit/releases/latest"
-    local ver := ""
-    try {
-        http.Open("GET", url, true)
-        http.SetRequestHeader("Accept", "application/vnd.github+json")
-        http.SetRequestHeader("X-GitHub-Api-Version", "2022-11-28")
-        http.SetRequestHeader("User-Agent", "AutoHotkey")
-
-        http.Send()
-        http.WaitForResponse()
-
-        status := http.Status
-        if status != 200 {
-            MsgBox("无法获取最新版本信息，请检查网络连接", "玉兔毫输入法")
+    OnClick(wParam, lParam, msg, hWnd) {
+        local status_text
+        if !this.rime || !this.session_id || A_IsSuspended {
             return
         }
+        if lParam == WM_LBUTTONDOWN {
+            this.runtime_state.on_tray_icon_click := true
+        } else if lParam == WM_LBUTTONUP {
+            local old_ascii_mode := this.rime.get_option(this.session_id, "ascii_mode")
+            this.rime.set_option(this.session_id, "ascii_mode", !old_ascii_mode)
+            local new_ascii_mode := this.rime.get_option(this.session_id, "ascii_mode")
+            this.runtime_state.UpdateWinAscii(
+                new_ascii_mode,
+                true,
+                this.runtime_state.active_win,
+                true
+            )
+            status_text := new_ascii_mode
+                ? this.runtime_state.ascii_mode_true_label_abbr
+                : this.runtime_state.ascii_mode_false_label_abbr
+            if this.config.show_tips {
+                ToolTip(status_text, , , STATUS_TOOLTIP)
+                SetTimer(
+                    () => ToolTip(, , , STATUS_TOOLTIP),
+                    -this.config.show_tips_time
+                )
+            }
+            WinActivate("ahk_exe " . this.runtime_state.active_win)
+            this.runtime_state.on_tray_icon_click := false
+        }
+    }
 
-        response_text := http.ResponseText
-        if RegExMatch(response_text, '"name"\s*:\s*"(.*?)"', &match) {
-            if SubStr(match[1], 1, 1) == "v" {
-                ver := SubStr(match[1], 2)
-            } else {
-                ver := match[1]
+    UpdateTip(
+        schema_name := this.schema_name,
+        ascii_mode := this.ascii_mode,
+        full_shape := this.full_shape,
+        ascii_punct := this.ascii_punct
+    ) {
+        this.schema_name := schema_name ? schema_name : this.schema_name
+        this.ascii_mode := !!ascii_mode
+        this.full_shape := !!full_shape
+        this.ascii_punct := !!ascii_punct
+        local suspended := A_IsSuspended ? "（已禁用）" : ""
+        A_IconTip := Format(
+            "玉兔毫 {} {}`n左键切换模式，右键打开菜单`n{} | {} | {}",
+            suspended,
+            this.schema_name,
+            this.ascii_mode
+                ? this.runtime_state.ascii_mode_true_label
+                : this.runtime_state.ascii_mode_false_label,
+            this.full_shape
+                ? this.runtime_state.full_shape_true_label
+                : this.runtime_state.full_shape_false_label,
+            this.ascii_punct
+                ? this.runtime_state.ascii_punct_true_label
+                : this.runtime_state.ascii_punct_false_label
+        )
+    }
+
+    UpdateSchemaIcon(schema_id) {
+        local icon_path
+        if this.config.TryGetSchemaIcon(schema_id, &icon_path) {
+            this.current_schema_icon := icon_path
+            if icon_path {
+                this.UpdateIcon()
+            }
+        }
+    }
+
+    UpdateIcon() {
+        local icon_path := this.current_schema_icon
+        local icon_num
+        if !icon_path {
+            icon_path := "Lib\rabbit.ico"
+        }
+        if A_IsCompiled {
+            icon_num := this.ascii_mode ? 2 : (this.current_schema_icon ? 0 : 1)
+            if icon_num {
+                TraySetIcon(A_ScriptFullPath, icon_num)
+            } else if FileExist(this.current_schema_icon) {
+                TraySetIcon(this.current_schema_icon)
             }
         } else {
-            MsgBox("无法解析版本字段，请稍后再试", "玉兔毫输入法")
+            icon_path := A_IsSuspended
+                ? "Lib\rabbit-alt.ico"
+                : (this.ascii_mode ? "Lib\rabbit-ascii.ico" : icon_path)
+            if FileExist(icon_path) {
+                TraySetIcon(icon_path, , true)
+            }
+        }
+    }
+
+    CheckNewVersion() {
+        local http, url, status, response_text, match, down, arch
+        if !IsDigit(SubStr(RABBIT_VERSION, 1, 1)) {
+            MsgBox("非正式版本，请前往仓库检查新版本", "玉兔毫输入法")
             return
         }
-    }
-
-    if ver == "" {
-        MsgBox("无法获取最新版本号，请稍后再试", "玉兔毫输入法")
-        return
-    }
-
-    if VerCompare(ver, RABBIT_VERSION) > 0 {
-        down := MsgBox(Format("发现新版本：{}`r`n是否前往下载？", ver), "玉兔毫输入法", "YesNo")
-        if down == "Yes" {
-            arch := A_Is64BitOS ? "x64" : "x86"
-            Run(Format("https://github.com/rimeinn/rabbit/releases/download/v{1}/rabbit-v{1}-{2}.zip", ver, arch))
+        http := ComObject("WinHttp.WinHttpRequest.5.1")
+        url := "https://api.github.com/repos/rimeinn/rabbit/releases/latest"
+        local version := ""
+        try {
+            http.Open("GET", url, true)
+            http.SetRequestHeader("Accept", "application/vnd.github+json")
+            http.SetRequestHeader("X-GitHub-Api-Version", "2022-11-28")
+            http.SetRequestHeader("User-Agent", "AutoHotkey")
+            http.Send()
+            http.WaitForResponse()
+            status := http.Status
+            if status != 200 {
+                MsgBox("无法获取最新版本信息，请检查网络连接", "玉兔毫输入法")
+                return
+            }
+            response_text := http.ResponseText
+            if RegExMatch(response_text, '"name"\s*:\s*"(.*?)"', &match) {
+                version := SubStr(match[1], 1, 1) == "v" ? SubStr(match[1], 2) : match[1]
+            } else {
+                MsgBox("无法解析版本字段，请稍后再试", "玉兔毫输入法")
+                return
+            }
         }
-    } else {
-        MsgBox("当前已是最新版本", "玉兔毫输入法")
+        if version == "" {
+            MsgBox("无法获取最新版本号，请稍后再试", "玉兔毫输入法")
+            return
+        }
+        if VerCompare(version, RABBIT_VERSION) > 0 {
+            down := MsgBox(
+                Format("发现新版本：{}`r`n是否前往下载？", version),
+                "玉兔毫输入法",
+                "YesNo"
+            )
+            if down == "Yes" {
+                arch := A_Is64BitOS ? "x64" : "x86"
+                Run(Format(
+                    "https://github.com/rimeinn/rabbit/releases/download/v{1}/rabbit-v{1}-{2}.zip",
+                    version,
+                    arch
+                ))
+            }
+        } else {
+            MsgBox("当前已是最新版本", "玉兔毫输入法")
+        }
     }
 }

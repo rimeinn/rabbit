@@ -16,7 +16,7 @@
  *
  */
 
-RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance) {
+RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance, rime_initialized := true) {
     try {
         if candidate_box && HasMethod(candidate_box, "Dispose") {
             candidate_box.Dispose()
@@ -27,8 +27,12 @@ RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance) {
                 try {
                     rime_api.destroy_session(session)
                 } finally {
-                    rime_api.finalize()
+                    if rime_initialized {
+                        rime_api.finalize()
+                    }
                 }
+            } else if rime_initialized {
+                rime_api.finalize()
             }
         } finally {
             if mutex_instance {

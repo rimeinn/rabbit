@@ -36,43 +36,18 @@ global WM_LBUTTONUP := 0x202
 global WM_SETTINGCHANGE := 0x001A
 global WM_DWMCOLORIZATIONCOLORCHANGED := 0x0320
 
-global rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
 global RABBIT_IME_NAME := "玉兔毫"
 global RABBIT_CODE_NAME := "Rabbit"
 global RABBIT_NO_MAINTENANCE := "0"
 global RABBIT_PARTIAL_MAINTENANCE := "1"
 global RABBIT_FULL_MAINTENANCE := "2"
 
-global IN_MAINTENANCE := false
 global STATUS_TOOLTIP := 2
-global box := 0
-global rabbit_traits
-global IS_DARK_MODE := false
-global ASCII_MODE_FALSE_LABEL := "中文"
-global ASCII_MODE_TRUE_LABEL := "西文"
-global ASCII_MODE_FALSE_LABEL_ABBR := "中"
-global ASCII_MODE_TRUE_LABEL_ABBR := "西"
-global FULL_SHAPE_FALSE_LABEL := "半角"
-global FULL_SHAPE_TRUE_LABEL := "全角"
-global FULL_SHAPE_FALSE_LABEL_ABBR := "半"
-global FULL_SHAPE_TRUE_LABEL_ABBR := "全"
-global ASCII_PUNCT_FALSE_LABEL := "。，"
-global ASCII_PUNCT_TRUE_LABEL := ". ,"
-global ASCII_PUNCT_FALSE_LABEL_ABBR := "。"
-global ASCII_PUNCT_TRUE_LABEL_ABBR := "."
 
 global ERROR_ALREADY_EXISTS := 183 ; https://learn.microsoft.com/windows/win32/debug/system-error-codes--0-499-
 
 RabbitIsOldWindows() {
     return VerCompare(A_OSVersion, "< 10")
-}
-
-class RabbitGlobals {
-    static process_ascii := Map()
-    static on_tray_icon_click := false
-    static active_win := ""
-    static current_schema_icon := ""
-    static keyboard_layout := 0x0409
 }
 
 class RabbitMutex {
@@ -138,26 +113,6 @@ RabbitLogPath() {
         DirCreate(path)
     }
     return path
-}
-
-OnRimeMessage(context_object, session_id, message_type, message_value) {
-    local msg_type, msg_value
-    msg_type := StrGet(message_type, "UTF-8")
-    msg_value := StrGet(message_value, "UTF-8")
-    if msg_type = "deploy" {
-        if msg_value = "start" {
-            TrayTip()
-            TrayTip("维护中", RABBIT_IME_NAME)
-        } else if msg_value = "success" {
-            TrayTip()
-            TrayTip("维护完成", RABBIT_IME_NAME)
-            SetTimer(TrayTip, -2000)
-        } else {
-            TrayTip(msg_type . ": " . msg_value . " (" . session_id . ")", RABBIT_IME_NAME)
-        }
-    } else {
-        ; TrayTip(msg_type . ": " . msg_value . " (" . session_id . ")", RABBIT_IME_NAME)
-    }
 }
 
 RabbitCleanOldLogs() {

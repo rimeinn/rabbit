@@ -32,18 +32,50 @@ RabbitIsUserDarkMode() {
     return false
 }
 
-OnColorChange(wParam, lParam, msg, hWnd) {
-    local config
-    global rime, IS_DARK_MODE, box, ui_style
-    local old_dark := IS_DARK_MODE
-    IS_DARK_MODE := RabbitIsUserDarkMode()
-    if old_dark != IS_DARK_MODE {
-        if (config := rime.config_open("rabbit")) {
-            ui_style := RabbitUIStyleSnapshot.FromConfig(rime, config, IS_DARK_MODE)
-            rime.config_close(config)
-            box.UpdateStyle(ui_style)
+class RabbitAppearanceController {
+    __New(rime_api, candidate_box, style, dark_mode) {
+        this.rime := rime_api
+        this.candidate_box := candidate_box
+        this.style := style
+        this.dark_mode := dark_mode
+        this.color_change_callback := this.OnColorChange.Bind(this)
+        this.registered := false
+    }
+
+    Register() {
+        if this.registered {
+            return
         }
-        DarkMode.set(IS_DARK_MODE)
+        OnMessage(WM_SETTINGCHANGE, this.color_change_callback)
+        OnMessage(WM_DWMCOLORIZATIONCOLORCHANGED, this.color_change_callback)
+        this.registered := true
+    }
+
+    Dispose() {
+        if !this.registered {
+            return
+        }
+        OnMessage(WM_SETTINGCHANGE, this.color_change_callback, 0)
+        OnMessage(WM_DWMCOLORIZATIONCOLORCHANGED, this.color_change_callback, 0)
+        this.registered := false
+    }
+
+    OnColorChange(wParam, lParam, msg, hWnd) {
+        local config
+        local new_dark_mode := RabbitIsUserDarkMode()
+        if new_dark_mode != this.dark_mode {
+            this.dark_mode := new_dark_mode
+            if (config := this.rime.config_open("rabbit")) {
+                this.style := RabbitUIStyleSnapshot.FromConfig(
+                    this.rime,
+                    config,
+                    this.dark_mode
+                )
+                this.rime.config_close(config)
+                this.candidate_box.UpdateStyle(this.style)
+            }
+            DarkMode.set(this.dark_mode)
+        }
     }
 }
 
