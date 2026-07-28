@@ -18,6 +18,7 @@
 
 #Include <RabbitCommon>
 #Include <RabbitUIStyle>
+#Include <RabbitUIStyleSnapshot>
 
 class RabbitConfig {
     static suspend_hotkey := ""
@@ -33,10 +34,11 @@ class RabbitConfig {
 
     static load() {
         global rime, IS_DARK_MODE
-        local config, result, iter, proc_name, color_name, schema_list, schema, icon, icon_path
+        local config, result, iter, proc_name, schema_list, schema, icon, icon_path
+        local ui_style := RabbitUIStyleSnapshot()
 
         if !rime || !(config := rime.config_open("rabbit")) {
-            return
+            return ui_style
         }
         RabbitConfig.suspend_hotkey := rime.config_get_string(config, "suspend_hotkey")
         if rime.config_test_get_bool(config, "show_tips", &result) {
@@ -78,18 +80,16 @@ class RabbitConfig {
         if rime.config_test_get_bool(config, "use_caret_hook", &result) {
             RabbitConfig.use_caret_hook := !!result
         }
-        UIStyle.Update(config, true)
-        if (IS_DARK_MODE := RabbitIsUserDarkMode()) {
-            if (color_name := rime.config_get_string(config, "style/color_scheme_dark")) {
-                UIStyle.use_dark := UIStyle.UpdateColor(config, color_name)
-            }
+        IS_DARK_MODE := RabbitIsUserDarkMode()
+        ui_style := RabbitUIStyleSnapshot.FromConfig(rime, config, IS_DARK_MODE)
+        if IS_DARK_MODE {
             DarkMode.set(IS_DARK_MODE)
         }
 
         rime.config_close(config)
 
         if !(schema_list := rime.get_schema_list()) {
-            return
+            return ui_style
         }
         Loop schema_list.size {
             local item := schema_list.list[A_Index]
@@ -109,5 +109,6 @@ class RabbitConfig {
         }
 
         rime.free_schema_list(schema_list)
+        return ui_style
     }
 }

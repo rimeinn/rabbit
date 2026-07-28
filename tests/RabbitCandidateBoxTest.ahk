@@ -17,33 +17,43 @@
  */
 
 candidate_context := CreateCandidateContext()
+candidate_style := RabbitUIStyleSnapshot()
 
 if A_Args.Length {
     switch A_Args[1] {
         case "factory-old-windows":
-            RunTest("old Windows factory selection", TestOldWindowsFactorySelection.Bind())
+            RunTest("old Windows factory selection", TestOldWindowsFactorySelection.Bind(candidate_style))
         case "factory-configured-legacy":
-            RunTest("configured legacy factory selection", TestConfiguredLegacyFactorySelection.Bind())
+            RunTest(
+                "configured legacy factory selection",
+                TestConfiguredLegacyFactorySelection.Bind(candidate_style)
+            )
         case "factory-modern":
-            RunTest("modern factory selection", TestModernFactorySelection.Bind())
+            RunTest("modern factory selection", TestModernFactorySelection.Bind(candidate_style))
         case "legacy-build-no-direct2d":
-            RunTest("legacy build without Direct2D", TestLegacyBuildWithoutDirect2D.Bind())
+            RunTest("legacy build without Direct2D", TestLegacyBuildWithoutDirect2D.Bind(candidate_style))
         case "visual-modern":
-            ShowVisualCandidate(CandidateBox(), candidate_context)
+            ShowVisualCandidate(CandidateBox(candidate_style), candidate_context)
         case "visual-legacy":
-            ShowVisualCandidate(LegacyCandidateBox(), candidate_context)
+            ShowVisualCandidate(LegacyCandidateBox(candidate_style), candidate_context)
         default:
             throw Error("Unknown test mode: " . A_Args[1])
     }
     ExitApp()
 }
 
-RunTest("old Windows factory selection", TestOldWindowsFactorySelection.Bind())
-RunTest("configured legacy factory selection", TestConfiguredLegacyFactorySelection.Bind())
-RunTest("modern factory selection", TestModernFactorySelection.Bind())
-RunTest("modern candidate lifecycle", TestBackendLifecycle.Bind("modern", CandidateBox(), candidate_context))
-RunTest("legacy candidate lifecycle", TestBackendLifecycle.Bind("legacy", LegacyCandidateBox(), candidate_context))
-RunTest("partial construction cleanup", TestPartialConstructionCleanup.Bind())
+RunTest("old Windows factory selection", TestOldWindowsFactorySelection.Bind(candidate_style))
+RunTest("configured legacy factory selection", TestConfiguredLegacyFactorySelection.Bind(candidate_style))
+RunTest("modern factory selection", TestModernFactorySelection.Bind(candidate_style))
+RunTest(
+    "modern candidate lifecycle",
+    TestBackendLifecycle.Bind("modern", CandidateBox(candidate_style), candidate_context, candidate_style)
+)
+RunTest(
+    "legacy candidate lifecycle",
+    TestBackendLifecycle.Bind("legacy", LegacyCandidateBox(candidate_style), candidate_context, candidate_style)
+)
+RunTest("partial construction cleanup", TestPartialConstructionCleanup.Bind(candidate_style))
 
 ShowVisualCandidate(candidate_box, context) {
     local width, height
@@ -84,25 +94,25 @@ RunTest(name, test) {
     FileAppend("PASS: " . name . "`n", "*")
 }
 
-TestOldWindowsFactorySelection() {
-    TestCandidateFactorySelection(true, "Old Windows")
+TestOldWindowsFactorySelection(style) {
+    TestCandidateFactorySelection(true, "Old Windows", style)
 }
 
-TestConfiguredLegacyFactorySelection() {
-    TestCandidateFactorySelection(true, "The legacy setting")
+TestConfiguredLegacyFactorySelection(style) {
+    TestCandidateFactorySelection(true, "The legacy setting", style)
 }
 
-TestModernFactorySelection() {
-    TestCandidateFactorySelection(false, "The modern path")
+TestModernFactorySelection(style) {
+    TestCandidateFactorySelection(false, "The modern path", style)
 }
 
-TestCandidateFactorySelection(use_legacy_candidate_box, description) {
+TestCandidateFactorySelection(use_legacy_candidate_box, description, style) {
     local modern_count := { value: 0 }
     local legacy_count := { value: 0 }
     local direct2d_count := { value: 0 }
     local modern_constructor := CreateModernCandidate.Bind(modern_count, direct2d_count)
     local legacy_constructor := CreateLegacyCandidate.Bind(legacy_count)
-    local factory := RabbitCandidateBoxFactory(UIStyle, modern_constructor, legacy_constructor)
+    local factory := RabbitCandidateBoxFactory(style, modern_constructor, legacy_constructor)
     local candidate_box := factory.Create(use_legacy_candidate_box)
 
     local expected_modern := use_legacy_candidate_box ? 0 : 1
@@ -113,7 +123,7 @@ TestCandidateFactorySelection(use_legacy_candidate_box, description) {
     candidate_box.Dispose()
 }
 
-TestLegacyBuildWithoutDirect2D() {
+TestLegacyBuildWithoutDirect2D(style) {
     local direct2d_count := { value: 0 }
     local original_constructor := Direct2D.Prototype.GetOwnPropDesc("__New")
     local original_destructor := Direct2D.Prototype.GetOwnPropDesc("__Delete")
@@ -128,7 +138,7 @@ TestLegacyBuildWithoutDirect2D() {
         construction_probe := 0
         direct2d_count.value := 0
 
-        candidate_box := RabbitCandidateBoxFactory().Create(true)
+        candidate_box := RabbitCandidateBoxFactory(style).Create(true)
         candidate_box.Build(candidate_context, &width, &height)
         AssertTrue(width > 0 && height > 0, "The legacy backend must build valid dimensions.")
     } finally {
@@ -169,8 +179,9 @@ CreateFakeDirect2D(direct2d_count, hwnd) {
     return RabbitFakeDirect2D()
 }
 
-TestBackendLifecycle(name, candidate_box, context) {
+TestBackendLifecycle(name, candidate_box, context, style) {
     local first_width, first_height, second_width, second_height
+    local updated_width, updated_height, restored_width, restored_height
     try {
         candidate_box.Hide()
         candidate_box.Hide()
@@ -181,7 +192,21 @@ TestBackendLifecycle(name, candidate_box, context) {
         AssertTrue(first_height > 0, name . " height must be positive.")
         AssertEqual(first_width, second_width, name . " width must be stable across repeated builds.")
         AssertEqual(first_height, second_height, name . " height must be stable across repeated builds.")
-        AssertTrue(first_width >= UIStyle.min_width, name . " width must honor the configured minimum.")
+        AssertTrue(first_width >= style.min_width, name . " width must honor the configured minimum.")
+
+        local updated_style := style.With(Map("min_width", style.min_width + 40))
+        candidate_box.UpdateStyle(updated_style)
+        candidate_box.UpdateStyle(updated_style)
+        candidate_box.Build(context, &updated_width, &updated_height)
+        AssertTrue(
+            updated_width >= updated_style.min_width,
+            name . " width must honor an updated style snapshot."
+        )
+
+        candidate_box.UpdateStyle(style)
+        candidate_box.Build(context, &restored_width, &restored_height)
+        AssertEqual(first_width, restored_width, name . " width must restore with the original style snapshot.")
+        AssertEqual(first_height, restored_height, name . " height must restore with the original style snapshot.")
 
         candidate_box.Show(10, 10)
         candidate_box.Show(10, 10)
@@ -201,7 +226,7 @@ TestBackendLifecycle(name, candidate_box, context) {
         candidate_box.Show.Bind(candidate_box, 10, 10),
         name . " Show() must fail after disposal.")
     AssertThrows(
-        candidate_box.UpdateStyle.Bind(candidate_box, UIStyle),
+        candidate_box.UpdateStyle.Bind(candidate_box, style),
         name . " UpdateStyle() must fail after disposal.")
 }
 
@@ -210,10 +235,10 @@ BuildCandidate(candidate_box, context) {
     candidate_box.Build(context, &width, &height)
 }
 
-TestPartialConstructionCleanup() {
+TestPartialConstructionCleanup(style) {
     RabbitFailingModernCandidateBox.dispose_calls := 0
     AssertThrows(
-        (*) => RabbitFailingModernCandidateBox(UIStyle, ThrowDirect2D.Bind()),
+        (*) => RabbitFailingModernCandidateBox(style, ThrowDirect2D.Bind()),
         "Modern construction failure must be rethrown.")
     AssertEqual(1, RabbitFailingModernCandidateBox.dispose_calls,
         "Modern construction failure must dispose partial resources once.")

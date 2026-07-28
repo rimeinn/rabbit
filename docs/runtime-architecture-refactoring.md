@@ -1,6 +1,6 @@
 # Rabbit Runtime Architecture Refactoring
 
-Status: Phase 2 candidate presentation model implemented and validated
+Status: Phase 3 explicit style snapshots implemented and validated
 Last updated: 2026-07-28
 
 ## 1. Purpose
@@ -42,7 +42,7 @@ Rabbit.ahk
   -> create traits and initialize the global Rime API
   -> run first-start deployment or Rime maintenance
   -> create the Rime session
-  -> load RabbitConfig and mutate UIStyle
+  -> load RabbitConfig and publish a resolved UI style snapshot
   -> choose and construct one candidate-box backend
   -> register hotkeys
   -> read state labels and initial Rime status
@@ -118,12 +118,12 @@ lookup data. “Target owner” describes the planned boundary, not an implement
 These properties do not share one useful lifecycle. `RabbitGlobals` is therefore a service-locator-like collection
 rather than a cohesive owner.
 
-### 4.3 Static configuration and style state
+### 4.3 Static configuration and resolved style state
 
 | Container | State | Writers | Readers | Target |
 |---|---|---|---|---|
 | `RabbitConfig` | hotkey, tips, ASCII, schema icons, candidate/caret options | `RabbitConfig.load()` | main runtime modules | `RabbitConfigSnapshot` |
-| `UIStyle` | fonts, geometry, colors, dark selection | config load, color changes, previews | both boxes and previews | `RabbitUIStyleSnapshot` |
+| `RabbitUIStyleSnapshot` | resolved fonts, geometry, colors, dark selection | constructed before publication | both boxes and previews | implemented snapshot |
 | `LegacyCandidateBox` | GUI, colors, font options, debug flag/border | constructor/style/build | all legacy instances | instance state or immutable diagnostic option |
 | `CandidateBox.isHidden` | `Show()` and `Hide()` | `Show()` and `Hide()` | candidate instance | instance state |
 
@@ -200,15 +200,12 @@ startup and disposal.
 
 ### 5.1 Candidate-box coupling
 
-- Both backends read the static mutable `UIStyle` directly.
+- Both backends receive a resolved `RabbitUIStyleSnapshot` explicitly.
 - Both receive raw librime context data through `Build()`.
 - `RabbitInput` owns context fetching, content building, placement policy, monitor correction, and visibility decisions.
 - `RabbitTrayMenu` and the color-change handler reach the global box directly.
-- In the Phase 0 snapshot, `RabbitLegacyCandidateBox` includes `RabbitCandidateBox` only to reuse the then-named
-  `GetCompositionText()`. This pulls the
-  Direct2D implementation into a dependency that should be backend-neutral.
-- Modern visibility and legacy GUI/style state are class-static even though only the selected candidate instance should
-  own them.
+- Candidate presentation conversion is backend-neutral, and the legacy backend does not depend on the Direct2D backend.
+- Modern and legacy visibility, GUI, and backend style state are instance-owned.
 
 ### 5.2 Configuration-dialog coupling
 
@@ -216,10 +213,9 @@ startup and disposal.
   workspace updates.
 - Dialog completion is communicated through mutable `{ yes: false }` result objects.
 - Dialog callbacks close over their GUI instances; explicit callback/resource teardown is not represented.
-- `UIStyleSettingsDialog` creates `CandidatePreview` only on supported Windows, which is the correct point for lazy
-  Direct2D construction.
-- Theme discovery mutates the shared `UIStyle` once per preset and then restores it. This is a non-local transaction and
-  a structural risk, but no user-visible defect has yet been established.
+- `UIStyleSettingsDialog` creates `CandidatePreview` only on supported Windows, which remains the lazy Direct2D
+  construction point.
+- Theme discovery creates an independent resolved snapshot per preset and does not mutate the active runtime snapshot.
 
 ## 6. Current dependency direction
 
@@ -236,9 +232,9 @@ Rabbit.ahk
   |     +-> RabbitGlobals
   +-> RabbitConfig
   |     +-> global rime/IS_DARK_MODE
-  |     +-> UIStyle
+  |     +-> RabbitUIStyleSnapshot
   +-> RabbitUIStyle
-        +-> global rime/IS_DARK_MODE/box
+        +-> global rime/IS_DARK_MODE/box/ui_style
 
 RabbitDeployer.ahk
   +-> RabbitConfigurator
@@ -246,15 +242,12 @@ RabbitDeployer.ahk
         +-> switcher, style, and dictionary dialogs
         +-> RabbitUIStyleSettings
               +-> global rime
-              +-> static UIStyle
-
-LegacyCandidateBox
-  +-> CandidateBox
-        +-> Direct2D
+              +-> RabbitUIStyleSnapshot
 ```
 
-The major direction violations are callbacks reaching back into global entry-owned state, style parsing reaching into
-the active view, and the legacy backend depending on the modern rendering backend.
+The remaining major direction violations are callbacks reaching back into global entry-owned state and deployer
+workflows relying on process globals. Style parsing now publishes value snapshots, and the legacy backend is independent
+of the modern renderer.
 
 ## 7. Target ownership model
 
@@ -400,7 +393,7 @@ These findings are not classified as defects without a reproducible behavior or 
 | SR-001 | legacy candidate GUI and styles are class-static | move to instance ownership in candidate-boundary phase |
 | SR-002 | modern candidate hidden state is class-static | move to instance ownership in candidate-boundary phase |
 | SR-003 | normal candidate disposal relies on `__Delete()` | add explicit idempotent disposal |
-| SR-004 | theme enumeration temporarily mutates shared `UIStyle` | replace with independent style snapshots |
+| SR-004 | theme enumeration temporarily mutates shared `UIStyle` | resolved in Phase 3 with independent style snapshots |
 | SR-005 | message, hotkey, and timer registrations have no unified owner | assign owners during app-context migration |
 | SR-006 | `RabbitCommon` creates the Rime service and declares app state | separate constants/helpers from process ownership |
 | SR-007 | `RabbitInput` combines key translation, Rime processing, presentation, placement, and clipboard output | split only at stable behavioral seams |
@@ -468,6 +461,28 @@ Validation:
 
 - the focused presentation fixture checks a non-empty custom label and an empty label in the same menu;
 - the empty label resolves to its formatted candidate ordinal.
+
+### BUG-003: Legacy candidate updates leave auxiliary GUI windows visible
+
+Status: Open; requires separate approval before fixing
+
+Reproduction:
+
+1. Select the legacy candidate backend and keep `use_caret_hook: false`.
+2. Start Rabbit, focus a verified text editor window, and enter `shuru`.
+3. Enumerate Rabbit's visible top-level windows after each input update.
+4. Press `Esc` to hide the candidate.
+5. The active `172 x 190` candidate window is hidden, but three same-position auxiliary GUI windows created during
+   prior updates remain visible.
+
+Characterization:
+
+- the behavior predates Phase 3 and is present in the reorganized baseline;
+- `LegacyCandidateBox.BoxGui.Update()` constructs a temporary `BoxGui` for measurement on every update;
+- the main candidate hide contract still targets the active GUI instance, while the auxiliary native windows remain;
+- the legacy process continues to satisfy the no-Direct2D policy.
+
+No fix is included in the Phase 3 refactoring commit.
 
 ## 11. Refactoring phases
 
@@ -539,6 +554,14 @@ Commit: `refactor(ui): pass explicit style snapshots`
 - create independent preview snapshots without mutating active style;
 - pass snapshots explicitly to both candidate backends and previews;
 - preserve dark-mode and theme selection behavior.
+
+Implementation result:
+
+- `RabbitUIStyleSnapshot` resolves all scalar font, geometry, and color values before publication;
+- active runtime style and each preview preset are independent snapshot instances;
+- constructor and `With()` inputs are copied into scalar properties rather than retained as mutable containers;
+- candidate factories, both candidate backends, and the Direct2D preview require explicit styles;
+- appearance changes replace the active snapshot and pass the replacement to the selected backend.
 
 ### Phase 4: Main application context
 
@@ -619,6 +642,14 @@ Focused tests:
 | Phase 2 | modern and legacy real-input paths | Pass; preedit, candidates, highlighting, paging, and hiding were exercised |
 | Phase 2 | `Rabbit.ahk` and `RabbitDeployer.ahk` validation | Pass; both entry scripts exited validation with code 0 |
 | Phase 2 | local caret-hook safety override cleanup | Pass; `rabbit.custom.yaml` was restored, redeployed, and absent from the diff |
+| Phase 3 | style snapshot construction and parsing fixtures | Pass; constructor and override Maps were not retained, and active, dark, and explicit preview schemes stayed independent |
+| Phase 3 | candidate lifecycle and local dimensions | Pass; modern remained 160 x 101 and legacy remained 172 x 99 with explicit default snapshots |
+| Phase 3 | fresh-process candidate factory and legacy build modes | Pass; all selection modes passed and the calibrated legacy Direct2D probe remained at zero |
+| Phase 3 | `Rabbit.ahk` and `RabbitDeployer.ahk` validation | Pass; both entry scripts exited validation with code 0 |
+| Phase 3 | supported style preview integration | Pass; preset snapshots rendered positive dimensions and `rabbit.custom.yaml` remained byte-for-byte unchanged |
+| Phase 3 | modern real-input path | Pass; `shuru`, `Down`, and `Esc` showed, updated, and hid a `160 x 190` candidate while Direct2D, DirectWrite, and GDI+ were loaded |
+| Phase 3 | configured legacy real-input path | Pass with BUG-003 recorded; the active `172 x 190` candidate showed, updated, and hid, and no Direct2D, DirectWrite, or GDI+ module loaded |
+| Phase 3 | local configuration restoration | Pass; `use_legacy_candidate_box: true` and `use_caret_hook: false` were restored and redeployed |
 
 The local source checks used the available AutoHotkey v2.0.26 interpreter with `/ErrorStdOut`, with both standard output
 and standard error captured. A high-frequency visible-window probe was also used to identify the missing-icon exception

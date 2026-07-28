@@ -25,4 +25,5 @@
 
 #Include tests\RabbitCandidatePresentationTest.ahk
 #Include tests\RabbitCandidateBoxTest.ahk
+#Include tests\RabbitUIStyleSnapshotTest.ahk
 #Include tests\RabbitShutdownTest.ahk

@@ -19,12 +19,12 @@
 
 #Include <RabbitCandidateBoxCommon>
 #Include <RabbitCandidatePresentation>
-#Include <RabbitUIStyle>
+#Include <RabbitUIStyleSnapshot>
 
 class LegacyCandidateBox {
     static dbg := false
 
-    __New(style := UIStyle) {
+    __New(style) {
         this.gui := 0
         this.built := false
         this.visible := false

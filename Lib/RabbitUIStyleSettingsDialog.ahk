@@ -104,7 +104,7 @@ class UIStyleSettingsDialog extends Gui {
             return
         }
         local info := this.preset[index]
-        this.candidate_box.Build(info, &box_width, &box_height)
+        this.candidate_box.Build(info.style, &box_width, &box_height)
         box_width := box_width / this.candidate_box.dpiScale
         box_height := box_height / this.candidate_box.dpiScale
         local box_x := this.MarginX + this.color_schemes_width + this.preview_offset + Round((this.preview_width - box_width) / 2)

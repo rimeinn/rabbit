@@ -17,7 +17,7 @@
  */
 
 #Include <RabbitCommon>
-#Include <RabbitUIStyle>
+#Include <RabbitUIStyleSnapshot>
 
 class UIStyleSettings {
     __New() {
@@ -26,7 +26,7 @@ class UIStyleSettings {
     }
 
     GetPresetColorSchemes() {
-        local config, preset, name
+        local config, preset, name, style
         global rime
         local result := []
         if !(config := this.api.settings_get_config(this.settings)) {
@@ -42,22 +42,12 @@ class UIStyleSettings {
             }
             local author_key := preset.path . "/author"
             local author := rime.config_get_cstring(config, author_key)
-            UIStyle.UpdateColor(config, StrLower(preset.key))
+            style := RabbitUIStyleSnapshot.FromConfig(rime, config, false, StrLower(preset.key))
             result.Push({
                 color_scheme_id: preset.key,
                 name: name,
                 author: author,
-                border_color: UIStyle.border_color,
-                text_color: UIStyle.text_color,
-                back_color: UIStyle.back_color,
-                hilited_text_color: UIStyle.hilited_text_color,
-                hilited_back_color: UIStyle.hilited_back_color,
-                hilited_candidate_text_color: UIStyle.hilited_candidate_text_color,
-                hilited_candidate_back_color: UIStyle.hilited_candidate_back_color,
-                candidate_text_color: UIStyle.candidate_text_color,
-                candidate_back_color: UIStyle.candidate_back_color,
-                font_face: UIStyle.font_face,
-                font_point: UIStyle.font_point,
+                style: style,
             })
         }
         return result

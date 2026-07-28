@@ -29,12 +29,14 @@
 #Include <RabbitShutdown>
 #Include <RabbitTrayMenu>
 #Include <RabbitUIStyle>
+#Include <RabbitUIStyleSnapshot>
 #Include <RabbitConfig>
 
 global IN_MAINTENANCE := false
 global session_id := 0
 global mutex := RabbitMutex()
 global last_is_hide := false
+global ui_style := RabbitUIStyleSnapshot()
 
 RabbitMain(A_Args)
 
@@ -43,7 +45,7 @@ RabbitMain(A_Args)
 ; args[3]: keyboard layout
 RabbitMain(args) {
     local layout, fail_count, status
-    global box, rabbit_traits
+    global box, rabbit_traits, ui_style
     if args.Length >= 3 {
         layout := Number(args[3])
     }
@@ -103,9 +105,9 @@ RabbitMain(args) {
 
     RabbitCleanOldLogs()
     RabbitCleanMisplacedConfigs()
-    RabbitConfig.load()
+    ui_style := RabbitConfig.load()
     local use_legacy_candidate_box := RabbitIsOldWindows() || RabbitConfig.use_legacy_candidate_box
-    box := RabbitCandidateBoxFactory().Create(use_legacy_candidate_box)
+    box := RabbitCandidateBoxFactory(ui_style).Create(use_legacy_candidate_box)
     RegisterHotKeys()
     UpdateStateLabels()
     if (status := rime.get_status(session_id)) {
@@ -125,7 +127,6 @@ RabbitMain(args) {
         }
     }
     SetupTrayMenu()
-    box.UpdateStyle(UIStyle)
     OnMessage(AHK_NOTIFYICON, ClickHandler.Bind())
     OnMessage(WM_SETTINGCHANGE, OnColorChange.Bind())
     OnMessage(WM_DWMCOLORIZATIONCOLORCHANGED, OnColorChange.Bind())

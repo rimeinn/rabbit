@@ -20,7 +20,7 @@
 #Include <RabbitLegacyCandidateBox>
 
 class RabbitCandidateBoxFactory {
-    __New(style := UIStyle, modern_constructor := CandidateBox, legacy_constructor := LegacyCandidateBox) {
+    __New(style, modern_constructor := CandidateBox, legacy_constructor := LegacyCandidateBox) {
         this.style := style
         this.modern_constructor := modern_constructor
         this.legacy_constructor := legacy_constructor

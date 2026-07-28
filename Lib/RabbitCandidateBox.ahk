@@ -17,7 +17,7 @@
  *
  */
 
-#Include <RabbitUIStyle>
+#Include <RabbitUIStyleSnapshot>
 #Include <RabbitCandidateBoxCommon>
 #Include <RabbitCandidatePresentation>
 #Include <Direct2D/Direct2D>
@@ -25,7 +25,7 @@
 class CandidateBox {
     gui := 0
 
-    __New(style := UIStyle, d2d_constructor := Direct2D) {
+    __New(style, d2d_constructor := Direct2D) {
         this.gui := 0
         this.d2d := 0
         this.built := false

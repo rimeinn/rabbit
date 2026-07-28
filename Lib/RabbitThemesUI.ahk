@@ -17,7 +17,7 @@
  *
  */
 
-#Include <RabbitUIStyle>
+#Include <RabbitUIStyleSnapshot>
 #Include <Direct2D\Direct2D>
 
 class CandidatePreview {
@@ -35,30 +35,30 @@ class CandidatePreview {
         }
     }
 
-    Build(theme, &calc_width, &calc_height) {
+    Build(style, &calc_width, &calc_height) {
         local em2pt
-        this.borderWidth := UIStyle.border_width
-        this.borderColor := UIStyle.border_color
-        this.boxCornerR := UIStyle.corner_radius
-        this.hlCornerR := UIStyle.round_corner
-        this.lineSpacing := UIStyle.margin_y
-        this.padding := UIStyle.margin_x
+        this.borderWidth := style.border_width
+        this.borderColor := style.border_color
+        this.boxCornerR := style.corner_radius
+        this.hlCornerR := style.round_corner
+        this.lineSpacing := style.margin_y
+        this.padding := style.margin_x
 
         ; only use one font to preview
-        this.fontName := theme.HasOwnProp("font_face") ? theme.font_face : UIStyle.font_face
-        this.fontSize := theme.HasOwnProp("font_point") ? theme.font_point : UIStyle.font_point
+        this.fontName := style.font_face
+        this.fontSize := style.font_point
         this.fontSize *= (em2pt := (96.0 / 72.0))
         ; preedite style
-        this.borderColor := theme.border_color
-        this.textColor := theme.text_color
-        this.backgroundColor := theme.back_color
-        this.hlTxtColor := theme.hilited_text_color
-        this.hlBgColor := theme.hilited_back_color
+        this.borderColor := style.border_color
+        this.textColor := style.text_color
+        this.backgroundColor := style.back_color
+        this.hlTxtColor := style.hilited_text_color
+        this.hlBgColor := style.hilited_back_color
         ; candidate style
-        this.hlCandTxtColor := theme.hilited_candidate_text_color
-        this.hlCandBgColor := theme.hilited_candidate_back_color
-        this.candTxtColor := theme.candidate_text_color
-        this.candBgColor := theme.candidate_back_color
+        this.hlCandTxtColor := style.hilited_candidate_text_color
+        this.hlCandBgColor := style.hilited_candidate_back_color
+        this.candTxtColor := style.candidate_text_color
+        this.candBgColor := style.candidate_back_color
 
         this.prdSelSize := this.d2d.GetMetrics("RIME", this.fontName, this.fontSize)
         this.prdHlSize := this.d2d.GetMetrics("shu ru fa", this.fontName, this.fontSize)
@@ -133,12 +133,12 @@ class CandidatePreview {
 }
 
 class ThemesGUI {
-    __New(result) {
+    __New(result, style) {
         this.result := result
         this.preset_color_schemes := Map()
         this.colorSchemeMap := Map()
-        this.previewFontName := UIStyle.font_face
-        this.previewFontSize := UIStyle.font_point
+        this.previewFontName := style.font_face
+        this.previewFontSize := style.font_point
         this.themeListBoxW := 400
         this.previewGroupW := 300
         this.previewGroupH := 418
@@ -219,13 +219,12 @@ class ThemesGUI {
     }
 
     OnConfirm(*) {
-        local config, init
+        local config
         global rime
         if rime &&(config := rime.config_open("rabbit")) {
             rime.config_set_string(config, "style/color_scheme", this.currentTheme)
             rime.config_set_int(config, "style/font_point", this.previewFontSize)
             rime.config_set_string(config, "style/font_face", this.previewFontName)
-            UIStyle.Update(config, init := true)
             rime.config_close(config)
             this.result.yes := true
         }
@@ -235,9 +234,10 @@ class ThemesGUI {
 
     SetPreviewCandsBox(theme, fontName, fontSize) {
         local candidate_box_width, candidate_box_height, preview_box_x, preview_box_y
-        this.previewStyle := this.GetThemeColor(theme)
-        this.previewStyle.font_face := fontName
-        this.previewStyle.font_point := fontSize
+        this.previewStyle := this.GetThemeColor(theme).With({
+            font_face: fontName,
+            font_point: fontSize
+        })
         this.candidateBox.Build(this.previewStyle, &candidate_box_width, &candidate_box_height)
         preview_box_x := this.gui.MarginX + this.themeListBoxW + this.previewGroupOffset + Round((this.previewGroupW - candidate_box_width) / 2)
         preview_box_y := this.gui.MarginY + this.titleH + Round((this.previewGroupH - candidate_box_height) / 2)
@@ -246,7 +246,7 @@ class ThemesGUI {
     }
 
     GetPresetStylesMap() {
-        local config, iter, style_map, theme, name, init
+        local config, iter, style_map, theme, name
         local preset_styles_map := Map()
         global rime
         if rime &&(config := rime.config_open("rabbit")) {
@@ -256,42 +256,19 @@ class ThemesGUI {
                     theme := StrLower(iter.key)
                     if (name := rime.config_get_string(config, "preset_color_schemes/" . theme . "/name")) {
                         style_map["name"] := name
-                        UIStyle.UpdateColor(config, theme)
+                        style_map["style"] := RabbitUIStyleSnapshot.FromConfig(rime, config, false, theme)
                     }
-                    style_map["border_color"] := UIStyle.border_color
-                    style_map["text_color"] := UIStyle.text_color
-                    style_map["back_color"] := UIStyle.back_color
-                    style_map["hilited_text_color"] := UIStyle.hilited_text_color
-                    style_map["hilited_back_color"] := UIStyle.hilited_back_color
-                    style_map["hilited_candidate_text_color"] := UIStyle.hilited_candidate_text_color
-                    style_map["hilited_candidate_back_color"] := UIStyle.hilited_candidate_back_color
-                    style_map["candidate_text_color"] := UIStyle.candidate_text_color
-                    style_map["candidate_back_color"] := UIStyle.candidate_back_color
                     preset_styles_map[theme] := style_map
                 }
                 rime.config_end(iter)
             }
-            ; restore UIStyle
-            UIStyle.Update(config, init := true)
             rime.config_close(config)
         }
         return preset_styles_map
     }
 
     GetThemeColor(selected_theme) {
-        local style
-        style := this.preset_color_schemes[selected_theme]
-        return {
-            border_color: style["border_color"],
-            text_color: style["text_color"],
-            back_color: style["back_color"],
-            hilited_text_color: style["hilited_text_color"],
-            hilited_back_color: style["hilited_back_color"],
-            hilited_candidate_text_color: style["hilited_candidate_text_color"],
-            hilited_candidate_back_color: style["hilited_candidate_back_color"],
-            candidate_text_color: style["candidate_text_color"],
-            candidate_back_color: style["candidate_back_color"],
-        }
+        return this.preset_color_schemes[selected_theme]["style"]
     }
 }
 
