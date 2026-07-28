@@ -18,6 +18,7 @@
  */
 
 #Include <RabbitCandidateBoxCommon>
+#Include <RabbitCandidatePresentation>
 #Include <RabbitUIStyle>
 
 class LegacyCandidateBox {
@@ -116,10 +117,11 @@ class LegacyCandidateBox {
 
     Build(context, &width, &height) {
         this.AssertNotDisposed()
+        local presentation := RabbitCandidatePresentation(context, this.style.label_format)
         if !this.gui || !this.gui.built {
-            this.gui := LegacyCandidateBox.BoxGui(this, context)
+            this.gui := LegacyCandidateBox.BoxGui(this, presentation)
         } else {
-            this.gui.Update(context)
+            this.gui.Update(presentation)
         }
         width := this.gui.max_width
         height := this.gui.max_height
@@ -153,17 +155,16 @@ class LegacyCandidateBox {
 
     class BoxGui extends Gui {
         built := false
-        __New(owner, context, &pre?, &sel?, &post?, &menu?) {
+        __New(owner, presentation, &pre?, &sel?, &post?) {
             local w, h, h1, h2, h3
             super.__New(, , this)
             this.owner := owner
 
-            menu := context.menu
-            local cands := menu.candidates
-            local num_candidates := menu.num_candidates
-            local hilited_index := menu.highlighted_candidate_index + 1
-            local composition := context.composition
-            GetCompositionText(composition, &pre, &sel, &post)
+            local num_candidates := presentation.candidates.Length
+            local hilited_index := presentation.highlighted_index
+            pre := presentation.preedit.before_selection
+            sel := presentation.preedit.selected
+            post := presentation.preedit.after_selection
 
             this.Opt(Format("-DPIScale -Caption +Owner +AlwaysOnTop {} {} {}", WS_EX_NOACTIVATE, WS_EX_COMPOSITED, WS_EX_LAYERED))
             this.BackColor := this.owner.back_color
@@ -211,30 +212,23 @@ class LegacyCandidateBox {
             this.max_candidate_width := 0
             this.max_comment_width := 0
             this.candidate_height := 0
-            local has_label := !!context.select_labels[0]
-            local select_keys := menu.select_keys
-            local num_select_keys := StrLen(select_keys)
             loop num_candidates {
                 position := Format("xs y+{} section {}", this.MarginY, this.owner.border)
-                local label_text := String(A_Index)
-                if A_Index <= menu.page_size && has_label {
-                    label_text := context.select_labels[A_Index]
-                } else if A_Index <= num_select_keys {
-                    label_text := SubStr(select_keys, A_Index, 1)
-                }
-                label_text := Format(this.owner.style.label_format, label_text)
+                local candidate_presentation := presentation.candidates[A_Index]
                 this.SetFont(this.owner.label_font_opt, this.owner.style.label_font_face)
-                local label := this.AddText(Format("Right {} vL{}", position, A_Index), label_text)
+                local label := this.AddText(
+                    Format("Right {} vL{}", position, A_Index), candidate_presentation.legacy_label)
                 label.GetPos(, , &w, &h1)
                 this.max_label_width := max(this.max_label_width, w + this.MarginX)
 
                 position := Format("x+{} ys {}", this.MarginX, this.owner.border)
                 this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
-                local candidate := this.AddText(Format("{} vC{}", position, A_Index), cands[A_Index].text)
+                local candidate := this.AddText(
+                    Format("{} vC{}", position, A_Index), candidate_presentation.text)
                 candidate.GetPos(, , &w, &h2)
                 this.max_candidate_width := max(this.max_candidate_width, w + this.MarginX)
 
-                if (comment_text := cands[A_Index].comment) {
+                if (comment_text := candidate_presentation.comment) {
                     this.has_comment := true
                 }
                 this.SetFont(this.owner.comment_font_opt, this.owner.style.comment_font_face)
@@ -291,11 +285,11 @@ class LegacyCandidateBox {
             this.built := true
         }
 
-        Update(context) {
+        Update(presentation) {
             local x, y, w, h, width, height
-            local fake_gui := LegacyCandidateBox.BoxGui(this.owner, context, &pre, &sel, &post, &menu)
-            local num_candidates := menu.num_candidates
-            local hilited_index := menu.highlighted_candidate_index + 1
+            local fake_gui := LegacyCandidateBox.BoxGui(this.owner, presentation, &pre, &sel, &post)
+            local num_candidates := presentation.candidates.Length
+            local hilited_index := presentation.highlighted_index
             this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
             this.num_candidates := max(this.num_candidates, num_candidates)
             this.max_width := fake_gui.max_width

@@ -20,7 +20,9 @@
 #SingleInstance Off
 
 #Include <RabbitCandidateBoxFactory>
+#Include <RabbitCandidatePresentation>
 #Include <RabbitShutdown>
 
+#Include tests\RabbitCandidatePresentationTest.ahk
 #Include tests\RabbitCandidateBoxTest.ahk
 #Include tests\RabbitShutdownTest.ahk

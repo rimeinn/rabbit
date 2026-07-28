@@ -19,6 +19,7 @@
 
 #Include <RabbitUIStyle>
 #Include <RabbitCandidateBoxCommon>
+#Include <RabbitCandidatePresentation>
 #Include <Direct2D/Direct2D>
 
 class CandidateBox {
@@ -100,31 +101,36 @@ class CandidateBox {
     }
 
     Build(context, &win_w, &win_h) { ; build text layout
-        local pre_selected, selected, post_selected, base_x, base_y, preedit_0, preedit_1, preedit_2, preedit_1_x
+        local base_x, base_y, preedit_0, preedit_1, preedit_2, preedit_1_x
         local preedit_2_x, max_row_width
-        local total_rows_height, has_label, select_keys, num_select_keys, label_text, label_box, candidate_text
-        local candidate_box
+        local total_rows_height, label_box, candidate_box
         local comment_text, comment_box, row_rect, increment, label_width, candidate_width, comment, comment_gap
         this.AssertNotDisposed()
-        local menu := context.menu
-        local cands := menu.candidates
-        this.num_candidates := menu.num_candidates
-        this.hilited_index := menu.highlighted_candidate_index + 1
-
-        GetCompositionText(context.composition, &pre_selected, &selected, &post_selected)
+        local presentation := RabbitCandidatePresentation(context, this.style.label_format)
+        this.num_candidates := presentation.candidates.Length
+        this.hilited_index := presentation.highlighted_index
 
         ; Build preedit layout
         base_x := this.borderWidth + this.padding
         base_y := this.borderWidth + this.lineSpacing
-        preedit_0 := this.GetTextMetrics(pre_selected, this.mainFont)
-        preedit_1 := this.GetTextMetrics(selected, this.mainFont)
-        preedit_2 := this.GetTextMetrics(post_selected, this.mainFont)
+        preedit_0 := this.GetTextMetrics(presentation.preedit.before_selection, this.mainFont)
+        preedit_1 := this.GetTextMetrics(presentation.preedit.selected, this.mainFont)
+        preedit_2 := this.GetTextMetrics(presentation.preedit.after_selection, this.mainFont)
         preedit_1_x := base_x + preedit_0.w + this.padding
         preedit_2_x := preedit_1_x + preedit_1.w
         this.preeditLayout := {
-            selBox: { x: base_x, y: base_y, w: preedit_0.w, h: preedit_0.h, text: pre_selected },
-            hlSelBox: { x: preedit_1_x, y: base_y, w: preedit_1.w, h: preedit_1.h, text: selected },
-            hlUnSelBox: { x: preedit_2_x, y: base_y, w: preedit_2.w, h: preedit_2.h, text: post_selected },
+            selBox: {
+                x: base_x, y: base_y, w: preedit_0.w, h: preedit_0.h,
+                text: presentation.preedit.before_selection
+            },
+            hlSelBox: {
+                x: preedit_1_x, y: base_y, w: preedit_1.w, h: preedit_1.h,
+                text: presentation.preedit.selected
+            },
+            hlUnSelBox: {
+                x: preedit_2_x, y: base_y, w: preedit_2.w, h: preedit_2.h,
+                text: presentation.preedit.after_selection
+            },
             left: base_x,
             top: base_y,
             width: preedit_0.w + this.padding + preedit_1.w + preedit_2.w,
@@ -137,25 +143,22 @@ class CandidateBox {
         base_y := base_y + total_rows_height
         this.candidatesLayout := { labels: [], cands: [], comments: [], rows: [] }
 
-        has_label := !!context.select_labels[0]
-        select_keys := menu.select_keys
-        num_select_keys := StrLen(select_keys)
         Loop this.num_candidates {
-            label_text := String(A_Index)
-            if A_Index <= menu.page_size && has_label {
-                label_text := context.select_labels[A_Index] || label_text
-            } else if A_Index <= num_select_keys {
-                label_text := SubStr(select_keys, A_Index, 1)
-            }
-            label_text := Format(this.style.label_format, label_text)
-            label_box := this.GetTextMetrics(label_text, this.labFont)
-            this.candidatesLayout.labels.Push({ x: base_x, y: base_y, w: label_box.w, h: label_box.h, text: label_text })
+            local candidate := presentation.candidates[A_Index]
+            label_box := this.GetTextMetrics(candidate.label, this.labFont)
+            this.candidatesLayout.labels.Push(
+                { x: base_x, y: base_y, w: label_box.w, h: label_box.h, text: candidate.label })
 
-            candidate_text := cands[A_Index].text
-            candidate_box := this.GetTextMetrics(candidate_text, this.mainFont)
-            this.candidatesLayout.cands.Push({ x: base_x + label_box.w + this.padding, y: base_y, w: candidate_box.w, h: candidate_box.h, text: candidate_text })
+            candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
+            this.candidatesLayout.cands.Push({
+                x: base_x + label_box.w + this.padding,
+                y: base_y,
+                w: candidate_box.w,
+                h: candidate_box.h,
+                text: candidate.text
+            })
 
-            comment_text := cands[A_Index].comment
+            comment_text := candidate.comment
             comment_box := this.GetTextMetrics(comment_text, this.commentFont)
             this.candidatesLayout.comments.Push({ x: base_x + label_box.w + candidate_box.w, y: base_y, w: comment_box.w, h: comment_box.h, text: comment_text })
 

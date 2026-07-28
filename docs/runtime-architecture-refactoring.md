@@ -1,6 +1,6 @@
 # Rabbit Runtime Architecture Refactoring
 
-Status: Phase 1 candidate-box boundary implemented and validated
+Status: Phase 2 candidate presentation model implemented and validated
 Last updated: 2026-07-28
 
 ## 1. Purpose
@@ -579,6 +579,12 @@ Focused tests:
 | Phase 1 | injected candidate disposal failure | Pass; Rime session destruction, finalization, and mutex closure still ran in order |
 | Phase 1 | deployer default UI and `deploy` command | Pass; the expected configuration window opened and deployment exited with code 0 |
 | Phase 1 | local caret-hook safety override cleanup | Pass; `rabbit.custom.yaml` was restored and no override entered the diff |
+| Phase 2 | candidate presentation fixtures | Pass; UTF-8 selection, cursor insertion, label sources, comments, highlighting, and empty menus |
+| Phase 2 | backend lifecycle and local dimensions | Pass; modern remained 160 x 101 and legacy remained 172 x 99 |
+| Phase 2 | dedicated legacy build process | Pass; calibrated `Direct2D.__New()` probe observed 0 constructions |
+| Phase 2 | modern and legacy real-input paths | Pass; preedit, candidates, highlighting, paging, and hiding were exercised |
+| Phase 2 | `Rabbit.ahk` and `RabbitDeployer.ahk` validation | Pass; both entry scripts exited validation with code 0 |
+| Phase 2 | local caret-hook safety override cleanup | Pass; `rabbit.custom.yaml` was restored, redeployed, and absent from the diff |
 
 The local source checks used the available AutoHotkey v2.0.26 interpreter with `/ErrorStdOut`, with both standard output
 and standard error captured. A high-frequency visible-window probe was also used to identify the missing-icon exception
