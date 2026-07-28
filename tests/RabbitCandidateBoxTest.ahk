@@ -132,11 +132,17 @@ TestLegacyBuildWithoutDirect2D() {
         candidate_box.Build(candidate_context, &width, &height)
         AssertTrue(width > 0 && height > 0, "The legacy backend must build valid dimensions.")
     } finally {
-        if candidate_box {
-            candidate_box.Dispose()
+        try {
+            if candidate_box {
+                candidate_box.Dispose()
+            }
+        } finally {
+            try {
+                Direct2D.Prototype.DefineProp("__New", original_constructor)
+            } finally {
+                Direct2D.Prototype.DefineProp("__Delete", original_destructor)
+            }
         }
-        Direct2D.Prototype.DefineProp("__New", original_constructor)
-        Direct2D.Prototype.DefineProp("__Delete", original_destructor)
     }
     AssertEqual(0, direct2d_count.value, "Building the legacy backend must not construct Direct2D.")
 }
