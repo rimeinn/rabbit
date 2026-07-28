@@ -280,7 +280,7 @@ ProcessKey(key, mask, this_hotkey) {
                     box.Show(info.work.left + 4, info.work.top + 4)
                 }
             }
-            if !show_at_left_top && GetCaretPos(&caret_x, &caret_y, &caret_w, &caret_h) {
+            if !show_at_left_top && RabbitGetCaretPos(&caret_x, &caret_y, &caret_w, &caret_h) {
                 box.Build(context, &box_width, &box_height)
                 if RabbitConfig.fix_candidate_box && prev_show {
                     new_x := prev_x

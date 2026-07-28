@@ -46,7 +46,7 @@ class UIStyleSettingsDialog extends Gui {
         this.preview_group := this.AddGroupBox(Format("x+{} yp-8 w{} h{}", this.preview_offset, this.preview_width, this.list_height + 8), "预览")
         ; 0xE(SS_BITMAP) or 0x4E (Bitmap and Resizable, but text is unclear)
         this.preview_img := this.AddPicture("xp+50 yp+50 w180 h180 0xE BackgroundWhite")
-        if IsOldWindows() {
+        if RabbitIsOldWindows() {
             this.preview_img.Visible := false
             this.preview_group.GetPos(&group_x, &group_y, &group_width, &group_height)
             this.AddText(Format("x{} y{} w{} h{} Center +0x200", group_x + 10, group_y + 20,

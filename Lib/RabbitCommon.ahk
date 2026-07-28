@@ -63,7 +63,7 @@ global ASCII_PUNCT_TRUE_LABEL_ABBR := "."
 
 global ERROR_ALREADY_EXISTS := 183 ; https://learn.microsoft.com/windows/win32/debug/system-error-codes--0-499-
 
-IsOldWindows() {
+RabbitIsOldWindows() {
     return VerCompare(A_OSVersion, "< 10")
 }
 
@@ -94,7 +94,7 @@ class RabbitMutex {
     }
 }
 
-CreateTraits() {
+RabbitCreateTraits() {
     local traits
     traits := RimeTraits()
     traits.distribution_name := RABBIT_IME_NAME
@@ -160,7 +160,7 @@ OnRimeMessage(context_object, session_id, message_type, message_value) {
     }
 }
 
-CleanOldLogs() {
+RabbitCleanOldLogs() {
     local app_name, dir, files, file
     app_name := "rime.rabbit"
     dir := RabbitLogPath()
@@ -186,7 +186,7 @@ CleanOldLogs() {
     }
 }
 
-CleanMisPlacedConfigs() {
+RabbitCleanMisplacedConfigs() {
     local shared, user
     shared := RabbitSharedDataPath()
     user := RabbitUserDataPath()

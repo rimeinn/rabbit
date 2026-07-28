@@ -22,7 +22,7 @@
 #Include <RabbitUIStyleSettings>
 #Include <RabbitUIStyleSettingsDialog>
 
-CreateFileIfNotExist(filename) {
+RabbitCreateFileIfNotExist(filename) {
     local user_data_dir, filepath
     user_data_dir := RabbitUserDataPath() . "\"
     if !InStr(DirExist(user_data_dir), "D") {
@@ -86,13 +86,13 @@ ConfigureUI(levers, ui_style_settings, &reconfigured) {
 
 class Configurator extends Class {
     __New() {
-        CreateFileIfNotExist("default.custom.yaml")
-        CreateFileIfNotExist("rabbit.custom.yaml")
+        RabbitCreateFileIfNotExist("default.custom.yaml")
+        RabbitCreateFileIfNotExist("rabbit.custom.yaml")
     }
 
     Initialize() {
         global rabbit_traits
-        rabbit_traits := CreateTraits()
+        rabbit_traits := RabbitCreateTraits()
         rime.setup(rabbit_traits)
         rime.deployer_initialize(0)
     }

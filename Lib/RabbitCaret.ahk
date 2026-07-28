@@ -32,7 +32,7 @@
  * @param W Value is set to the width of the caret
  * @param H Value is set to the height of the caret
  */
-GetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?) {
+RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?) {
     local left, top, right, bottom
     caret_x := 0
     caret_y := 0
@@ -41,7 +41,7 @@ GetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?) {
 
     if GetCaretPosEx(&left, &top, &right, &bottom, RabbitConfig.use_caret_hook) {
         if !IsSet(left) || !IsSet(top) || !IsSet(right) || !IsSet(bottom) {
-            return GetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
+            return RabbitGetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
         }
         local max_int := 2147483647
         local max_uint := 4294967295
@@ -58,10 +58,10 @@ GetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?) {
         return true
     }
 
-    return GetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
+    return RabbitGetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
 }
 
-GetBuiltInCaretPos(&x, &y, &w, &h) {
+RabbitGetBuiltInCaretPos(&x, &y, &w, &h) {
     local saved_caret := A_CoordModeCaret
     CoordMode("Caret", "Screen")
     local found := CaretGetPos(&x, &y)

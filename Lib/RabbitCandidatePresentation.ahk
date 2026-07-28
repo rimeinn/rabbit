@@ -25,7 +25,7 @@ class RabbitCandidatePresentation {
         local select_keys := menu.select_keys
         local select_key_count := StrLen(select_keys)
 
-        GetCompositionText(
+        RabbitGetCompositionText(
             context.composition, &before_selection, &selected, &after_selection)
         this.preedit := {
             before_selection: before_selection,
@@ -52,7 +52,7 @@ class RabbitCandidatePresentation {
     }
 }
 
-GetCompositionText(composition, &pre_selected, &selected, &post_selected) {
+RabbitGetCompositionText(composition, &pre_selected, &selected, &post_selected) {
     local preedit, byte
     pre_selected := ""
     selected := ""

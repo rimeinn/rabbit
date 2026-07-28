@@ -72,7 +72,7 @@ RabbitMain(args) {
         || !FileExist(RabbitUserDataPath() . "\installation.yaml")
         || !FileExist(RabbitUserDataPath() . "\build\rabbit.yaml") ; in staging dir
 
-    rabbit_traits := CreateTraits()
+    rabbit_traits := RabbitCreateTraits()
     global rime
     rime.setup(rabbit_traits)
     rime.set_notification_handler(OnRimeMessage, 0)
@@ -101,10 +101,10 @@ RabbitMain(args) {
         throw Error("未能成功创建 RIME 会话。")
     }
 
-    CleanOldLogs()
-    CleanMisPlacedConfigs()
+    RabbitCleanOldLogs()
+    RabbitCleanMisplacedConfigs()
     RabbitConfig.load()
-    local use_legacy_candidate_box := IsOldWindows() || RabbitConfig.use_legacy_candidate_box
+    local use_legacy_candidate_box := RabbitIsOldWindows() || RabbitConfig.use_legacy_candidate_box
     box := RabbitCandidateBoxFactory().Create(use_legacy_candidate_box)
     RegisterHotKeys()
     UpdateStateLabels()
