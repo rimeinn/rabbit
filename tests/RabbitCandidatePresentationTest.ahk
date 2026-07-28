@@ -43,7 +43,6 @@ TestCandidateLabelFallbackPresentation() {
 
     AssertEqual("[甲]", presentation.candidates[1].label, "The custom label is incorrect.")
     AssertEqual("[2]", presentation.candidates[2].label, "An empty custom label must fall back to its ordinal.")
-    AssertEqual("[]", presentation.candidates[2].legacy_label, "The legacy empty-label behavior changed.")
     AssertEqual("候选一", presentation.candidates[1].text, "The candidate text is incorrect.")
     AssertEqual("注释", presentation.candidates[1].comment, "The candidate comment is incorrect.")
     AssertTrue(presentation.candidates[2].highlighted, "The highlighted candidate mapping is incorrect.")

@@ -217,7 +217,7 @@ class LegacyCandidateBox {
                 local candidate_presentation := presentation.candidates[A_Index]
                 this.SetFont(this.owner.label_font_opt, this.owner.style.label_font_face)
                 local label := this.AddText(
-                    Format("Right {} vL{}", position, A_Index), candidate_presentation.legacy_label)
+                    Format("Right {} vL{}", position, A_Index), candidate_presentation.label)
                 label.GetPos(, , &w, &h1)
                 this.max_label_width := max(this.max_label_width, w + this.MarginX)
 

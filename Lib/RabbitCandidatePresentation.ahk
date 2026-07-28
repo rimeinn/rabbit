@@ -37,17 +37,13 @@ class RabbitCandidatePresentation {
 
         loop menu.num_candidates {
             local label := String(A_Index)
-            local legacy_label := label
             if A_Index <= menu.page_size && has_custom_labels {
-                legacy_label := context.select_labels[A_Index]
-                label := legacy_label || label
+                label := context.select_labels[A_Index] || label
             } else if A_Index <= select_key_count {
                 label := SubStr(select_keys, A_Index, 1)
-                legacy_label := label
             }
             this.candidates.Push({
                 label: Format(label_format, label),
-                legacy_label: Format(label_format, legacy_label),
                 text: candidates[A_Index].text,
                 comment: candidates[A_Index].comment,
                 highlighted: A_Index == this.highlighted_index

@@ -435,6 +435,26 @@ Validation:
 - with the icons removed, `RabbitDeployer.ahk deploy` exited with code 0 and no captured output or exception;
 - the ignored local test icons were restored and remain outside the diff.
 
+### BUG-002: Legacy candidate box displays an empty custom label
+
+Status: Fixed by `fix(ui): fall back from empty custom labels`
+
+Reproduction:
+
+1. Provide a non-empty `select_labels[0]` marker so the custom-label path is selected.
+2. Leave one candidate's custom label empty.
+3. Build the legacy candidate box; the corresponding label is empty while the modern backend falls back to its ordinal.
+
+Resolution:
+
+- the shared candidate presentation model resolves an empty custom label to the candidate ordinal;
+- both candidate backends consume the same resolved label.
+
+Validation:
+
+- the focused presentation fixture checks a non-empty custom label and an empty label in the same menu;
+- the empty label resolves to its formatted candidate ordinal.
+
 ## 11. Refactoring phases
 
 ### Phase 0: Audit and baseline
