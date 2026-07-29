@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - dev
+      - codex/refactor-ahk-architecture
     tags:
       - 'v*'
 
@@ -234,6 +235,49 @@ jobs:
           files: |
             rabbit-nightly-x64.zip
             rabbit-nightly-x86.zip
+
+  # Keep architecture test builds separate from the public "latest" nightly channel.
+  create-refactor-nightly:
+    name: Create Refactor Nightly release
+    if: ${{ github.ref == 'refs/heads/codex/refactor-ahk-architecture' }}
+    runs-on: ubuntu-latest
+    needs: build-rabbit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download x64
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Full-x64
+          path: x64
+
+      - name: Pack x64
+        working-directory: x64
+        run: |
+          mkdir Rime && zip -r -q ../rabbit-refactor-nightly-x64.zip *
+
+      - name: Download x86
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Full-x86
+          path: x86
+
+      - name: Pack x86
+        working-directory: x86
+        run: |
+          mkdir Rime && zip -r -q ../rabbit-refactor-nightly-x86.zip *
+
+      - name: Upload Refactor Nightly
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: refactor-nightly
+          prerelease: true
+          title: "Architecture Refactor Nightly"
+          files: |
+            rabbit-refactor-nightly-x64.zip
+            rabbit-refactor-nightly-x86.zip
 
   create-release:
     name: Create Release
