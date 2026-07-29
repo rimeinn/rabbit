@@ -461,7 +461,7 @@ Validation:
 
 ### BUG-003: Legacy candidate updates leave auxiliary GUI windows visible
 
-Status: Open; requires separate approval before fixing
+Status: Fixed by `fix(ui): destroy legacy measurement windows`
 
 Reproduction:
 
@@ -479,7 +479,19 @@ Characterization:
 - the main candidate hide contract still targets the active GUI instance, while the auxiliary native windows remain;
 - the legacy process continues to satisfy the no-Direct2D policy.
 
-No fix is included in the Phase 3 or Phase 4 refactoring commits.
+Resolution:
+
+- the existing GUI-based measurement algorithm is unchanged;
+- `Update()` now explicitly destroys its temporary measurement GUI after copying the measured values;
+- replacing GUI-based measurement with direct GDI or Win32 measurement remains a separate optional refactoring.
+
+Validation:
+
+- repeated legacy `Build()` calls leave the process with only the owned candidate GUI, and disposal restores the
+  native GUI count to its baseline;
+- the modern and legacy lifecycle fixtures retain their local `160 x 101` and `172 x 99` dimensions;
+- real legacy input displayed and updated the candidate, and `Esc` left no auxiliary candidate window visible;
+- the configured-legacy process did not load Direct2D, DirectWrite, or GDI+.
 
 ## 11. Refactoring phases
 

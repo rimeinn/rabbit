@@ -46,6 +46,10 @@ RunTest("old Windows factory selection", TestOldWindowsFactorySelection.Bind(can
 RunTest("configured legacy factory selection", TestConfiguredLegacyFactorySelection.Bind(candidate_style))
 RunTest("modern factory selection", TestModernFactorySelection.Bind(candidate_style))
 RunTest(
+    "legacy measurement window cleanup",
+    TestLegacyMeasurementWindowCleanup.Bind(candidate_style, candidate_context)
+)
+RunTest(
     "modern candidate lifecycle",
     TestBackendLifecycle.Bind("modern", CandidateBox(candidate_style), candidate_context, candidate_style)
 )
@@ -177,6 +181,78 @@ CreateLegacyCandidate(legacy_count, style) {
 CreateFakeDirect2D(direct2d_count, hwnd) {
     direct2d_count.value++
     return RabbitFakeDirect2D()
+}
+
+TestLegacyMeasurementWindowCleanup(style, context) {
+    local baseline := CountProcessGuiWindows()
+    local candidate_box := 0
+    local destroy_calls := { value: 0 }
+    local box_gui_prototype := LegacyCandidateBox.BoxGui.Prototype
+    local had_own_destroy := box_gui_prototype.HasOwnProp("Destroy")
+    local own_destroy := had_own_destroy ? box_gui_prototype.GetOwnPropDesc("Destroy") : 0
+    local original_destroy := box_gui_prototype.Destroy
+    local width, height
+    box_gui_prototype.DefineProp(
+        "Destroy",
+        { Call: CountLegacyGuiDestruction.Bind(destroy_calls, original_destroy) }
+    )
+    try {
+        candidate_box := LegacyCandidateBox(style)
+        candidate_box.Build(context, &width, &height)
+        local built_count := CountProcessGuiWindows()
+        AssertEqual(
+            baseline + 1,
+            built_count,
+            "The initial legacy build must create only its owned candidate window."
+        )
+
+        Loop 3 {
+            candidate_box.Build(context, &width, &height)
+        }
+        AssertEqual(
+            3,
+            destroy_calls.value,
+            "Legacy updates did not explicitly destroy their measurement windows."
+        )
+        AssertEqual(
+            built_count,
+            CountProcessGuiWindows(),
+            "Legacy measurement windows remained after repeated updates."
+        )
+    } finally {
+        try {
+            if candidate_box {
+                candidate_box.Dispose()
+            }
+        } finally {
+            if had_own_destroy {
+                box_gui_prototype.DefineProp("Destroy", own_destroy)
+            } else {
+                box_gui_prototype.DeleteProp("Destroy")
+            }
+        }
+    }
+    AssertEqual(
+        baseline,
+        CountProcessGuiWindows(),
+        "Legacy candidate disposal left native GUI windows behind."
+    )
+}
+
+CountLegacyGuiDestruction(destroy_calls, original_destroy, gui, parameters*) {
+    destroy_calls.value++
+    original_destroy.Call(gui, parameters*)
+}
+
+CountProcessGuiWindows() {
+    local previous_detect_hidden_windows := A_DetectHiddenWindows
+    DetectHiddenWindows(true)
+    try {
+        local process_id := DllCall("GetCurrentProcessId", "UInt")
+        return WinGetList("ahk_class AutoHotkeyGUI ahk_pid " . process_id).Length
+    } finally {
+        DetectHiddenWindows(previous_detect_hidden_windows)
+    }
 }
 
 TestBackendLifecycle(name, candidate_box, context, style) {

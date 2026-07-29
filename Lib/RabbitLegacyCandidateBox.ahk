@@ -386,6 +386,7 @@ class LegacyCandidateBox {
 
             fake_gui.GetPos(, , &width, &height)
             this.Move(, , width, height)
+            fake_gui.Destroy()
         }
     }
 }
