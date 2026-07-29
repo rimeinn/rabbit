@@ -141,15 +141,18 @@ jobs:
           cp plum/rime-install.bat .
 
       - name: Set Version
+        env:
+          RABBIT_REF_NAME: ${{ github.ref_name }}
+          RABBIT_SHA: ${{ github.sha }}
         run: |
-          if [[ ${{ github.ref_name }} == v* ]]; then
-            VER=${{ github.ref_name }}
-            VER=${VER:1}
+          if [[ "$RABBIT_REF_NAME" == v* ]]; then
+            VER=${RABBIT_REF_NAME:1}
           else
-            VER=${{ github.ref_name }}-$(git rev-parse --short ${{ github.sha }})
+            VER=${RABBIT_REF_NAME}-$(git rev-parse --short "$RABBIT_SHA")
           fi
-          echo $VER
-          sed -i -E 's/global RABBIT_VERSION := .+/global RABBIT_VERSION := \"'"$VER"'\"/' Lib/RabbitCommon.ahk
+          VER=$(printf '%s' "$VER" | tr -c 'A-Za-z0-9._-' '-')
+          echo "$VER"
+          sed -i -E 's|global RABBIT_VERSION := .+|global RABBIT_VERSION := "'"$VER"'"|' Lib/RabbitCommon.ahk
 
       - name: Upload Rabbit ${{ matrix.target }}
         uses: actions/upload-artifact@v7
