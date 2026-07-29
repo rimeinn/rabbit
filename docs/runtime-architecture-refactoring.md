@@ -493,6 +493,47 @@ Validation:
 - real legacy input displayed and updated the candidate, and `Esc` left no auxiliary candidate window visible;
 - the configured-legacy process did not load Direct2D, DirectWrite, or GDI+.
 
+### BUG-004: Chromium-class windows may expose invalid successful MSAA caret rectangles
+
+Status: Open; documented for assessment after Phase 5 and before final integration or release
+
+Affected observations:
+
+- confirmed and instrumented in `Feishu.exe`, `ahk_class Chrome_WidgetWin_1`;
+- reported with the same visible behavior in `ChatGPT.exe`, `ahk_class Chrome_WidgetWin_1`;
+- other Chromium or Electron desktop applications may expose the same accessibility behavior.
+
+Reproduction:
+
+1. Keep `use_caret_hook: false`.
+2. Focus an editable control in an affected `Chrome_WidgetWin_1` application.
+3. Start a Rime composition so Rabbit requests the caret rectangle.
+4. The candidate X coordinate follows the real caret, while its Y coordinate remains near the top of the screen.
+5. On `master`, the observed lookup failure instead sends the candidate to the existing mouse-position fallback.
+
+Characterization:
+
+- the current branch and `master` use the same `GetCaretPosEx` MSAA algorithm; a specific refactoring statement has
+  not been shown to cause the different accessibility result;
+- the difference is runtime-state or timing-sensitive: `master` was observed to reject or fail the lookup, while the
+  current branch receives a successful MSAA result;
+- in the instrumented Feishu case, `GetGUIThreadInfo` returned no caret HWND and the hook path was skipped;
+- MSAA returned success with the normalized rectangle `x=-1739, y=-1, w=1, h=17`;
+- Rabbit accepted the rectangle without checking whether it intersected the relevant window client area;
+- candidate placement consequently calculated `new_y = -1 + 17 + 4 = 20`;
+- the ChatGPT observation is user-reported and was not separately instrumented.
+
+Safety and future-fix constraints:
+
+- diagnosis and future regression tests must keep the hook disabled and must not execute its remote-thread path;
+- negative screen coordinates are valid on monitors left of or above the primary monitor and cannot be rejected
+  categorically;
+- a general fix should validate an MSAA rectangle against the relevant client area, continue with UIA when the MSAA
+  result is invalid, and retain the existing mouse fallback when all caret providers fail;
+- do not add application-name special cases for Feishu or ChatGPT;
+- this defect does not block Phase 5 because that phase does not change input or caret lookup, but it should be
+  reassessed before final integration or release.
+
 ## 11. Refactoring phases
 
 ### Phase 0: Audit and baseline
