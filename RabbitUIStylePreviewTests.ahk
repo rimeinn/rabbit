@@ -23,25 +23,24 @@
 #Include <RabbitUIStyleSettings>
 #Include <RabbitUIStyleSettingsDialog>
 
-global rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
-
 RunUIStylePreviewTest()
 
 RunUIStylePreviewTest() {
     local dialog := 0
     local settings := 0
+    local rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
     local traits := RabbitCreateTraits()
     rime.setup(traits)
     rime.deployer_initialize(0)
 
     try {
-        local levers := RimeLeversApi()
-        settings := UIStyleSettings()
+        local levers := RimeLeversApi(rime)
+        settings := UIStyleSettings(rime, levers)
         if !levers.load_settings(settings.settings) {
             throw Error("Failed to load UI style settings.")
         }
 
-        dialog := UIStyleSettingsDialog(settings, { yes: false })
+        dialog := UIStyleSettingsDialog(settings)
         if RabbitIsOldWindows() {
             if dialog.candidate_box {
                 throw Error("The old-Windows style page constructed a Direct2D preview.")
@@ -62,11 +61,11 @@ RunUIStylePreviewTest() {
         FileAppend("PASS: UI style preview snapshots`n", "*")
     } finally {
         if dialog {
-            dialog.Destroy()
+            dialog.Dispose()
             dialog := 0
         }
         if settings {
-            settings.api.custom_settings_destroy(settings.settings)
+            settings.Dispose()
             settings := 0
         }
         rime.finalize()

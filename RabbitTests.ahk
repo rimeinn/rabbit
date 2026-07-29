@@ -21,6 +21,7 @@
 
 #Include <RabbitCandidateBoxFactory>
 #Include <RabbitCandidatePresentation>
+#Include <RabbitDeployerApplication>
 #Include <RabbitShutdown>
 
 #Include tests\RabbitCandidatePresentationTest.ahk
@@ -30,5 +31,7 @@
 #Include tests\RabbitAppContextTest.ahk
 #Include tests\RabbitInputControllerTest.ahk
 #Include tests\RabbitShutdownTest.ahk
+#Include tests\RabbitDeployerContextTest.ahk
+#Include tests\RabbitDeployerWorkflowTest.ahk
 
 ExitApp()

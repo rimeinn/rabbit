@@ -21,15 +21,15 @@
 #Include <RabbitUIStyleSettings>
 
 class UIStyleSettingsDialog extends Gui {
-    __New(settings, result) {
+    __New(settings, old_windows := RabbitIsOldWindows(), preview_factory := CandidatePreview) {
         local h, group_x, group_y, group_width, group_height
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】界面风格设定", this)
         this.settings := settings
         this.loaded := false
-        this.api := RimeLeversApi()
+        this.accepted := false
+        this.disposed := false
 
         this.preset := []
-        this.result := result
 
         ; Layout
         this.MarginX := 15
@@ -46,14 +46,14 @@ class UIStyleSettingsDialog extends Gui {
         this.preview_group := this.AddGroupBox(Format("x+{} yp-8 w{} h{}", this.preview_offset, this.preview_width, this.list_height + 8), "预览")
         ; 0xE(SS_BITMAP) or 0x4E (Bitmap and Resizable, but text is unclear)
         this.preview_img := this.AddPicture("xp+50 yp+50 w180 h180 0xE BackgroundWhite")
-        if RabbitIsOldWindows() {
+        if old_windows {
             this.preview_img.Visible := false
             this.preview_group.GetPos(&group_x, &group_y, &group_width, &group_height)
             this.AddText(Format("x{} y{} w{} h{} Center +0x200", group_x + 10, group_y + 20,
                 group_width - 20, group_height - 30), "旧版 Windows 暂不支持预览")
             this.candidate_box := 0
         } else {
-            this.candidate_box := CandidatePreview(this.preview_img)
+            this.candidate_box := preview_factory(this.preview_img)
         }
 
         this.set_font := this.AddButton(Format("xs ys+{} w120", this.list_height + this.MarginY), "设置字体")
@@ -61,7 +61,12 @@ class UIStyleSettingsDialog extends Gui {
         this.ok := this.AddButton("x+180 w90", "中")
         this.ok.OnEvent("Click", (*) => this.OnOK())
 
-        this.Populate()
+        try {
+            this.Populate()
+        } catch {
+            this.Dispose()
+            throw
+        }
     }
 
     Populate() {
@@ -118,7 +123,22 @@ class UIStyleSettingsDialog extends Gui {
     }
 
     Exit(yes) {
-        this.result.yes := yes
-        this.Destroy()
+        this.accepted := yes
+        this.Dispose()
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.disposed := true
+        try {
+            if this.candidate_box {
+                this.candidate_box.Dispose()
+                this.candidate_box := 0
+            }
+        } finally {
+            try this.Destroy()
+        }
     }
 }

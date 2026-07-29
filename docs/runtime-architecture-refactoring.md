@@ -647,6 +647,19 @@ Commit: `refactor(deployer): make workflow ownership explicit`
 - make dialog and preview resource ownership explicit;
 - retain lazy Direct2D preview initialization.
 
+Implementation result:
+
+- `RabbitDeployer.ahk` constructs its Rime API and delegates command dispatch and shutdown to
+  `RabbitDeployerApplication`;
+- `RabbitDeployerContext` owns deployer traits, command state, the Rime initialization boundary, and idempotent
+  finalization;
+- `RabbitDeployerWorkflow` coordinates configuration, deployment, dictionary, and synchronization paths through an
+  explicit Rime dependency, with mutex closure guaranteed on success, early return, and failure;
+- settings and dictionary dialogs receive their Rime/levers dependencies, own their acceptance state, and release
+  schema lists, dictionary iterators, custom settings, GUI resources, preview bitmaps, and preview renderers explicitly;
+- deploy and synchronization paths do not construct levers or dialog services, while old-Windows style configuration
+  does not construct a preview; Direct2D remains limited to the supported style-preview path.
+
 ## 12. Validation strategy
 
 Every implementation phase performs checks proportional to its changes and pauses after its commit.
@@ -680,7 +693,10 @@ Focused tests:
 - candidate presentation conversion, including UTF-8 cursor and selection byte offsets;
 - label fallback and highlighted candidate mapping;
 - style snapshot parsing without shared-state mutation;
-- backend factory selection without construction of the unselected backend.
+- backend factory selection without construction of the unselected backend;
+- deployer context initialization/finalization and partial-construction cleanup;
+- workflow mutex cleanup and absence of unrelated dialog services in deploy/synchronization paths;
+- old-Windows preview suppression and supported-preview disposal.
 
 ## 13. Phase validation log
 
@@ -723,6 +739,12 @@ Focused tests:
 | Phase 4 | configured legacy real-input path | Pass with BUG-003 unchanged; the active `172 x 190` candidate showed, updated, and hid, and no Direct2D, DirectWrite, or GDI+ module loaded |
 | Phase 4 | normal application shutdown | Pass; posting the normal close message exercised the exit callback and the process exited with code 0 |
 | Phase 4 | local configuration restoration | Pass; `use_legacy_candidate_box: true` and `use_caret_hook: false` were restored and redeployed |
+| Phase 5 | deployer context and workflow ownership fixtures | Pass; Rime finalized once, partial contexts stayed safe, and deploy/sync mutexes closed on success and injected failure |
+| Phase 5 | preview construction policy fixtures | Pass; forced old-Windows configuration constructed no preview, while the supported path constructed and disposed exactly one |
+| Phase 5 | real levers dialog integration | Pass; hidden switcher and dictionary dialogs loaded actual data and released schema lists, the dictionary iterator, GUI resources, and custom settings |
+| Phase 5 | supported style preview integration | Pass; actual preset snapshots rendered positive dimensions and the dialog explicitly released its bitmap and Direct2D preview |
+| Phase 5 | `RabbitDeployer.ahk deploy` | Pass; the real deployment path exited with code 0 after explicit workflow and Rime cleanup |
+| Phase 5 | repository scope and safety | Pass; no submodule pointer, caret-hook setting, generated runtime file, or BUG-004 behavior changed |
 
 The local source checks used the available AutoHotkey v2.0.26 interpreter with `/ErrorStdOut`, with both standard output
 and standard error captured. A high-frequency visible-window probe was also used to identify the missing-icon exception

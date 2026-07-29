@@ -20,46 +20,59 @@
 #Include <RabbitUIStyleSnapshot>
 
 class UIStyleSettings {
-    __New() {
-        this.api := RimeLeversApi()
+    rime := 0
+    api := 0
+    settings := 0
+    disposed := false
+
+    __New(rime_api, levers_api := 0) {
+        this.rime := rime_api
+        this.api := levers_api ? levers_api : RimeLeversApi(rime_api)
         this.settings := this.api.custom_settings_init("rabbit", "Rabbit.UIStyleSettings")
     }
 
     GetPresetColorSchemes() {
         local config, preset, name, style
-        global rime
         local result := []
         if !(config := this.api.settings_get_config(this.settings)) {
             return result
         }
-        if !rime || !(preset := rime.config_begin_map(config, "preset_color_schemes")) {
+        if !(preset := this.rime.config_begin_map(config, "preset_color_schemes")) {
             return result
         }
-        while rime.config_next(preset) {
-            local name_key := preset.path . "/name"
-            if !(name := rime.config_get_cstring(config, name_key)) {
-                continue
+        try {
+            while this.rime.config_next(preset) {
+                local name_key := preset.path . "/name"
+                if !(name := this.rime.config_get_cstring(config, name_key)) {
+                    continue
+                }
+                local author_key := preset.path . "/author"
+                local author := this.rime.config_get_cstring(config, author_key)
+                style := RabbitUIStyleSnapshot.FromConfig(
+                    this.rime,
+                    config,
+                    false,
+                    StrLower(preset.key)
+                )
+                result.Push({
+                    color_scheme_id: preset.key,
+                    name: name,
+                    author: author,
+                    style: style,
+                })
             }
-            local author_key := preset.path . "/author"
-            local author := rime.config_get_cstring(config, author_key)
-            style := RabbitUIStyleSnapshot.FromConfig(rime, config, false, StrLower(preset.key))
-            result.Push({
-                color_scheme_id: preset.key,
-                name: name,
-                author: author,
-                style: style,
-            })
+        } finally {
+            this.rime.config_end(preset)
         }
         return result
     }
 
     GetActiveColorScheme() {
         local config, value
-        global rime
         if !(config := this.api.settings_get_config(this.settings)) {
             return ""
         }
-        if !rime || !(value := rime.config_get_cstring(config, "style/color_scheme")) {
+        if !(value := this.rime.config_get_cstring(config, "style/color_scheme")) {
             return ""
         }
         return value
@@ -68,5 +81,20 @@ class UIStyleSettings {
     SelectColorScheme(color_scheme_id) {
         this.api.customize_string(this.settings, "style/color_scheme", color_scheme_id)
         return true
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.disposed := true
+        if this.settings {
+            this.api.custom_settings_destroy(this.settings)
+            this.settings := 0
+        }
+    }
+
+    __Delete() {
+        this.Dispose()
     }
 }

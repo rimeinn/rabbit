@@ -22,6 +22,8 @@
 
 class CandidatePreview {
     hBitmap := 0
+    d2d := 0
+    disposed := false
 
     __New(ctrl) {
         this.imgCtrl := ctrl
@@ -30,9 +32,30 @@ class CandidatePreview {
     }
 
     __Delete() {
-        if this.hBitmap {
-            DllCall("DeleteObject", "UPtr", this.hBitmap), this.hBitmap := 0
+        this.Dispose()
+    }
+
+    Dispose() {
+        local old_bitmap
+        if this.disposed {
+            return
         }
+        this.disposed := true
+        if this.hBitmap {
+            old_bitmap := 0
+            try old_bitmap := SendMessage(0x0172, 0, 0, this.imgCtrl.Hwnd)
+            if old_bitmap {
+                DllCall("DeleteObject", "UPtr", old_bitmap)
+                if old_bitmap == this.hBitmap {
+                    this.hBitmap := 0
+                }
+            }
+        }
+        if this.hBitmap {
+            DllCall("DeleteObject", "UPtr", this.hBitmap)
+            this.hBitmap := 0
+        }
+        this.d2d := 0
     }
 
     Build(style, &calc_width, &calc_height) {
@@ -74,6 +97,7 @@ class CandidatePreview {
         local wic_render_target, background_x, background_y, background_width, background_height, background_radius
         local current_y, preedit_text_rect, highlighted_preedit_rect, i, candidate, candidate_color
         local highlight_x, highlight_y, highlight_width, highlight_height, text_to_draw, candidate_row_rect
+        local new_bitmap, old_bitmap
         local STM_SETIMAGE
         local IMAGE_BITMAP
         wic_render_target := this.d2d.SetRenderTarget("wic", this.previewWidth, this.previewHeight)
@@ -123,17 +147,30 @@ class CandidatePreview {
         }
         this.d2d.EndDraw()
 
-        if (this.hBitmap := wic_render_target.GetHBitmapFromWICBitmap()) {
+        if (new_bitmap := wic_render_target.GetHBitmapFromWICBitmap()) {
             ; Replace preview image with hBitmap
-            SendMessage(STM_SETIMAGE := 0x0172, IMAGE_BITMAP := 0, this.hBitmap, this.imgCtrl.Hwnd)
-            DllCall("DeleteObject", "UPtr", this.hBitmap)
+            old_bitmap := SendMessage(
+                STM_SETIMAGE := 0x0172,
+                IMAGE_BITMAP := 0,
+                new_bitmap,
+                this.imgCtrl.Hwnd
+            )
+            if old_bitmap {
+                DllCall("DeleteObject", "UPtr", old_bitmap)
+            }
+            this.hBitmap := new_bitmap
             this.d2d.Clear()
         }
     }
 }
 
 class ThemesGUI {
-    __New(result, style) {
+    gui := 0
+    candidateBox := 0
+    disposed := false
+
+    __New(rime_api, result, style) {
+        this.rime := rime_api
         this.result := result
         this.preset_color_schemes := Map()
         this.colorSchemeMap := Map()
@@ -220,12 +257,11 @@ class ThemesGUI {
 
     OnConfirm(*) {
         local config
-        global rime
-        if rime &&(config := rime.config_open("rabbit")) {
-            rime.config_set_string(config, "style/color_scheme", this.currentTheme)
-            rime.config_set_int(config, "style/font_point", this.previewFontSize)
-            rime.config_set_string(config, "style/font_face", this.previewFontName)
-            rime.config_close(config)
+        if (config := this.rime.config_open("rabbit")) {
+            this.rime.config_set_string(config, "style/color_scheme", this.currentTheme)
+            this.rime.config_set_int(config, "style/font_point", this.previewFontSize)
+            this.rime.config_set_string(config, "style/font_face", this.previewFontName)
+            this.rime.config_close(config)
             this.result.yes := true
         }
 
@@ -248,27 +284,55 @@ class ThemesGUI {
     GetPresetStylesMap() {
         local config, iter, style_map, theme, name
         local preset_styles_map := Map()
-        global rime
-        if rime &&(config := rime.config_open("rabbit")) {
-            if (iter := rime.config_begin_map(config, "preset_color_schemes")) {
-                while rime.config_next(iter) {
+        if (config := this.rime.config_open("rabbit")) {
+            if (iter := this.rime.config_begin_map(config, "preset_color_schemes")) {
+                while this.rime.config_next(iter) {
                     style_map := Map()
                     theme := StrLower(iter.key)
-                    if (name := rime.config_get_string(config, "preset_color_schemes/" . theme . "/name")) {
+                    if (name := this.rime.config_get_string(
+                        config,
+                        "preset_color_schemes/" . theme . "/name"
+                    )) {
                         style_map["name"] := name
-                        style_map["style"] := RabbitUIStyleSnapshot.FromConfig(rime, config, false, theme)
+                        style_map["style"] := RabbitUIStyleSnapshot.FromConfig(
+                            this.rime,
+                            config,
+                            false,
+                            theme
+                        )
                     }
                     preset_styles_map[theme] := style_map
                 }
-                rime.config_end(iter)
+                this.rime.config_end(iter)
             }
-            rime.config_close(config)
+            this.rime.config_close(config)
         }
         return preset_styles_map
     }
 
     GetThemeColor(selected_theme) {
         return this.preset_color_schemes[selected_theme]["style"]
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.disposed := true
+        try {
+            if this.candidateBox {
+                this.candidateBox.Dispose()
+                this.candidateBox := 0
+            }
+        } finally {
+            if this.gui {
+                try this.gui.Destroy()
+            }
+        }
+    }
+
+    __Delete() {
+        this.Dispose()
     }
 }
 

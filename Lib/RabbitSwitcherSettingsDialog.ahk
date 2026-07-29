@@ -19,16 +19,20 @@
 #Include <RabbitCommon>
 
 class SwitcherSettingsDialog extends Gui {
-    __New(settings, result) {
+    available_schemas := 0
+    selected_schemas := 0
+
+    __New(settings, levers_api) {
         local EM_SETCUEBANNER
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】方案选单设定", this)
         this.settings := settings
         this.loaded := false
         this.modified := false
-        this.api := RimeLeversApi()
+        this.api := levers_api
+        this.accepted := false
+        this.disposed := false
 
         this.item_data := Map()
-        this.result := result
 
         ; Layout
         this.MarginX := 15
@@ -50,7 +54,12 @@ class SwitcherSettingsDialog extends Gui {
         this.ok := this.AddButton("X+60 YP w90", "中")
         this.ok.OnEvent("Click", (*) => this.OnOK())
 
-        this.Populate()
+        try {
+            this.Populate()
+        } catch {
+            this.Dispose()
+            throw
+        }
     }
 
     Populate() {
@@ -58,8 +67,18 @@ class SwitcherSettingsDialog extends Gui {
         if !this.settings {
             return
         }
+        this.item_data := Map()
+        this.ReleaseSchemaLists()
         local available := this.api.get_available_schema_list(this.settings)
-        local selected := this.api.get_selected_schema_list(this.settings)
+        local selected := 0
+        try {
+            selected := this.api.get_selected_schema_list(this.settings)
+        } catch {
+            this.api.schema_list_destroy(available)
+            throw
+        }
+        this.available_schemas := available
+        this.selected_schemas := selected
         this.schema_list.Delete()
 
         local recruited := Map()
@@ -170,7 +189,34 @@ class SwitcherSettingsDialog extends Gui {
     }
 
     Exit(yes) {
-        this.result.yes := yes
-        this.Destroy()
+        this.accepted := yes
+        this.Dispose()
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.disposed := true
+        try {
+            this.item_data := Map()
+            this.ReleaseSchemaLists()
+        } finally {
+            try this.Destroy()
+        }
+    }
+
+    ReleaseSchemaLists() {
+        try {
+            if this.selected_schemas {
+                this.api.schema_list_destroy(this.selected_schemas)
+                this.selected_schemas := 0
+            }
+        } finally {
+            if this.available_schemas {
+                this.api.schema_list_destroy(this.available_schemas)
+                this.available_schemas := 0
+            }
+        }
     }
 }

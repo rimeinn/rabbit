@@ -19,9 +19,11 @@
 #Include <RabbitCommon>
 
 class DictManagementDialog extends Gui {
-    __New() {
+    __New(rime_api, levers_api) {
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】用户词典管理", this)
-        this.api := RimeLeversApi()
+        this.rime := rime_api
+        this.api := levers_api
+        this.disposed := false
 
         ; Layout
         this.MarginX := 15
@@ -47,10 +49,13 @@ class DictManagementDialog extends Gui {
         if !(iter := this.api.user_dict_iterator_init()) {
             return
         }
-        while (dict := this.api.next_user_dict(iter)) {
-            this.dict_list.Add([dict])
+        try {
+            while (dict := this.api.next_user_dict(iter)) {
+                this.dict_list.Add([dict])
+            }
+        } finally {
+            this.api.user_dict_iterator_destroy(iter)
         }
-        this.api.user_dict_iterator_destroy(iter)
         this.dict_list.Choose(0)
     }
 
@@ -62,7 +67,7 @@ class DictManagementDialog extends Gui {
             return
         }
 
-        local path := rime.get_user_data_sync_dir()
+        local path := this.rime.get_user_data_sync_dir()
         if !DirExist(path) {
             try {
                 DirCreate(path)
@@ -142,5 +147,13 @@ class DictManagementDialog extends Gui {
         this.backup.Enabled := enabled
         this.export.Enabled := enabled
         this.import.Enabled := enabled
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.disposed := true
+        try this.Destroy()
     }
 }
