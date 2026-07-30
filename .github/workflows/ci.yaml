@@ -171,6 +171,7 @@ jobs:
             Lib/*.ico
             Rabbit.exe
             *.ahk
+            !*Tests.ahk
             LICENSE
             README.md
             rime-install.bat
@@ -193,6 +194,7 @@ jobs:
             Lib/*.ico
             Rabbit.exe
             *.ahk
+            !*Tests.ahk
             LICENSE
             README.md
             rime-install.bat
