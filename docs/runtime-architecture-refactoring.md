@@ -1,7 +1,7 @@
 # Rabbit Runtime Architecture Refactoring
 
-Status: Phase 4 main application context implemented and validated
-Last updated: 2026-07-28
+Status: Phase 5 implemented; post-Phase 5 nightly validation in progress
+Last updated: 2026-07-31
 
 ## 1. Purpose
 
@@ -386,19 +386,19 @@ unverifiable OS claim.
 
 These findings are not classified as defects without a reproducible behavior or resource impact.
 
-| ID | Finding | Planned handling |
+| ID | Finding | Disposition |
 |---|---|---|
-| SR-001 | legacy candidate GUI and styles are class-static | move to instance ownership in candidate-boundary phase |
-| SR-002 | modern candidate hidden state is class-static | move to instance ownership in candidate-boundary phase |
-| SR-003 | normal candidate disposal relies on `__Delete()` | add explicit idempotent disposal |
+| SR-001 | legacy candidate GUI and styles were class-static | resolved in Phase 1 with instance-owned GUI and style state |
+| SR-002 | modern candidate hidden state was class-static | resolved in Phase 1 with instance-owned lifecycle state |
+| SR-003 | normal candidate disposal relied on `__Delete()` | resolved in Phase 1 with explicit idempotent disposal |
 | SR-004 | theme enumeration temporarily mutates shared `UIStyle` | resolved in Phase 3 with independent style snapshots |
-| SR-005 | message, hotkey, and timer registrations had no unified owner | resolved for the main app in Phase 4; deployer ownership remains in Phase 5 |
+| SR-005 | message, hotkey, and timer registrations had no unified owner | resolved across the main app and deployer by Phase 5 |
 | SR-006 | `RabbitCommon` created the Rime service and declared app state | resolved in Phase 4 |
 | SR-007 | `RabbitInput` combined key translation, Rime processing, presentation, placement, and clipboard output | controller ownership established in Phase 4; split further only at stable behavioral seams |
-| SR-008 | dialog result objects and destruction paths are inconsistent | clarify during deployer-context migration |
+| SR-008 | dialog result objects and destruction paths were inconsistent | resolved for active deployer dialogs in Phase 5; inactive `ThemesGUI` remains covered by SR-009 |
 | SR-009 | `ThemesGUI` has no first-party construction path | preserve until separately confirmed obsolete |
 | SR-010 | overlapping clipboard sends may queue restores with different captured clipboard values | reproduce separately before treating as a defect |
-| SR-011 | event, hotkey, tray, and workflow entry functions remained in AutoHotkey's global function namespace | main-app entries resolved in Phase 4; deployer and dialog workflows remain for Phase 5 |
+| SR-011 | event, hotkey, tray, and workflow entry functions remained in AutoHotkey's global function namespace | resolved for application and deployer owners by Phase 5; remaining reusable helpers use the `Rabbit` prefix |
 
 Confirmed defects are added to a separate defect section with reproduction steps and do not share a refactoring commit.
 
@@ -409,9 +409,9 @@ The post-Phase 2 namespace cleanup is intentionally limited to reusable helper f
 candidate text conversion, and log cleanup.
 
 Main-application event entries such as Rime notification handling, hotkey registration and processing, tray clicks,
-appearance messages, keyboard restoration, and exit handling are now methods on their runtime owners. Phase 5 performs
-the equivalent migration for deployer and dialog workflows such as `ConfigureSwitcher`. Until then, new reusable
-helpers must use the `Rabbit` prefix and new global callback entry points should be avoided.
+appearance messages, keyboard restoration, and exit handling are methods on their runtime owners. Phase 5 completed
+the equivalent migration for deployer and active dialog workflows. Remaining reusable helpers use the `Rabbit` prefix,
+and new global callback entry points should be avoided.
 
 ## 10. Confirmed defect register
 
@@ -495,7 +495,7 @@ Validation:
 
 ### BUG-004: Chromium-class windows may expose invalid successful MSAA caret rectangles
 
-Status: Open; documented for assessment after Phase 5 and before final integration or release
+Status: Monitoring; previously reproduced, but not reproduced during current `refactor-nightly` daily use
 
 Affected observations:
 
@@ -503,7 +503,14 @@ Affected observations:
 - reported with the same visible behavior in `ChatGPT.exe`, `ahk_class Chrome_WidgetWin_1`;
 - other Chromium or Electron desktop applications may expose the same accessibility behavior.
 
-Reproduction:
+Current monitoring:
+
+- daily use of the current `refactor-nightly` has not reproduced the misplaced Y coordinate;
+- no caret-provider or placement fix is known to account for the change, so the historical evidence remains relevant;
+- recurrence should be recorded with the application, window class, monitor layout, and returned caret-provider
+  rectangle while the hook remains disabled.
+
+Historical reproduction:
 
 1. Keep `use_caret_hook: false`.
 2. Focus an editable control in an affected `Chrome_WidgetWin_1` application.
@@ -531,8 +538,8 @@ Safety and future-fix constraints:
 - a general fix should validate an MSAA rectangle against the relevant client area, continue with UIA when the MSAA
   result is invalid, and retain the existing mouse fallback when all caret providers fail;
 - do not add application-name special cases for Feishu or ChatGPT;
-- this defect does not block Phase 5 because that phase does not change input or caret lookup, but it should be
-  reassessed before final integration or release.
+- continue monitoring through final integration; if the symptom recurs, reassess the provider-validation fix before
+  release rather than treating the current absence as a confirmed correction.
 
 ### BUG-005: Main application may launch the deployer before releasing Rime
 
@@ -668,8 +675,8 @@ Implementation result:
   explicit instance owners;
 - normal shutdown unregisters the tray message before disposing hotkeys, the timer, appearance messages, the candidate
   box, the Rime session, Rime, and the mutex;
-- the deployer constructs its own explicit Rime API for compatibility, while its context and workflow migration remain
-  Phase 5 work.
+- the deployer constructs its own explicit Rime API; its context and workflow ownership migration is completed in
+  Phase 5.
 
 ### Phase 5: Deployer context and dialog ownership
 
