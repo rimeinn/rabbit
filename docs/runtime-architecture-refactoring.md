@@ -571,6 +571,41 @@ Validation:
 - a tray fixture verifies that deployer commands retain the current keyboard layout when delegated to the application;
 - the complete first-party test suite passes with the caret hook disabled.
 
+### BUG-006: An interrupted candidate render may overwrite a newer result
+
+Status: Fixed by `fix(input): prevent stale candidate rendering`
+
+Affected observations:
+
+- when candidate rendering is slow, a previous key's candidate result may appear after the latest key's result and
+  remain visible;
+- the behavior predates the runtime refactoring and affects the shared candidate update structure on `master`.
+
+Characterization:
+
+- each registered input hotkey starts an AutoHotkey logical thread, and a slow `ProcessKey()` becomes interruptible;
+- a newer key can therefore complete its candidate `Build()` and `Show()` before the interrupted older thread resumes;
+- both candidate backends mutate one shared candidate-box instance, so the resumed thread can overwrite the newer
+  layout, GUI controls, or Direct2D render target;
+- Direct2D `BeginDraw()` and `EndDraw()` are synchronous calls; the ordering failure comes from AutoHotkey thread
+  interruption rather than asynchronous renderer completion;
+- the `S0` hotkey option controls exemption from `Suspend` and does not serialize hotkey callbacks.
+
+Resolution:
+
+- every `ProcessKey()` receives a monotonically increasing candidate revision;
+- candidate `Build()`, `Show()`, and `Hide()` operations reject an older revision before touching shared UI state;
+- the revision check and accepted candidate update execute in one short `Critical` section, preventing another input
+  thread from interleaving with the renderer;
+- Rime processing, caret lookup, and text delivery remain outside the critical section.
+
+Validation:
+
+- the focused input-controller fixture verifies that an outdated revision cannot reach the renderer;
+- the accepted revision is observed as critical while executing, and both successful and failed updates restore the
+  caller's previous critical state;
+- the complete first-party test suite passes with the caret hook disabled.
+
 ## 11. Refactoring phases
 
 ### Phase 0: Audit and baseline

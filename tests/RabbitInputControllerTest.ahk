@@ -20,6 +20,7 @@
 #Include <RabbitInput>
 
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
+RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 
 TestInputHotkeyOwnership() {
     local input := RabbitInputController(
@@ -36,4 +37,62 @@ TestInputHotkeyOwnership() {
     input.Dispose()
     Persistent(false)
     AssertEqual(0, input.registered_hotkeys.Length, "The input owner did not release its hotkeys.")
+}
+
+TestLatestCandidateUpdateOrdering() {
+    local input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    local previous_critical := A_IsCritical
+    local stale_ran := false
+    local latest_ran := false
+    local latest_was_critical := false
+    local failure_caught := false
+
+    stale_update(*) {
+        stale_ran := true
+    }
+    latest_update(*) {
+        latest_ran := true
+        latest_was_critical := !!A_IsCritical
+    }
+    failing_update(*) {
+        throw Error("Injected candidate update failure.")
+    }
+
+    input.candidate_revision := 2
+    AssertTrue(
+        !input.RunCandidateUpdate(1, stale_update),
+        "An outdated candidate update was accepted."
+    )
+    AssertTrue(!stale_ran, "An outdated candidate update reached the renderer.")
+
+    AssertTrue(
+        input.RunCandidateUpdate(2, latest_update),
+        "The latest candidate update was rejected."
+    )
+    AssertTrue(latest_ran, "The latest candidate update did not reach the renderer.")
+    AssertTrue(latest_was_critical, "The renderer was interruptible during a candidate update.")
+    AssertEqual(
+        previous_critical,
+        A_IsCritical,
+        "The candidate update did not restore the previous critical state."
+    )
+
+    try {
+        input.RunCandidateUpdate(2, failing_update)
+    } catch {
+        failure_caught := true
+    }
+    AssertTrue(failure_caught, "The injected candidate update failure was not observed.")
+    AssertEqual(
+        previous_critical,
+        A_IsCritical,
+        "A failed candidate update did not restore the previous critical state."
+    )
 }

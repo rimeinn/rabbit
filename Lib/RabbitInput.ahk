@@ -34,10 +34,10 @@ class RabbitInputController {
         this.tray := tray
         this.suspend_hotkey_mask := 0
         this.suspend_hotkey := ""
-        this.last_is_hide := false
         this.prev_show := false
         this.prev_x := 4
         this.prev_y := 4
+        this.candidate_revision := 0
         this.registered_hotkeys := []
     }
 
@@ -206,9 +206,8 @@ class RabbitInputController {
     }
 
     ProcessKey(key, mask, this_hotkey) {
-        local check_key, check_code, caps, status, processed, commit, context, hmon, info, box_width, box_height
-        local caret_x, caret_y, caret_w, caret_h, new_x, new_y, hwnd, workspace_width, workspace_height
-        local backup_mouse_ref, mouse_x, mouse_y
+        local check_key, check_code, caps, status, processed, commit, context
+        local candidate_revision, hide_candidate := false
         local code := 0
         Loop 4 {
             local key_map
@@ -237,6 +236,7 @@ class RabbitInputController {
         if !code {
             return
         }
+        candidate_revision := ++this.candidate_revision
         if (caps := GetKeyState("CapsLock", "T")) {
             if StrLen(key) == 1 && Ord(key) >= Ord("a") && Ord(key) <= Ord("z") { ; small case letters
                 code += (Ord("A") - Ord("a"))
@@ -298,19 +298,18 @@ class RabbitInputController {
 
         if (commit := this.rime.get_commit(this.session_id)) {
             if ascii_changed {
-                this.last_is_hide := true
-            } else {
-                this.last_is_hide := false
+                hide_candidate := true
             }
             if StrLen(commit.text) >= this.config.send_by_clipboard_length {
                 this.SendTextByClipboard(commit.text)
             } else {
                 SendText(commit.text)
             }
-            this.candidate_box.Hide()
+            this.RunCandidateUpdate(
+                candidate_revision,
+                () => this.candidate_box.Hide()
+            )
             this.rime.free_commit(commit)
-        } else {
-            this.last_is_hide := false
         }
         if this.suspend_hotkey && this.suspend_hotkey_mask
             && (key = this.suspend_hotkey || SubStr(key, 2) = this.suspend_hotkey)
@@ -320,78 +319,7 @@ class RabbitInputController {
         }
 
         if (context := this.rime.get_context(this.session_id)) {
-            if context.composition.length > 0 || context.menu.num_candidates > 0 {
-                DetectHiddenWindows True
-                local start_menu := WinActive(
-                    "ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe"
-                )
-                    || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
-                    || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
-                DetectHiddenWindows False
-                local show_at_left_top := false
-                if start_menu {
-                    hmon := MonitorManage.MonitorFromWindow(start_menu)
-                    info := MonitorManage.GetMonitorInfo(hmon)
-                    show_at_left_top := !!info
-                    if show_at_left_top && !this.last_is_hide {
-                        this.candidate_box.Build(context, &box_width, &box_height)
-                        this.candidate_box.Show(info.work.left + 4, info.work.top + 4)
-                    }
-                }
-                if !show_at_left_top && RabbitGetCaretPos(
-                    &caret_x,
-                    &caret_y,
-                    &caret_w,
-                    &caret_h,
-                    this.config.use_caret_hook
-                ) {
-                    this.candidate_box.Build(context, &box_width, &box_height)
-                    if this.config.fix_candidate_box && this.prev_show {
-                        new_x := this.prev_x
-                        new_y := this.prev_y
-                    } else {
-                        new_x := caret_x + caret_w
-                        new_y := caret_y + caret_h + 4
-
-                        hwnd := WinExist("A")
-                        hmon := MonitorManage.MonitorFromWindow(hwnd)
-                        info := MonitorManage.GetMonitorInfo(hmon)
-                        if info {
-                            if new_x + box_width > info.work.right {
-                                new_x := info.work.right - box_width
-                            }
-                            if new_y + box_height > info.work.bottom {
-                                new_y := caret_y - 4 - box_height
-                            }
-                        } else {
-                            workspace_width := SysGet(16) ; SM_CXFULLSCREEN
-                            workspace_height := SysGet(17) ; SM_CYFULLSCREEN
-                            if new_x + box_width > workspace_width {
-                                new_x := workspace_width - box_width
-                            }
-                            if new_y + box_height > workspace_height {
-                                new_y := caret_y - 4 - box_height
-                            }
-                        }
-                    }
-                    if !this.last_is_hide {
-                        this.candidate_box.Show(new_x, new_y)
-                    }
-                    this.prev_x := new_x
-                    this.prev_y := new_y
-                } else if !show_at_left_top {
-                    backup_mouse_ref := A_CoordModeMouse
-                    CoordMode("Mouse", "Screen")
-                    MouseGetPos(&mouse_x, &mouse_y)
-                    CoordMode("Mouse", backup_mouse_ref)
-                    this.candidate_box.Build(context, &box_width, &box_height)
-                    this.candidate_box.Show(mouse_x, mouse_y)
-                }
-                this.prev_show := true
-            } else {
-                this.candidate_box.Hide()
-                this.prev_show := false
-            }
+            this.UpdateCandidate(context, candidate_revision, hide_candidate)
             this.rime.free_context(context)
         }
 
@@ -412,6 +340,126 @@ class RabbitInputController {
                 SendInput(shift . ctrl . alt . win . "{" . key . "}")
             }
         }
+    }
+
+    RunCandidateUpdate(candidate_revision, update_callback) {
+        local previous_critical := Critical()
+        try {
+            if candidate_revision != this.candidate_revision {
+                return false
+            }
+            update_callback.Call()
+            return true
+        } finally {
+            Critical(previous_critical)
+        }
+    }
+
+    UpdateCandidate(context, candidate_revision, hide_candidate) {
+        local hmon, info, caret_x, caret_y, caret_w, caret_h, hwnd
+        local backup_mouse_ref, mouse_x, mouse_y, placement
+        if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
+            placement := { mode: "hide" }
+        } else {
+            DetectHiddenWindows True
+            local start_menu := WinActive(
+                "ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe"
+            )
+                || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
+                || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
+            DetectHiddenWindows False
+            if start_menu
+                && (hmon := MonitorManage.MonitorFromWindow(start_menu))
+                && (info := MonitorManage.GetMonitorInfo(hmon)) {
+                placement := {
+                    mode: "top_left",
+                    x: info.work.left + 4,
+                    y: info.work.top + 4
+                }
+            } else if RabbitGetCaretPos(
+                &caret_x,
+                &caret_y,
+                &caret_w,
+                &caret_h,
+                this.config.use_caret_hook
+            ) {
+                hwnd := WinExist("A")
+                hmon := MonitorManage.MonitorFromWindow(hwnd)
+                info := MonitorManage.GetMonitorInfo(hmon)
+                placement := {
+                    mode: "caret",
+                    caret_x: caret_x,
+                    caret_y: caret_y,
+                    caret_w: caret_w,
+                    caret_h: caret_h,
+                    monitor_info: info,
+                    workspace_width: info ? 0 : SysGet(16), ; SM_CXFULLSCREEN
+                    workspace_height: info ? 0 : SysGet(17) ; SM_CYFULLSCREEN
+                }
+            } else {
+                backup_mouse_ref := A_CoordModeMouse
+                CoordMode("Mouse", "Screen")
+                MouseGetPos(&mouse_x, &mouse_y)
+                CoordMode("Mouse", backup_mouse_ref)
+                placement := { mode: "mouse", x: mouse_x, y: mouse_y }
+            }
+        }
+
+        return this.RunCandidateUpdate(
+            candidate_revision,
+            () => this.ApplyCandidateUpdate(context, placement, hide_candidate)
+        )
+    }
+
+    ApplyCandidateUpdate(context, placement, hide_candidate) {
+        local box_width, box_height, new_x, new_y, info
+        switch placement.mode {
+            case "hide":
+                this.candidate_box.Hide()
+                this.prev_show := false
+                return
+            case "top_left":
+                if !hide_candidate {
+                    this.candidate_box.Build(context, &box_width, &box_height)
+                    this.candidate_box.Show(placement.x, placement.y)
+                }
+            case "caret":
+                this.candidate_box.Build(context, &box_width, &box_height)
+                if this.config.fix_candidate_box && this.prev_show {
+                    new_x := this.prev_x
+                    new_y := this.prev_y
+                } else {
+                    new_x := placement.caret_x + placement.caret_w
+                    new_y := placement.caret_y + placement.caret_h + 4
+                    info := placement.monitor_info
+                    if info {
+                        if new_x + box_width > info.work.right {
+                            new_x := info.work.right - box_width
+                        }
+                        if new_y + box_height > info.work.bottom {
+                            new_y := placement.caret_y - 4 - box_height
+                        }
+                    } else {
+                        if new_x + box_width > placement.workspace_width {
+                            new_x := placement.workspace_width - box_width
+                        }
+                        if new_y + box_height > placement.workspace_height {
+                            new_y := placement.caret_y - 4 - box_height
+                        }
+                    }
+                }
+                if !hide_candidate {
+                    this.candidate_box.Show(new_x, new_y)
+                }
+                this.prev_x := new_x
+                this.prev_y := new_y
+            case "mouse":
+                this.candidate_box.Build(context, &box_width, &box_height)
+                this.candidate_box.Show(placement.x, placement.y)
+            default:
+                throw Error("Unknown candidate placement mode: " . placement.mode)
+        }
+        this.prev_show := true
     }
 
     ; by rawbx (https://github.com/rimeinn/rabbit/issues/13#issuecomment-3072554342)
