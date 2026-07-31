@@ -17,24 +17,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Dependencies
-        uses: MinoruSekine/setup-scoop@v5
+      - name: Restore prepared AutoHotkey
+        id: cache-autohotkey
+        uses: actions/cache@v5
         with:
-          buckets: extras
-          apps: rcedit autohotkey@2.0.19
+          path: ${{ runner.temp }}/rabbit-autohotkey
+          key: >-
+            ${{ runner.os }}-rabbit-autohotkey-v1-${{
+            hashFiles('.github/scripts/prepare-autohotkey.ps1', 'assets/*.svg') }}
 
-      - name: Prepare binaries
+      - name: Prepare AutoHotkey
+        if: steps.cache-autohotkey.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          Push-Location assets
-          # https://learn.microsoft.com/windows/apps/design/style/iconography/app-icon-construction
-          magick.exe -background transparent -define 'icon:auto-resize=16,24,32,48,256' zhuyin-t.svg rabbit.ico
-          magick.exe -background transparent -define 'icon:auto-resize=16,24,32,48,256' zhuyin-t-alt.svg rabbit-alt.ico
-          magick.exe -background transparent -define 'icon:auto-resize=16,24,32,48,256' pinyin-t.svg rabbit-ascii.ico
-          Copy-Item "$(scoop prefix autohotkey)/v2/AutoHotkey32.exe","$(scoop prefix autohotkey)/v2/AutoHotkey64.exe" .
-          rcedit.exe AutoHotkey32.exe --set-icon rabbit.ico
-          rcedit.exe AutoHotkey64.exe --set-icon rabbit.ico
-          Pop-Location
-          Move-Item "assets/AutoHotkey32.exe","assets/AutoHotkey64.exe","assets/rabbit.ico","assets/rabbit-alt.ico","assets/rabbit-ascii.ico" .
+          .github/scripts/prepare-autohotkey.ps1 `
+            -OutputDirectory "$env:RUNNER_TEMP/rabbit-autohotkey"
+
+      - name: Copy prepared AutoHotkey
+        shell: pwsh
+        run: |
+          Copy-Item "$env:RUNNER_TEMP/rabbit-autohotkey/*" .
 
       - name: Upload Icon
         uses: actions/upload-artifact@v7
@@ -62,29 +64,45 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Fetch Librime
+      - name: Resolve Librime release
+        id: librime-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/resolve-librime-release.sh
+
+      - name: Restore Librime
+        id: cache-librime
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/rabbit-librime
+          key: >-
+            ${{ runner.os }}-librime-v1-${{
+            hashFiles(
+              '.github/scripts/resolve-librime-release.sh',
+              '.github/scripts/prepare-librime.sh'
+            )
+            }}-${{ steps.librime-release.outputs.x86_sha256
+            }}-${{ steps.librime-release.outputs.x64_sha256
+            }}-${{ steps.librime-release.outputs.deps_x86_sha256 }}
+
+      - name: Prepare Librime
+        if: steps.cache-librime.outputs.cache-hit != 'true'
+        env:
+          LIBRIME_X86_URL: ${{ steps.librime-release.outputs.x86_url }}
+          LIBRIME_X86_SHA256: ${{ steps.librime-release.outputs.x86_sha256 }}
+          LIBRIME_X64_URL: ${{ steps.librime-release.outputs.x64_url }}
+          LIBRIME_X64_SHA256: ${{ steps.librime-release.outputs.x64_sha256 }}
+          LIBRIME_DEPS_X86_URL: ${{ steps.librime-release.outputs.deps_x86_url }}
+          LIBRIME_DEPS_X86_SHA256: ${{ steps.librime-release.outputs.deps_x86_sha256 }}
         run: |
-          WORK=`pwd`
-          LIBRIME_TAG=$(curl -s https://api.github.com/repos/rime/librime/releases/latest | jq -r '.tag_name')
-          LIBRIME_SHA=$(curl -s https://api.github.com/repos/rime/librime/tags | jq -r --arg LIBRIME_TAG "${LIBRIME_TAG}" '.[] | select(.name == $LIBRIME_TAG).commit.sha' | cut -c1-7)
-          LIBRIME_MSVC_X86_URL="https://github.com/rime/librime/releases/download/${LIBRIME_TAG}/rime-${LIBRIME_SHA}-Windows-msvc-x86.7z"
-          LIBRIME_MSVC_X86_DEPS_URL="https://github.com/rime/librime/releases/download/${LIBRIME_TAG}/rime-deps-${LIBRIME_SHA}-Windows-msvc-x86.7z"
-          LIBRIME_MSVC_X64_URL="https://github.com/rime/librime/releases/download/${LIBRIME_TAG}/rime-${LIBRIME_SHA}-Windows-msvc-x64.7z"
-          mkdir -p ${WORK}/librime-msvc ${WORK}/librime-clang
-          cd ${WORK}/librime-msvc && \
-            wget -O librime.7z ${LIBRIME_MSVC_X86_URL} && \
-            7z x '-i!dist/lib/rime.dll' librime.7z && \
-            cp dist/lib/rime.dll ${WORK}/rime-x86.dll && \
-            rm -rf librime.7z dist && \
-            wget -O deps.7z ${LIBRIME_MSVC_X86_DEPS_URL} && \
-            7z x '-i!share/opencc' deps.7z && \
-            cp -r share/opencc ${WORK}/ && \
-            rm -rf deps.7z share
-          cd ${WORK}/librime-clang && \
-            wget -O librime.7z ${LIBRIME_MSVC_X64_URL} && \
-            7z x '-i!dist/lib/rime.dll' librime.7z && \
-            cp dist/lib/rime.dll ${WORK}/rime-x64.dll && \
-            rm -rf librime.7z dist
+          bash .github/scripts/prepare-librime.sh \
+            "$RUNNER_TEMP/rabbit-librime"
+
+      - name: Copy prepared Librime
+        run: |
+          cp "$RUNNER_TEMP/rabbit-librime/rime-x86.dll" .
+          cp "$RUNNER_TEMP/rabbit-librime/rime-x64.dll" .
+          cp -R "$RUNNER_TEMP/rabbit-librime/opencc" .
 
       - name: Upload Rime
         uses: actions/upload-artifact@v7
