@@ -21,6 +21,7 @@
 
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
+RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 
 TestInputHotkeyOwnership() {
     local input := RabbitInputController(
@@ -95,4 +96,73 @@ TestLatestCandidateUpdateOrdering() {
         A_IsCritical,
         "A failed candidate update did not restore the previous critical state."
     )
+}
+
+TestFocusChangeClearsComposition() {
+    local rime := RabbitInputRimeProbe()
+    local candidate_box := RabbitInputCandidateProbe()
+    local input := RabbitInputController(
+        rime,
+        42,
+        candidate_box,
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    local composing_context := {
+        composition: { length: 1 },
+        menu: { num_candidates: 0 }
+    }
+    local empty_context := {
+        composition: { length: 0 },
+        menu: { num_candidates: 0 }
+    }
+
+    input.UpdateCompositionOwner(composing_context, 100)
+    input.prev_show := true
+    input.candidate_revision := 7
+
+    AssertTrue(
+        !input.CancelCompositionIfFocusChanged(100),
+        "The composition was cleared while its window still had focus."
+    )
+    AssertEqual(0, rime.clear_calls, "The unchanged focus reached Rime cleanup.")
+    AssertEqual(0, candidate_box.hide_calls, "The unchanged focus hid the candidate box.")
+
+    AssertTrue(
+        input.CancelCompositionIfFocusChanged(200),
+        "The composition survived a foreground-window change."
+    )
+    AssertEqual(1, rime.clear_calls, "The focus change did not clear the Rime composition.")
+    AssertEqual(42, rime.cleared_session_id, "The focus change cleared the wrong Rime session.")
+    AssertEqual(1, candidate_box.hide_calls, "The focus change did not hide the candidate box.")
+    AssertEqual(0, input.composition_owner_hwnd, "The old composition retained its window owner.")
+    AssertEqual(8, input.candidate_revision, "The focus change did not invalidate old rendering.")
+    AssertTrue(!input.prev_show, "The focus change retained the previous candidate position state.")
+
+    input.UpdateCompositionOwner(composing_context, 300)
+    input.UpdateCompositionOwner(empty_context, 300)
+    AssertEqual(0, input.composition_owner_hwnd, "An empty context retained a composition owner.")
+}
+
+class RabbitInputRimeProbe {
+    __New() {
+        this.clear_calls := 0
+        this.cleared_session_id := 0
+    }
+
+    clear_composition(session_id) {
+        this.clear_calls++
+        this.cleared_session_id := session_id
+    }
+}
+
+class RabbitInputCandidateProbe {
+    __New() {
+        this.hide_calls := 0
+    }
+
+    Hide() {
+        this.hide_calls++
+    }
 }

@@ -131,6 +131,7 @@ class RabbitApplication {
         )
 
         this.context.input.RegisterHotKeys()
+        this.context.input.StartFocusMonitor()
         this.context.runtime_state.UpdateStateLabels()
         if (status := this.context.rime.get_status(this.context.session_id)) {
             local schema_id := status.schema_id

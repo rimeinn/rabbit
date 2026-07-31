@@ -626,6 +626,44 @@ Validation:
   caller's previous critical state;
 - the complete first-party test suite passes with the caret hook disabled.
 
+### BUG-007: Composition survives a foreground-window change
+
+Status: Fixed by `fix(input): clear composition on focus change`
+
+Affected observations:
+
+- switching foreground windows while composing leaves the old candidate box visible;
+- the first key in the new window continues the old window's Rime composition;
+- [issue #26](https://github.com/rimeinn/rabbit/issues/26) reports the same behavior and identifies
+  `clear_composition()` as the Rime reset operation.
+
+Characterization:
+
+- Rabbit uses one Rime session for input in every application and did not associate an active composition with its
+  originating foreground window;
+- candidate visibility was updated only while handling input, so a foreground change alone could not hide it;
+- the existing runtime timer tracks process names for per-process ASCII state, is disabled by `global_ascii`, and cannot
+  distinguish two top-level windows from the same process;
+- hiding the candidate box without clearing Rime leaves the composition available to the next intercepted key.
+
+Resolution:
+
+- the input controller records the foreground HWND that owns a non-empty composition or candidate menu;
+- an independent 50 ms polling timer clears the composition and hides the candidate box when that HWND loses the
+  foreground, without installing a Windows event hook;
+- `ProcessKey()` performs the same check before sending a new key to Rime, covering a key that arrives before the next
+  timer tick;
+- focus cleanup increments the candidate revision before hiding, so an interrupted render from the old window cannot
+  show the candidate box again;
+- input-controller disposal stops the focus timer before unregistering hotkeys and releasing Rime.
+
+Validation:
+
+- the focused input-controller fixture verifies that unchanged focus preserves composition;
+- a changed HWND clears the correct Rime session, hides the candidate box, drops its owner, resets previous-placement
+  state, and invalidates older rendering;
+- an empty Rime context drops the recorded composition owner.
+
 ## 11. Refactoring phases
 
 ### Phase 0: Audit and baseline

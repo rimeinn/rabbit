@@ -25,6 +25,8 @@
 #Include <RabbitTrayMenu>
 
 class RabbitInputController {
+    static FOCUS_POLL_INTERVAL := 50
+
     __New(rime_api, session_id, candidate_box, config, runtime_state, tray) {
         this.rime := rime_api
         this.session_id := session_id
@@ -38,6 +40,9 @@ class RabbitInputController {
         this.prev_x := 4
         this.prev_y := 4
         this.candidate_revision := 0
+        this.composition_owner_hwnd := 0
+        this.focus_timer_callback := this.CheckCompositionFocus.Bind(this)
+        this.focus_timer_running := false
         this.registered_hotkeys := []
     }
 
@@ -195,8 +200,22 @@ class RabbitInputController {
         this.registered_hotkeys.Push(name)
     }
 
+    StartFocusMonitor() {
+        if !this.focus_timer_running {
+            SetTimer(
+                this.focus_timer_callback,
+                RabbitInputController.FOCUS_POLL_INTERVAL
+            )
+            this.focus_timer_running := true
+        }
+    }
+
     Dispose() {
         local name
+        if this.focus_timer_running {
+            SetTimer(this.focus_timer_callback, 0)
+            this.focus_timer_running := false
+        }
         for name in this.registered_hotkeys {
             try {
                 Hotkey(name, , "Off")
@@ -207,7 +226,7 @@ class RabbitInputController {
 
     ProcessKey(key, mask, this_hotkey) {
         local check_key, check_code, caps, status, processed, commit, context
-        local candidate_revision, hide_candidate := false
+        local candidate_revision, foreground_hwnd, hide_candidate := false
         local code := 0
         Loop 4 {
             local key_map
@@ -236,6 +255,8 @@ class RabbitInputController {
         if !code {
             return
         }
+        foreground_hwnd := this.GetForegroundWindow()
+        this.CancelCompositionIfFocusChanged(foreground_hwnd)
         candidate_revision := ++this.candidate_revision
         if (caps := GetKeyState("CapsLock", "T")) {
             if StrLen(key) == 1 && Ord(key) >= Ord("a") && Ord(key) <= Ord("z") { ; small case letters
@@ -319,7 +340,10 @@ class RabbitInputController {
         }
 
         if (context := this.rime.get_context(this.session_id)) {
-            this.UpdateCandidate(context, candidate_revision, hide_candidate)
+            this.UpdateCompositionOwner(context, foreground_hwnd)
+            if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
+                this.UpdateCandidate(context, candidate_revision, hide_candidate)
+            }
             this.rime.free_context(context)
         }
 
@@ -340,6 +364,48 @@ class RabbitInputController {
                 SendInput(shift . ctrl . alt . win . "{" . key . "}")
             }
         }
+    }
+
+    GetForegroundWindow() {
+        return DllCall("GetForegroundWindow", "Ptr")
+    }
+
+    CheckCompositionFocus() {
+        this.CancelCompositionIfFocusChanged(this.GetForegroundWindow())
+    }
+
+    CancelCompositionIfFocusChanged(foreground_hwnd) {
+        if !this.composition_owner_hwnd || !foreground_hwnd
+            || foreground_hwnd == this.composition_owner_hwnd {
+            return false
+        }
+        this.ClearComposition()
+        return true
+    }
+
+    ClearComposition() {
+        local candidate_revision := ++this.candidate_revision
+        this.composition_owner_hwnd := 0
+        this.rime.clear_composition(this.session_id)
+        this.RunCandidateUpdate(
+            candidate_revision,
+            () => this.HideCandidate()
+        )
+    }
+
+    UpdateCompositionOwner(context, foreground_hwnd) {
+        if context.composition.length > 0 || context.menu.num_candidates > 0 {
+            if foreground_hwnd {
+                this.composition_owner_hwnd := foreground_hwnd
+            }
+        } else {
+            this.composition_owner_hwnd := 0
+        }
+    }
+
+    HideCandidate() {
+        this.candidate_box.Hide()
+        this.prev_show := false
     }
 
     RunCandidateUpdate(candidate_revision, update_callback) {
