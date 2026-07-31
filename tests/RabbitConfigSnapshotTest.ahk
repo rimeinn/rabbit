@@ -19,6 +19,7 @@
 #Include <RabbitConfigSnapshot>
 
 RunTest("config snapshot collection boundaries", TestConfigSnapshotCollections.Bind())
+RunTest("caret hook defaults to disabled", TestCaretHookDefaults.Bind())
 
 TestConfigSnapshotCollections() {
     local process_modes := Map("code.exe", true)
@@ -52,5 +53,19 @@ TestConfigSnapshotCollections() {
     AssertTrue(
         config.TryGetPresetProcessAscii("code.exe", &ascii_mode) && ascii_mode,
         "The config snapshot exposed its process-mode Map."
+    )
+}
+
+TestCaretHookDefaults() {
+    local default_config := RabbitConfigSnapshot()
+    local enabled_config := RabbitConfigSnapshot(Map("use_caret_hook", true))
+
+    AssertTrue(
+        !default_config.use_caret_hook,
+        "The caret hook was enabled without an explicit setting."
+    )
+    AssertTrue(
+        enabled_config.use_caret_hook,
+        "An explicit caret-hook opt-in was not preserved."
     )
 }

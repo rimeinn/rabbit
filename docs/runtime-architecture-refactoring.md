@@ -719,9 +719,9 @@ Candidate/UI checks:
 
 Safety constraint:
 
+- the caret hook is disabled by default and remains an explicit user opt-in;
 - local tests that can call `GetCaretPosEx` must never enable its hook;
-- a temporary hard-coded `RabbitConfig.use_caret_hook` override is allowed only for local testing;
-- the override must be restored and absent from every diff and commit.
+- temporary local caret-hook overrides must be restored and absent from every unrelated diff and commit.
 
 Focused tests:
 

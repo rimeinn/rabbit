@@ -31,7 +31,7 @@
  * @param W Value is set to the width of the caret
  * @param H Value is set to the height of the caret
  */
-RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?, use_caret_hook := true) {
+RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?, use_caret_hook := false) {
     local left, top, right, bottom
     caret_x := 0
     caret_y := 0

@@ -24,7 +24,7 @@ class RabbitConfigSnapshot {
         this.global_ascii := this.GetValue(values, "global_ascii", false)
         this.fix_candidate_box := this.GetValue(values, "fix_candidate_box", false)
         this.use_legacy_candidate_box := this.GetValue(values, "use_legacy_candidate_box", false)
-        this.use_caret_hook := this.GetValue(values, "use_caret_hook", true)
+        this.use_caret_hook := this.GetValue(values, "use_caret_hook", false)
         this.send_by_clipboard_length := this.GetValue(values, "send_by_clipboard_length", 8)
         this._preset_process_ascii := this.CopyMap(
             this.GetValue(values, "preset_process_ascii", Map()))
