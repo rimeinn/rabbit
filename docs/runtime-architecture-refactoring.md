@@ -132,16 +132,13 @@ cohesive owner.
 | `ProcessKey.prev_show` | updated after candidate visibility decisions | main process | candidate placement history | candidate placement coordinator |
 | `ProcessKey.prev_x` / `prev_y` | updated after caret placement | main process | last fixed candidate position | candidate placement coordinator |
 | `RabbitLogLimit.labels` | counts emitted messages by label | process | mutable rate-limit cache | logging helper/service |
-| `GUIUtilities.GetFontArray.font_array` | populated on first font enumeration | process | lazy read-mostly cache | font enumeration service |
 | `MonitorManage.monitors` | replaced and populated by enumeration | process | mutable write-only cache in current first-party code | monitor service or separately approved removal |
 
 `ProcessKey.prev_*` is especially significant: `fix_candidate_box` changes whether the next candidate placement reuses
 the previous coordinates. It is UI lifecycle state hidden inside the input callback and must move with placement policy,
 not with key translation or the candidate renderer.
 
-`RabbitLogLimit.labels` and `GUIUtilities.GetFontArray.font_array` may remain lazy caches. Their mutation and ownership
-must still be explicit. A caller must not receive the internal font `Array` if it can mutate it; the service returns a
-copy or exposes enumeration without sharing the cached container.
+`RabbitLogLimit.labels` may remain a lazy cache. Its mutation and ownership must still be explicit.
 
 `SendTextByClipboard()` owns `clip_prev` until its one-shot timer callback restores the clipboard. Overlapping clipboard
 sends may leave multiple pending restore callbacks with different captured values. This is a structural risk, not a
@@ -189,7 +186,6 @@ startup and disposal.
 | style settings dialog | `ConfigureUI()` | synchronous workflow | theme selection and OK | `Destroy()` on accepted exit |
 | style candidate preview | style dialog | dialog property | theme selection | reference release is implicit |
 | dictionary dialog | `Configurator.DictManagement()` | synchronous workflow | list and file-operation events | window close observed by caller |
-| dormant `ThemesGUI` | no first-party constructor found | none | theme/font callbacks | hides rather than destroys |
 | tray menu | `SetupTrayMenu()` | process-global AHK tray | tray callbacks | process exit |
 | hotkeys | `RegisterHotKeys()` | process-global AHK hotkey table | keyboard input | no unified unregister path |
 | system messages | `RabbitMain()` | process-global message table | tray and color changes | process exit |
@@ -395,8 +391,8 @@ These findings are not classified as defects without a reproducible behavior or 
 | SR-005 | message, hotkey, and timer registrations had no unified owner | resolved across the main app and deployer by Phase 5 |
 | SR-006 | `RabbitCommon` created the Rime service and declared app state | resolved in Phase 4 |
 | SR-007 | `RabbitInput` combined key translation, Rime processing, presentation, placement, and clipboard output | controller ownership established in Phase 4; split further only at stable behavioral seams |
-| SR-008 | dialog result objects and destruction paths were inconsistent | resolved for active deployer dialogs in Phase 5; inactive `ThemesGUI` remains covered by SR-009 |
-| SR-009 | `ThemesGUI` has no first-party construction path | preserve until separately confirmed obsolete |
+| SR-008 | dialog result objects and destruction paths were inconsistent | resolved for deployer dialogs in Phase 5 |
+| SR-009 | `ThemesGUI` had no first-party construction path | resolved after Phase 5 by removing the obsolete dialog and retaining `CandidatePreview` as an independent module |
 | SR-010 | overlapping clipboard sends may queue restores with different captured clipboard values | reproduce separately before treating as a defect |
 | SR-011 | event, hotkey, tray, and workflow entry functions remained in AutoHotkey's global function namespace | resolved for application and deployer owners by Phase 5; remaining reusable helpers use the `Rabbit` prefix |
 

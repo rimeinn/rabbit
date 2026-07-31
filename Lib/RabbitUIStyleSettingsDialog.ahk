@@ -17,7 +17,7 @@
  */
 
 #Include <RabbitCommon>
-#Include <RabbitThemesUI>
+#Include <RabbitCandidatePreview>
 #Include <RabbitUIStyleSettings>
 
 class UIStyleSettingsDialog extends Gui {
