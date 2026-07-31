@@ -35,7 +35,7 @@ RabbitUpdateMaintenanceTrayIcon() {
     }
 }
 
-RabbitRunDeployer(command, args*) {
+RabbitLaunchDeployer(command, args*) {
     local arguments := ""
     for argument in args {
         arguments .= " " . argument
@@ -46,17 +46,25 @@ RabbitRunDeployer(command, args*) {
     } else {
         Run(Format("{} `"{}\RabbitDeployer.ahk`" {} {}", A_AhkPath, A_ScriptDir, command, arguments))
     }
-    ExitApp(1)
 }
 
 class RabbitTrayController {
-    __New(rime_api, session_id, candidate_box, config, runtime_state, keyboard_layout) {
+    __New(
+        rime_api,
+        session_id,
+        candidate_box,
+        config,
+        runtime_state,
+        keyboard_layout,
+        deployer_callback
+    ) {
         this.rime := rime_api
         this.session_id := session_id
         this.candidate_box := candidate_box
         this.config := config
         this.runtime_state := runtime_state
         this.keyboard_layout := keyboard_layout
+        this.deployer_callback := deployer_callback
         this.schema_name := ""
         this.ascii_mode := false
         this.full_shape := false
@@ -70,15 +78,15 @@ class RabbitTrayController {
         A_TrayMenu.Delete()
         A_TrayMenu.Add(
             "输入法设定",
-            (*) => RabbitRunDeployer("configure", this.keyboard_layout)
+            (*) => this.StartDeployer("configure")
         )
         A_TrayMenu.Add(
             "用户词典管理",
-            (*) => RabbitRunDeployer("dict", this.keyboard_layout)
+            (*) => this.StartDeployer("dict")
         )
         A_TrayMenu.Add(
             "用户资料同步",
-            (*) => RabbitRunDeployer("sync", this.keyboard_layout)
+            (*) => this.StartDeployer("sync")
         )
         A_TrayMenu.Add()
         A_TrayMenu.Add("用户文件夹", (*) => Run(RabbitUserDataPath()))
@@ -136,7 +144,7 @@ class RabbitTrayController {
         A_TrayMenu.Add("检查新版本", (*) => this.CheckNewVersion())
         A_TrayMenu.Add(
             "重新部署",
-            (*) => RabbitRunDeployer("deploy", this.keyboard_layout)
+            (*) => this.StartDeployer("deploy")
         )
         A_TrayMenu.Add()
         A_TrayMenu.Add(
@@ -144,6 +152,10 @@ class RabbitTrayController {
             (*) => this.ToggleSuspend()
         )
         A_TrayMenu.Add("退出玉兔毫", (*) => ExitApp())
+    }
+
+    StartDeployer(command) {
+        this.deployer_callback.Call(command, this.keyboard_layout)
     }
 
     ToggleSuspend() {

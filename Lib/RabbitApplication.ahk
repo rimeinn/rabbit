@@ -71,7 +71,7 @@ class RabbitApplication {
         if maintenance != RABBIT_NO_MAINTENANCE {
             RabbitUpdateMaintenanceTrayIcon()
             if first_run {
-                RabbitRunDeployer("install", this.context.keyboard_layout)
+                this.RunDeployer("install", this.context.keyboard_layout)
             } else if this.context.rime.start_maintenance(
                 maintenance == RABBIT_FULL_MAINTENANCE) {
                 this.context.rime.join_maintenance_thread()
@@ -111,7 +111,8 @@ class RabbitApplication {
             this.context.candidate_box,
             this.context.config,
             this.context.runtime_state,
-            this.context.keyboard_layout
+            this.context.keyboard_layout,
+            this.RunDeployer.Bind(this)
         )
         this.context.runtime_state.SetTray(this.tray)
         this.context.input := RabbitInputController(
@@ -149,6 +150,20 @@ class RabbitApplication {
         this.tray_message_registered := true
         this.context.appearance.Register()
         this.context.runtime_state.StartTimer()
+    }
+
+    RunDeployer(command, args*) {
+        this.Shutdown(1)
+        this.LaunchDeployer(command, args*)
+        this.ExitApplication(1)
+    }
+
+    LaunchDeployer(command, args*) {
+        RabbitLaunchDeployer(command, args*)
+    }
+
+    ExitApplication(code) {
+        ExitApp(code)
     }
 
     ResolveKeyboardLayout(args) {

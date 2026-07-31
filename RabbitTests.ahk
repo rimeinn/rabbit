@@ -29,6 +29,7 @@
 #Include tests\RabbitUIStyleSnapshotTest.ahk
 #Include tests\RabbitConfigSnapshotTest.ahk
 #Include tests\RabbitAppContextTest.ahk
+#Include tests\RabbitApplicationTest.ahk
 #Include tests\RabbitInputControllerTest.ahk
 #Include tests\RabbitShutdownTest.ahk
 #Include tests\RabbitDeployerContextTest.ahk

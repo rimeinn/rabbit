@@ -534,6 +534,40 @@ Safety and future-fix constraints:
 - this defect does not block Phase 5 because that phase does not change input or caret lookup, but it should be
   reassessed before final integration or release.
 
+### BUG-005: Main application may launch the deployer before releasing Rime
+
+Status: Resolved after Phase 5 nightly validation
+
+Affected observations:
+
+- `重新部署` could start the deployer while the main process still owned its Rime session and mutex, causing the
+  deployer to exit without visible feedback;
+- `用户词典管理` could reach the same race and report that another deployment task was running;
+- `输入法设定` visibly started the deployer before the main process exited, but its additional UI setup usually
+  delayed Rime access enough to hide the conflict.
+
+Characterization:
+
+- the tray helper called `Run()` before `ExitApp(1)`, so child-process startup raced the main application's `OnExit`
+  cleanup;
+- the ordering predates Phase 4, but Phase 4's explicit disposal of input, runtime, appearance, candidate, session,
+  Rime, and mutex owners widened the interval and made the race reproducible;
+- the deployer mutex warning was accurate: the main process had not completed its own mutex and Rime release.
+
+Resolution:
+
+- tray commands now delegate deployer handoff to `RabbitApplication`;
+- the application completes its idempotent `Shutdown(1)` before launching the deployer, then exits without repeating
+  cleanup;
+- first-run installation uses the same ordered handoff.
+
+Validation:
+
+- the handoff fixture records input, runtime, appearance, candidate, session, Rime, and mutex cleanup before the
+  deployer launch callback;
+- a tray fixture verifies that deployer commands retain the current keyboard layout when delegated to the application;
+- the complete first-party test suite passes with the caret hook disabled.
+
 ## 11. Refactoring phases
 
 ### Phase 0: Audit and baseline
@@ -745,6 +779,7 @@ Focused tests:
 | Phase 5 | supported style preview integration | Pass; actual preset snapshots rendered positive dimensions and the dialog explicitly released its bitmap and Direct2D preview |
 | Phase 5 | `RabbitDeployer.ahk deploy` | Pass; the real deployment path exited with code 0 after explicit workflow and Rime cleanup |
 | Phase 5 | repository scope and safety | Pass; no submodule pointer, caret-hook setting, generated runtime file, or BUG-004 behavior changed |
+| Post-Phase 5 | nightly deployer handoff regression | Pass after BUG-005 fix; application and tray fixtures require complete main-process Rime and mutex cleanup before child launch |
 
 The local source checks used the available AutoHotkey v2.0.26 interpreter with `/ErrorStdOut`, with both standard output
 and standard error captured. A high-frequency visible-window probe was also used to identify the missing-icon exception
