@@ -491,8 +491,9 @@ Validation:
 
 ### BUG-004: Chromium-class windows may expose invalid successful MSAA caret rectangles
 
-Status: Confirmed in direct-source runs; mitigated in CI packages by the historical
-`Lib/GetCaretPosEx/GetCaretPosEx.patch`
+Status: The MSAA path now consumes the physical screen coordinates returned by
+`IAccessible::accLocation` without an additional client-coordinate/DPI round trip.
+Multi-monitor regression validation remains pending.
 
 Affected observations:
 
@@ -502,23 +503,19 @@ Affected observations:
 
 Source/package distinction:
 
-- `Lib/GetCaretPosEx/GetCaretPosEx.patch` is a tracked packaging patch; the Chromium/Electron change was added by
-  `169cc16` (`fix: wrong caret position in some electron apps`) on 2025-08-06;
-- the `build-rabbit` CI job runs `git apply` on this patch before uploading the package;
-- direct execution from the repository does not apply the patch and therefore uses the checked-in provider order
-  `MSAA -> UIA -> hook` for `Chrome_WidgetWin_*`;
-- the patch gives `Chrome_WidgetWin_*` the provider order `UIA -> hook`, deliberately skipping MSAA; with
-  `use_caret_hook: false`, the packaged path uses only UIA;
-- the patch also contains Adobe-window handling and a Windows 7 guard around `GetDpiForWindow`; those changes are
-  unrelated to this Chromium symptom.
+- The provider order is now defined by the checked-in `GetCaretPosEx.ahk` source for both direct execution and
+  CI packages.
+- `Chrome_WidgetWin_*` no longer has a packaging-only provider override; after the MSAA coordinate update it uses
+  the normal `MSAA -> UIA -> hook` order.
+- The former Chromium/Electron provider override has been removed; the Adobe-window exclusion and older-Windows
+  DPI guard from the former patch are now part of the checked-in source.
 
-Current reproduction:
+Historical reproduction before the in-tree MSAA update:
 
 - direct execution from `D:\rime-repos\rabbit` reproduced the misplaced Y coordinate;
-- the package installed at `D:\Apps\rabbit` did not reproduce it because its distributed
-  `Lib/GetCaretPosEx/GetCaretPosEx.ahk` already contained the applied Chromium patch;
-- the package being one application commit behind the working tree was not the cause of the behavioral difference;
-- the earlier `refactor-nightly` daily-use result therefore demonstrated the historical patch's mitigation rather than
+- the previously installed package did not reproduce it because its distributed
+  `Lib/GetCaretPosEx/GetCaretPosEx.ahk` contained the applied Chromium workaround;
+- the earlier package result therefore demonstrated the workaround's mitigation rather than
   the underlying MSAA result becoming valid.
 
 Historical reproduction:
@@ -531,10 +528,10 @@ Historical reproduction:
 
 Characterization:
 
-- the current branch and `master` contain the same unpatched `GetCaretPosEx` MSAA algorithm, while CI packages apply
-  the additional tracked patch;
-- no refactoring statement caused the invalid rectangle; direct-source versus packaged behavior differs by design
-  because only the packaging workflow applies the patch;
+- the old current branch and `master` contained the same unpatched `GetCaretPosEx` MSAA algorithm, while CI packages
+  applied an additional tracked patch;
+- no refactoring statement caused the invalid rectangle; direct-source versus packaged behavior differed by design
+  because only the packaging workflow applied the patch;
 - the difference is runtime-state or timing-sensitive: `master` was observed to reject or fail the lookup, while the
   current branch receives a successful MSAA result;
 - in the instrumented Feishu case, `GetGUIThreadInfo` returned no caret HWND and the hook path was skipped;
@@ -542,7 +539,7 @@ Characterization:
 - Rabbit accepted the rectangle without checking whether it intersected the relevant window client area;
 - candidate placement consequently calculated `new_y = -1 + 17 + 4 = 20`;
 - the ChatGPT observation is user-reported and was not separately instrumented;
-- patched packages avoid this exact failure by never querying MSAA for `Chrome_WidgetWin_*`.
+- the historical workaround avoided this exact failure by never querying MSAA for `Chrome_WidgetWin_*`.
 
 Safety and future-fix constraints:
 
@@ -551,11 +548,9 @@ Safety and future-fix constraints:
   categorically;
 - a general fix should validate an MSAA rectangle against the relevant client area, continue with UIA when the MSAA
   result is invalid, and retain the existing mouse fallback when all caret providers fail;
-- do not add executable-name special cases for Feishu or ChatGPT; the existing window-class patch remains a package
-  mitigation until a general validation fix replaces it;
-- a future general fix must reconcile or remove the packaging patch so direct-source and packaged provider behavior do
-  not silently diverge;
-- validation should cover both direct-source execution and the post-patch package while keeping the hook disabled.
+- do not add executable-name special cases for Feishu or ChatGPT; the former window-class workaround has been
+  removed in favor of the shared MSAA coordinate path;
+- validation should cover both direct-source execution and the release package while keeping the hook disabled.
 
 ### BUG-005: Main application may launch the deployer before releasing Rime
 

@@ -14,6 +14,11 @@ GetCaretPosEx(&left?, &top?, &right?, &bottom?, useHook := false) {
         className := WinGetClass(hwnd)
     catch
         className := ""
+
+    ; Adobe typing mode is not a normal input mode, exclude it.
+    if className == "PSViewC" or className == "DroverLord - Window Class"
+        return false
+
     if className ~= "^(?:Windows|Microsoft)\.UI\..+"
         funcs := [getCaretPosFromUIA, getCaretPosFromHook, getCaretPosFromMSAA]
     else if className ~= "^HwndWrapper\[PowerShell_ISE\.exe;;[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\]"
@@ -59,14 +64,15 @@ GetCaretPosEx(&left?, &top?, &right?, &bottom?, useHook := false) {
                 hr := ComCall(22, accCaret, "int*", &x := 0, "int*", &y := 0, "int*", &w := 0, "int*", &h := 0, "int64", 3, "int64", 0, "int")
             }
             if !hr {
-                pt := x | y << 32
-                DllCall("ScreenToClient", "ptr", hwnd, "int64*", &pt)
-                left := pt & 0xffffffff
-                top := pt >> 32
+                ; IAccessible::accLocation returns physical screen coordinates.
+                ; Converting through client coordinates applies DPI virtualization
+                ; a second time for some multi-monitor configurations.
+                if w < 0 || h <= 0
+                    return false
+                left := x
+                top := y
                 right := left + w
                 bottom := top + h
-                scaleRect(getWindowScale(hwnd), &left, &top, &right, &bottom)
-                clientToScreenRect(hwnd, &left, &top, &right, &bottom)
                 return true
             }
         }
@@ -332,8 +338,12 @@ end:
     }
 
     static getWindowScale(hwnd) {
-        if winDpi := DllCall("GetDpiForWindow", "ptr", hwnd, "uint")
-            return A_ScreenDPI / winDpi
+        try {
+            if winDpi := DllCall("GetDpiForWindow", "ptr", hwnd, "uint")
+                return A_ScreenDPI / winDpi
+        } catch {
+            ; Ignore unavailable GetDpiForWindow on older Windows versions.
+        }
         return 1
     }
 
