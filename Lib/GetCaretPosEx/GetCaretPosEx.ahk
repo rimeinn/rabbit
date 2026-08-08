@@ -64,15 +64,14 @@ GetCaretPosEx(&left?, &top?, &right?, &bottom?, useHook := false) {
                 hr := ComCall(22, accCaret, "int*", &x := 0, "int*", &y := 0, "int*", &w := 0, "int*", &h := 0, "int64", 3, "int64", 0, "int")
             }
             if !hr {
-                ; IAccessible::accLocation returns physical screen coordinates.
-                ; Converting through client coordinates applies DPI virtualization
-                ; a second time for some multi-monitor configurations.
                 if w < 0 || h <= 0
                     return false
+                ; IAccessible::accLocation returns physical screen coordinates.
                 left := x
                 top := y
                 right := left + w
                 bottom := top + h
+                physicalToScreenRect(hwnd, &left, &top, &right, &bottom)
                 return true
             }
         }
@@ -239,7 +238,7 @@ end:
         if !DllCall("ReadProcessMemory", "ptr", hProcess, "ptr", pRect, "ptr", rect, "uptr", rect.Size, "uptr*", &bytesRead := 0) || bytesRead !== rect.Size
             return false
         getRect(rect, &left, &top, &right, &bottom)
-        scaleRect(getWindowScale(hwnd), &left, &top, &right, &bottom)
+        physicalToScreenRect(hwnd, &left, &top, &right, &bottom)
         return true
 
         static isX64Process(hProcess) {
@@ -352,6 +351,22 @@ end:
         top := Round(top * scale)
         right := Round(right * scale)
         bottom := Round(bottom * scale)
+    }
+
+    static physicalToScreenRect(hwnd, &left, &top, &right, &bottom) {
+        monitor := DllCall("MonitorFromWindow", "ptr", hwnd, "uint", 2, "ptr")
+        monitor_info := Buffer(40)
+        NumPut("uint", monitor_info.Size, monitor_info)
+        if !DllCall("GetMonitorInfoW", "ptr", monitor, "ptr", monitor_info.Ptr, "int")
+            return
+
+        monitor_left := NumGet(monitor_info, 4, "int")
+        monitor_top := NumGet(monitor_info, 8, "int")
+        scale := getWindowScale(hwnd)
+        left := monitor_left + Round((left - monitor_left) * scale)
+        top := monitor_top + Round((top - monitor_top) * scale)
+        right := monitor_left + Round((right - monitor_left) * scale)
+        bottom := monitor_top + Round((bottom - monitor_top) * scale)
     }
 
     static clientToScreenRect(hwnd, &left, &top, &right, &bottom) {
