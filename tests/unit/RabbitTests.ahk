@@ -31,6 +31,7 @@
 #Include RabbitShutdownTest.ahk
 #Include RabbitStatusTipTest.ahk
 #Include RabbitTestCommonTest.ahk
+#Include RabbitTrayClickTest.ahk
 #Include RabbitTrayStatusTipTest.ahk
 #Include RabbitUIStyleSnapshotTest.ahk
 

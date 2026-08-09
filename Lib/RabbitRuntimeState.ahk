@@ -26,6 +26,9 @@ class RabbitRuntimeState {
         this.tray := 0
         this.process_ascii := config.GetPresetProcessAscii()
         this.on_tray_icon_click := false
+        this.tray_click_window := 0
+        this.tray_click_process := ""
+        this.tray_click_timeout_callback := this.EndTrayIconClick.Bind(this)
         this.active_win := ""
         this.timer_callback := this.UpdateWinAscii.Bind(this)
         this.timer_running := false
@@ -56,9 +59,48 @@ class RabbitRuntimeState {
     }
 
     Dispose() {
+        SetTimer(this.tray_click_timeout_callback, 0)
+        this.EndTrayIconClick()
         if this.timer_running {
             SetTimer(this.timer_callback, 0)
             this.timer_running := false
+        }
+    }
+
+    BeginTrayIconClick() {
+        local active_window
+        this.on_tray_icon_click := true
+        this.tray_click_window := 0
+        this.tray_click_process := ""
+        if (active_window := WinExist("A")) {
+            this.tray_click_window := active_window
+            try {
+                this.tray_click_process := StrLower(WinGetProcessName("ahk_id " . active_window))
+            }
+        }
+        ; A mouse-up outside the notification area may not produce a callback.
+        SetTimer(this.tray_click_timeout_callback, -5000)
+    }
+
+    EndTrayIconClick() {
+        SetTimer(this.tray_click_timeout_callback, 0)
+        this.on_tray_icon_click := false
+        this.tray_click_window := 0
+        this.tray_click_process := ""
+    }
+
+    ApplyTrayAscii(target) {
+        if !this.config.global_ascii && this.tray_click_process {
+            this.UpdateWinAscii(target, true, this.tray_click_process, true)
+        } else if this.tray {
+            this.tray.UpdateTip(, target)
+            this.tray.UpdateIcon()
+        }
+    }
+
+    RestoreTrayClickWindow() {
+        if this.tray_click_window && WinExist("ahk_id " . this.tray_click_window) {
+            WinActivate("ahk_id " . this.tray_click_window)
         }
     }
 

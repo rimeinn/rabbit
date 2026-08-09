@@ -180,25 +180,30 @@ class RabbitTrayController {
             return
         }
         if lParam == WM_LBUTTONDOWN {
-            this.runtime_state.on_tray_icon_click := true
+            this.runtime_state.BeginTrayIconClick()
         } else if lParam == WM_LBUTTONUP {
-            local old_ascii_mode := this.rime.get_option(this.session_id, "ascii_mode")
-            this.rime.set_option(this.session_id, "ascii_mode", !old_ascii_mode)
-            local new_ascii_mode := this.rime.get_option(this.session_id, "ascii_mode")
-            this.runtime_state.UpdateWinAscii(
-                new_ascii_mode,
-                true,
-                this.runtime_state.active_win,
-                true
-            )
-            status_text := new_ascii_mode
-                ? this.runtime_state.ascii_mode_true_label_abbr
-                : this.runtime_state.ascii_mode_false_label_abbr
-            if this.config.show_tips {
-                this.ShowStatusTip(status_text, true)
+            if !this.runtime_state.on_tray_icon_click {
+                this.runtime_state.BeginTrayIconClick()
             }
-            WinActivate("ahk_exe " . this.runtime_state.active_win)
-            this.runtime_state.on_tray_icon_click := false
+            try {
+                if this.candidate_box && HasMethod(this.candidate_box, "Hide") {
+                    this.candidate_box.Hide()
+                }
+                this.rime.clear_composition(this.session_id)
+                local old_ascii_mode := this.rime.get_option(this.session_id, "ascii_mode")
+                this.rime.set_option(this.session_id, "ascii_mode", !old_ascii_mode)
+                local new_ascii_mode := this.rime.get_option(this.session_id, "ascii_mode")
+                this.runtime_state.ApplyTrayAscii(new_ascii_mode)
+                status_text := new_ascii_mode
+                    ? this.runtime_state.ascii_mode_true_label_abbr
+                    : this.runtime_state.ascii_mode_false_label_abbr
+                if this.config.show_tips {
+                    this.ShowStatusTip(status_text, true)
+                }
+                this.runtime_state.RestoreTrayClickWindow()
+            } finally {
+                this.runtime_state.EndTrayIconClick()
+            }
         }
     }
 
