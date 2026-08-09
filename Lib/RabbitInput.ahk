@@ -45,6 +45,7 @@ class RabbitInputController {
         this.prev_y := 4
         this.candidate_revision := 0
         this.composition_owner_hwnd := 0
+        this.switcher_state := 0
         this.focus_timer_callback := this.CheckCompositionFocus.Bind(this)
         this.focus_timer_running := false
         this.registered_hotkeys := []
@@ -289,37 +290,50 @@ class RabbitInputController {
         local new_ascii_punct := status.is_ascii_punct
         this.rime.free_status(status)
 
-        if old_schema_id !== new_schema_id {
-            this.runtime_state.UpdateStateLabels()
-        }
-
-        this.tray.UpdateTip(new_schema_name, new_ascii_mode, new_full_shape, new_ascii_punct)
-        if old_schema_id !== new_schema_id {
-            this.tray.UpdateSchemaIcon(new_schema_id)
-        }
-
+        local switcher_status := this.ResolveSwitcherStatus(
+            old_schema_id,
+            old_ascii_mode,
+            old_full_shape,
+            old_ascii_punct,
+            new_schema_id
+        )
+        local processing_switcher := switcher_status.processing_switcher
+        old_schema_id := switcher_status.schema_id
+        old_ascii_mode := switcher_status.ascii_mode
+        old_full_shape := switcher_status.full_shape
+        old_ascii_punct := switcher_status.ascii_punct
+        local schema_changed := !processing_switcher && old_schema_id !== new_schema_id
         local status_text := ""
         local status_changed := false
         local ascii_changed := false
-        if old_ascii_mode != new_ascii_mode {
+        if !processing_switcher && schema_changed {
+            this.runtime_state.UpdateStateLabels()
+        }
+        if !processing_switcher {
+            this.tray.UpdateTip(new_schema_name, new_ascii_mode, new_full_shape, new_ascii_punct)
+            if schema_changed {
+                this.tray.UpdateSchemaIcon(new_schema_id)
+            }
+        }
+        if !processing_switcher && old_ascii_mode != new_ascii_mode {
             ascii_changed := true
             this.runtime_state.UpdateWinAscii(new_ascii_mode, true)
             status_text := new_ascii_mode
                 ? this.runtime_state.ascii_mode_true_label_abbr
                 : this.runtime_state.ascii_mode_false_label_abbr
-        } else if old_full_shape != new_full_shape {
+        } else if !processing_switcher && old_full_shape != new_full_shape {
             status_changed := true
             status_text := new_full_shape
                 ? this.runtime_state.full_shape_true_label_abbr
                 : this.runtime_state.full_shape_false_label_abbr
-        } else if old_ascii_punct != new_ascii_punct {
+        } else if !processing_switcher && old_ascii_punct != new_ascii_punct {
             status_changed := true
             status_text := new_ascii_punct
                 ? this.runtime_state.ascii_punct_true_label_abbr
                 : this.runtime_state.ascii_punct_false_label_abbr
         }
 
-        if this.config.show_tips && old_schema_id !== new_schema_id {
+        if this.config.show_tips && schema_changed {
             this.tray.ShowStatusTip(new_schema_name, true)
         } else if this.config.show_tips && (status_changed || ascii_changed) {
             this.tray.ShowStatusTip(status_text, ascii_changed)
@@ -357,6 +371,44 @@ class RabbitInputController {
 
         if !processed && !pass_through {
             this.ReplayInput(key, mask)
+        }
+    }
+
+    ResolveSwitcherStatus(old_schema_id, old_ascii_mode, old_full_shape, old_ascii_punct, new_schema_id) {
+        local state
+        if new_schema_id = ".default" {
+            if old_schema_id != ".default" {
+                this.switcher_state := {
+                    schema_id: old_schema_id,
+                    ascii_mode: old_ascii_mode,
+                    full_shape: old_full_shape,
+                    ascii_punct: old_ascii_punct
+                }
+            }
+            return {
+                processing_switcher: true,
+                schema_id: old_schema_id,
+                ascii_mode: old_ascii_mode,
+                full_shape: old_full_shape,
+                ascii_punct: old_ascii_punct
+            }
+        }
+        if (state := this.switcher_state) {
+            this.switcher_state := 0
+            return {
+                processing_switcher: false,
+                schema_id: state.schema_id,
+                ascii_mode: state.ascii_mode,
+                full_shape: state.full_shape,
+                ascii_punct: state.ascii_punct
+            }
+        }
+        return {
+            processing_switcher: false,
+            schema_id: old_schema_id,
+            ascii_mode: old_ascii_mode,
+            full_shape: old_full_shape,
+            ascii_punct: old_ascii_punct
         }
     }
 

@@ -27,6 +27,8 @@ RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind(
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
+RunTest("switcher temporary schema preserves mode baseline", TestSwitcherTemporarySchemaPreservesModeBaseline.Bind())
+RunTest("switcher ASCII selection shows mode status", TestSwitcherAsciiSelectionShowsModeStatus.Bind())
 
 TestInputHotkeyOwnership() {
     local input := RabbitInputController(
@@ -313,6 +315,60 @@ TestNonTextTargetBypassesRimeInput() {
     AssertEqual("A", input.replayed_keys[1].key, "The wrong key was replayed to the target.")
 }
 
+TestSwitcherTemporarySchemaPreservesModeBaseline() {
+    local input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    local entering := input.ResolveSwitcherStatus("xmjd6", false, false, false, ".default")
+    AssertTrue(entering.processing_switcher, "The switcher temporary schema was not recognized.")
+    AssertEqual("xmjd6", input.switcher_state.schema_id, "The real schema was not cached for switcher selection.")
+
+    local expanding := input.ResolveSwitcherStatus(".default", false, false, false, ".default")
+    AssertTrue(expanding.processing_switcher, "The expanded switcher menu was treated as a real schema.")
+
+    local selected := input.ResolveSwitcherStatus(".default", false, false, false, "xmjd6")
+    AssertTrue(!selected.processing_switcher, "Returning from switcher did not restore normal status handling.")
+    AssertEqual("xmjd6", selected.schema_id, "The switcher selection did not use the real schema as its baseline.")
+    AssertEqual(false, selected.ascii_mode, "The switcher selection did not preserve the prior ASCII state.")
+    AssertEqual(0, input.switcher_state, "The completed switcher selection retained stale state.")
+}
+
+TestSwitcherAsciiSelectionShowsModeStatus() {
+    local rime := RabbitSwitcherStatusRimeProbe([
+        RabbitSwitcherStatus("xmjd6", "星猫键道", false),
+        RabbitSwitcherStatus(".default", ".default", false),
+        RabbitSwitcherStatus(".default", ".default", false),
+        RabbitSwitcherStatus(".default", ".default", false),
+        RabbitSwitcherStatus(".default", ".default", false),
+        RabbitSwitcherStatus("xmjd6", "星猫键道", true)
+    ])
+    local runtime_state := RabbitSwitcherStatusRuntimeProbe()
+    local tray := RabbitSwitcherStatusTrayProbe()
+    local input := RabbitInputController(
+        rime,
+        42,
+        {},
+        RabbitConfigSnapshot(),
+        runtime_state,
+        tray,
+        RabbitInputTargetProbe(RabbitInputTarget.UNKNOWN)
+    )
+
+    input.ProcessKey("F4", 0)
+    input.ProcessKey("2", 0)
+    input.ProcessKey("2", 0)
+
+    AssertEqual(1, tray.status_tips.Length, "The switcher ASCII selection displayed an unexpected number of status tips.")
+    AssertEqual("西", tray.status_tips[1].text, "The switcher ASCII selection displayed the schema name instead of the mode label.")
+    AssertTrue(tray.status_tips[1].show_icon, "The switcher ASCII selection did not show the mode icon.")
+    AssertEqual(0, runtime_state.state_label_updates, "The switcher temporary schema refreshed real schema labels.")
+}
+
 class RabbitInputRimeProbe {
     __New() {
         this.clear_calls := 0
@@ -322,6 +378,78 @@ class RabbitInputRimeProbe {
     clear_composition(session_id) {
         this.clear_calls++
         this.cleared_session_id := session_id
+    }
+}
+
+RabbitSwitcherStatus(schema_id, schema_name, ascii_mode) {
+    return {
+        schema_id: schema_id,
+        schema_name: schema_name,
+        is_ascii_mode: ascii_mode,
+        is_full_shape: false,
+        is_ascii_punct: false
+    }
+}
+
+class RabbitSwitcherStatusRimeProbe {
+    __New(statuses) {
+        this.statuses := statuses
+        this.status_index := 0
+    }
+
+    get_status(session_id) {
+        this.status_index++
+        return this.statuses[this.status_index]
+    }
+
+    free_status(status) {
+    }
+
+    process_key(session_id, keycode, mask) {
+        return true
+    }
+
+    get_commit(session_id) {
+        return 0
+    }
+
+    get_context(session_id) {
+        return 0
+    }
+}
+
+class RabbitSwitcherStatusRuntimeProbe {
+    __New() {
+        this.ascii_mode_false_label_abbr := "中"
+        this.ascii_mode_true_label_abbr := "西"
+        this.full_shape_false_label_abbr := "半"
+        this.full_shape_true_label_abbr := "全"
+        this.ascii_punct_false_label_abbr := "。"
+        this.ascii_punct_true_label_abbr := "."
+        this.state_label_updates := 0
+    }
+
+    UpdateStateLabels() {
+        this.state_label_updates++
+    }
+
+    UpdateWinAscii(target, use_target) {
+    }
+}
+
+class RabbitSwitcherStatusTrayProbe {
+    __New() {
+        this.status_tips := []
+    }
+
+    UpdateTip(schema_name, ascii_mode, full_shape, ascii_punct) {
+    }
+
+    UpdateSchemaIcon(schema_id) {
+    }
+
+    ShowStatusTip(text, show_icon := false) {
+        this.status_tips.Push({ text: text, show_icon: show_icon })
     }
 }
 
