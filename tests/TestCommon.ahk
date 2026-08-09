@@ -16,9 +16,21 @@
  *
  */
 
+OnError(TestUnhandledError)
+
 RunTest(name, test) {
     test.Call()
     FileAppend("PASS: " . name . "`n", "*")
+}
+
+TestUnhandledError(error, *) {
+    local message := "FAIL: " . error.Message
+    if error.File {
+        message .= " (" . error.File . ":" . error.Line . ")"
+    }
+    FileAppend(message . "`n", "*")
+    ExitApp(1)
+    return true
 }
 
 AssertTrue(condition, message) {

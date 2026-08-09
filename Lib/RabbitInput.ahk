@@ -19,6 +19,7 @@
 #Include <RabbitCommon>
 #Include <RabbitKeyTable>
 #Include <RabbitInputHotkeys>
+#Include <RabbitInputTarget>
 #Include <RabbitCaret>
 #Include <RabbitMonitors>
 #Include <RabbitConfigSnapshot>
@@ -28,13 +29,14 @@
 class RabbitInputController {
     static FOCUS_POLL_INTERVAL := 50
 
-    __New(rime_api, session_id, candidate_box, config, runtime_state, tray) {
+    __New(rime_api, session_id, candidate_box, config, runtime_state, tray, input_target := 0) {
         this.rime := rime_api
         this.session_id := session_id
         this.candidate_box := candidate_box
         this.config := config
         this.runtime_state := runtime_state
         this.tray := tray
+        this.input_target := input_target ? input_target : RabbitInputTarget
         this.suspend_hotkey_mask := 0
         this.suspend_hotkey := ""
         this.prev_show := false
@@ -64,7 +66,7 @@ class RabbitInputController {
             for registration in this.config.input_hotkeys.GetRegistrations() {
                 this.RegisterHotKey(
                     (registration.pass_through ? "$~" : "$") . registration.hotkey,
-                    this.ProcessKey.Bind(
+                    this.ProcessConfiguredKey.Bind(
                         this,
                         registration.key,
                         registration.mask,
@@ -81,7 +83,7 @@ class RabbitInputController {
             for key, _ in key_map {
                 this.RegisterHotKey(
                     "$" . key,
-                    this.ProcessKey.Bind(this, key, 0, false),
+                    this.ProcessTextKey.Bind(this, key, 0),
                     "S0"
                 )
             }
@@ -92,12 +94,12 @@ class RabbitInputController {
         for key, _ in KeyDef.shifted_keycode {
             this.RegisterHotKey(
                 "$<+" . key,
-                this.ProcessKey.Bind(this, key, shift, false),
+                this.ProcessTextKey.Bind(this, key, shift),
                 "S0"
             )
             this.RegisterHotKey(
                 "$>+" . key,
-                this.ProcessKey.Bind(this, key, shift, false),
+                this.ProcessTextKey.Bind(this, key, shift),
                 "S0"
             )
         }
@@ -105,7 +107,7 @@ class RabbitInputController {
         ; Special handling
         this.RegisterHotKey(
             "$Space Up",
-            this.ProcessKey.Bind(this, "Space", up, false),
+            this.ProcessTextKey.Bind(this, "Space", up),
             "S0"
         )
 
@@ -140,7 +142,7 @@ class RabbitInputController {
             if KeyDef.rime_to_ahk.Has(target_key) {
                 target_key := KeyDef.rime_to_ahk[target_key]
             }
-            callback := this.ProcessKey.Bind(this, target_key, mask, false)
+            callback := this.ProcessConfiguredKey.Bind(this, target_key, mask, false)
             if num_modifiers = 1 {
                 if mask & ctrl {
                     this.RegisterHotKey("$<^" . target_key, callback, "S", true)
@@ -158,13 +160,13 @@ class RabbitInputController {
             }
         } else if keys.Length == 1 && keys[1] = "Shift" {
             ; A standalone Shift key is intentionally unsupported for now.
-            callback := this.ProcessKey.Bind(this, "LShift", shift, false)
+            callback := this.ProcessConfiguredKey.Bind(this, "LShift", shift, false)
             this.RegisterHotKey("$LShift", callback, "S", true)
-            callback := this.ProcessKey.Bind(this, "RShift", shift, false)
+            callback := this.ProcessConfiguredKey.Bind(this, "RShift", shift, false)
             this.RegisterHotKey("$RShift", callback, "S", true)
-            callback := this.ProcessKey.Bind(this, "LShift", shift | up, false)
+            callback := this.ProcessConfiguredKey.Bind(this, "LShift", shift | up, false)
             this.RegisterHotKey("$LShift Up", callback, "S", true)
-            callback := this.ProcessKey.Bind(this, "RShift", shift | up, false)
+            callback := this.ProcessConfiguredKey.Bind(this, "RShift", shift | up, false)
             this.RegisterHotKey("$RShift Up", callback, "S", true)
             this.suspend_hotkey_mask := shift | up
             this.suspend_hotkey := "Shift"
@@ -208,9 +210,18 @@ class RabbitInputController {
         this.registered_hotkey_names := Map()
     }
 
-    ProcessKey(key, mask, pass_through := false, this_hotkey := "") {
+    ProcessTextKey(key, mask, this_hotkey := "") {
+        return this.ProcessKey(key, mask, false, this_hotkey, true)
+    }
+
+    ProcessConfiguredKey(key, mask, pass_through := false, this_hotkey := "") {
+        return this.ProcessKey(key, mask, pass_through, this_hotkey, false)
+    }
+
+    ProcessKey(key, mask, pass_through := false, this_hotkey := "", requires_text_target := false) {
         local check_key, check_code, caps, status, processed, commit, context
         local candidate_revision, foreground_hwnd, hide_candidate := false
+        local input_target
         local code := 0
         Loop 4 {
             local key_map
@@ -240,6 +251,17 @@ class RabbitInputController {
             return
         }
         foreground_hwnd := this.GetForegroundWindow()
+        input_target := this.input_target.Classify(foreground_hwnd)
+        if input_target = RabbitInputTarget.NO {
+            this.ClearCompositionIfActive()
+            if requires_text_target {
+                this.ReplayInput(key, mask, pass_through)
+                return
+            }
+            if pass_through {
+                return
+            }
+        }
         this.CancelCompositionIfFocusChanged(foreground_hwnd)
         candidate_revision := ++this.candidate_revision
         if (caps := GetKeyState("CapsLock", "T")) {
@@ -332,17 +354,31 @@ class RabbitInputController {
         }
 
         if !processed && !pass_through {
-            local has_modifier := mask & (
-                KeyDef.mask["Shift"] | KeyDef.mask["Ctrl"] | KeyDef.mask["Alt"] | KeyDef.mask["Win"]
-            )
-            local fallback := this.BuildFallbackInput(key, mask)
-
-            if key == "Space" && !has_modifier {
-                Send(fallback)
-            } else {
-                SendInput(fallback)
-            }
+            this.ReplayInput(key, mask)
         }
+    }
+
+    ReplayInput(key, mask, pass_through := false) {
+        if pass_through {
+            return
+        }
+        local has_modifier := mask & (
+            KeyDef.mask["Shift"] | KeyDef.mask["Ctrl"] | KeyDef.mask["Alt"] | KeyDef.mask["Win"]
+        )
+        local fallback := this.BuildFallbackInput(key, mask)
+        if key == "Space" && !has_modifier {
+            Send(fallback)
+        } else {
+            SendInput(fallback)
+        }
+    }
+
+    ClearCompositionIfActive() {
+        if !this.composition_owner_hwnd && !this.prev_show {
+            return false
+        }
+        this.ClearComposition()
+        return true
     }
 
     BuildFallbackInput(key, mask) {

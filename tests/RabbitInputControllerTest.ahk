@@ -25,6 +25,7 @@ RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
+RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
 
 TestInputHotkeyOwnership() {
     local input := RabbitInputController(
@@ -273,6 +274,25 @@ TestFocusChangeClearsComposition() {
     AssertEqual(0, input.composition_owner_hwnd, "An empty context retained a composition owner.")
 }
 
+TestNonTextTargetBypassesRimeInput() {
+    local rime := RabbitInputRimeProbe()
+    local candidate_box := RabbitInputCandidateProbe()
+    local input := RabbitInputTargetControllerProbe(
+        rime,
+        candidate_box,
+        RabbitInputTargetProbe(RabbitInputTarget.NO)
+    )
+    input.composition_owner_hwnd := 100
+    input.prev_show := true
+
+    input.ProcessTextKey("A", 0)
+
+    AssertEqual(1, rime.clear_calls, "A non-text target did not clear the active Rime composition.")
+    AssertEqual(1, candidate_box.hide_calls, "A non-text target did not hide the candidate box.")
+    AssertEqual(1, input.replayed_keys.Length, "The ordinary text key was not replayed to the target.")
+    AssertEqual("A", input.replayed_keys[1].key, "The wrong key was replayed to the target.")
+}
+
 class RabbitInputRimeProbe {
     __New() {
         this.clear_calls := 0
@@ -292,5 +312,42 @@ class RabbitInputCandidateProbe {
 
     Hide() {
         this.hide_calls++
+    }
+}
+
+class RabbitInputTargetProbe {
+    __New(result) {
+        this.result := result
+    }
+
+    Classify(*) {
+        return this.result
+    }
+}
+
+class RabbitInputTargetControllerProbe extends RabbitInputController {
+    __New(rime, candidate_box, input_target) {
+        super.__New(
+            rime,
+            42,
+            candidate_box,
+            RabbitConfigSnapshot(),
+            {},
+            {},
+            input_target
+        )
+        this.replayed_keys := []
+    }
+
+    GetForegroundWindow() {
+        return 100
+    }
+
+    ReplayInput(key, mask, pass_through := false) {
+        this.replayed_keys.Push({
+            key: key,
+            mask: mask,
+            pass_through: pass_through
+        })
     }
 }

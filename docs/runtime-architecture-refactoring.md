@@ -659,6 +659,41 @@ Validation:
   state, and invalidates older rendering;
 - an empty Rime context drops the recorded composition owner.
 
+### BUG-008: Plain keys are processed without a confirmed text target
+
+Status: Fixed in the current input-target classifier implementation.
+
+Reproduction:
+
+1. Start Rabbit with a non-ASCII schema active.
+2. Focus the file view in Windows Explorer.
+3. Press a letter that matches a file name.
+4. Rabbit creates or continues a Rime composition instead of allowing Explorer's type-to-select behavior.
+
+Characterization:
+
+- `ProcessKey()` registered all ordinary text keys globally and called `rime.process_key()` before deciding whether the
+  target could accept text;
+- caret lookup is a candidate-placement signal and can fail even when an application has an editable text target;
+- treating a failed caret lookup as a negative input decision would break applications whose caret providers are incomplete.
+
+Resolution:
+
+- `RabbitInputTarget` obtains the focused control with `GetGUIThreadInfo()` and classifies it as `yes`, `no`, or
+  `unknown` using the process name and focused HWND class chain;
+- the initial explicit `no` rules cover Explorer's file view, desktop windows, and taskbar button/notification controls;
+- editable `Edit` and RichEdit controls remain text targets, including controls hosted by Explorer;
+- ordinary text keys bypass Rime only for an explicit `no` target, while configured Rabbit shortcuts retain their existing
+  processing and `unknown` targets retain the previous behavior;
+- entering an explicit `no` target reuses the existing composition cleanup path before replaying the ordinary key.
+
+Validation:
+
+- input-target fixtures cover Explorer file view, Explorer edit controls, the desktop, taskbar controls, and unknown
+  applications;
+- the input-controller fixture verifies that a non-text target clears the active composition and replays the ordinary key;
+- the README now distinguishes caret-position fallback from input-target eligibility.
+
 ## 11. Refactoring phases
 
 ### Phase 0: Audit and baseline
