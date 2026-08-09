@@ -88,13 +88,17 @@ class RabbitInputHotkeys {
     }
 
     AddAsciiComposerSwitchKeys(rime_api, config) {
-        local iter
+        local iter, switch_action
         if !(iter := rime_api.config_begin_map(config, "ascii_composer/switch_key")) {
             return
         }
         try {
             while rime_api.config_next(iter) {
-                this.AddBinding(iter.key, "ascii")
+                switch_action := rime_api.config_get_string(config, iter.path)
+                ; librime treats noop as a disabled switch key; do not intercept it as an ASCII source.
+                if switch_action != "noop" {
+                    this.AddBinding(iter.key, "ascii")
+                }
             }
         } finally {
             rime_api.config_end(iter)

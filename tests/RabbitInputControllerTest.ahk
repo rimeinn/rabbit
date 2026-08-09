@@ -22,6 +22,7 @@
 
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.Bind())
+RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind())
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
@@ -121,6 +122,25 @@ TestConfiguredInputHotkeySelection() {
         "An ASCII-only standalone modifier key-up was not registered for immediate pass-through."
     )
     input.Dispose()
+}
+
+TestNoopAsciiSwitchKeyIsIgnored() {
+    local hotkeys := RabbitInputHotkeys()
+    local rime := RabbitInputHotkeysConfigProbe(Map(
+        "Control_L", "noop",
+        "Shift_L", "inline_ascii"
+    ))
+    hotkeys.AddAsciiComposerSwitchKeys(rime, {})
+    hotkeys.Finalize()
+
+    AssertTrue(
+        !FindInputRegistration(hotkeys.GetRegistrations(), "LCtrl"),
+        "An ascii_composer switch key configured as noop was registered."
+    )
+    AssertTrue(
+        FindInputRegistration(hotkeys.GetRegistrations(), "LShift"),
+        "A non-noop ascii_composer switch key was not registered."
+    )
 }
 
 FindInputRegistration(registrations, hotkey) {
@@ -312,6 +332,51 @@ class RabbitInputCandidateProbe {
 
     Hide() {
         this.hide_calls++
+    }
+}
+
+class RabbitInputHotkeysConfigProbe {
+    __New(values) {
+        this.values := values
+    }
+
+    config_begin_map(config, path) {
+        return RabbitInputHotkeysMapIterator(this.values)
+    }
+
+    config_next(iter) {
+        return iter.MoveNext()
+    }
+
+    config_get_string(config, path) {
+        local parts := StrSplit(path, "/")
+        return this.values[parts[parts.Length]]
+    }
+
+    config_end(iter) {
+    }
+}
+
+class RabbitInputHotkeysMapIterator {
+    __New(values) {
+        this.keys := []
+        local key
+        for key, _ in values {
+            this.keys.Push(key)
+        }
+        this.index := 0
+        this.key := ""
+        this.path := ""
+    }
+
+    MoveNext() {
+        this.index++
+        if this.index > this.keys.Length {
+            return false
+        }
+        this.key := this.keys[this.index]
+        this.path := "ascii_composer/switch_key/" . this.key
+        return true
     }
 }
 
