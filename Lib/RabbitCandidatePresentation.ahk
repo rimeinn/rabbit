@@ -21,10 +21,6 @@ class RabbitCandidatePresentation {
         local before_selection, selected, after_selection
         local menu := context.menu
         local candidates := menu.candidates
-        local has_custom_labels := !!context.select_labels[0]
-        local select_keys := menu.select_keys
-        local select_key_count := StrLen(select_keys)
-
         RabbitGetCompositionText(
             context.composition, &before_selection, &selected, &after_selection)
         this.preedit := {
@@ -36,12 +32,7 @@ class RabbitCandidatePresentation {
         this.candidates := []
 
         loop menu.num_candidates {
-            local label := String(A_Index)
-            if A_Index <= menu.page_size && has_custom_labels {
-                label := context.select_labels[A_Index] || label
-            } else if A_Index <= select_key_count {
-                label := SubStr(select_keys, A_Index, 1)
-            }
+            local label := RabbitCandidatePresentation.GetLabel(context, A_Index)
             this.candidates.Push({
                 label: Format(label_format, label),
                 text: candidates[A_Index].text,
@@ -49,6 +40,21 @@ class RabbitCandidatePresentation {
                 highlighted: A_Index == this.highlighted_index
             })
         }
+    }
+
+    static GetLabel(context, index) {
+        local menu := context.menu
+        local has_custom_labels := !!context.select_labels[0]
+        local select_keys := menu.select_keys
+        local select_key_count := StrLen(select_keys)
+        local label := String(index)
+        if index <= menu.page_size && has_custom_labels {
+            return context.select_labels[index] || label
+        }
+        if index <= select_key_count {
+            return SubStr(select_keys, index, 1)
+        }
+        return label
     }
 }
 

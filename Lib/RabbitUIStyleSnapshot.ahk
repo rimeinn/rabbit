@@ -39,6 +39,11 @@ class RabbitUIStyleSnapshot {
         this.margin_x := this.GetValue(overrides, "margin_x", this.GetValue(values, "margin_x", 6))
         this.margin_y := this.GetValue(overrides, "margin_y", this.GetValue(values, "margin_y", 6))
         this.min_width := this.GetValue(overrides, "min_width", this.GetValue(values, "min_width", 160))
+        this.layout_type := this.GetValue(overrides, "layout_type", this.GetValue(values, "layout_type", "stacked"))
+        this.flow_rows := this.GetValue(overrides, "flow_rows", this.GetValue(values, "flow_rows", 5))
+        this.candidate_spacing := this.GetValue(
+            overrides, "candidate_spacing", this.GetValue(values, "candidate_spacing", 6))
+        this.align_type := this.GetValue(overrides, "align_type", this.GetValue(values, "align_type", "top"))
 
         this.border_color := this.GetValue(
             overrides, "border_color", this.GetValue(values, "border_color", 0xffe0e0e0))
@@ -82,7 +87,8 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, cr, r, mx, my, w, selected_color_scheme, dark_color_scheme
+        local fmt, cr, r, mx, my, w, flow_rows, candidate_spacing, layout_type, align_type
+        local selected_color_scheme, dark_color_scheme
         local values := Map()
 
         if !rime_api || !config {
@@ -132,6 +138,25 @@ class RabbitUIStyleSnapshot {
         }
         if rime_api.config_test_get_int(config, "style/layout/min_width", &w) && w >= 0 {
             values["min_width"] := w
+        }
+        if rime_api.config_test_get_string(config, "style/layout/type", &layout_type) {
+            layout_type := StrLower(layout_type)
+            if layout_type = "stacked" || layout_type = "flow" || layout_type = "vertical_text" {
+                values["layout_type"] := layout_type
+            }
+        }
+        if rime_api.config_test_get_int(config, "style/layout/flow_rows", &flow_rows) {
+            values["flow_rows"] := Min(9, Max(1, flow_rows))
+        }
+        if rime_api.config_test_get_int(config, "style/layout/candidate_spacing", &candidate_spacing)
+            && candidate_spacing >= 0 {
+            values["candidate_spacing"] := candidate_spacing
+        }
+        if rime_api.config_test_get_string(config, "style/layout/align_type", &align_type) {
+            align_type := StrLower(align_type)
+            if align_type = "top" || align_type = "center" || align_type = "bottom" {
+                values["align_type"] := align_type
+            }
         }
 
         selected_color_scheme := IsSet(color_scheme)

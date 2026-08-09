@@ -31,6 +31,7 @@ TestStyleSnapshotCopiesValues() {
 
     AssertEqual("Snapshot Font", style.font_face, "The snapshot retained its constructor Map.")
     AssertEqual(17, style.font_point, "The snapshot retained its constructor Map value.")
+    AssertEqual("stacked", style.layout_type, "The default candidate layout is not stacked.")
 
     local overrides := Map("font_point", 21)
     local updated_style := style.With(overrides)
@@ -48,6 +49,10 @@ TestStyleSnapshotParsing() {
     AssertEqual("Configured Font", light_style.font_face, "The active font was not parsed.")
     AssertEqual(18, light_style.font_point, "The active font size was not parsed.")
     AssertEqual(9, light_style.margin_x, "The active horizontal margin was not parsed.")
+    AssertEqual("flow", light_style.layout_type, "The active layout type was not parsed.")
+    AssertEqual(9, light_style.flow_rows, "Flow rows were not clamped to the supported range.")
+    AssertEqual(7, light_style.candidate_spacing, "Candidate spacing was not parsed.")
+    AssertEqual("center", light_style.align_type, "Candidate alignment was not parsed.")
     AssertEqual(0xff112233, light_style.text_color, "The active color scheme was not parsed.")
     AssertEqual(false, light_style.use_dark, "The light snapshot was marked as dark.")
 
@@ -74,6 +79,10 @@ CreateStyleConfigValues() {
         "style/label_font_point", 16,
         "style/comment_font_point", 15,
         "style/layout/margin_x", 9,
+        "style/layout/type", "flow",
+        "style/layout/flow_rows", 12,
+        "style/layout/candidate_spacing", 7,
+        "style/layout/align_type", "center",
         "style/color_scheme", "light",
         "style/color_scheme_dark", "dark",
         "preset_color_schemes/light/text_color", "0x112233",

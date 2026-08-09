@@ -34,7 +34,7 @@ RunTest(name, test, failure_reporter := 0) {
         }
         return false
     }
-    FileAppend("PASS: " . name . "`n", "*")
+    TestWrite("PASS: " . name . "`n")
     return true
 }
 
@@ -56,7 +56,7 @@ TestExit(exit_reason, exit_code) {
 TestReportFailure(name, error) {
     local message := "FAIL: " . name . "`n"
     if !IsObject(error) {
-        FileAppend(message . "  Error: " . error . "`n", "*")
+        TestWrite(message . "  Error: " . error . "`n")
         return
     }
     if HasProp(error, "Message") {
@@ -77,7 +77,17 @@ TestReportFailure(name, error) {
     if HasProp(error, "Stack") && error.Stack {
         message .= "  Stack:`n" . error.Stack . "`n"
     }
-    FileAppend(message, "*")
+    TestWrite(message)
+}
+
+TestWrite(message) {
+    try {
+        FileAppend(message, "*")
+    } catch as error {
+        ; A GUI-launched test has no inherited stdout handle.  Preserve the
+        ; original test outcome and leave its report available to a debugger.
+        OutputDebug(message)
+    }
 }
 
 AssertTrue(condition, message) {

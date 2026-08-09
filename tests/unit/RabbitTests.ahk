@@ -22,6 +22,7 @@
 #Include RabbitApplicationTest.ahk
 #Include RabbitCandidateBoxTest.ahk
 #Include RabbitCandidatePresentationTest.ahk
+#Include RabbitCandidateViewportTest.ahk
 #Include RabbitConfigSnapshotTest.ahk
 #Include RabbitDeployerContextTest.ahk
 #Include RabbitDeployerWorkflowTest.ahk

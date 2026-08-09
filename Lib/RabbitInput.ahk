@@ -23,6 +23,7 @@
 #Include RabbitCaret.ahk
 #Include RabbitMonitors.ahk
 #Include RabbitPopupPlacement.ahk
+#Include RabbitCandidateViewport.ahk
 #Include RabbitConfigSnapshot.ahk
 #Include RabbitRuntimeState.ahk
 #Include RabbitTrayMenu.ahk
@@ -44,6 +45,7 @@ class RabbitInputController {
         this.prev_x := 4
         this.prev_y := 4
         this.candidate_revision := 0
+        this.candidate_viewport := RabbitCandidateViewport()
         this.composition_owner_hwnd := 0
         this.switcher_state := 0
         this.focus_timer_callback := this.CheckCompositionFocus.Bind(this)
@@ -350,7 +352,7 @@ class RabbitInputController {
             }
             this.RunCandidateUpdate(
                 candidate_revision,
-                () => this.candidate_box.Hide()
+                () => this.HideCandidate()
             )
             this.rime.free_commit(commit)
         }
@@ -495,6 +497,7 @@ class RabbitInputController {
     HideCandidate() {
         this.candidate_box.Hide()
         this.prev_show := false
+        this.candidate_viewport.Reset()
     }
 
     RunCandidateUpdate(candidate_revision, update_callback) {
@@ -529,7 +532,8 @@ class RabbitInputController {
                 placement := {
                     mode: "top_left",
                     x: info.work.left + 4,
-                    y: info.work.top + 4
+                    y: info.work.top + 4,
+                    monitor_info: info
                 }
             } else if RabbitGetCaretPos(
                 &caret_x,
@@ -571,18 +575,18 @@ class RabbitInputController {
         local box_width, box_height, new_x, new_y, info, position
         switch placement.mode {
             case "hide":
-                this.candidate_box.Hide()
-                this.prev_show := false
+                this.HideCandidate()
                 return
             case "top_left":
                 if !hide_candidate {
-                    this.candidate_box.Build(context, &box_width, &box_height)
+                    this.BuildCandidate(context, &box_width, &box_height, placement.monitor_info)
                     this.candidate_box.Show(placement.x, placement.y)
                 }
                 this.prev_x := placement.x
                 this.prev_y := placement.y
             case "caret":
-                this.candidate_box.Build(context, &box_width, &box_height)
+                info := placement.monitor_info
+                this.BuildCandidate(context, &box_width, &box_height, info)
                 if this.config.fix_candidate_box && this.prev_show {
                     info := RabbitPopupPlacement.GetWorkAreaAt(this.prev_x, this.prev_y)
                     position := RabbitPopupPlacement.PlaceAtPoint(
@@ -595,7 +599,6 @@ class RabbitInputController {
                     new_x := position.x
                     new_y := position.y
                 } else {
-                    info := placement.monitor_info
                     position := RabbitPopupPlacement.PlaceBelowCaret(
                         placement.caret_x,
                         placement.caret_y,
@@ -614,7 +617,7 @@ class RabbitInputController {
                 this.prev_x := new_x
                 this.prev_y := new_y
             case "mouse":
-                this.candidate_box.Build(context, &box_width, &box_height)
+                this.BuildCandidate(context, &box_width, &box_height, placement.monitor_info)
                 position := RabbitPopupPlacement.PlaceAtPoint(
                     placement.x,
                     placement.y,
@@ -629,6 +632,27 @@ class RabbitInputController {
                 throw Error("Unknown candidate placement mode: " . placement.mode)
         }
         this.prev_show := true
+    }
+
+    BuildCandidate(context, &box_width, &box_height, monitor_info := 0) {
+        local style, presentation, max_width := 0
+        if !HasMethod(this.candidate_box, "BuildPresentation") || !HasProp(this.candidate_box, "style") {
+            this.candidate_box.Build(context, &box_width, &box_height)
+            return
+        }
+        style := this.candidate_box.style
+        if monitor_info {
+            max_width := monitor_info.work.right - monitor_info.work.left
+        }
+        presentation := this.candidate_viewport.Build(
+            context,
+            style.label_format,
+            style.layout_type,
+            style.flow_rows,
+            this.rime,
+            this.session_id
+        )
+        this.candidate_box.BuildPresentation(presentation, &box_width, &box_height, max_width)
     }
 
     ; by rawbx (https://github.com/rimeinn/rabbit/issues/13#issuecomment-3072554342)

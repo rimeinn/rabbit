@@ -60,6 +60,7 @@ RunTest(
     "modern candidate lifecycle",
     TestBackendLifecycle.Bind("modern", CandidateBox(candidate_style), candidate_context, candidate_style)
 )
+RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest(
     "legacy candidate lifecycle",
     TestBackendLifecycle.Bind("legacy", LegacyCandidateBox(candidate_style), candidate_context, candidate_style)
@@ -598,6 +599,64 @@ TestLegacyPureLayoutCalculation() {
     AssertEqual(49, layout.width, "An empty comment incorrectly widened the candidate layout.")
     AssertEqual(27, layout.height, "The comment-free row height is incorrect.")
     AssertTrue(!layout.has_comment, "An empty comment created a visible comment column.")
+}
+
+TestModernFlowCandidateLayout(style) {
+    local candidate_box := CandidateBox(style.With(Map(
+        "layout_type", "flow",
+        "candidate_spacing", 7,
+        "align_type", "center"
+    )))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+    presentation.flow_page_size := 2
+    Loop 4 {
+        presentation.candidates.Push({
+            label: "",
+            text: "预览候选" . A_Index,
+            comment: A_Index = 1 ? "预览注释" : "",
+            highlighted: false,
+            preview: true
+        })
+    }
+    try {
+        candidate_box.BuildPresentation(presentation, &width, &height, 400)
+        AssertTrue(width >= style.min_width, "The flow candidate layout ignored the minimum width.")
+        AssertTrue(
+            candidate_box.candidatesLayout.rows[3].y > candidate_box.candidatesLayout.rows[1].y,
+            "A flow page did not advance to the next candidate row."
+        )
+        AssertEqual(
+            candidate_box.candidatesLayout.rows[1].y,
+            candidate_box.candidatesLayout.rows[2].y,
+            "Candidates from the same flow page were split into separate rows."
+        )
+        AssertEqual(
+            candidate_box.candidatesLayout.cands[1].x,
+            candidate_box.candidatesLayout.cands[3].x,
+            "The first candidate column was not aligned across flow pages."
+        )
+        AssertEqual(
+            candidate_box.candidatesLayout.cands[2].x,
+            candidate_box.candidatesLayout.cands[4].x,
+            "The second candidate column was not aligned across flow pages."
+        )
+        AssertEqual(
+            "",
+            candidate_box.candidatesLayout.labels[3].text,
+            "A preloaded flow candidate retained its selection label."
+        )
+        AssertTrue(
+            candidate_box.candidateHighlights[1],
+            "The selected current-page candidate lost its card highlight."
+        )
+        AssertTrue(
+            !candidate_box.candidateHighlights[3],
+            "A preloaded candidate received a highlight."
+        )
+    } finally {
+        candidate_box.Dispose()
+    }
 }
 
 TestBackendLifecycle(name, candidate_box, context, style) {
