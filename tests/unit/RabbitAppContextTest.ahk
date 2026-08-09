@@ -16,8 +16,8 @@
  *
  */
 
-#Include TestCommon.ahk
-#Include <RabbitAppContext>
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitAppContext.ahk
 
 RunTest("application context disposal order", TestAppContextDisposalOrder.Bind())
 RunTest("partial application context disposal", TestPartialAppContextDisposal.Bind())
@@ -40,7 +40,7 @@ TestAppContextDisposalOrder() {
     context.Dispose()
     AssertEqual(
         "input,runtime,appearance,candidate,destroy:42,finalize,close",
-        JoinShutdownCalls(calls),
+        JoinAppContextCalls(calls),
         "The application context disposed resources out of order."
     )
 }
@@ -54,7 +54,7 @@ TestPartialAppContextDisposal() {
     context.Dispose()
     AssertEqual(
         "close",
-        JoinShutdownCalls(calls),
+        JoinAppContextCalls(calls),
         "A partial application context finalized resources it did not initialize."
     )
 }
@@ -81,9 +81,17 @@ TestAppContextOwnerFailure() {
     AssertTrue(failed, "The application context swallowed an owner disposal failure.")
     AssertEqual(
         "input,runtime,appearance,candidate,destroy:42,finalize,close",
-        JoinShutdownCalls(calls),
+        JoinAppContextCalls(calls),
         "An owner disposal failure skipped downstream application cleanup."
     )
+}
+
+JoinAppContextCalls(calls) {
+    local result := ""
+    for call in calls {
+        result .= (result ? "," : "") . call
+    }
+    return result
 }
 
 class RabbitAppContextDisposableProbe {

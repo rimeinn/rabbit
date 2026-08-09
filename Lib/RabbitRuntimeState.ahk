@@ -16,7 +16,7 @@
  *
  */
 
-#Include <RabbitConfigSnapshot>
+#Include RabbitConfigSnapshot.ahk
 
 class RabbitRuntimeState {
     __New(rime_api, session_id, config) {

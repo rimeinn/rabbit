@@ -16,9 +16,10 @@
  *
  */
 
-#Include TestCommon.ahk
-#Include <RabbitDeployerContext>
-#Include <RabbitUIStyleSettings>
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitDeployerContext.ahk
+#Include ..\..\Lib\RabbitUIStyleSettings.ahk
+#Include ..\..\Lib\RabbitUIStyleSettingsDialog.ahk
 
 RunTest("deployer context lifecycle", TestDeployerContextLifecycle.Bind())
 RunTest("partial deployer context disposal", TestPartialDeployerContextDisposal.Bind())

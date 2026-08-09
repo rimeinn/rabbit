@@ -16,13 +16,14 @@
  *
  */
 
-#Include <RabbitAppContext>
-#Include <RabbitCandidateBoxFactory>
-#Include <RabbitConfig>
-#Include <RabbitInput>
-#Include <RabbitRuntimeState>
-#Include <RabbitTrayMenu>
-#Include <RabbitUIStyle>
+#Include RabbitAppContext.ahk
+#Include RabbitCandidateBoxFactory.ahk
+#Include RabbitConfig.ahk
+#Include RabbitInput.ahk
+#Include RabbitRuntimeState.ahk
+#Include RabbitStatusTip.ahk
+#Include RabbitTrayMenu.ahk
+#Include RabbitUIStyle.ahk
 
 class RabbitApplication {
     __New(rime_api) {
@@ -100,6 +101,9 @@ class RabbitApplication {
             || this.context.config.use_legacy_candidate_box
         this.context.candidate_box := RabbitCandidateBoxFactory(loaded.style).Create(
             use_legacy_candidate_box)
+        if !use_legacy_candidate_box {
+            this.context.status_tip := RabbitStatusTip(loaded.style, this.context.config)
+        }
         this.context.runtime_state := RabbitRuntimeState(
             this.context.rime,
             this.context.session_id,
@@ -112,7 +116,8 @@ class RabbitApplication {
             this.context.config,
             this.context.runtime_state,
             this.context.keyboard_layout,
-            this.RunDeployer.Bind(this)
+            this.RunDeployer.Bind(this),
+            this.context.status_tip
         )
         this.context.runtime_state.SetTray(this.tray)
         this.context.input := RabbitInputController(
@@ -127,7 +132,8 @@ class RabbitApplication {
             this.context.rime,
             this.context.candidate_box,
             loaded.style,
-            loaded.dark_mode
+            loaded.dark_mode,
+            this.context.status_tip
         )
 
         this.context.input.RegisterHotKeys()

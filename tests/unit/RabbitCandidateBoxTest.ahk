@@ -16,7 +16,8 @@
  *
  */
 
-#Include TestCommon.ahk
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitCandidateBoxFactory.ahk
 
 candidate_context := CreateCandidateContext()
 candidate_style := RabbitUIStyleSnapshot()

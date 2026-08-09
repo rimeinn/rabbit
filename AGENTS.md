@@ -38,7 +38,15 @@ Match surrounding YAML indentation and comments. No formatter or linter is curre
 
 ## Testing Guidelines
 
-There is no top-level automated test suite or coverage threshold. Before submitting, launch both scripts and manually exercise affected input, tray, candidate-window, configuration, and deployment paths on Windows. For binding-level changes, run:
+There is no CI-enforced coverage threshold. Run focused tests directly or use the unit test runner. Always use `/ErrorStdOut` for startup and load diagnostics, but do not treat it as an exception boundary: each test body must run through `RunTest`, which catches callback exceptions and prints the test name, error, location, and stack to standard output. Test scripts use explicit relative includes and must remain runnable without a root-level test launcher.
+
+```powershell
+AutoHotkey.exe /ErrorStdOut tests\unit\RabbitTests.ahk
+```
+
+`tests\integration\RabbitDeployerDialogTests.ahk` and `tests\integration\RabbitUIStylePreviewTests.ahk` are separate integration smoke tests. They initialize the real Rime deployer, require a matching `rime.dll` and local Rime data, and create native/Direct2D dialog resources; do not include them in `tests\unit\RabbitTests.ahk`. Run either one explicitly with `/ErrorStdOut` when changing its dialog or preview path.
+
+Before submitting, launch both scripts and manually exercise affected input, tray, candidate-window, configuration, and deployment paths on Windows. For binding-level changes, run:
 
 ```powershell
 AutoHotkey.exe Lib/librime-ahk/tests/rime_test_main.ahk

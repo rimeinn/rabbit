@@ -16,8 +16,8 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitUIStyleSnapshot>
+#Include RabbitCommon.ahk
+#Include RabbitUIStyleSnapshot.ahk
 
 class UIStyleSettings {
     rime := 0

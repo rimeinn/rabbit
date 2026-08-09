@@ -16,9 +16,9 @@
  *
  */
 
-#Include <RabbitDeployerContext>
-#Include <RabbitDeployerWorkflow>
-#Include <RabbitTrayMenu>
+#Include RabbitDeployerContext.ahk
+#Include RabbitDeployerWorkflow.ahk
+#Include RabbitTrayMenu.ahk
 
 class RabbitDeployerApplication {
     __New(rime_api) {

@@ -16,7 +16,7 @@
  *
  */
 
-#Include <RabbitCommon>
+#Include RabbitCommon.ahk
 
 class SwitcherSettingsDialog extends Gui {
     available_schemas := 0

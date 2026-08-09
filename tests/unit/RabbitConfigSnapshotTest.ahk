@@ -16,8 +16,8 @@
  *
  */
 
-#Include TestCommon.ahk
-#Include <RabbitConfigSnapshot>
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitConfigSnapshot.ahk
 
 RunTest("config snapshot collection boundaries", TestConfigSnapshotCollections.Bind())
 RunTest("caret hook defaults to disabled", TestCaretHookDefaults.Bind())

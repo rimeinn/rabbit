@@ -16,11 +16,11 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitConfigSnapshot>
-#Include <RabbitInputHotkeys>
-#Include <RabbitUIStyle>
-#Include <RabbitUIStyleSnapshot>
+#Include RabbitCommon.ahk
+#Include RabbitConfigSnapshot.ahk
+#Include RabbitInputHotkeys.ahk
+#Include RabbitUIStyle.ahk
+#Include RabbitUIStyleSnapshot.ahk
 
 class RabbitConfigLoader {
     static Load(rime_api) {

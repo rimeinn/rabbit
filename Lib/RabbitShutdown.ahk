@@ -16,27 +16,33 @@
  *
  */
 
-RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance, rime_initialized := true) {
+RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance, rime_initialized := true, status_tip := 0) {
     try {
         if candidate_box && HasMethod(candidate_box, "Dispose") {
             candidate_box.Dispose()
         }
     } finally {
         try {
-            if session {
-                try {
-                    rime_api.destroy_session(session)
-                } finally {
-                    if rime_initialized {
-                        rime_api.finalize()
-                    }
-                }
-            } else if rime_initialized {
-                rime_api.finalize()
+            if status_tip && HasMethod(status_tip, "Dispose") {
+                status_tip.Dispose()
             }
         } finally {
-            if mutex_instance {
-                mutex_instance.Close()
+            try {
+                if session {
+                    try {
+                        rime_api.destroy_session(session)
+                    } finally {
+                        if rime_initialized {
+                            rime_api.finalize()
+                        }
+                    }
+                } else if rime_initialized {
+                    rime_api.finalize()
+                }
+            } finally {
+                if mutex_instance {
+                    mutex_instance.Close()
+                }
             }
         }
     }

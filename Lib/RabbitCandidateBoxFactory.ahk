@@ -16,8 +16,8 @@
  *
  */
 
-#Include <RabbitCandidateBox>
-#Include <RabbitLegacyCandidateBox>
+#Include RabbitCandidateBox.ahk
+#Include RabbitLegacyCandidateBox.ahk
 
 class RabbitCandidateBoxFactory {
     __New(style, modern_constructor := CandidateBox, legacy_constructor := LegacyCandidateBox) {

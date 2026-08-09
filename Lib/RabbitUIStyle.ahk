@@ -16,8 +16,8 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitUIStyleSnapshot>
+#Include RabbitCommon.ahk
+#Include RabbitUIStyleSnapshot.ahk
 
 RabbitIsUserDarkMode() {
     try {
@@ -33,11 +33,12 @@ RabbitIsUserDarkMode() {
 }
 
 class RabbitAppearanceController {
-    __New(rime_api, candidate_box, style, dark_mode) {
+    __New(rime_api, candidate_box, style, dark_mode, status_tip := 0) {
         this.rime := rime_api
         this.candidate_box := candidate_box
         this.style := style
         this.dark_mode := dark_mode
+        this.status_tip := status_tip
         this.color_change_callback := this.OnColorChange.Bind(this)
         this.registered := false
     }
@@ -73,6 +74,9 @@ class RabbitAppearanceController {
                 )
                 this.rime.config_close(config)
                 this.candidate_box.UpdateStyle(this.style)
+                if this.status_tip {
+                    this.status_tip.UpdateStyle(this.style)
+                }
             }
             DarkMode.set(this.dark_mode)
         }

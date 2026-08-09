@@ -16,8 +16,8 @@
  *
  */
 
-#Include TestCommon.ahk
-#Include <RabbitUIStyleSnapshot>
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitUIStyleSnapshot.ahk
 
 RunTest("style snapshot copies constructor values", TestStyleSnapshotCopiesValues.Bind())
 RunTest("style snapshot parses active and dark styles", TestStyleSnapshotParsing.Bind())

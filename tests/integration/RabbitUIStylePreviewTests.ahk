@@ -19,16 +19,16 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
-#Include <RabbitCommon>
-#Include <RabbitUIStyleSettings>
-#Include <RabbitUIStyleSettingsDialog>
+#Include ..\..\Lib\RabbitCommon.ahk
+#Include ..\..\Lib\RabbitUIStyleSettings.ahk
+#Include ..\..\Lib\RabbitUIStyleSettingsDialog.ahk
 
 RunUIStylePreviewTest()
 
 RunUIStylePreviewTest() {
     local dialog := 0
     local settings := 0
-    local rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
+    local rime := RimeApi(A_ScriptDir . "\..\..\Lib\librime-ahk\rime.dll")
     local traits := RabbitCreateTraits()
     rime.setup(traits)
     rime.deployer_initialize(0)

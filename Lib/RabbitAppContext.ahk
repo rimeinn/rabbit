@@ -16,7 +16,7 @@
  *
  */
 
-#Include <RabbitShutdown>
+#Include RabbitShutdown.ahk
 
 class RabbitAppContext {
     __New(rime_api, mutex_instance) {
@@ -25,6 +25,7 @@ class RabbitAppContext {
         this.traits := 0
         this.session_id := 0
         this.candidate_box := 0
+        this.status_tip := 0
         this.config := 0
         this.keyboard_layout := 0
         this.rime_initialized := false
@@ -59,7 +60,8 @@ class RabbitAppContext {
                         this.rime,
                         this.session_id,
                         this.mutex,
-                        this.rime_initialized
+                        this.rime_initialized,
+                        this.status_tip
                     )
                 }
             }

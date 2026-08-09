@@ -17,8 +17,8 @@
  *
  */
 
-#Include <RabbitUIStyleSnapshot>
-#Include <Direct2D\Direct2D>
+#Include RabbitUIStyleSnapshot.ahk
+#Include Direct2D\Direct2D.ahk
 
 class CandidatePreview {
     hBitmap := 0

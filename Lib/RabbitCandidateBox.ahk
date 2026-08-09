@@ -17,10 +17,10 @@
  *
  */
 
-#Include <RabbitUIStyleSnapshot>
-#Include <RabbitCandidateBoxCommon>
-#Include <RabbitCandidatePresentation>
-#Include <Direct2D/Direct2D>
+#Include RabbitUIStyleSnapshot.ahk
+#Include RabbitCandidateBoxCommon.ahk
+#Include RabbitCandidatePresentation.ahk
+#Include Direct2D/Direct2D.ahk
 
 class CandidateBox {
     gui := 0

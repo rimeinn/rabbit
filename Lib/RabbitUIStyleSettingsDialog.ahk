@@ -16,9 +16,9 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitCandidatePreview>
-#Include <RabbitUIStyleSettings>
+#Include RabbitCommon.ahk
+#Include RabbitCandidatePreview.ahk
+#Include RabbitUIStyleSettings.ahk
 
 class UIStyleSettingsDialog extends Gui {
     __New(settings, old_windows := RabbitIsOldWindows(), preview_factory := CandidatePreview) {

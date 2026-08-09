@@ -16,15 +16,16 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitKeyTable>
-#Include <RabbitInputHotkeys>
-#Include <RabbitInputTarget>
-#Include <RabbitCaret>
-#Include <RabbitMonitors>
-#Include <RabbitConfigSnapshot>
-#Include <RabbitRuntimeState>
-#Include <RabbitTrayMenu>
+#Include RabbitCommon.ahk
+#Include RabbitKeyTable.ahk
+#Include RabbitInputHotkeys.ahk
+#Include RabbitInputTarget.ahk
+#Include RabbitCaret.ahk
+#Include RabbitMonitors.ahk
+#Include RabbitPopupPlacement.ahk
+#Include RabbitConfigSnapshot.ahk
+#Include RabbitRuntimeState.ahk
+#Include RabbitTrayMenu.ahk
 
 class RabbitInputController {
     static FOCUS_POLL_INTERVAL := 50
@@ -318,9 +319,10 @@ class RabbitInputController {
                 : this.runtime_state.ascii_punct_false_label_abbr
         }
 
-        if this.config.show_tips && (status_changed || ascii_changed) {
-            ToolTip(status_text, , , STATUS_TOOLTIP)
-            SetTimer(() => ToolTip(, , , STATUS_TOOLTIP), -this.config.show_tips_time)
+        if this.config.show_tips && old_schema_id !== new_schema_id {
+            this.tray.ShowStatusTip(new_schema_name, true)
+        } else if this.config.show_tips && (status_changed || ascii_changed) {
+            this.tray.ShowStatusTip(status_text, ascii_changed)
         }
 
         if (commit := this.rime.get_commit(this.session_id)) {
@@ -457,7 +459,7 @@ class RabbitInputController {
     }
 
     UpdateCandidate(context, candidate_revision, hide_candidate) {
-        local hmon, info, caret_x, caret_y, caret_w, caret_h, hwnd
+        local info, caret_x, caret_y, caret_w, caret_h
         local backup_mouse_ref, mouse_x, mouse_y, placement
         if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
             placement := { mode: "hide" }
@@ -484,25 +486,26 @@ class RabbitInputController {
                 &caret_h,
                 this.config.use_caret_hook
             ) {
-                hwnd := WinExist("A")
-                hmon := MonitorManage.MonitorFromWindow(hwnd)
-                info := MonitorManage.GetMonitorInfo(hmon)
+                info := RabbitPopupPlacement.GetWorkAreaAt(caret_x, caret_y)
                 placement := {
                     mode: "caret",
                     caret_x: caret_x,
                     caret_y: caret_y,
                     caret_w: caret_w,
                     caret_h: caret_h,
-                    monitor_info: info,
-                    workspace_width: info ? 0 : SysGet(16), ; SM_CXFULLSCREEN
-                    workspace_height: info ? 0 : SysGet(17) ; SM_CYFULLSCREEN
+                    monitor_info: info
                 }
             } else {
                 backup_mouse_ref := A_CoordModeMouse
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&mouse_x, &mouse_y)
                 CoordMode("Mouse", backup_mouse_ref)
-                placement := { mode: "mouse", x: mouse_x, y: mouse_y }
+                placement := {
+                    mode: "mouse",
+                    x: mouse_x,
+                    y: mouse_y,
+                    monitor_info: RabbitPopupPlacement.GetWorkAreaAt(mouse_x, mouse_y)
+                }
             }
         }
 
@@ -513,7 +516,7 @@ class RabbitInputController {
     }
 
     ApplyCandidateUpdate(context, placement, hide_candidate) {
-        local box_width, box_height, new_x, new_y, info
+        local box_width, box_height, new_x, new_y, info, position
         switch placement.mode {
             case "hide":
                 this.candidate_box.Hide()
@@ -524,30 +527,34 @@ class RabbitInputController {
                     this.candidate_box.Build(context, &box_width, &box_height)
                     this.candidate_box.Show(placement.x, placement.y)
                 }
+                this.prev_x := placement.x
+                this.prev_y := placement.y
             case "caret":
                 this.candidate_box.Build(context, &box_width, &box_height)
                 if this.config.fix_candidate_box && this.prev_show {
-                    new_x := this.prev_x
-                    new_y := this.prev_y
+                    info := RabbitPopupPlacement.GetWorkAreaAt(this.prev_x, this.prev_y)
+                    position := RabbitPopupPlacement.PlaceAtPoint(
+                        this.prev_x,
+                        this.prev_y,
+                        box_width,
+                        box_height,
+                        info
+                    )
+                    new_x := position.x
+                    new_y := position.y
                 } else {
-                    new_x := placement.caret_x + placement.caret_w
-                    new_y := placement.caret_y + placement.caret_h + 4
                     info := placement.monitor_info
-                    if info {
-                        if new_x + box_width > info.work.right {
-                            new_x := info.work.right - box_width
-                        }
-                        if new_y + box_height > info.work.bottom {
-                            new_y := placement.caret_y - 4 - box_height
-                        }
-                    } else {
-                        if new_x + box_width > placement.workspace_width {
-                            new_x := placement.workspace_width - box_width
-                        }
-                        if new_y + box_height > placement.workspace_height {
-                            new_y := placement.caret_y - 4 - box_height
-                        }
-                    }
+                    position := RabbitPopupPlacement.PlaceBelowCaret(
+                        placement.caret_x,
+                        placement.caret_y,
+                        placement.caret_w,
+                        placement.caret_h,
+                        box_width,
+                        box_height,
+                        info
+                    )
+                    new_x := position.x
+                    new_y := position.y
                 }
                 if !hide_candidate {
                     this.candidate_box.Show(new_x, new_y)
@@ -556,7 +563,16 @@ class RabbitInputController {
                 this.prev_y := new_y
             case "mouse":
                 this.candidate_box.Build(context, &box_width, &box_height)
-                this.candidate_box.Show(placement.x, placement.y)
+                position := RabbitPopupPlacement.PlaceAtPoint(
+                    placement.x,
+                    placement.y,
+                    box_width,
+                    box_height,
+                    placement.monitor_info
+                )
+                this.candidate_box.Show(position.x, position.y)
+                this.prev_x := position.x
+                this.prev_y := position.y
             default:
                 throw Error("Unknown candidate placement mode: " . placement.mode)
         }

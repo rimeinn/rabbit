@@ -16,8 +16,8 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitConfigSnapshot>
+#Include RabbitCommon.ahk
+#Include RabbitConfigSnapshot.ahk
 
 A_IconTip := "玉兔毫（维护中）"
 
@@ -56,7 +56,8 @@ class RabbitTrayController {
         config,
         runtime_state,
         keyboard_layout,
-        deployer_callback
+        deployer_callback,
+        status_tip := 0
     ) {
         this.rime := rime_api
         this.session_id := session_id
@@ -65,6 +66,7 @@ class RabbitTrayController {
         this.runtime_state := runtime_state
         this.keyboard_layout := keyboard_layout
         this.deployer_callback := deployer_callback
+        this.status_tip := status_tip
         this.schema_name := ""
         this.ascii_mode := false
         this.full_shape := false
@@ -167,11 +169,7 @@ class RabbitTrayController {
         this.UpdateTip()
         this.UpdateIcon()
         if this.config.show_tips {
-            ToolTip(A_IsSuspended ? "禁用" : "启用", , , STATUS_TOOLTIP)
-            SetTimer(
-                () => ToolTip(, , , STATUS_TOOLTIP),
-                -this.config.show_tips_time
-            )
+            this.ShowStatusTip(A_IsSuspended ? "禁用" : "启用")
         }
         this.SetupMenu()
     }
@@ -197,11 +195,7 @@ class RabbitTrayController {
                 ? this.runtime_state.ascii_mode_true_label_abbr
                 : this.runtime_state.ascii_mode_false_label_abbr
             if this.config.show_tips {
-                ToolTip(status_text, , , STATUS_TOOLTIP)
-                SetTimer(
-                    () => ToolTip(, , , STATUS_TOOLTIP),
-                    -this.config.show_tips_time
-                )
+                this.ShowStatusTip(status_text, true)
             }
             WinActivate("ahk_exe " . this.runtime_state.active_win)
             this.runtime_state.on_tray_icon_click := false
@@ -237,12 +231,30 @@ class RabbitTrayController {
 
     UpdateSchemaIcon(schema_id) {
         local icon_path
-        if this.config.TryGetSchemaIcon(schema_id, &icon_path) {
-            this.current_schema_icon := icon_path
-            if icon_path {
-                this.UpdateIcon()
-            }
+        if !this.config.TryGetSchemaIcon(schema_id, &icon_path) {
+            icon_path := ""
         }
+        this.current_schema_icon := icon_path
+        this.UpdateIcon()
+    }
+
+    ShowStatusTip(text, show_icon := false) {
+        if this.status_tip {
+            this.status_tip.Show(text, show_icon ? this.GetStatusIconPath() : "")
+        } else {
+            ToolTip(text, , , STATUS_TOOLTIP)
+            SetTimer(() => ToolTip(, , , STATUS_TOOLTIP), -this.config.show_tips_time)
+        }
+    }
+
+    GetStatusIconPath() {
+        if A_IsSuspended {
+            return "Lib\rabbit-alt.ico"
+        }
+        if this.ascii_mode {
+            return "Lib\rabbit-ascii.ico"
+        }
+        return this.current_schema_icon ? this.current_schema_icon : "Lib\rabbit.ico"
     }
 
     UpdateIcon() {

@@ -21,7 +21,7 @@
  * with MIT License
  */
 
-#Include <GetCaretPosEx\GetCaretPosEx>
+#Include GetCaretPosEx\GetCaretPosEx.ahk
 
 /**
  * Gets the position of the caret with UIA, Acc or CaretGetPos.

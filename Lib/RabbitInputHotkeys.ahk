@@ -16,7 +16,7 @@
  *
  */
 
-#Include <RabbitKeyTable>
+#Include RabbitKeyTable.ahk
 
 class RabbitInputHotkeys {
     __New() {

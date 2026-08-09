@@ -16,7 +16,7 @@
  *
  */
 
-#Include <RabbitCommon>
+#Include RabbitCommon.ahk
 
 class RabbitDeployerContext {
     __New(rime_api) {

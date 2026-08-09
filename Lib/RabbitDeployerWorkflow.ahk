@@ -16,11 +16,11 @@
  *
  */
 
-#Include <RabbitCommon>
-#Include <RabbitDictManagementDialog>
-#Include <RabbitSwitcherSettingsDialog>
-#Include <RabbitUIStyleSettings>
-#Include <RabbitUIStyleSettingsDialog>
+#Include RabbitCommon.ahk
+#Include RabbitDictManagementDialog.ahk
+#Include RabbitSwitcherSettingsDialog.ahk
+#Include RabbitUIStyleSettings.ahk
+#Include RabbitUIStyleSettingsDialog.ahk
 
 class RabbitDeployerWorkflow {
     __New(rime_api) {

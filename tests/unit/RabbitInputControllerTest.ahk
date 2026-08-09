@@ -16,9 +16,9 @@
  *
  */
 
-#Include TestCommon.ahk
-#Include <RabbitConfigSnapshot>
-#Include <RabbitInput>
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitConfigSnapshot.ahk
+#Include ..\..\Lib\RabbitInput.ahk
 
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.Bind())

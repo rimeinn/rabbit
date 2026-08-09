@@ -17,10 +17,10 @@
  *
  */
 
-#Include <RabbitCandidateBoxCommon>
-#Include <RabbitCandidatePresentation>
-#Include <RabbitLegacyCandidateLayout>
-#Include <RabbitUIStyleSnapshot>
+#Include RabbitCandidateBoxCommon.ahk
+#Include RabbitCandidatePresentation.ahk
+#Include RabbitLegacyCandidateLayout.ahk
+#Include RabbitUIStyleSnapshot.ahk
 
 class LegacyCandidateBox {
     static dbg := false

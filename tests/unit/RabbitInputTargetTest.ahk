@@ -16,8 +16,8 @@
  *
  */
 
-#Include TestCommon.ahk
-#Include ..\Lib\RabbitInputTarget.ahk
+#Include ..\support\TestCommon.ahk
+#Include ..\..\Lib\RabbitInputTarget.ahk
 
 RunTest("Explorer file view is a non-text target", TestExplorerFileViewIsNo.Bind())
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())

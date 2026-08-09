@@ -19,14 +19,14 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
-#Include <RabbitCommon>
-#Include <RabbitDictManagementDialog>
-#Include <RabbitSwitcherSettingsDialog>
+#Include ..\..\Lib\RabbitCommon.ahk
+#Include ..\..\Lib\RabbitDictManagementDialog.ahk
+#Include ..\..\Lib\RabbitSwitcherSettingsDialog.ahk
 
 RunDeployerDialogTests()
 
 RunDeployerDialogTests() {
-    local rime := RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
+    local rime := RimeApi(A_ScriptDir . "\..\..\Lib\librime-ahk\rime.dll")
     local traits := RabbitCreateTraits()
     local levers := 0
     local switcher_settings := 0

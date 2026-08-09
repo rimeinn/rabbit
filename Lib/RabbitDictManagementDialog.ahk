@@ -16,7 +16,7 @@
  *
  */
 
-#Include <RabbitCommon>
+#Include RabbitCommon.ahk
 
 class DictManagementDialog extends Gui {
     __New(rime_api, levers_api) {

@@ -27,8 +27,8 @@ global RABBIT_VERSION := "dev"
 ;@Ahk2Exe-AddResource Lib\rabbit-ascii.ico, 160
 ;@Ahk2Exe-AddResource Lib\rabbit-alt.ico,   206
 
-#Include <librime-ahk\rime_api>
-#Include <librime-ahk\rime_levers_api>
+#Include librime-ahk\rime_api.ahk
+#Include librime-ahk\rime_levers_api.ahk
 
 global AHK_NOTIFYICON := 0x404
 global WM_LBUTTONDOWN := 0x201
