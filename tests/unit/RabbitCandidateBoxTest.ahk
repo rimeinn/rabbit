@@ -21,6 +21,7 @@
 
 candidate_context := CreateCandidateContext()
 candidate_style := RabbitUIStyleSnapshot()
+candidate_golden := LoadCandidateBoxGolden()
 
 if A_Args.Length {
     switch A_Args[1] {
@@ -50,7 +51,7 @@ RunTest("configured legacy factory selection", TestConfiguredLegacyFactorySelect
 RunTest("modern factory selection", TestModernFactorySelection.Bind(candidate_style))
 RunTest(
     "legacy update without measurement windows",
-    TestLegacyUpdateWithoutMeasurementWindow.Bind(candidate_style, candidate_context)
+    TestLegacyUpdateWithoutMeasurementWindow.Bind(candidate_style, candidate_context, candidate_golden)
 )
 RunTest("legacy dynamic calculated layout", TestLegacyDynamicCalculatedLayout.Bind(candidate_style))
 RunTest("legacy GDI text measurement parity", TestLegacyGdiTextMeasurementParity.Bind(candidate_style))
@@ -58,12 +59,24 @@ RunTest("legacy fake GUI uniform row backgrounds", TestLegacyFakeGuiUniformRowBa
 RunTest("legacy pure layout calculation", TestLegacyPureLayoutCalculation.Bind())
 RunTest(
     "modern candidate lifecycle",
-    TestBackendLifecycle.Bind("modern", CandidateBox(candidate_style), candidate_context, candidate_style)
+    TestBackendLifecycle.Bind(
+        "modern",
+        CandidateBox(candidate_style),
+        candidate_context,
+        candidate_style,
+        candidate_golden
+    )
 )
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest(
     "legacy candidate lifecycle",
-    TestBackendLifecycle.Bind("legacy", LegacyCandidateBox(candidate_style), candidate_context, candidate_style)
+    TestBackendLifecycle.Bind(
+        "legacy",
+        LegacyCandidateBox(candidate_style),
+        candidate_context,
+        candidate_style,
+        candidate_golden
+    )
 )
 RunTest("partial construction cleanup", TestPartialConstructionCleanup.Bind(candidate_style))
 
@@ -99,6 +112,32 @@ CreateCandidateContext() {
         },
         select_labels: Map(0, "", 1, "", 2, "")
     }
+}
+
+LoadCandidateBoxGolden() {
+    local path := A_ScriptDir . "\RabbitCandidateBoxGolden.ini"
+    if !FileExist(path) {
+        throw Error("Candidate box golden file was not found: " . path)
+    }
+    return Map(
+        "legacy", Map(
+            "update_duration_ms", ReadGoldenInteger(path, "legacy", "update_duration_ms"),
+            "width", ReadGoldenInteger(path, "legacy", "width"),
+            "height", ReadGoldenInteger(path, "legacy", "height")
+        ),
+        "modern", Map(
+            "width", ReadGoldenInteger(path, "modern", "width"),
+            "height", ReadGoldenInteger(path, "modern", "height")
+        )
+    )
+}
+
+ReadGoldenInteger(path, section, key) {
+    local value := IniRead(path, section, key, "")
+    if value = "" || !RegExMatch(value, "^\d+$") {
+        throw Error(Format("Invalid candidate box golden [{}] {}: {}", section, key, value))
+    }
+    return Integer(value)
 }
 
 TestOldWindowsFactorySelection(style) {
@@ -186,7 +225,7 @@ CreateFakeDirect2D(direct2d_count, hwnd) {
     return RabbitFakeDirect2D()
 }
 
-TestLegacyUpdateWithoutMeasurementWindow(style, context) {
+TestLegacyUpdateWithoutMeasurementWindow(style, context, golden) {
     local baseline := CountProcessGuiWindows()
     local candidate_box := 0
     local destroy_calls := { value: 0 }
@@ -217,9 +256,13 @@ TestLegacyUpdateWithoutMeasurementWindow(style, context) {
             candidate_box.Build(context, &width, &height)
         }
         local update_duration := A_TickCount - update_started_at
-        FileAppend(
-            Format("CHARACTERIZATION: legacy 20 calculated updates {}ms`n", update_duration),
-            "*"
+        AssertTrue(
+            update_duration < golden["legacy"]["update_duration_ms"],
+            Format(
+                "Legacy 20 calculated updates exceeded the {}ms golden: {}ms.",
+                golden["legacy"]["update_duration_ms"],
+                update_duration
+            )
         )
         AssertEqual(
             0,
@@ -659,7 +702,7 @@ TestModernFlowCandidateLayout(style) {
     }
 }
 
-TestBackendLifecycle(name, candidate_box, context, style) {
+TestBackendLifecycle(name, candidate_box, context, style, golden) {
     local first_width, first_height, second_width, second_height
     local updated_width, updated_height, restored_width, restored_height
     try {
@@ -668,8 +711,13 @@ TestBackendLifecycle(name, candidate_box, context, style) {
         candidate_box.Build(context, &first_width, &first_height)
         candidate_box.Build(context, &second_width, &second_height)
 
+        local golden_width := golden[name]["width"]
+        local golden_height := golden[name]["height"]
+
         AssertTrue(first_width > 0, name . " width must be positive.")
         AssertTrue(first_height > 0, name . " height must be positive.")
+        AssertEqual(golden_width, first_width, name . " width changed from the golden dimensions.")
+        AssertEqual(golden_height, first_height, name . " height changed from the golden dimensions.")
         AssertEqual(first_width, second_width, name . " width must be stable across repeated builds.")
         AssertEqual(first_height, second_height, name . " height must be stable across repeated builds.")
         AssertTrue(first_width >= style.min_width, name . " width must honor the configured minimum.")
@@ -698,7 +746,6 @@ TestBackendLifecycle(name, candidate_box, context, style) {
         candidate_box.Show(10, 10)
         candidate_box.Hide()
         candidate_box.Hide()
-        FileAppend(Format("CHARACTERIZATION: {} {}x{}`n", name, first_width, first_height), "*")
     } finally {
         candidate_box.Dispose()
     }
