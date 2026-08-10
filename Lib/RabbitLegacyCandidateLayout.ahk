@@ -24,19 +24,48 @@ class RabbitLegacyCandidateLayout {
         local max_width := 0
         local layout := {pre: 0, sel: 0, post: 0, rows: []}
 
-        if metrics.pre {
+        if HasProp(metrics, "preedit") {
+            local preedit_groups := RabbitGetPreeditGroups(presentation.preedit)
+            local x := margin_x
+            layout.preedit_segments := []
+            loop preedit_groups.Length {
+                local group := preedit_groups[A_Index]
+                local group_metrics := metrics.preedit[A_Index]
+                if A_Index == 2 {
+                    x += margin_x
+                }
+                loop group.segments.Length {
+                    local segment := group.segments[A_Index]
+                    local segment_metrics := group_metrics[A_Index]
+                    layout.preedit_segments.Push({
+                        x: x,
+                        y: y,
+                        w: segment_metrics.w,
+                        h: segment_metrics.h,
+                        text: segment.text,
+                        highlighted: group.highlighted,
+                        cursor: segment.cursor
+                    })
+                    preedit_height := max(preedit_height, segment_metrics.h)
+                    x += segment_metrics.w
+                }
+            }
+            if layout.preedit_segments.Length {
+                max_width := x - margin_x
+            }
+        } else if HasProp(metrics, "pre") && metrics.pre {
             layout.pre := {x: x, y: y, w: metrics.pre.w, h: metrics.pre.h}
             x += metrics.pre.w + margin_x
             preedit_height := max(preedit_height, metrics.pre.h)
             max_width += metrics.pre.w + margin_x
         }
-        if metrics.sel {
+        if HasProp(metrics, "sel") && metrics.sel {
             layout.sel := {x: x, y: y, w: metrics.sel.w, h: metrics.sel.h}
             x += metrics.sel.w + margin_x
             preedit_height := max(preedit_height, metrics.sel.h)
             max_width += metrics.sel.w + margin_x
         }
-        if metrics.post {
+        if HasProp(metrics, "post") && metrics.post {
             layout.post := {x: x, y: y, w: metrics.post.w, h: metrics.post.h}
             preedit_height := max(preedit_height, metrics.post.h)
             max_width += metrics.post.w

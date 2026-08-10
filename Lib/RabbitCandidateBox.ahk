@@ -121,12 +121,11 @@ class CandidateBox {
             this.BuildFlow(presentation, &win_w, &win_h, max_width)
             return
         }
-        this.BuildVertical(presentation, &win_w, &win_h)
+        this.BuildStacked(presentation, &win_w, &win_h)
     }
 
-    BuildVertical(presentation, &win_w, &win_h) { ; build text layout
-        local base_x, base_y, preedit_0, preedit_1, preedit_2, preedit_1_x
-        local preedit_2_x, max_row_width
+    BuildStacked(presentation, &win_w, &win_h) { ; build text layout
+        local base_x, base_y, max_row_width
         local total_rows_height, label_box, candidate_box
         local comment_text, comment_box, row_rect, increment, label_width, candidate_width, comment, comment_gap
         this.num_candidates := presentation.candidates.Length
@@ -136,29 +135,7 @@ class CandidateBox {
         ; Build preedit layout
         base_x := this.borderWidth + this.padding
         base_y := this.borderWidth + this.lineSpacing
-        preedit_0 := this.GetTextMetrics(presentation.preedit.before_selection, this.mainFont)
-        preedit_1 := this.GetTextMetrics(presentation.preedit.selected, this.mainFont)
-        preedit_2 := this.GetTextMetrics(presentation.preedit.after_selection, this.mainFont)
-        preedit_1_x := base_x + preedit_0.w + this.padding
-        preedit_2_x := preedit_1_x + preedit_1.w
-        this.preeditLayout := {
-            selBox: {
-                x: base_x, y: base_y, w: preedit_0.w, h: preedit_0.h,
-                text: presentation.preedit.before_selection
-            },
-            hlSelBox: {
-                x: preedit_1_x, y: base_y, w: preedit_1.w, h: preedit_1.h,
-                text: presentation.preedit.selected
-            },
-            hlUnSelBox: {
-                x: preedit_2_x, y: base_y, w: preedit_2.w, h: preedit_2.h,
-                text: presentation.preedit.after_selection
-            },
-            left: base_x,
-            top: base_y,
-            width: preedit_0.w + this.padding + preedit_1.w + preedit_2.w,
-            height: Max(preedit_0.h, preedit_1.h, preedit_2.h)
-        }
+        this.preeditLayout := this.BuildPreeditLayout(presentation, base_x, base_y)
         max_row_width := this.preeditLayout.width
 
         ; Build candidates layout
@@ -224,16 +201,68 @@ class CandidateBox {
         }
     }
 
+    BuildPreeditLayout(presentation, base_x, base_y) {
+        local groups := RabbitGetPreeditGroups(presentation.preedit)
+        local x := base_x
+        local height := 0
+        local selected_x := 0
+        local selected_width := 0
+        local selected_height := 0
+        local layout := {
+            segments: [],
+            selectedBox: 0,
+            left: base_x,
+            top: base_y,
+            width: 0,
+            height: 0
+        }
+
+        for group_index, group in groups {
+            if group_index == 2 || group_index == 3 {
+                x += this.padding
+            }
+            for segment in group.segments {
+                local metrics := this.GetTextMetrics(segment.text, this.mainFont)
+                layout.segments.Push({
+                    x: x,
+                    y: base_y,
+                    w: metrics.w,
+                    h: metrics.h,
+                    text: segment.text,
+                    highlighted: group.highlighted,
+                    cursor: segment.cursor
+                })
+                if group.highlighted {
+                    if !selected_width {
+                        selected_x := x
+                    }
+                    selected_width += metrics.w
+                    selected_height := Max(selected_height, metrics.h)
+                }
+                height := Max(height, metrics.h)
+                x += metrics.w
+            }
+        }
+
+        if selected_width {
+            layout.selectedBox := {
+                x: selected_x,
+                y: base_y,
+                w: selected_width,
+                h: selected_height
+            }
+        }
+        layout.width := x - base_x
+        layout.height := height
+        return layout
+    }
+
     BuildFlow(presentation, &win_w, &win_h, max_width) {
         local base_x := this.borderWidth + this.padding
         local base_y := this.borderWidth + this.lineSpacing
-        local preedit_0 := this.GetTextMetrics(presentation.preedit.before_selection, this.mainFont)
-        local preedit_1 := this.GetTextMetrics(presentation.preedit.selected, this.mainFont)
-        local preedit_2 := this.GetTextMetrics(presentation.preedit.after_selection, this.mainFont)
-        local preedit_1_x := base_x + preedit_0.w + this.padding
-        local preedit_2_x := preedit_1_x + preedit_1.w
-        local preedit_width := preedit_0.w + this.padding + preedit_1.w + preedit_2.w
-        local preedit_height := Max(preedit_0.h, preedit_1.h, preedit_2.h)
+        local preedit_layout := this.BuildPreeditLayout(presentation, base_x, base_y)
+        local preedit_width := preedit_layout.width
+        local preedit_height := preedit_layout.height
         local page_size := presentation.flow_page_size
         local max_row_width := preedit_width
         local available_width := max_width ? Max(1, max_width - (this.borderWidth + this.padding) * 2) : 0
@@ -248,24 +277,7 @@ class CandidateBox {
         this.num_candidates := presentation.candidates.Length
         this.hilited_index := 0
         this.candidateHighlights := []
-        this.preeditLayout := {
-            selBox: {
-                x: base_x, y: base_y, w: preedit_0.w, h: preedit_0.h,
-                text: presentation.preedit.before_selection
-            },
-            hlSelBox: {
-                x: preedit_1_x, y: base_y, w: preedit_1.w, h: preedit_1.h,
-                text: presentation.preedit.selected
-            },
-            hlUnSelBox: {
-                x: preedit_2_x, y: base_y, w: preedit_2.w, h: preedit_2.h,
-                text: presentation.preedit.after_selection
-            },
-            left: base_x,
-            top: base_y,
-            width: preedit_width,
-            height: preedit_height
-        }
+        this.preeditLayout := preedit_layout
         this.candidatesLayout := { labels: [], cands: [], comments: [], rows: [] }
         base_y += preedit_height + this.lineSpacing
 
@@ -427,6 +439,7 @@ class CandidateBox {
     Show(x, y) {
         local background_x, background_y, background_width, background_height, background_radius, highlight_width
         local row_rect, label_color, candidate_color, comment_color, label, cand, comment
+        local segment, selected_box
         this.AssertNotDisposed()
         if !this.built {
             throw Error("Candidate box must be built before it is shown.")
@@ -448,16 +461,23 @@ class CandidateBox {
         }
 
         ; Draw preedit
-        if this.preeditLayout.hlSelBox.text {
+        if (selected_box := this.preeditLayout.selectedBox) {
             ; highlight background for preedit selection
             this.d2d.FillRoundedRectangle(
-                this.preeditLayout.hlSelBox.x, this.preeditLayout.hlSelBox.y,
-                this.preeditLayout.hlSelBox.w, this.preeditLayout.hlSelBox.h,
+                selected_box.x, selected_box.y,
+                selected_box.w, selected_box.h,
                 this.hlCornerR, this.hlCornerR, this.hlBgColor)
         }
-        this.d2d.DrawText(this.preeditLayout.selBox.text, this.preeditLayout.selBox.x, this.preeditLayout.selBox.y, this.mainFont.size, this.textColor, this.mainFont.name)
-        this.d2d.DrawText(this.preeditLayout.hlSelBox.text, this.preeditLayout.hlSelBox.x, this.preeditLayout.hlSelBox.y, this.mainFont.size, this.hlTxtColor, this.mainFont.name)
-        this.d2d.DrawText(this.preeditLayout.hlUnSelBox.text, this.preeditLayout.hlUnSelBox.x, this.preeditLayout.hlUnSelBox.y, this.mainFont.size, this.textColor, this.mainFont.name)
+        for segment in this.preeditLayout.segments {
+            this.d2d.DrawText(
+                segment.text,
+                segment.x,
+                segment.y,
+                this.mainFont.size,
+                segment.highlighted ? this.hlTxtColor : this.textColor,
+                this.mainFont.name
+            )
+        }
 
         highlight_width := this.boxWidth - this.borderWidth * 2 - this.padding * 2
         ; Draw candidates

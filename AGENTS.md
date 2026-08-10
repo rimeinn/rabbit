@@ -40,6 +40,8 @@ Match surrounding YAML indentation and comments. No formatter or linter is curre
 
 There is no CI-enforced coverage threshold. Run focused tests directly or use the unit test runner. Always use `/ErrorStdOut` for startup and load diagnostics, but do not treat it as an exception boundary: each test body must run through `RunTest`, which catches callback exceptions and prints the test name, error, location, and stack to standard output. Test scripts use explicit relative includes and must remain runnable without a root-level test launcher.
 
+AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. When running or testing an AutoHotkey script, wrap the top-level startup or test entry point in `try/catch` and explicitly report the exception details. `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for this top-level exception boundary.
+
 ```powershell
 AutoHotkey.exe /ErrorStdOut tests\unit\RabbitTests.ahk
 ```

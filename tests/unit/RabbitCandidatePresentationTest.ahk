@@ -36,7 +36,10 @@ TestUtf8CandidatePresentation() {
 
     AssertEqual("输", presentation.preedit.before_selection, "UTF-8 text before selection is incorrect.")
     AssertEqual("入", presentation.preedit.selected, "UTF-8 selected text is incorrect.")
-    AssertEqual("‸法", presentation.preedit.after_selection, "UTF-8 text after selection is incorrect.")
+    AssertEqual("法", presentation.preedit.after_selection, "UTF-8 text after selection is incorrect.")
+    AssertEqual("‸", presentation.preedit.cursor.text, "The cursor text is incorrect.")
+    AssertEqual("after_selection", presentation.preedit.cursor.segment, "The cursor segment is incorrect.")
+    AssertEqual(0, presentation.preedit.cursor.offset, "The cursor offset is incorrect.")
 }
 
 TestCandidateLabelFallbackPresentation() {
@@ -67,6 +70,7 @@ TestEmptyCandidatePresentation() {
     AssertEqual("", presentation.preedit.before_selection, "Empty preedit text is incorrect.")
     AssertEqual("", presentation.preedit.selected, "Empty selected text is incorrect.")
     AssertEqual("", presentation.preedit.after_selection, "Empty post-selection text is incorrect.")
+    AssertEqual(0, presentation.preedit.cursor, "Empty preedit text must not create a cursor segment.")
     AssertEqual(0, presentation.candidates.Length, "An empty menu must produce no candidate rows.")
 }
 

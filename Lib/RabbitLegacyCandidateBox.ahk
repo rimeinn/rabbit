@@ -58,6 +58,7 @@ class LegacyCandidateBox {
     }
 
     UpdateStyle(style) {
+        local segment_index, group, segment
         this.AssertNotDisposed()
         this.style := style
         ; Alpha is not supported.
@@ -104,14 +105,13 @@ class LegacyCandidateBox {
             this.gui.MarginX := style.margin_x
             this.gui.MarginY := style.margin_y
 
-            if HasProp(this.gui, "pre") && this.gui.pre {
-                this.gui.pre.Opt(this.base_opt)
-            }
-            if HasProp(this.gui, "sel") && this.gui.sel {
-                this.gui.sel.Opt(this.hilited_opt)
-            }
-            if HasProp(this.gui, "post") && this.gui.post {
-                this.gui.post.Opt(this.base_opt)
+            segment_index := 0
+            for group in this.gui.preedit_groups {
+                for segment in group.segments {
+                    segment_index += 1
+                    this.gui["P" . segment_index].Opt(
+                        group.highlighted ? this.hilited_opt : this.base_opt)
+                }
             }
         }
     }
@@ -170,6 +170,8 @@ class LegacyCandidateBox {
             this.MarginX := this.owner.style.margin_x
             this.MarginY := this.owner.style.margin_y
             this.num_candidates := 0
+            this.preedit_segment_count := 0
+            this.preedit_visible_count := 0
             this.has_comment := false
             this.max_width := 0
             this.max_height := 0
@@ -186,9 +188,7 @@ class LegacyCandidateBox {
             this.ApplyControlFonts()
             layout := this.CalculateLayout(presentation)
 
-            this.ApplyPreeditLayout("pre", presentation.preedit.before_selection, layout.pre)
-            this.ApplyPreeditLayout("sel", presentation.preedit.selected, layout.sel)
-            this.ApplyPreeditLayout("post", presentation.preedit.after_selection, layout.post)
+            this.ApplyPreeditLayout(layout)
 
             loop this.num_candidates {
                 if A_Index > num_candidates {
@@ -237,21 +237,38 @@ class LegacyCandidateBox {
 
         EnsureControls(presentation) {
             local num_candidates := presentation.candidates.Length
-            local pre := presentation.preedit.before_selection
-            local sel := presentation.preedit.selected
-            local post := presentation.preedit.after_selection
-            if pre && (!HasProp(this, "pre") || !this.pre) {
-                this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
-                this.pre := this.AddText(Format("x0 y0 {}", this.owner.border), pre)
+            local groups := RabbitGetPreeditGroups(presentation.preedit)
+            local segment_index := 0
+            this.preedit_groups := groups
+            this.preedit_visible_count := 0
+            this.pre := 0
+            this.sel := 0
+            this.post := 0
+            for group in groups {
+                for segment in group.segments {
+                    segment_index += 1
+                    this.preedit_visible_count := segment_index
+                    local name := "P" . segment_index
+                    if !HasProp(this, name) || !this.%name% {
+                        this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
+                        this.%name% := this.AddText(
+                            Format("x0 y0 {} v{}", this.owner.border, name), segment.text)
+                    }
+                    if group.name = "before_selection" && !this.pre {
+                        this.pre := this.%name%
+                    } else if group.name = "selected" && !this.sel {
+                        this.sel := this.%name%
+                    } else if group.name = "after_selection" && !this.post {
+                        this.post := this.%name%
+                    }
+                }
             }
-            if sel && (!HasProp(this, "sel") || !this.sel) {
-                this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
-                this.sel := this.AddText(Format("x0 y0 {}", this.owner.border), sel)
+            loop this.preedit_segment_count {
+                if A_Index > this.preedit_visible_count {
+                    this["P" . A_Index].Visible := false
+                }
             }
-            if post && (!HasProp(this, "post") || !this.post) {
-                this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
-                this.post := this.AddText(Format("x0 y0 {}", this.owner.border), post)
-            }
+            this.preedit_segment_count := Max(this.preedit_segment_count, this.preedit_visible_count)
 
             if num_candidates <= this.num_candidates {
                 return
@@ -271,14 +288,9 @@ class LegacyCandidateBox {
         }
 
         ApplyControlFonts() {
-            if HasProp(this, "pre") && this.pre {
-                this.pre.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
-            }
-            if HasProp(this, "sel") && this.sel {
-                this.sel.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
-            }
-            if HasProp(this, "post") && this.post {
-                this.post.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
+            loop this.preedit_segment_count {
+                this["P" . A_Index].SetFont(
+                    this.owner.base_font_opt, this.owner.style.font_face)
             }
             loop this.num_candidates {
                 this["L" . A_Index].SetFont(
@@ -290,18 +302,18 @@ class LegacyCandidateBox {
             }
         }
 
-        ApplyPreeditLayout(name, text, layout) {
-            if !text {
-                if HasProp(this, name) && this.%name% {
-                    this.%name%.Visible := false
-                }
-                return
+        ApplyPreeditLayout(layout) {
+            loop this.preedit_segment_count {
+                this["P" . A_Index].Visible := false
             }
-            local control := this.%name%
-            control.Value := text
-            control.Move(layout.x, layout.y, layout.w, layout.h)
-            control.Opt(name == "sel" ? this.owner.hilited_opt : this.owner.base_opt)
-            control.Visible := true
+            loop layout.preedit_segments.Length {
+                local segment := layout.preedit_segments[A_Index]
+                local control := this["P" . A_Index]
+                control.Value := segment.text
+                control.Move(segment.x, segment.y, segment.w, segment.h)
+                control.Opt(segment.highlighted ? this.owner.hilited_opt : this.owner.base_opt)
+                control.Visible := true
+            }
         }
 
         CalculateLayout(presentation) {
@@ -317,19 +329,17 @@ class LegacyCandidateBox {
         }
 
         CalculateLayoutWithDC(presentation, hdc) {
-            local pre := presentation.preedit.before_selection
-            local sel := presentation.preedit.selected
-            local post := presentation.preedit.after_selection
-            local metrics := {pre: 0, sel: 0, post: 0, rows: []}
-
-            if pre {
-                metrics.pre := this.MeasureText(hdc, pre, this.pre)
-            }
-            if sel {
-                metrics.sel := this.MeasureText(hdc, sel, this.sel)
-            }
-            if post {
-                metrics.post := this.MeasureText(hdc, post, this.post)
+            local preedit_metrics := []
+            local segment_index := 0
+            local metrics := {preedit: preedit_metrics, rows: []}
+            for group in this.preedit_groups {
+                local group_metrics := []
+                for segment in group.segments {
+                    segment_index += 1
+                    group_metrics.Push(this.MeasureText(
+                        hdc, segment.text, this["P" . segment_index]))
+                }
+                preedit_metrics.Push(group_metrics)
             }
 
             loop presentation.candidates.Length {

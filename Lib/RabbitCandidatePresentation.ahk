@@ -18,15 +18,16 @@
 
 class RabbitCandidatePresentation {
     __New(context, label_format) {
-        local before_selection, selected, after_selection
+        local before_selection, selected, after_selection, cursor
         local menu := context.menu
         local candidates := menu.candidates
         RabbitGetCompositionText(
-            context.composition, &before_selection, &selected, &after_selection)
+            context.composition, &before_selection, &selected, &after_selection, &cursor)
         this.preedit := {
             before_selection: before_selection,
             selected: selected,
-            after_selection: after_selection
+            after_selection: after_selection,
+            cursor: cursor
         }
         this.highlighted_index := menu.highlighted_candidate_index + 1
         this.candidates := []
@@ -58,48 +59,43 @@ class RabbitCandidatePresentation {
     }
 }
 
-RabbitGetCompositionText(composition, &pre_selected, &selected, &post_selected) {
-    local preedit, byte
+RabbitGetCompositionText(composition, &pre_selected, &selected, &post_selected, &cursor) {
+    local preedit
     pre_selected := ""
     selected := ""
     post_selected := ""
+    cursor := 0
     if !(preedit := composition.preedit) {
         return false
     }
     static cursor_text := "‸" ; Alternative cursor: 𝙸
-    static cursor_size := StrPut(cursor_text, "UTF-8") - 1 ; Do not count the trailing null terminator.
 
     local preedit_length := StrPut(preedit, "UTF-8")
     local selected_start := composition.sel_start
     local selected_end := composition.sel_end
 
-    local preedit_buffer ; insert caret text into preedit text if applicable
-    if 0 <= composition.cursor_pos && composition.cursor_pos <= preedit_length {
-        preedit_buffer := Buffer(preedit_length + cursor_size, 0)
-        local temp_preedit := Buffer(preedit_length, 0)
-        StrPut(preedit, temp_preedit, "UTF-8")
-        local src := temp_preedit.Ptr
-        local tgt := preedit_buffer.Ptr
-        Loop composition.cursor_pos {
-            byte := NumGet(src, A_Index - 1, "Char")
-            NumPut("Char", byte, tgt, A_Index - 1)
+    local cursor_pos := composition.cursor_pos
+    if 0 <= cursor_pos && cursor_pos <= preedit_length {
+        cursor := {text: cursor_text}
+        if 0 <= selected_start && selected_start < selected_end && selected_end <= preedit_length {
+            if cursor_pos <= selected_start {
+                cursor.segment := "before_selection"
+                cursor.offset := cursor_pos
+            } else if cursor_pos < selected_end {
+                cursor.segment := "selected"
+                cursor.offset := cursor_pos - selected_start
+            } else {
+                cursor.segment := "after_selection"
+                cursor.offset := cursor_pos - selected_end
+            }
+        } else {
+            cursor.segment := "before_selection"
+            cursor.offset := cursor_pos
         }
-        src := src + composition.cursor_pos
-        tgt := tgt + composition.cursor_pos
-        StrPut(cursor_text, tgt, "UTF-8")
-        tgt := tgt + cursor_size
-        Loop preedit_length - composition.cursor_pos {
-            byte := NumGet(src, A_Index - 1, "Char")
-            NumPut("Char", byte, tgt, A_Index - 1)
-        }
-        preedit_length := preedit_length + cursor_size
-        if selected_start >= composition.cursor_pos {
-            selected_start := selected_start + cursor_size
-        }
-        if selected_end > composition.cursor_pos {
-            selected_end := selected_end + cursor_size
-        }
-    } else {
+    }
+
+    local preedit_buffer
+    {
         preedit_buffer := Buffer(preedit_length, 0)
         StrPut(preedit, preedit_buffer, "UTF-8")
     }
@@ -113,4 +109,44 @@ RabbitGetCompositionText(composition, &pre_selected, &selected, &post_selected) 
         pre_selected := StrGet(preedit_buffer, "UTF-8")
         return false
     }
+}
+
+RabbitGetPreeditGroups(preedit) {
+    local groups := []
+    local names := ["before_selection", "selected", "after_selection"]
+    local index := 0
+    local cursor := preedit.cursor
+
+    for name in names {
+        index += 1
+        local text := preedit.%name%
+        local group := {
+            name: name,
+            highlighted: index == 2,
+            segments: []
+        }
+        if cursor && cursor.segment = name {
+            local before_cursor, after_cursor
+            RabbitSplitUtf8Text(text, cursor.offset, &before_cursor, &after_cursor)
+            if before_cursor {
+                group.segments.Push({text: before_cursor, cursor: false})
+            }
+            group.segments.Push({text: cursor.text, cursor: true})
+            if after_cursor {
+                group.segments.Push({text: after_cursor, cursor: false})
+            }
+        } else if text {
+            group.segments.Push({text: text, cursor: false})
+        }
+        groups.Push(group)
+    }
+    return groups
+}
+
+RabbitSplitUtf8Text(text, byte_offset, &before, &after) {
+    local buffer_length := StrPut(text, "UTF-8")
+    local text_buffer := Buffer(buffer_length, 0)
+    StrPut(text, text_buffer, "UTF-8")
+    before := byte_offset > 0 ? StrGet(text_buffer, byte_offset, "UTF-8") : ""
+    after := StrGet(text_buffer.Ptr + byte_offset, "UTF-8")
 }
