@@ -24,10 +24,12 @@ RunTest("themed status tip renders icons and text", TestStatusTipRendersContent.
 
 TestStatusTipRendersContent() {
     local d2d := RabbitStatusTipDirect2DProbe(0)
+    local layered_window := RabbitStatusTipLayeredWindowProbe(0)
     local tip := RabbitStatusTipProbe(
         RabbitUIStyleSnapshot(),
         RabbitConfigSnapshot(Map("show_tips_time", 1000)),
-        (*) => d2d
+        (*) => d2d,
+        (*) => layered_window
     )
     try {
         tip.Show("西", A_ScriptDir . "\..\..\Lib\rabbit-ascii.ico")
@@ -38,6 +40,7 @@ TestStatusTipRendersContent() {
         AssertEqual(0, d2d.source_rect, "The status tip cropped its icon instead of scaling the full image.")
         AssertEqual(1, d2d.text_calls, "The status tip did not render its label.")
         AssertTrue(tip.box_width > 0 && tip.box_height > 0, "The status tip did not build a valid layout.")
+        AssertEqual(1, layered_window.update_calls, "The status tip did not submit its layered surface.")
     } finally {
         tip.Dispose()
     }
@@ -67,6 +70,9 @@ class RabbitStatusTipDirect2DProbe {
 
     GetDesktopDpiScale() {
         return 1
+    }
+
+    SetRenderTarget(target, width, height) {
     }
 
     GetMetrics(text, font_name, font_size) {
@@ -106,10 +112,27 @@ class RabbitStatusTipRenderTargetProbe {
         this.owner := owner
     }
 
+    GetWICBitmap() {
+        return 1
+    }
+
     DrawBitmap(bitmap, destination, opacity := 1, interpolation := 1, source := 0) {
         this.owner.scaled_image_calls++
         this.owner.scaled_image_width := NumGet(destination, 8, "Float") - NumGet(destination, 0, "Float")
         this.owner.scaled_image_height := NumGet(destination, 12, "Float") - NumGet(destination, 4, "Float")
         this.owner.source_rect := source
+    }
+}
+
+class RabbitStatusTipLayeredWindowProbe {
+    __New(hwnd) {
+        this.update_calls := 0
+    }
+
+    Update(wic_bitmap, width, height, x, y) {
+        this.update_calls++
+    }
+
+    Dispose() {
     }
 }

@@ -220,7 +220,7 @@ CreateLegacyCandidate(legacy_count, style) {
     return LegacyCandidateBox(style)
 }
 
-CreateFakeDirect2D(direct2d_count, hwnd) {
+CreateFakeDirect2D(direct2d_count, target := 0, parameters*) {
     direct2d_count.value++
     return RabbitFakeDirect2D()
 }
@@ -784,7 +784,7 @@ TestPartialConstructionCleanup(style) {
         "Legacy construction failure must dispose partial resources once.")
 }
 
-ThrowDirect2D(hwnd) {
+ThrowDirect2D(parameters*) {
     throw Error("Injected Direct2D construction failure.")
 }
 

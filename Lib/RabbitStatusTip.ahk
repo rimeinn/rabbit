@@ -19,12 +19,17 @@
 #Include RabbitCaret.ahk
 #Include RabbitPopupPlacement.ahk
 #Include RabbitUIStyleSnapshot.ahk
+#Include RabbitLayeredWindow.ahk
 #Include Direct2D/Direct2D.ahk
 
 class RabbitStatusTip {
-    __New(style, config, d2d_constructor := Direct2D) {
+    __New(style, config, d2d_constructor := Direct2D, layered_window_constructor := RabbitLayeredWindow) {
         this.gui := 0
         this.d2d := 0
+        this.d2d_constructor := d2d_constructor
+        this.layered_window := 0
+        this.render_width := 0
+        this.render_height := 0
         this.visible := false
         this.disposed := false
         this.config := config
@@ -32,7 +37,8 @@ class RabbitStatusTip {
         try {
             ; WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
             this.gui := Gui("-Caption -DPIScale +E0x80800A8")
-            this.d2d := d2d_constructor.Call(this.gui.Hwnd)
+            this.d2d := this.CreateRenderTarget(1, 1)
+            this.layered_window := layered_window_constructor.Call(this.gui.Hwnd)
             this.dpi_scale := this.d2d.GetDesktopDpiScale()
             this.UpdateStyle(style)
         } catch as error {
@@ -51,6 +57,7 @@ class RabbitStatusTip {
         }
         SetTimer(this.hide_callback, 0)
         this.Hide()
+        this.layered_window := 0
         this.d2d := 0
         if this.gui {
             this.gui.Destroy()
@@ -102,14 +109,21 @@ class RabbitStatusTip {
                 this.box_height,
                 monitor_info
             )
+        this.EnsureRenderTarget()
+        this.d2d.BeginDraw()
+        this.Draw()
+        this.d2d.EndDraw()
+        this.layered_window.Update(
+            this.d2d.ID2D1RenderTarget.GetWICBitmap(),
+            this.box_width,
+            this.box_height,
+            position.x,
+            position.y
+        )
         if !this.visible {
             this.gui.Show("NA")
             this.visible := true
         }
-        this.d2d.SetPosition(position.x, position.y, this.box_width, this.box_height)
-        this.d2d.BeginDraw()
-        this.Draw()
-        this.d2d.EndDraw()
         SetTimer(this.hide_callback, 0)
         SetTimer(this.hide_callback, -this.config.show_tips_time)
     }
@@ -118,9 +132,26 @@ class RabbitStatusTip {
         if this.disposed || !this.visible {
             return
         }
-        this.d2d.Clear()
         this.gui.Hide()
         this.visible := false
+    }
+
+    EnsureRenderTarget() {
+        if this.render_width = this.box_width && this.render_height = this.box_height {
+            return
+        }
+        this.d2d := 0
+        this.d2d := this.CreateRenderTarget(this.box_width, this.box_height)
+        this.render_width := this.box_width
+        this.render_height := this.box_height
+    }
+
+    CreateRenderTarget(width, height) {
+        local d2d := this.d2d_constructor.Call()
+        if HasMethod(d2d, "SetRenderTarget") {
+            d2d.SetRenderTarget("wic", width, height)
+        }
+        return d2d
     }
 
     GetAnchor() {

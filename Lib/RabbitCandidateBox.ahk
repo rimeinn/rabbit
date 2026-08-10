@@ -20,6 +20,7 @@
 #Include RabbitUIStyleSnapshot.ahk
 #Include RabbitCandidateBoxCommon.ahk
 #Include RabbitCandidatePresentation.ahk
+#Include RabbitLayeredWindow.ahk
 #Include Direct2D/Direct2D.ahk
 
 class CandidateBox {
@@ -28,6 +29,10 @@ class CandidateBox {
     __New(style, d2d_constructor := Direct2D) {
         this.gui := 0
         this.d2d := 0
+        this.d2d_constructor := d2d_constructor
+        this.layered_window := 0
+        this.render_width := 0
+        this.render_height := 0
         this.built := false
         this.visible := false
         this.disposed := false
@@ -35,7 +40,8 @@ class CandidateBox {
         try {
             ; +E0x8080088: WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
             this.gui := Gui("-Caption -DPIScale +E0x8080088")
-            this.d2d := d2d_constructor.Call(this.gui.Hwnd)
+            this.d2d := this.CreateRenderTarget(1, 1)
+            this.layered_window := RabbitLayeredWindow(this.gui.Hwnd)
             this.dpiScale := this.d2d.GetDesktopDpiScale()
             this.UpdateStyle(style)
         } catch as error {
@@ -53,6 +59,7 @@ class CandidateBox {
             return
         }
         this.Hide()
+        this.layered_window := 0
         this.d2d := 0
         if this.gui {
             this.gui.Destroy()
@@ -424,12 +431,7 @@ class CandidateBox {
         if !this.built {
             throw Error("Candidate box must be built before it is shown.")
         }
-        if !this.visible {
-            this.gui.Show("NA")
-            this.visible := true
-        }
-
-        this.d2d.SetPosition(x, y, this.boxWidth, this.boxHeight)
+        this.EnsureRenderTarget()
         this.d2d.BeginDraw()
 
         if this.borderWidth > 0 {
@@ -492,6 +494,17 @@ class CandidateBox {
         }
 
         this.d2d.EndDraw()
+        this.layered_window.Update(
+            this.d2d.ID2D1RenderTarget.GetWICBitmap(),
+            this.boxWidth,
+            this.boxHeight,
+            x,
+            y
+        )
+        if !this.visible {
+            this.gui.Show("NA")
+            this.visible := true
+        }
     }
 
     Hide() {
@@ -499,11 +512,27 @@ class CandidateBox {
             return
         }
         if this.visible {
-            this.d2d.EndDraw()
-            this.d2d.Clear()
             this.gui.Hide()
             this.visible := false
         }
+    }
+
+    EnsureRenderTarget() {
+        if this.render_width = this.boxWidth && this.render_height = this.boxHeight {
+            return
+        }
+        this.d2d := 0
+        this.d2d := this.CreateRenderTarget(this.boxWidth, this.boxHeight)
+        this.render_width := this.boxWidth
+        this.render_height := this.boxHeight
+    }
+
+    CreateRenderTarget(width, height) {
+        local d2d := this.d2d_constructor.Call()
+        if HasMethod(d2d, "SetRenderTarget") {
+            d2d.SetRenderTarget("wic", width, height)
+        }
+        return d2d
     }
 
     AssertNotDisposed() {
