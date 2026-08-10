@@ -108,6 +108,30 @@ class RabbitInputController {
             )
         }
 
+        ; Other keys only need shifted variants when the corresponding
+        ; standalone Shift key is intercepted by Rabbit. Otherwise the target
+        ; application can handle the native combination itself.
+        local has_lshift := this.registered_hotkey_names.Has("$LShift")
+            || this.registered_hotkey_names.Has("$~LShift")
+        local has_rshift := this.registered_hotkey_names.Has("$RShift")
+            || this.registered_hotkey_names.Has("$~RShift")
+        for key, _ in KeyDef.other_keycode {
+            if has_lshift {
+                this.RegisterHotKey(
+                    "$<+" . key,
+                    this.ProcessTextKey.Bind(this, key, shift),
+                    "S0"
+                )
+            }
+            if has_rshift {
+                this.RegisterHotKey(
+                    "$>+" . key,
+                    this.ProcessTextKey.Bind(this, key, shift),
+                    "S0"
+                )
+            }
+        }
+
         ; Special handling
         this.RegisterHotKey(
             "$Space Up",

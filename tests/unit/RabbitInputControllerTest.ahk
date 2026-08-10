@@ -44,6 +44,14 @@ TestInputHotkeyOwnership() {
         ArrayContains(input.registered_hotkeys, "$^!Space"),
         "The suspend hotkey was not registered before its options were updated."
     )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$<+Enter"),
+        "A left Shift combination was registered without a standalone Shift binding."
+    )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$>+Enter"),
+        "A right Shift combination was registered without a standalone Shift binding."
+    )
     AssertTrue(input.registered_hotkeys.Length > 0, "The input owner did not record its hotkeys.")
     input.Dispose()
     input.Dispose()
@@ -123,7 +131,37 @@ TestConfiguredInputHotkeySelection() {
         ArrayContains(input.registered_hotkeys, "$~LShift Up"),
         "An ASCII-only standalone modifier key-up was not registered for immediate pass-through."
     )
+    AssertTrue(
+        ArrayContains(input.registered_hotkeys, "$<+Enter"),
+        "An ASCII-only left Shift combination was not registered."
+    )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$>+Enter"),
+        "A right Shift combination was registered without a right standalone Shift binding."
+    )
     input.Dispose()
+
+    local right_ascii_only := RabbitInputHotkeys()
+    right_ascii_only.AddBinding("Shift_R", "ascii")
+    right_ascii_only.Finalize()
+    local right_input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(Map("input_hotkeys", right_ascii_only)),
+        {},
+        {}
+    )
+    right_input.RegisterHotKeys()
+    AssertTrue(
+        ArrayContains(right_input.registered_hotkeys, "$>+Enter"),
+        "An ASCII-only right Shift combination was not registered."
+    )
+    AssertTrue(
+        !ArrayContains(right_input.registered_hotkeys, "$<+Enter"),
+        "A left Shift combination was registered without a left standalone Shift binding."
+    )
+    right_input.Dispose()
 }
 
 TestNoopAsciiSwitchKeyIsIgnored() {
