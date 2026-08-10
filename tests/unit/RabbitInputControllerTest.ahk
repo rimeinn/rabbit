@@ -52,6 +52,14 @@ TestInputHotkeyOwnership() {
         !ArrayContains(input.registered_hotkeys, "$>+Enter"),
         "A right Shift combination was registered without a standalone Shift binding."
     )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$<+^N"),
+        "A left Ctrl+Shift character combination was registered without a standalone Shift binding."
+    )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$>+^N"),
+        "A right Ctrl+Shift character combination was registered without a standalone Shift binding."
+    )
     AssertTrue(input.registered_hotkeys.Length > 0, "The input owner did not record its hotkeys.")
     input.Dispose()
     input.Dispose()
@@ -139,6 +147,22 @@ TestConfiguredInputHotkeySelection() {
         !ArrayContains(input.registered_hotkeys, "$>+Enter"),
         "A right Shift combination was registered without a right standalone Shift binding."
     )
+    AssertTrue(
+        ArrayContains(input.registered_hotkeys, "$<+^N"),
+        "An ASCII-only left Ctrl+Shift character combination was not registered."
+    )
+    AssertTrue(
+        ArrayContains(input.registered_hotkeys, "$<+^Tab"),
+        "An ASCII-only left Ctrl+Shift other-key combination was not registered."
+    )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$>+^N"),
+        "A right Ctrl+Shift character combination was registered without a right standalone Shift binding."
+    )
+    AssertTrue(
+        !ArrayContains(input.registered_hotkeys, "$>+^Tab"),
+        "A right Ctrl+Shift other-key combination was registered without a right standalone Shift binding."
+    )
     input.Dispose()
 
     local right_ascii_only := RabbitInputHotkeys()
@@ -160,6 +184,22 @@ TestConfiguredInputHotkeySelection() {
     AssertTrue(
         !ArrayContains(right_input.registered_hotkeys, "$<+Enter"),
         "A left Shift combination was registered without a left standalone Shift binding."
+    )
+    AssertTrue(
+        ArrayContains(right_input.registered_hotkeys, "$>+^N"),
+        "An ASCII-only right Ctrl+Shift character combination was not registered."
+    )
+    AssertTrue(
+        ArrayContains(right_input.registered_hotkeys, "$>+^Tab"),
+        "An ASCII-only right Ctrl+Shift other-key combination was not registered."
+    )
+    AssertTrue(
+        !ArrayContains(right_input.registered_hotkeys, "$<+^N"),
+        "A left Ctrl+Shift character combination was registered without a left standalone Shift binding."
+    )
+    AssertTrue(
+        !ArrayContains(right_input.registered_hotkeys, "$<+^Tab"),
+        "A left Ctrl+Shift other-key combination was registered without a left standalone Shift binding."
     )
     right_input.Dispose()
 }

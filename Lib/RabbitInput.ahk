@@ -93,6 +93,11 @@ class RabbitInputController {
             }
         }
 
+        local has_lshift := this.registered_hotkey_names.Has("$LShift")
+            || this.registered_hotkey_names.Has("$~LShift")
+        local has_rshift := this.registered_hotkey_names.Has("$RShift")
+            || this.registered_hotkey_names.Has("$~RShift")
+
         ; Shifted letters and symbols must remain registered even when no
         ; schema binding mentions them: they are required for normal text input.
         for key, _ in KeyDef.shifted_keycode {
@@ -106,20 +111,35 @@ class RabbitInputController {
                 this.ProcessTextKey.Bind(this, key, shift),
                 "S0"
             )
+            if has_lshift {
+                this.RegisterHotKey(
+                    "$<+^" . key,
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl),
+                    "S0"
+                )
+            }
+            if has_rshift {
+                this.RegisterHotKey(
+                    "$>+^" . key,
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl),
+                    "S0"
+                )
+            }
         }
 
         ; Other keys only need shifted variants when the corresponding
         ; standalone Shift key is intercepted by Rabbit. Otherwise the target
         ; application can handle the native combination itself.
-        local has_lshift := this.registered_hotkey_names.Has("$LShift")
-            || this.registered_hotkey_names.Has("$~LShift")
-        local has_rshift := this.registered_hotkey_names.Has("$RShift")
-            || this.registered_hotkey_names.Has("$~RShift")
         for key, _ in KeyDef.other_keycode {
             if has_lshift {
                 this.RegisterHotKey(
                     "$<+" . key,
                     this.ProcessTextKey.Bind(this, key, shift),
+                    "S0"
+                )
+                this.RegisterHotKey(
+                    "$<+^" . key,
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl),
                     "S0"
                 )
             }
@@ -129,8 +149,16 @@ class RabbitInputController {
                     this.ProcessTextKey.Bind(this, key, shift),
                     "S0"
                 )
+                this.RegisterHotKey(
+                    "$>+^" . key,
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl),
+                    "S0"
+                )
             }
         }
+
+        ; Alt+Shift and Ctrl+Alt+Shift variants are intentionally not
+        ; registered yet: they are uncommon and would broaden interception.
 
         ; Special handling
         this.RegisterHotKey(
