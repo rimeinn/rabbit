@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitCandidateViewport.ahk
 
 RunTest("flow viewport expands after page transition", TestFlowViewportExpansion.Bind())
+RunTest("flow viewport collapses when returning to first page", TestFlowViewportCollapse.Bind())
 RunTest("flow viewport centers the final page", TestFlowViewportFinalPage.Bind())
 RunTest("flow viewport falls back without iterator APIs", TestFlowViewportFallback.Bind())
 
@@ -39,6 +40,16 @@ TestFlowViewportExpansion() {
     AssertTrue(presentation.candidates[4].highlighted, "The current highlighted candidate was lost.")
     AssertTrue(!presentation.candidates[1].highlighted, "A preview candidate was highlighted.")
     AssertEqual(1, rime.end_calls, "The candidate iterator was not ended after preloading.")
+}
+
+TestFlowViewportCollapse() {
+    local rime := RabbitCandidateViewportRimeProbe(18)
+    local viewport := RabbitCandidateViewport()
+    viewport.Build(CreateViewportContext(0), "{}", "flow", 5, rime, 1)
+    viewport.Build(CreateViewportContext(1), "{}", "flow", 5, rime, 1)
+    local presentation := viewport.Build(CreateViewportContext(0), "{}", "flow", 5, rime, 1)
+
+    AssertEqual(3, presentation.candidates.Length, "Returning to the first page did not collapse the flow viewport.")
 }
 
 TestFlowViewportFinalPage() {

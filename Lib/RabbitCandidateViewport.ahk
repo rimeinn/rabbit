@@ -39,8 +39,12 @@ class RabbitCandidateViewport {
             return presentation
         }
         presentation.flow_page_size := page_size
-        if this.last_page_no >= 0 && page_no != this.last_page_no {
-            this.expanded := true
+        if this.last_page_no >= 0 {
+            if this.last_page_no == 1 && page_no == 0 {
+                this.expanded := false
+            } else if page_no != this.last_page_no {
+                this.expanded := true
+            }
         }
         this.last_page_no := page_no
         if !this.expanded || !rime_api || !session_id || !this.CanPreload(rime_api) {
