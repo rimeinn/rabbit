@@ -21,6 +21,7 @@
 #Include ..\..\Lib\RabbitStatusTip.ahk
 
 RunTest("themed status tip renders icons and text", TestStatusTipRendersContent.Bind())
+RunTest("vertical status tip keeps its icon upright", TestVerticalStatusTipRendersContent.Bind())
 
 TestStatusTipRendersContent() {
     local d2d := RabbitStatusTipDirect2DProbe(0)
@@ -46,6 +47,50 @@ TestStatusTipRendersContent() {
     }
 }
 
+TestVerticalStatusTipRendersContent() {
+    local d2d := RabbitStatusTipDirect2DProbe(0)
+    local layered_window := RabbitStatusTipLayeredWindowProbe(0)
+    local style := RabbitUIStyleSnapshot().With(Map(
+        "layout_type", "vertical_text",
+        "vertical_text_left_to_right", false
+    ))
+    local tip := RabbitStatusTipProbe(
+        style,
+        RabbitConfigSnapshot(Map("show_tips_time", 1000)),
+        (*) => d2d,
+        (*) => layered_window
+    )
+    try {
+        tip.Show("竖排文字", A_ScriptDir . "\..\..\Lib\rabbit-ascii.ico")
+        AssertEqual("竖排文字", tip.text, "The vertical status tip did not retain its label.")
+        AssertEqual(1, d2d.scaled_image_calls, "The vertical status tip did not render its icon.")
+        AssertEqual(tip.icon_size, d2d.scaled_image_width, "The vertical status tip changed its icon width.")
+        AssertEqual(tip.icon_size, d2d.scaled_image_height, "The vertical status tip changed its icon height.")
+        AssertEqual(0, d2d.source_rect, "The vertical status tip cropped its icon.")
+        AssertEqual(0, d2d.text_calls, "The vertical status tip used horizontal text rendering.")
+        AssertEqual(1, d2d.text_layout_calls, "The vertical status tip did not use a text layout.")
+        AssertEqual(
+            Direct2D.DWRITE_READING_DIRECTION_TOP_TO_BOTTOM,
+            d2d.text_layout_options.readingDirection,
+            "The vertical status tip used the wrong reading direction."
+        )
+        AssertEqual(
+            Direct2D.DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT,
+            d2d.text_layout_options.flowDirection,
+            "The vertical status tip used the wrong flow direction."
+        )
+        AssertTrue(tip.text_y > tip.icon_y, "The vertical status tip did not place text below its icon.")
+        AssertEqual(
+            tip.icon_x + tip.icon_size / 2,
+            tip.text_x + tip.text_metrics.w / 2,
+            "The vertical status tip did not center its icon and text in one column."
+        )
+        AssertTrue(tip.box_height > tip.box_width, "The vertical status tip did not build a vertical layout.")
+    } finally {
+        tip.Dispose()
+    }
+}
+
 class RabbitStatusTipProbe extends RabbitStatusTip {
     GetAnchor() {
         return {
@@ -64,6 +109,7 @@ class RabbitStatusTipDirect2DProbe {
         this.image_calls := 0
         this.scaled_image_calls := 0
         this.text_calls := 0
+        this.text_layout_calls := 0
         this.bmpDstRect := Buffer(16, 0)
         this.ID2D1RenderTarget := RabbitStatusTipRenderTargetProbe(this)
     }
@@ -75,7 +121,10 @@ class RabbitStatusTipDirect2DProbe {
     SetRenderTarget(target, width, height) {
     }
 
-    GetMetrics(text, font_name, font_size) {
+    GetMetrics(text, font_name, font_size, args*) {
+        if args.Length {
+            return { w: 20, h: StrLen(text) * 20 }
+        }
         return { w: StrLen(text) * 10, h: 20 }
     }
 
@@ -104,6 +153,11 @@ class RabbitStatusTipDirect2DProbe {
 
     DrawText(text, x, y, font_size, color, font_name) {
         this.text_calls++
+    }
+
+    DrawTextWithLayout(text, x, y, font_size, color, font_name, width, height, options) {
+        this.text_layout_calls++
+        this.text_layout_options := options
     }
 }
 

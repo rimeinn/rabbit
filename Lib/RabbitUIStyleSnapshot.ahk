@@ -39,7 +39,13 @@ class RabbitUIStyleSnapshot {
         this.margin_x := this.GetValue(overrides, "margin_x", this.GetValue(values, "margin_x", 6))
         this.margin_y := this.GetValue(overrides, "margin_y", this.GetValue(values, "margin_y", 6))
         this.min_width := this.GetValue(overrides, "min_width", this.GetValue(values, "min_width", 160))
+        this.min_height := this.GetValue(overrides, "min_height", this.GetValue(values, "min_height", 160))
         this.layout_type := this.GetValue(overrides, "layout_type", this.GetValue(values, "layout_type", "stacked"))
+        this.vertical_text_left_to_right := this.GetValue(
+            overrides,
+            "vertical_text_left_to_right",
+            this.GetValue(values, "vertical_text_left_to_right", false)
+        )
         this.flow_rows := this.GetValue(overrides, "flow_rows", this.GetValue(values, "flow_rows", 5))
         this.candidate_spacing := this.GetValue(
             overrides, "candidate_spacing", this.GetValue(values, "candidate_spacing", 6))
@@ -87,7 +93,8 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, cr, r, mx, my, w, flow_rows, candidate_spacing, layout_type, align_type
+        local fmt, cr, r, mx, my, w, h, vertical_text_left_to_right
+        local flow_rows, candidate_spacing, layout_type, align_type
         local selected_color_scheme, dark_color_scheme
         local values := Map()
 
@@ -139,11 +146,21 @@ class RabbitUIStyleSnapshot {
         if rime_api.config_test_get_int(config, "style/layout/min_width", &w) && w >= 0 {
             values["min_width"] := w
         }
+        if rime_api.config_test_get_int(config, "style/layout/min_height", &h) && h >= 0 {
+            values["min_height"] := h
+        }
         if rime_api.config_test_get_string(config, "style/layout/type", &layout_type) {
             layout_type := StrLower(layout_type)
             if layout_type = "stacked" || layout_type = "flow" || layout_type = "vertical_text" {
                 values["layout_type"] := layout_type
             }
+        }
+        if rime_api.config_test_get_bool(
+            config,
+            "style/vertical_text_left_to_right",
+            &vertical_text_left_to_right
+        ) {
+            values["vertical_text_left_to_right"] := vertical_text_left_to_right
         }
         if rime_api.config_test_get_int(config, "style/layout/flow_rows", &flow_rows) {
             values["flow_rows"] := Min(9, Max(1, flow_rows))

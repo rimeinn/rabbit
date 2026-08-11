@@ -32,6 +32,9 @@ TestStyleSnapshotCopiesValues() {
     AssertEqual("Snapshot Font", style.font_face, "The snapshot retained its constructor Map.")
     AssertEqual(17, style.font_point, "The snapshot retained its constructor Map value.")
     AssertEqual("stacked", style.layout_type, "The default candidate layout is not stacked.")
+    AssertEqual(160, style.min_width, "The default stacked minimum width changed.")
+    AssertEqual(160, style.min_height, "The default vertical text minimum height changed.")
+    AssertTrue(!style.vertical_text_left_to_right, "The default vertical text direction is not right to left.")
 
     local overrides := Map("font_point", 21)
     local updated_style := style.With(overrides)
@@ -49,7 +52,10 @@ TestStyleSnapshotParsing() {
     AssertEqual("Configured Font", light_style.font_face, "The active font was not parsed.")
     AssertEqual(18, light_style.font_point, "The active font size was not parsed.")
     AssertEqual(9, light_style.margin_x, "The active horizontal margin was not parsed.")
+    AssertEqual(180, light_style.min_width, "The stacked minimum width was not parsed.")
+    AssertEqual(240, light_style.min_height, "The vertical text minimum height was not parsed.")
     AssertEqual("flow", light_style.layout_type, "The active layout type was not parsed.")
+    AssertTrue(light_style.vertical_text_left_to_right, "The vertical text direction was not parsed.")
     AssertEqual(9, light_style.flow_rows, "Flow rows were not clamped to the supported range.")
     AssertEqual(7, light_style.candidate_spacing, "Candidate spacing was not parsed.")
     AssertEqual("center", light_style.align_type, "Candidate alignment was not parsed.")
@@ -79,7 +85,10 @@ CreateStyleConfigValues() {
         "style/label_font_point", 16,
         "style/comment_font_point", 15,
         "style/layout/margin_x", 9,
+        "style/layout/min_width", 180,
+        "style/layout/min_height", 240,
         "style/layout/type", "flow",
+        "style/vertical_text_left_to_right", true,
         "style/layout/flow_rows", 12,
         "style/layout/candidate_spacing", 7,
         "style/layout/align_type", "center",
@@ -114,6 +123,14 @@ class RabbitUIStyleRimeProbe {
     }
 
     config_test_get_int(config, key, &value) {
+        if !this.values.Has(key) {
+            return false
+        }
+        value := this.values[key]
+        return true
+    }
+
+    config_test_get_bool(config, key, &value) {
         if !this.values.Has(key) {
             return false
         }

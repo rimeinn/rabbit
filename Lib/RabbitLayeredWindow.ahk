@@ -40,12 +40,13 @@ class RabbitLayeredWindow {
         this.disposed := true
     }
 
-    Update(wic_bitmap, width, height, x, y) {
+    Update(wic_bitmap, width, height, x, y, source_y := 0) {
         local stride := width * 4
         local size := stride * height
         local destination := Buffer(8, 0)
         local window_size := Buffer(8, 0)
         local source := Buffer(8, 0)
+        local source_rect := Buffer(16, 0)
         local blend := Buffer(4, 0)
 
         if this.disposed {
@@ -54,12 +55,18 @@ class RabbitLayeredWindow {
         if !wic_bitmap {
             throw Error("Layered window update requires a WIC bitmap.")
         }
+        if source_y < 0 {
+            throw ValueError("Layered window source y must not be negative.")
+        }
 
         this.EnsureBitmap(width, height)
+        NumPut("int", source_y, source_rect, 4)
+        NumPut("int", width, source_rect, 8)
+        NumPut("int", height, source_rect, 12)
         if ComCall(
             CopyPixels := 7,
             wic_bitmap,
-            "ptr", 0,
+            "ptr", source_rect,
             "uint", stride,
             "uint", size,
             "ptr", this.bits

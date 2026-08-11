@@ -47,9 +47,15 @@ style:
   # 不同于小狼毫，格式化标签文本需符合 AutoHotkey 语法
   # 详见 https://wyagd001.github.io/v2/docs/lib/Format.htm#FormatSpec
   label_format: "{:s}. "
+  # Only used with layout/type: vertical_text. Columns run right-to-left by default.
+  vertical_text_left_to_right: false
   layout:
-    # stacked | flow | vertical_text (temporarily falls back to stacked)
+    # stacked | flow | vertical_text
     type: stacked
+    # Minimum candidate box width in stacked layout
+    min_width: 160
+    # Minimum candidate box height in vertical_text layout
+    min_height: 160
     # Number of Rime pages shown after flow expands; valid range: 1 - 9
     flow_rows: 5
     # Space between candidate cards in flow layout
@@ -58,7 +64,7 @@ style:
     align_type: top
 
 # Copied from weasel.yaml
-# 默认颜色格式为 argb，暂不支持 alpha 通道
+# 默认颜色格式为 argb
 preset_color_schemes:
   aqua:
     name: 碧水／Aqua

@@ -144,6 +144,11 @@ jobs:
         with:
           submodules: 'recursive'
 
+      - name: Apply Rabbit Direct2D patch
+        run: |
+          git -C Lib/Direct2D apply --unidiff-zero --check ../../patches/ahk-direct2d-rabbit.patch
+          git -C Lib/Direct2D apply --unidiff-zero ../../patches/ahk-direct2d-rabbit.patch
+
       - name: Download Dependencies
         uses: actions/download-artifact@v8
 

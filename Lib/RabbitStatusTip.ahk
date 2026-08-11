@@ -74,6 +74,7 @@ class RabbitStatusTip {
         this.corner_radius := style.corner_radius
         this.padding_x := style.margin_x
         this.padding_y := style.margin_y
+        this.vertical_text := style.layout_type = "vertical_text"
         this.font := {
             name: style.font_face,
             size: style.font_point * 96.0 / 72.0 * this.dpi_scale
@@ -191,6 +192,10 @@ class RabbitStatusTip {
         if this.icon_size {
             icon_width := this.icon_size + this.padding_x
         }
+        if this.vertical_text {
+            this.BuildVerticalText(text)
+            return
+        }
         max_text_width := max_width
             ? Max(1, max_width - (this.border_width + this.padding_x) * 2 - icon_width)
             : 0
@@ -206,6 +211,25 @@ class RabbitStatusTip {
         if max_width {
             this.box_width := Min(this.box_width, max_width)
         }
+    }
+
+    BuildVerticalText(text) {
+        local content_width, content_height, base_x, base_y
+        this.text := text
+        this.text_metrics := this.GetVerticalTextMetrics(this.text)
+        content_width := Max(this.icon_size, this.text_metrics.w)
+        content_height := this.icon_size + this.text_metrics.h
+        if this.icon_size {
+            content_height += this.padding_y
+        }
+        base_x := this.border_width + this.padding_x
+        base_y := this.border_width + this.padding_y
+        this.icon_x := base_x + (content_width - this.icon_size) / 2
+        this.icon_y := base_y
+        this.text_x := base_x + (content_width - this.text_metrics.w) / 2
+        this.text_y := base_y + this.icon_size + (this.icon_size ? this.padding_y : 0)
+        this.box_width := Ceil(content_width) + (this.border_width + this.padding_x) * 2
+        this.box_height := Ceil(content_height) + (this.border_width + this.padding_y) * 2
     }
 
     Draw() {
@@ -250,14 +274,18 @@ class RabbitStatusTip {
         if this.icon_path {
             this.DrawIcon()
         }
-        this.d2d.DrawText(
-            this.text,
-            this.text_x,
-            this.text_y,
-            this.font.size,
-            this.text_color,
-            this.font.name
-        )
+        if this.vertical_text {
+            this.DrawVerticalText()
+        } else {
+            this.d2d.DrawText(
+                this.text,
+                this.text_x,
+                this.text_y,
+                this.font.size,
+                this.text_color,
+                this.font.name
+            )
+        }
     }
 
     DrawIcon() {
@@ -303,6 +331,36 @@ class RabbitStatusTip {
             truncated := SubStr(truncated, 1, -1)
         }
         return truncated ? truncated . ellipsis : ellipsis
+    }
+
+    GetVerticalTextMetrics(text) {
+        if !text {
+            return { w: 0, h: 0 }
+        }
+        return this.d2d.GetMetrics(text, this.font.name, this.font.size, 400, 0, {
+            reading_direction: Direct2D.DWRITE_READING_DIRECTION_TOP_TO_BOTTOM,
+            flow_direction: Direct2D.DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT
+        })
+    }
+
+    DrawVerticalText() {
+        local text_box_height
+        ; DirectWrite can wrap a Latin vertical glyph when its measured line height is exact.
+        text_box_height := this.text_metrics.h + this.font.size
+        this.d2d.DrawTextWithLayout(
+            this.text,
+            this.text_x,
+            this.text_y,
+            this.font.size,
+            this.text_color,
+            this.font.name,
+            this.text_metrics.w,
+            text_box_height,
+            {
+                readingDirection: Direct2D.DWRITE_READING_DIRECTION_TOP_TO_BOTTOM,
+                flowDirection: Direct2D.DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT
+            }
+        )
     }
 
     AssertNotDisposed() {

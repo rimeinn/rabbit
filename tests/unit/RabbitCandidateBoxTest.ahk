@@ -68,6 +68,13 @@ RunTest(
     )
 )
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
+RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
+RunTest("modern vertical text candidate layout", TestModernVerticalTextCandidateLayout.Bind(candidate_style))
+RunTest(
+    "modern left-to-right vertical text candidate layout",
+    TestModernVerticalTextLeftToRightCandidateLayout.Bind(candidate_style)
+)
+RunTest("horizontal preedit text stays unconstrained", TestHorizontalPreeditTextDraw.Bind(candidate_style))
 RunTest(
     "legacy candidate lifecycle",
     TestBackendLifecycle.Bind(
@@ -647,6 +654,7 @@ TestLegacyPureLayoutCalculation() {
 TestModernFlowCandidateLayout(style) {
     local candidate_box := CandidateBox(style.With(Map(
         "layout_type", "flow",
+        "min_width", 1000,
         "candidate_spacing", 7,
         "align_type", "center"
     )))
@@ -664,7 +672,7 @@ TestModernFlowCandidateLayout(style) {
     }
     try {
         candidate_box.BuildPresentation(presentation, &width, &height, 400)
-        AssertTrue(width >= style.min_width, "The flow candidate layout ignored the minimum width.")
+        AssertTrue(width < 1000, "The flow candidate layout was constrained by stacked minimum width.")
         AssertTrue(
             candidate_box.candidatesLayout.rows[3].y > candidate_box.candidatesLayout.rows[1].y,
             "A flow page did not advance to the next candidate row."
@@ -786,6 +794,180 @@ TestPartialConstructionCleanup(style) {
 
 ThrowDirect2D(parameters*) {
     throw Error("Injected Direct2D construction failure.")
+}
+
+TestModernFlowAnimationState(style) {
+    local candidate_box := CandidateBox(style.With(Map("layout_type", "flow")))
+    local collapsed := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local expanded := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local collapsed_width, collapsed_height, expanded_width, expanded_height
+
+    collapsed.flow_page_size := 2
+    expanded.flow_page_size := 2
+    Loop 4 {
+        expanded.candidates.Push({
+            label: "",
+            text: "预览候选" . A_Index,
+            comment: "",
+            highlighted: false,
+            preview: true
+        })
+    }
+    try {
+        candidate_box.BuildPresentation(collapsed, &collapsed_width, &collapsed_height)
+        AssertTrue(!candidate_box.flow_expanded, "A single flow page was treated as expanded.")
+        candidate_box.Show(100, 100)
+        candidate_box.BuildPresentation(expanded, &expanded_width, &expanded_height)
+        AssertTrue(candidate_box.flow_expanded, "Preloaded flow pages did not mark the layout as expanded.")
+        candidate_box.SetFlowAnimationAnchor(true)
+        candidate_box.Show(100, 70)
+        AssertTrue(candidate_box.flow_animation_active, "Flow expansion did not start an animation.")
+        AssertEqual(
+            collapsed_height,
+            candidate_box.display_height,
+            "Flow expansion did not start from the previous height."
+        )
+        Sleep(CandidateBox.FLOW_ANIMATION_DURATION + 60)
+        AssertTrue(!candidate_box.flow_animation_active, "Flow expansion animation did not finish.")
+        AssertEqual(expanded_height, candidate_box.display_height, "Flow expansion reached the wrong height.")
+        AssertEqual(70, candidate_box.display_render_y, "Flow expansion reached the wrong above-caret position.")
+
+        candidate_box.BuildPresentation(collapsed, &collapsed_width, &collapsed_height)
+        AssertTrue(!candidate_box.flow_expanded, "Returning to one flow page did not mark the layout as collapsed.")
+        candidate_box.SetFlowAnimationAnchor(false)
+        candidate_box.Show(100, 100)
+        AssertTrue(candidate_box.flow_animation_active, "Flow collapse did not start an animation.")
+        AssertEqual(
+            0,
+            candidate_box.flow_animation_target_height,
+            "A side-changing flow collapse did not shrink to zero before moving."
+        )
+        AssertEqual(
+            expanded_height,
+            candidate_box.display_height,
+            "Flow collapse did not start from the previous height."
+        )
+        AssertEqual(
+            70,
+            candidate_box.display_render_y,
+            "Flow collapse flipped position before its shrink animation."
+        )
+        Sleep(CandidateBox.FLOW_ANIMATION_DURATION + 60)
+        AssertTrue(!candidate_box.flow_animation_active, "Flow collapse animation did not finish.")
+        AssertEqual(collapsed_height, candidate_box.display_height, "Flow collapse reached the wrong height.")
+        AssertEqual(100, candidate_box.display_render_y, "Flow collapse did not move after its shrink animation.")
+        AssertEqual(
+            CandidateBox.FLOW_ANIMATION_DURATION,
+            160,
+            "The flow animation duration changed unexpectedly."
+        )
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestModernVerticalTextCandidateLayout(style) {
+    local candidate_box := CandidateBox(style.With(Map(
+        "layout_type", "vertical_text",
+        "min_width", 1000,
+        "min_height", 400
+    )))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+
+    try {
+        candidate_box.BuildPresentation(presentation, &width, &height)
+        AssertEqual("vertical_text", candidate_box.layoutType, "The vertical text layout fell back to stacked.")
+        AssertTrue(width < 1000, "Vertical text was constrained by stacked minimum width.")
+        AssertEqual(400, height, "Vertical text did not honor its minimum height.")
+        AssertTrue(
+            candidate_box.candidatesLayout.rows[1].x > candidate_box.candidatesLayout.rows[2].x,
+            "Vertical text candidates were not ordered from right to left."
+        )
+        AssertTrue(
+            candidate_box.candidatesLayout.labels[1].y < candidate_box.candidatesLayout.cands[1].y,
+            "A vertical text candidate did not place its label above the text."
+        )
+        AssertTrue(
+            candidate_box.preeditLayout.left > candidate_box.candidatesLayout.rows[1].x,
+            "The vertical preedit column was not placed to the right of the candidates."
+        )
+        AssertEqual(
+            height - candidate_box.borderWidth - candidate_box.lineSpacing,
+            candidate_box.candidatesLayout.comments[1].y + candidate_box.candidatesLayout.comments[1].h,
+            "Vertical text comments were not aligned with the content bottom."
+        )
+        AssertEqual(
+            height - candidate_box.borderWidth - candidate_box.lineSpacing,
+            candidate_box.candidatesLayout.rows[1].y + candidate_box.candidatesLayout.rows[1].h,
+            "The selected vertical text column did not cover its bottom-aligned comment."
+        )
+        candidate_box.Show(100, 100)
+        candidate_box.Hide()
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestModernVerticalTextLeftToRightCandidateLayout(style) {
+    local candidate_box := CandidateBox(style.With(Map(
+        "layout_type", "vertical_text",
+        "vertical_text_left_to_right", true
+    )))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+
+    try {
+        candidate_box.BuildPresentation(presentation, &width, &height)
+        AssertTrue(
+            candidate_box.candidatesLayout.rows[1].x < candidate_box.candidatesLayout.rows[2].x,
+            "Left-to-right vertical text candidates were not ordered from left to right."
+        )
+        AssertTrue(
+            candidate_box.preeditLayout.left < candidate_box.candidatesLayout.rows[1].x,
+            "The left-to-right vertical preedit column was not placed to the left of the candidates."
+        )
+        candidate_box.Show(100, 100)
+        candidate_box.Hide()
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestHorizontalPreeditTextDraw(style) {
+    local candidate_box := CandidateBox(style)
+    local draw_probe := RabbitDrawTextProbe()
+    local layout := { text: "preedit", x: 10, y: 20, w: 30, h: 40 }
+
+    try {
+        candidate_box.d2d := draw_probe
+        candidate_box.DrawLayoutText(layout, candidate_box.mainFont, 0xff000000)
+        AssertEqual(6, draw_probe.args.Length, "Horizontal preedit text was constrained to its measured bounds.")
+        AssertEqual("preedit", draw_probe.args[1], "The horizontal preedit text changed before drawing.")
+        candidate_box.layoutType := "vertical_text"
+        candidate_box.DrawLayoutText(layout, candidate_box.mainFont, 0xff000000)
+        AssertEqual("DrawTextWithLayout", draw_probe.method, "Vertical preedit text did not use a DirectWrite layout.")
+        AssertEqual(9, draw_probe.args.Length, "Vertical preedit text did not receive a drawing rectangle.")
+        AssertEqual(
+            layout.h + candidate_box.mainFont.size,
+            draw_probe.args[8],
+            "Vertical preedit text did not reserve enough height to avoid wrapping."
+        )
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+class RabbitDrawTextProbe {
+    DrawText(args*) {
+        this.args := args
+        this.method := "DrawText"
+    }
+
+    DrawTextWithLayout(args*) {
+        this.args := args
+        this.method := "DrawTextWithLayout"
+    }
 }
 
 class RabbitFakeDirect2D {

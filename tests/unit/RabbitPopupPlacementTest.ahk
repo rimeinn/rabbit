@@ -28,11 +28,13 @@ TestPlacementBelowCaret() {
     local position := RabbitPopupPlacement.PlaceBelowCaret(120, 200, 3, 20, 140, 50, TestWorkArea())
     AssertEqual(123, position.x, "The popup did not align with the caret edge.")
     AssertEqual(224, position.y, "The popup did not appear below the caret.")
+    AssertTrue(!position.above, "A below-caret popup incorrectly requested a bottom animation anchor.")
 }
 
 TestPlacementFlipsAboveCaret() {
     local position := RabbitPopupPlacement.PlaceBelowCaret(120, 560, 3, 20, 140, 50, TestWorkArea())
     AssertEqual(506, position.y, "The popup did not move above a bottom-edge caret.")
+    AssertTrue(position.above, "An above-caret popup did not request a bottom animation anchor.")
 }
 
 TestPlacementClampsHorizontalEdges() {

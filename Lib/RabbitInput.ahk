@@ -664,6 +664,9 @@ class RabbitInputController {
                     new_y := position.y
                 }
                 if !hide_candidate {
+                    if HasMethod(this.candidate_box, "SetFlowAnimationAnchor") {
+                        this.candidate_box.SetFlowAnimationAnchor(HasProp(position, "above") && position.above)
+                    }
                     this.candidate_box.Show(new_x, new_y)
                 }
                 this.prev_x := new_x
