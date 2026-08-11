@@ -30,6 +30,7 @@ class RabbitRuntimeState {
         this.tray_click_process := ""
         this.tray_click_timeout_callback := this.EndTrayIconClick.Bind(this)
         this.active_win := ""
+        this.active_window := 0
         this.timer_callback := this.UpdateWinAscii.Bind(this)
         this.timer_running := false
 
@@ -68,16 +69,11 @@ class RabbitRuntimeState {
     }
 
     BeginTrayIconClick() {
-        local active_window
         this.on_tray_icon_click := true
-        this.tray_click_window := 0
-        this.tray_click_process := ""
-        if (active_window := WinExist("A")) {
-            this.tray_click_window := active_window
-            try {
-                this.tray_click_process := StrLower(WinGetProcessName("ahk_id " . active_window))
-            }
-        }
+        ; The notification area becomes the active window before this callback runs.
+        ; Keep using the window and process cached by the focus monitor instead.
+        this.tray_click_window := this.active_window
+        this.tray_click_process := this.active_win
         ; A mouse-up outside the notification area may not produce a callback.
         SetTimer(this.tray_click_timeout_callback, -5000)
     }
@@ -156,6 +152,7 @@ class RabbitRuntimeState {
             if !proc_name {
                 return
             }
+            this.active_window := active_window
         }
         this.active_win := proc_name
         ; TODO: The cached state may be inaccurate because this update is not atomic.

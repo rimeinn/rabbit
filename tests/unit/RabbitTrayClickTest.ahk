@@ -23,6 +23,7 @@
 RunTest("tray click clears composition and updates ASCII state", TestTrayClickUpdatesAscii.Bind())
 RunTest("tray click releases its state after an error", TestTrayClickReleasesStateAfterError.Bind())
 RunTest("global ASCII tray click leaves process modes unchanged", TestGlobalAsciiTrayClickDoesNotCacheProcess.Bind())
+RunTest("tray click uses the cached pre-click window", TestTrayClickUsesCachedPreClickWindow.Bind())
 
 TestTrayClickUpdatesAscii() {
     local calls := []
@@ -86,6 +87,32 @@ TestGlobalAsciiTrayClickDoesNotCacheProcess() {
         "Global ASCII mode retained a per-process tray click value."
     )
     AssertEqual("tip:1,icon", JoinTrayClickCalls(calls), "Global ASCII mode did not refresh tray presentation.")
+}
+
+TestTrayClickUsesCachedPreClickWindow() {
+    local runtime_state := RabbitRuntimeState(
+        RabbitTrayClickRimeProbe([]),
+        1,
+        RabbitConfigSnapshot(Map())
+    )
+    runtime_state.active_win := "notepad.exe"
+    runtime_state.active_window := 12345
+
+    runtime_state.BeginTrayIconClick()
+    try {
+        AssertEqual(
+            "notepad.exe",
+            runtime_state.tray_click_process,
+            "The tray click used the notification area's process instead of the cached input process."
+        )
+        AssertEqual(
+            12345,
+            runtime_state.tray_click_window,
+            "The tray click did not retain the cached pre-click window."
+        )
+    } finally {
+        runtime_state.EndTrayIconClick()
+    }
 }
 
 JoinTrayClickCalls(calls) {
