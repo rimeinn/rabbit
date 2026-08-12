@@ -718,6 +718,7 @@ TestModernFlowCandidateLayout(style) {
 TestBackendLifecycle(name, candidate_box, context, style, golden) {
     local first_width, first_height, second_width, second_height
     local updated_width, updated_height, restored_width, restored_height
+    local window_x, window_y
     try {
         candidate_box.Hide()
         candidate_box.Hide()
@@ -756,6 +757,11 @@ TestBackendLifecycle(name, candidate_box, context, style, golden) {
         AssertEqual(first_height, restored_height, name . " height must restore with the original style snapshot.")
 
         candidate_box.Show(10, 10)
+        if name = "modern" {
+            candidate_box.gui.GetPos(&window_x, &window_y)
+            AssertEqual(10, window_x, "The first modern candidate window display used the wrong x position.")
+            AssertEqual(10, window_y, "The first modern candidate window display used the wrong y position.")
+        }
         candidate_box.Show(10, 10)
         candidate_box.Hide()
         candidate_box.Hide()

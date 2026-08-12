@@ -24,6 +24,7 @@ RunTest("themed status tip renders icons and text", TestStatusTipRendersContent.
 RunTest("vertical status tip keeps its icon upright", TestVerticalStatusTipRendersContent.Bind())
 
 TestStatusTipRendersContent() {
+    RabbitStatusTipLayeredWindowProbe.events := []
     local d2d := RabbitStatusTipDirect2DProbe(0)
     local layered_window := RabbitStatusTipLayeredWindowProbe(0)
     local tip := RabbitStatusTipProbe(
@@ -43,6 +44,15 @@ TestStatusTipRendersContent() {
         AssertEqual(0, d2d.source_rect, "The status tip cropped its icon instead of scaling the full image.")
         AssertEqual(1, d2d.text_calls, "The status tip did not render its label.")
         AssertTrue(tip.box_width > 0 && tip.box_height > 0, "The status tip did not build a valid layout.")
+        AssertTrue(
+            InStr(tip.gui.show_options, "x") && InStr(tip.gui.show_options, "y"),
+            "The first status tip display did not use its calculated position."
+        )
+        AssertEqual(
+            "show",
+            RabbitStatusTipLayeredWindowProbe.events[1],
+            "The status tip submitted its layered surface before its first GUI show."
+        )
         AssertEqual(1, layered_window.update_calls, "The status tip did not submit its layered surface.")
     } finally {
         tip.Dispose()
@@ -50,6 +60,7 @@ TestStatusTipRendersContent() {
 }
 
 TestVerticalStatusTipRendersContent() {
+    RabbitStatusTipLayeredWindowProbe.events := []
     local d2d := RabbitStatusTipDirect2DProbe(0)
     local layered_window := RabbitStatusTipLayeredWindowProbe(0)
     local style := RabbitUIStyleSnapshot().With(Map(
@@ -188,11 +199,14 @@ class RabbitStatusTipRenderTargetProbe {
 }
 
 class RabbitStatusTipLayeredWindowProbe {
+    static events := []
+
     __New(hwnd) {
         this.update_calls := 0
     }
 
     Update(wic_bitmap, width, height, x, y) {
+        RabbitStatusTipLayeredWindowProbe.events.Push("update")
         this.update_calls++
     }
 
@@ -206,6 +220,8 @@ class RabbitStatusTipGuiProbe {
     }
 
     Show(options := "") {
+        this.show_options := options
+        RabbitStatusTipLayeredWindowProbe.events.Push("show")
     }
 
     Hide() {

@@ -954,6 +954,10 @@ class CandidateBox {
 
             this.d2d.PopAxisAlignedClip()
             this.d2d.EndDraw()
+            if !this.visible {
+                this.gui.Show(Format("NA x{} y{} w{} h{}", this.display_x, display_y, this.boxWidth, height))
+                this.visible := true
+            }
             this.layered_window.Update(
                 this.d2d.ID2D1RenderTarget.GetWICBitmap(),
                 this.boxWidth,
@@ -962,10 +966,6 @@ class CandidateBox {
                 display_y,
                 source_y
             )
-            if !this.visible {
-                this.gui.Show("NA")
-                this.visible := true
-            }
             this.display_height := height
             this.display_render_y := display_y
             this.display_anchor_bottom := this.flow_animation_anchor_bottom

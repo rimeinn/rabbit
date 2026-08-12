@@ -160,7 +160,9 @@ class RabbitFloatingPreedit {
         this.y := caret_y
         this.WriteDebugInfo(caret_x, caret_y, caret_w, caret_h)
         this.built := true
-        this.Render()
+        if this.visible {
+            this.Render()
+        }
     }
 
     Show() {
@@ -169,8 +171,9 @@ class RabbitFloatingPreedit {
             return
         }
         if !this.visible {
-            this.gui.Show("NA")
+            this.gui.Show(Format("NA x{} y{} w{} h{}", this.x, this.y, this.box_width, this.box_height))
             this.visible := true
+            this.Render()
         }
     }
 

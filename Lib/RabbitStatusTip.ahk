@@ -121,6 +121,10 @@ class RabbitStatusTip {
         this.d2d.BeginDraw()
         this.Draw()
         this.d2d.EndDraw()
+        if !this.visible {
+            this.gui.Show(Format("NA x{} y{} w{} h{}", position.x, position.y, this.box_width, this.box_height))
+            this.visible := true
+        }
         this.layered_window.Update(
             this.d2d.ID2D1RenderTarget.GetWICBitmap(),
             this.box_width,
@@ -128,10 +132,6 @@ class RabbitStatusTip {
             position.x,
             position.y
         )
-        if !this.visible {
-            this.gui.Show("NA")
-            this.visible := true
-        }
         SetTimer(this.hide_callback, 0)
         SetTimer(this.hide_callback, -this.config.show_tips_time)
     }
