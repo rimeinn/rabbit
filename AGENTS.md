@@ -6,6 +6,8 @@ Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the
 
 Three directories are Git submodules: `Lib/librime-ahk`, `Lib/Direct2D`, and `plum`. Avoid mixing upstream submodule changes with application changes.
 
+Implement new candidate-window features only for the modern candidate box. The legacy candidate box needs regression protection, but does not need to support new functionality unless explicitly requested.
+
 Keep entry scripts readable as startup outlines: directives, direct includes, top-level state, the main workflow, and shutdown handling belong there. Move input processing, runtime state, dialogs, settings models, and other implementation details into cohesive `Lib/Rabbit*.ahk` modules. Give each substantial independent class its own file; keep small helpers with the feature they exclusively support. Every module must declare its direct `#Include` dependencies rather than relying on an entry script's include order.
 
 ## Build, Test, and Development Commands
