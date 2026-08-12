@@ -53,6 +53,8 @@ style:
   floating_preedit: false
   # Floating preedit window opacity, from 0 (transparent) to 1 (opaque).
   floating_preedit_opacity: 0.8
+  # Minimum floating preedit window height in pixels.
+  floating_preedit_min_height: 20
   layout:
     # stacked | flow | vertical_text
     type: stacked

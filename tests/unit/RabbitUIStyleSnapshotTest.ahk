@@ -37,6 +37,7 @@ TestStyleSnapshotCopiesValues() {
     AssertTrue(!style.vertical_text_left_to_right, "The default vertical text direction is not right to left.")
     AssertTrue(!style.floating_preedit, "Floating preedit is not disabled by default.")
     AssertEqual(0.8, style.floating_preedit_opacity, "The default floating preedit opacity changed.")
+    AssertEqual(20, style.floating_preedit_min_height, "The default floating preedit minimum height changed.")
 
     local overrides := Map("font_point", 21)
     local updated_style := style.With(overrides)
@@ -60,6 +61,7 @@ TestStyleSnapshotParsing() {
     AssertTrue(light_style.vertical_text_left_to_right, "The vertical text direction was not parsed.")
     AssertTrue(light_style.floating_preedit, "Floating preedit was not parsed.")
     AssertEqual(0.25, light_style.floating_preedit_opacity, "Floating preedit opacity was not parsed.")
+    AssertEqual(18, light_style.floating_preedit_min_height, "Floating preedit minimum height was not parsed.")
     AssertEqual(9, light_style.flow_rows, "Flow rows were not clamped to the supported range.")
     AssertEqual(7, light_style.candidate_spacing, "Candidate spacing was not parsed.")
     AssertEqual("center", light_style.align_type, "Candidate alignment was not parsed.")
@@ -95,6 +97,7 @@ CreateStyleConfigValues() {
         "style/vertical_text_left_to_right", true,
         "style/floating_preedit", true,
         "style/floating_preedit_opacity", 0.25,
+        "style/floating_preedit_min_height", 18,
         "style/layout/flow_rows", 12,
         "style/layout/candidate_spacing", 7,
         "style/layout/align_type", "center",

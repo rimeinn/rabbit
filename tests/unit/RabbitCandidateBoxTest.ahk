@@ -72,6 +72,7 @@ RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candida
 RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLayout.Bind(candidate_style))
 RunTest("floating preedit hides an empty candidate box", TestFloatingPreeditWithoutCandidates.Bind(candidate_style))
 RunTest("floating preedit adapts small corner radii", TestFloatingPreeditCornerRadius.Bind(candidate_style))
+RunTest("floating preedit applies its minimum height", TestFloatingPreeditMinimumHeight.Bind(candidate_style))
 RunTest("floating preedit failure falls back to docked layout", TestFloatingPreeditFallback.Bind(candidate_style))
 RunTest("modern vertical text candidate layout", TestModernVerticalTextCandidateLayout.Bind(candidate_style))
 RunTest(
@@ -936,6 +937,7 @@ TestFloatingPreeditLayout(style) {
 TestFloatingPreeditCornerRadius(style) {
     local candidate_box := CandidateBox(style.With(Map(
         "floating_preedit", true,
+        "floating_preedit_min_height", 0,
         "corner_radius", 10,
         "round_corner", 8,
         "border_width", 4
@@ -946,6 +948,19 @@ TestFloatingPreeditCornerRadius(style) {
         candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 12, &width, &height)
         AssertEqual(3, candidate_box.floating_preedit.draw_corner_radius, "Floating preedit corner radius exceeded one quarter of the caret height.")
         AssertEqual(3, candidate_box.floating_preedit.draw_border_width, "Floating preedit border exceeded one quarter of the caret height.")
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestFloatingPreeditMinimumHeight(style) {
+    local candidate_box := CandidateBox(style.With(Map("floating_preedit", true)))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+    try {
+        candidate_box.BuildFloatingPresentation(presentation, 100, 200, 1, 13, &width, &height)
+        AssertEqual(20, candidate_box.floating_preedit.box_height, "Floating preedit did not apply its minimum height.")
+        AssertEqual(16, candidate_box.floating_preedit.content_height, "Floating preedit used the wrong minimum-height content area.")
     } finally {
         candidate_box.Dispose()
     }

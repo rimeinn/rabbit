@@ -16,12 +16,14 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitCandidatePresentation.ahk
 #Include RabbitLayeredWindow.ahk
 #Include Direct2D/Direct2D.ahk
 
 class RabbitFloatingPreedit {
     static FONT_HEIGHT_CALIBRATION_TEXT := "中M"
+    static DEBUG_OUTPUT := true
 
     __New(style, d2d_constructor := Direct2D) {
         this.gui := 0
@@ -83,6 +85,7 @@ class RabbitFloatingPreedit {
         this.corner_radius := style.corner_radius
         this.highlighted_corner_radius := style.round_corner
         this.opacity := Round(style.floating_preedit_opacity * 255)
+        this.min_height := style.floating_preedit_min_height
     }
 
     Build(preedit, caret_x, caret_y, caret_w, caret_h) {
@@ -93,12 +96,12 @@ class RabbitFloatingPreedit {
             throw ValueError("Floating preedit requires a positive caret height.")
         }
         groups := RabbitGetPreeditGroups(preedit)
-        this.box_height := caret_h
-        this.draw_border_width := Min(this.border_width, Floor(caret_h / 4))
-        this.draw_corner_radius := Min(this.corner_radius, caret_h / 4)
+        this.box_height := Max(caret_h, this.min_height)
+        this.draw_border_width := Min(this.border_width, Floor(this.box_height / 4))
+        this.draw_corner_radius := Min(this.corner_radius, this.box_height / 4)
         this.content_x := this.draw_border_width
         this.content_y := this.draw_border_width
-        this.content_height := Max(1, caret_h - this.draw_border_width * 2)
+        this.content_height := Max(1, this.box_height - this.draw_border_width * 2)
         calibration_metrics := this.d2d.GetMetrics(
             RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT,
             this.font_face,
@@ -155,6 +158,7 @@ class RabbitFloatingPreedit {
         )
         this.x := caret_x + caret_w
         this.y := caret_y
+        this.WriteDebugInfo(caret_x, caret_y, caret_w, caret_h)
         this.built := true
         this.Render()
     }
@@ -285,6 +289,36 @@ class RabbitFloatingPreedit {
         if this.disposed {
             throw Error("Floating preedit has been disposed.")
         }
+    }
+
+    WriteDebugInfo(caret_x, caret_y, caret_w, caret_h) {
+        local hwnd, window_dpi := 0
+        if !RabbitFloatingPreedit.DEBUG_OUTPUT {
+            return
+        }
+        if hwnd := DllCall("GetForegroundWindow", "ptr") {
+            window_dpi := DllCall("GetDpiForWindow", "ptr", hwnd, "uint")
+        }
+        RabbitDebug(
+            Format(
+                "floating-preedit caret=({}, {}, {}, {}) target_dpi={} screen_dpi={} d2d_scale={} font_size={} box=({}, {}) content=({}, {}, {}, {})",
+                caret_x,
+                caret_y,
+                caret_w,
+                caret_h,
+                window_dpi,
+                A_ScreenDPI,
+                this.dpi_scale,
+                this.font_size,
+                this.box_width,
+                this.box_height,
+                this.content_x,
+                this.content_y,
+                this.content_width,
+                this.content_height
+            ),
+            Format("RabbitFloatingPreedit.ahk:{}", A_LineNumber)
+        )
     }
 
     static HasText(preedit) {
