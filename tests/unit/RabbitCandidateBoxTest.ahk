@@ -70,6 +70,7 @@ RunTest(
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
 RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLayout.Bind(candidate_style))
+RunTest("floating preedit hides an empty candidate box", TestFloatingPreeditWithoutCandidates.Bind(candidate_style))
 RunTest("floating preedit adapts small corner radii", TestFloatingPreeditCornerRadius.Bind(candidate_style))
 RunTest("floating preedit failure falls back to docked layout", TestFloatingPreeditFallback.Bind(candidate_style))
 RunTest("modern vertical text candidate layout", TestModernVerticalTextCandidateLayout.Bind(candidate_style))
@@ -911,7 +912,7 @@ TestFloatingPreeditLayout(style) {
                 candidate_box.floating_preedit.font_size,
                 "Floating preedit did not scale the candidate font to the caret height."
             )
-            AssertEqual(128, candidate_box.floating_preedit.opacity, "Floating preedit did not use 50% opacity.")
+            AssertEqual(204, candidate_box.floating_preedit.opacity, "Floating preedit did not use 80% opacity.")
             AssertEqual(24, candidate_box.floating_preedit.box_height, "Floating preedit did not match the caret height.")
             AssertEqual(2, candidate_box.floating_preedit.content_y, "Floating preedit did not reserve the top border.")
             AssertEqual(20, candidate_box.floating_preedit.content_height, "Floating preedit used the wrong inner height.")
@@ -945,6 +946,21 @@ TestFloatingPreeditCornerRadius(style) {
         candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 12, &width, &height)
         AssertEqual(3, candidate_box.floating_preedit.draw_corner_radius, "Floating preedit corner radius exceeded one quarter of the caret height.")
         AssertEqual(3, candidate_box.floating_preedit.draw_border_width, "Floating preedit border exceeded one quarter of the caret height.")
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestFloatingPreeditWithoutCandidates(style) {
+    local candidate_box := CandidateBox(style.With(Map("floating_preedit", true)))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+    presentation.candidates := []
+    try {
+        candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 24, &width, &height)
+        candidate_box.Show(102, 228)
+        AssertTrue(candidate_box.floating_preedit.visible, "Composition-only input did not show floating preedit.")
+        AssertTrue(!candidate_box.visible, "Composition-only input showed an empty candidate box.")
     } finally {
         candidate_box.Dispose()
     }

@@ -748,6 +748,15 @@ class CandidateBox {
         }
         this.CancelFlowAnimationFinish()
         this.StopFlowAnimation()
+        if this.floating_preedit_active && !this.num_candidates {
+            this.flow_animation_pending := false
+            this.render_pending := false
+            if this.visible {
+                this.gui.Hide()
+                this.visible := false
+            }
+            return
+        }
         this.target_x := x
         this.target_y := y
         this.target_anchor_bottom := this.flow_animation_anchor_bottom
