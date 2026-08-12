@@ -46,6 +46,16 @@ class RabbitUIStyleSnapshot {
             "vertical_text_left_to_right",
             this.GetValue(values, "vertical_text_left_to_right", false)
         )
+        this.floating_preedit := this.GetValue(
+            overrides,
+            "floating_preedit",
+            this.GetValue(values, "floating_preedit", false)
+        )
+        this.floating_preedit_opacity := Min(1, Max(0, this.GetValue(
+            overrides,
+            "floating_preedit_opacity",
+            this.GetValue(values, "floating_preedit_opacity", 0.8)
+        )))
         this.flow_rows := this.GetValue(overrides, "flow_rows", this.GetValue(values, "flow_rows", 5))
         this.candidate_spacing := this.GetValue(
             overrides, "candidate_spacing", this.GetValue(values, "candidate_spacing", 6))
@@ -93,7 +103,7 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, cr, r, mx, my, w, h, vertical_text_left_to_right
+        local fmt, cr, r, mx, my, w, h, vertical_text_left_to_right, floating_preedit, floating_preedit_opacity
         local flow_rows, candidate_spacing, layout_type, align_type
         local selected_color_scheme, dark_color_scheme
         local values := Map()
@@ -161,6 +171,16 @@ class RabbitUIStyleSnapshot {
             &vertical_text_left_to_right
         ) {
             values["vertical_text_left_to_right"] := vertical_text_left_to_right
+        }
+        if rime_api.config_test_get_bool(config, "style/floating_preedit", &floating_preedit) {
+            values["floating_preedit"] := floating_preedit
+        }
+        if rime_api.config_test_get_double(
+            config,
+            "style/floating_preedit_opacity",
+            &floating_preedit_opacity
+        ) {
+            values["floating_preedit_opacity"] := Min(1, Max(0, floating_preedit_opacity))
         }
         if rime_api.config_test_get_int(config, "style/layout/flow_rows", &flow_rows) {
             values["flow_rows"] := Min(9, Max(1, flow_rows))

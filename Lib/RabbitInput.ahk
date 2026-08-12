@@ -638,7 +638,7 @@ class RabbitInputController {
                 this.prev_y := placement.y
             case "caret":
                 info := placement.monitor_info
-                this.BuildCandidate(context, &box_width, &box_height, info)
+                this.BuildCandidate(context, &box_width, &box_height, info, placement)
                 if this.config.fix_candidate_box && this.prev_show {
                     info := RabbitPopupPlacement.GetWorkAreaAt(this.prev_x, this.prev_y)
                     position := RabbitPopupPlacement.PlaceAtPoint(
@@ -689,7 +689,7 @@ class RabbitInputController {
         this.prev_show := true
     }
 
-    BuildCandidate(context, &box_width, &box_height, monitor_info := 0) {
+    BuildCandidate(context, &box_width, &box_height, monitor_info := 0, caret := 0) {
         local style, presentation, max_width := 0
         if !HasMethod(this.candidate_box, "BuildPresentation") || !HasProp(this.candidate_box, "style") {
             this.candidate_box.Build(context, &box_width, &box_height)
@@ -707,6 +707,19 @@ class RabbitInputController {
             this.rime,
             this.session_id
         )
+        if caret && caret.caret_h > 0 && HasMethod(this.candidate_box, "BuildFloatingPresentation") {
+            this.candidate_box.BuildFloatingPresentation(
+                presentation,
+                caret.caret_x,
+                caret.caret_y,
+                caret.caret_w,
+                caret.caret_h,
+                &box_width,
+                &box_height,
+                max_width
+            )
+            return
+        }
         this.candidate_box.BuildPresentation(presentation, &box_width, &box_height, max_width)
     }
 

@@ -69,6 +69,9 @@ RunTest(
 )
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
+RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLayout.Bind(candidate_style))
+RunTest("floating preedit adapts small corner radii", TestFloatingPreeditCornerRadius.Bind(candidate_style))
+RunTest("floating preedit failure falls back to docked layout", TestFloatingPreeditFallback.Bind(candidate_style))
 RunTest("modern vertical text candidate layout", TestModernVerticalTextCandidateLayout.Bind(candidate_style))
 RunTest(
     "modern left-to-right vertical text candidate layout",
@@ -860,6 +863,104 @@ TestModernFlowAnimationState(style) {
             CandidateBox.FLOW_ANIMATION_DURATION,
             160,
             "The flow animation duration changed unexpectedly."
+        )
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestFloatingPreeditLayout(style) {
+    local layout_type, candidate_box, presentation, width, height
+    for layout_type in ["stacked", "flow", "vertical_text"] {
+        candidate_box := CandidateBox(style.With(Map(
+            "floating_preedit", true,
+            "layout_type", layout_type
+        )))
+        presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+        if layout_type = "flow" {
+            presentation.flow_page_size := 2
+        }
+        try {
+            candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 24, &width, &height)
+            AssertTrue(
+                candidate_box.floating_preedit_active,
+                layout_type . " floating preedit was not enabled for a valid caret: "
+                    . candidate_box.floating_preedit_error
+            )
+            AssertEqual(
+                0,
+                candidate_box.preeditLayout.segments.Length,
+                layout_type . " candidate box retained docked preedit text."
+            )
+            AssertTrue(
+                candidate_box.candidatesLayout.rows.Length > 0,
+                layout_type . " floating preedit removed candidate rows."
+            )
+            AssertEqual(
+                candidate_box.borderWidth + candidate_box.lineSpacing,
+                candidate_box.candidatesLayout.rows[1].y,
+                layout_type . " candidate rows retained space for floating preedit."
+            )
+            AssertEqual(102, candidate_box.floating_preedit.x, "Floating preedit did not start after the caret.")
+            AssertEqual(
+                candidate_box.mainFont.size * 20 / candidate_box.d2d.GetMetrics(
+                    RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT,
+                    candidate_box.mainFont.name,
+                    candidate_box.mainFont.size
+                ).h,
+                candidate_box.floating_preedit.font_size,
+                "Floating preedit did not scale the candidate font to the caret height."
+            )
+            AssertEqual(128, candidate_box.floating_preedit.opacity, "Floating preedit did not use 50% opacity.")
+            AssertEqual(24, candidate_box.floating_preedit.box_height, "Floating preedit did not match the caret height.")
+            AssertEqual(2, candidate_box.floating_preedit.content_y, "Floating preedit did not reserve the top border.")
+            AssertEqual(20, candidate_box.floating_preedit.content_height, "Floating preedit used the wrong inner height.")
+            AssertEqual(2, candidate_box.floating_preedit.content_x, "Floating preedit did not reserve the left border.")
+            AssertEqual(
+                candidate_box.floating_preedit.box_width - 4,
+                candidate_box.floating_preedit.content_width,
+                "Floating preedit used the wrong inner width."
+            )
+            AssertEqual(6, candidate_box.floating_preedit.draw_corner_radius, "Floating preedit changed a valid theme corner radius.")
+            AssertTrue(
+                candidate_box.floating_preedit.box_width > 0 && candidate_box.floating_preedit.box_height > 0,
+                "Floating preedit did not build a visible text surface."
+            )
+        } finally {
+            candidate_box.Dispose()
+        }
+    }
+}
+
+TestFloatingPreeditCornerRadius(style) {
+    local candidate_box := CandidateBox(style.With(Map(
+        "floating_preedit", true,
+        "corner_radius", 10,
+        "round_corner", 8,
+        "border_width", 4
+    )))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+    try {
+        candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 12, &width, &height)
+        AssertEqual(3, candidate_box.floating_preedit.draw_corner_radius, "Floating preedit corner radius exceeded one quarter of the caret height.")
+        AssertEqual(3, candidate_box.floating_preedit.draw_border_width, "Floating preedit border exceeded one quarter of the caret height.")
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestFloatingPreeditFallback(style) {
+    local candidate_box := CandidateBox(style.With(Map("floating_preedit", true)))
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+    try {
+        candidate_box.BuildFloatingPresentation(presentation, 100, 200, 0, 0, &width, &height)
+        AssertTrue(!candidate_box.floating_preedit_failed, "An invalid caret disabled floating preedit permanently.")
+        AssertTrue(!candidate_box.floating_preedit_active, "An invalid caret retained the floating layout.")
+        AssertTrue(
+            candidate_box.preeditLayout.segments.Length > 0,
+            "An invalid caret did not restore docked preedit text."
         )
     } finally {
         candidate_box.Dispose()

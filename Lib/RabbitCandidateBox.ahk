@@ -20,6 +20,7 @@
 #Include RabbitUIStyleSnapshot.ahk
 #Include RabbitCandidateBoxCommon.ahk
 #Include RabbitCandidatePresentation.ahk
+#Include RabbitFloatingPreedit.ahk
 #Include RabbitLayeredWindow.ahk
 #Include Direct2D/Direct2D.ahk
 
@@ -48,6 +49,10 @@ class CandidateBox {
         this.flow_animation_uses_previous_frame := false
         this.flow_animation_collapse_to_zero := false
         this.flow_animation_finish_pending := false
+        this.floating_preedit := 0
+        this.floating_preedit_active := false
+        this.floating_preedit_failed := false
+        this.floating_preedit_error := ""
         this.flow_animation_anchor_y := 0
         this.display_height := 0
         this.display_x := 0
@@ -85,6 +90,7 @@ class CandidateBox {
             return
         }
         this.Hide()
+        this.floating_preedit := 0
         this.layered_window := 0
         this.d2d := 0
         if this.gui {
@@ -131,6 +137,13 @@ class CandidateBox {
         this.hlLabelColor := style.hilited_label_color
         this.commentTxtColor := style.comment_text_color
         this.hlCommentTxtColor := style.hilited_comment_text_color
+        if this.floating_preedit {
+            this.floating_preedit.UpdateStyle(style)
+            if !style.floating_preedit {
+                this.floating_preedit.Hide()
+                this.floating_preedit_active := false
+            }
+        }
     }
 
     SetFlowAnimationAnchor(anchor_bottom) {
@@ -149,6 +162,56 @@ class CandidateBox {
     }
 
     BuildPresentation(presentation, &win_w, &win_h, max_width := 0) {
+        this.floating_preedit_active := false
+        if this.floating_preedit {
+            this.floating_preedit.Hide()
+        }
+        this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, true)
+    }
+
+    BuildFloatingPresentation(presentation, caret_x, caret_y, caret_w, caret_h, &win_w, &win_h, max_width := 0) {
+        this.AssertNotDisposed()
+        this.floating_preedit_active := false
+        if !this.style.floating_preedit || this.floating_preedit_failed {
+            if this.floating_preedit {
+                this.floating_preedit.Hide()
+            }
+            this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, true)
+            return
+        }
+        if caret_h <= 0 {
+            if this.floating_preedit {
+                this.floating_preedit.Hide()
+            }
+            this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, true)
+            return
+        }
+        if !RabbitFloatingPreedit.HasText(presentation.preedit) {
+            if this.floating_preedit {
+                this.floating_preedit.Hide()
+            }
+            this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, false)
+            return
+        }
+        try {
+            if !this.floating_preedit {
+                this.floating_preedit := RabbitFloatingPreedit(this.style, this.d2d_constructor)
+            }
+            this.floating_preedit.Build(presentation.preedit, caret_x, caret_y, caret_w, caret_h)
+        } catch as error {
+            this.floating_preedit_failed := true
+            this.floating_preedit_error := error.Message
+            if this.floating_preedit {
+                this.floating_preedit.Hide()
+            }
+            this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, true)
+            return
+        }
+        this.floating_preedit_active := true
+        this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, false)
+    }
+
+    BuildPresentationLayout(presentation, &win_w, &win_h, max_width, include_preedit) {
         local expanded
         this.AssertNotDisposed()
         this.flow_animation_anchor_bottom := false
@@ -157,19 +220,19 @@ class CandidateBox {
             this.flow_animation_pending := this.visible
                 && (this.flow_animation_active || expanded != this.flow_expanded)
             this.flow_expanded := expanded
-            this.BuildFlow(presentation, &win_w, &win_h, max_width)
+            this.BuildFlow(presentation, &win_w, &win_h, max_width, include_preedit)
             return
         }
         this.flow_animation_pending := false
         this.flow_expanded := false
         if this.layoutType = "vertical_text" {
-            this.BuildVerticalText(presentation, &win_w, &win_h)
+            this.BuildVerticalText(presentation, &win_w, &win_h, include_preedit)
             return
         }
-        this.BuildStacked(presentation, &win_w, &win_h)
+        this.BuildStacked(presentation, &win_w, &win_h, include_preedit)
     }
 
-    BuildStacked(presentation, &win_w, &win_h) { ; build text layout
+    BuildStacked(presentation, &win_w, &win_h, include_preedit := true) { ; build text layout
         local base_x, base_y, max_row_width
         local total_rows_height, label_box, candidate_box
         local comment_text, comment_box, row_rect, increment, label_width, candidate_width, comment, comment_gap
@@ -180,11 +243,13 @@ class CandidateBox {
         ; Build preedit layout
         base_x := this.borderWidth + this.padding
         base_y := this.borderWidth + this.lineSpacing
-        this.preeditLayout := this.BuildPreeditLayout(presentation, base_x, base_y)
+        this.preeditLayout := include_preedit
+            ? this.BuildPreeditLayout(presentation, base_x, base_y)
+            : this.CreateEmptyPreeditLayout(base_x, base_y)
         max_row_width := this.preeditLayout.width
 
         ; Build candidates layout
-        total_rows_height := this.preeditLayout.height + this.lineSpacing
+        total_rows_height := include_preedit ? this.preeditLayout.height + this.lineSpacing : 0
         base_y := base_y + total_rows_height
         this.candidatesLayout := { labels: [], cands: [], comments: [], rows: [] }
 
@@ -220,7 +285,9 @@ class CandidateBox {
             increment := row_rect.h + this.lineSpacing
             base_y += increment, total_rows_height += increment
         }
-        total_rows_height -= this.lineSpacing ; remove extra line spacing
+        if this.num_candidates {
+            total_rows_height -= this.lineSpacing ; remove extra line spacing
+        }
 
         this.commentOffset := 0
         this.boxWidth := Ceil(max_row_width) + (this.borderWidth + this.padding) * 2
@@ -302,10 +369,23 @@ class CandidateBox {
         return layout
     }
 
-    BuildVerticalText(presentation, &win_w, &win_h) {
+    CreateEmptyPreeditLayout(base_x, base_y) {
+        return {
+            segments: [],
+            selectedBox: 0,
+            left: base_x,
+            top: base_y,
+            width: 0,
+            height: 0
+        }
+    }
+
+    BuildVerticalText(presentation, &win_w, &win_h, include_preedit := true) {
         local base_x := this.borderWidth + this.padding
         local base_y := this.borderWidth + this.lineSpacing
-        local preedit_layout := this.BuildVerticalPreeditLayout(presentation, base_x, base_y)
+        local preedit_layout := include_preedit
+            ? this.BuildVerticalPreeditLayout(presentation, base_x, base_y)
+            : this.CreateEmptyPreeditLayout(base_x, base_y)
         local cards := []
         local candidates_width := 0
         local content_height := preedit_layout.height
@@ -474,10 +554,12 @@ class CandidateBox {
         }
     }
 
-    BuildFlow(presentation, &win_w, &win_h, max_width) {
+    BuildFlow(presentation, &win_w, &win_h, max_width, include_preedit := true) {
         local base_x := this.borderWidth + this.padding
         local base_y := this.borderWidth + this.lineSpacing
-        local preedit_layout := this.BuildPreeditLayout(presentation, base_x, base_y)
+        local preedit_layout := include_preedit
+            ? this.BuildPreeditLayout(presentation, base_x, base_y)
+            : this.CreateEmptyPreeditLayout(base_x, base_y)
         local preedit_width := preedit_layout.width
         local preedit_height := preedit_layout.height
         local page_size := presentation.flow_page_size
@@ -496,7 +578,9 @@ class CandidateBox {
         this.candidateHighlights := []
         this.preeditLayout := preedit_layout
         this.candidatesLayout := { labels: [], cands: [], comments: [], rows: [] }
-        base_y += preedit_height + this.lineSpacing
+        if include_preedit {
+            base_y += preedit_height + this.lineSpacing
+        }
 
         Loop page_size {
             label_widths.Push(0)
@@ -658,6 +742,9 @@ class CandidateBox {
         this.AssertNotDisposed()
         if !this.built {
             throw Error("Candidate box must be built before it is shown.")
+        }
+        if this.floating_preedit_active {
+            this.floating_preedit.Show()
         }
         this.CancelFlowAnimationFinish()
         this.StopFlowAnimation()
@@ -914,6 +1001,9 @@ class CandidateBox {
         this.CancelFlowAnimationFinish()
         this.flow_animation_pending := false
         this.render_pending := false
+        if this.floating_preedit {
+            this.floating_preedit.Hide()
+        }
         if this.visible {
             this.gui.Hide()
             this.visible := false

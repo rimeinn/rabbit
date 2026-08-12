@@ -40,7 +40,7 @@ class RabbitLayeredWindow {
         this.disposed := true
     }
 
-    Update(wic_bitmap, width, height, x, y, source_y := 0) {
+    Update(wic_bitmap, width, height, x, y, source_y := 0, opacity := 255) {
         local stride := width * 4
         local size := stride * height
         local destination := Buffer(8, 0)
@@ -80,7 +80,7 @@ class RabbitLayeredWindow {
         NumPut("int", height, window_size, 4)
         NumPut("uchar", 0, blend, 0) ; AC_SRC_OVER
         NumPut("uchar", 0, blend, 1)
-        NumPut("uchar", 255, blend, 2) ; Use the per-pixel alpha channel.
+        NumPut("uchar", opacity, blend, 2) ; Apply opacity to the per-pixel alpha channel.
         NumPut("uchar", 1, blend, 3) ; AC_SRC_ALPHA
 
         if !DllCall(

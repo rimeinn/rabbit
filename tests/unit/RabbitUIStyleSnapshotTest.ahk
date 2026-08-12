@@ -35,6 +35,8 @@ TestStyleSnapshotCopiesValues() {
     AssertEqual(160, style.min_width, "The default stacked minimum width changed.")
     AssertEqual(160, style.min_height, "The default vertical text minimum height changed.")
     AssertTrue(!style.vertical_text_left_to_right, "The default vertical text direction is not right to left.")
+    AssertTrue(!style.floating_preedit, "Floating preedit is not disabled by default.")
+    AssertEqual(0.8, style.floating_preedit_opacity, "The default floating preedit opacity changed.")
 
     local overrides := Map("font_point", 21)
     local updated_style := style.With(overrides)
@@ -56,6 +58,8 @@ TestStyleSnapshotParsing() {
     AssertEqual(240, light_style.min_height, "The vertical text minimum height was not parsed.")
     AssertEqual("flow", light_style.layout_type, "The active layout type was not parsed.")
     AssertTrue(light_style.vertical_text_left_to_right, "The vertical text direction was not parsed.")
+    AssertTrue(light_style.floating_preedit, "Floating preedit was not parsed.")
+    AssertEqual(0.25, light_style.floating_preedit_opacity, "Floating preedit opacity was not parsed.")
     AssertEqual(9, light_style.flow_rows, "Flow rows were not clamped to the supported range.")
     AssertEqual(7, light_style.candidate_spacing, "Candidate spacing was not parsed.")
     AssertEqual("center", light_style.align_type, "Candidate alignment was not parsed.")
@@ -89,6 +93,8 @@ CreateStyleConfigValues() {
         "style/layout/min_height", 240,
         "style/layout/type", "flow",
         "style/vertical_text_left_to_right", true,
+        "style/floating_preedit", true,
+        "style/floating_preedit_opacity", 0.25,
         "style/layout/flow_rows", 12,
         "style/layout/candidate_spacing", 7,
         "style/layout/align_type", "center",
@@ -123,6 +129,14 @@ class RabbitUIStyleRimeProbe {
     }
 
     config_test_get_int(config, key, &value) {
+        if !this.values.Has(key) {
+            return false
+        }
+        value := this.values[key]
+        return true
+    }
+
+    config_test_get_double(config, key, &value) {
         if !this.values.Has(key) {
             return false
         }
