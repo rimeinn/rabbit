@@ -75,6 +75,9 @@ class RabbitInputTarget {
         if this.IsDesktop(descriptor) {
             return this.NO
         }
+        if this.IsProcessExplorer(descriptor) {
+            return this.NO
+        }
         if descriptor.process_name != "explorer.exe" {
             return this.UNKNOWN
         }
@@ -131,6 +134,15 @@ class RabbitInputTarget {
     static IsExplorerFileView(descriptor) {
         return this.ContainsClass(descriptor.focus_classes, "shelldll_defview")
             || this.ContainsClass(descriptor.focus_classes, "syslistview32")
+    }
+
+    static IsProcessExplorer(descriptor) {
+        local process_name := descriptor.process_name
+        return (process_name = "procexp.exe"
+                || process_name = "procexp64.exe"
+                || process_name = "procexp64a.exe")
+            && (this.ContainsClass(descriptor.focus_classes, "procexplorer")
+                || this.ContainsClass(descriptor.active_classes, "procexplorer"))
     }
 
     static IsTaskbarControl(descriptor) {

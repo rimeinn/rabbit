@@ -21,6 +21,8 @@
 
 RunTest("Explorer file view is a non-text target", TestExplorerFileViewIsNo.Bind())
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())
+RunTest("Process Explorer process list is a non-text target", TestProcessExplorerListIsNo.Bind())
+RunTest("Process Explorer edit control remains a text target", TestProcessExplorerEditControlIsYes.Bind())
 RunTest("Desktop is a non-text target", TestDesktopIsNo.Bind())
 RunTest("Taskbar button is a non-text target", TestTaskbarButtonIsNo.Bind())
 RunTest("Unrecognized target remains unknown", TestUnknownTarget.Bind())
@@ -44,6 +46,30 @@ TestExplorerEditControlIsYes() {
             ["edit", "directuihwnd", "cabinetwclass"]
         )),
         "An Explorer edit control was classified as a non-text target."
+    )
+}
+
+TestProcessExplorerListIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "procexp64.exe",
+            ["syslistview32", "procexplorer"],
+            ["procexplorer"]
+        )),
+        "The Process Explorer process list was not classified as a non-text target."
+    )
+}
+
+TestProcessExplorerEditControlIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "procexp64.exe",
+            ["edit", "procexplorer"],
+            ["procexplorer"]
+        )),
+        "A Process Explorer edit control was classified as a non-text target."
     )
 }
 
