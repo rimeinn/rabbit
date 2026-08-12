@@ -18,22 +18,5 @@
 
 #Requires AutoHotkey v2.0
 
-#Include RabbitAppContextTest.ahk
-#Include RabbitApplicationTest.ahk
-#Include RabbitCandidatePresentationTest.ahk
-#Include RabbitCandidateViewportTest.ahk
-#Include RabbitConfigSnapshotTest.ahk
-#Include RabbitDeployerContextTest.ahk
-#Include RabbitDeployerWorkflowTest.ahk
-#Include RabbitInputControllerTest.ahk
-#Include RabbitInputTargetTest.ahk
-#Include RabbitIconTest.ahk
-#Include RabbitPopupPlacementTest.ahk
-#Include RabbitShutdownTest.ahk
-#Include RabbitStatusTipTest.ahk
-#Include RabbitTestCommonTest.ahk
-#Include RabbitTrayClickTest.ahk
-#Include RabbitTrayStatusTipTest.ahk
-#Include RabbitUIStyleSnapshotTest.ahk
-
-ExitApp()
+; These tests intentionally exercise native candidate windows and must not run in headless CI.
+#Include ..\unit\RabbitCandidateBoxTest.ahk

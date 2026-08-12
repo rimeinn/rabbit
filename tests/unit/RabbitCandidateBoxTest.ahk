@@ -122,7 +122,7 @@ CreateCandidateContext() {
 }
 
 LoadCandidateBoxGolden() {
-    local path := A_ScriptDir . "\RabbitCandidateBoxGolden.ini"
+    local path := RegExReplace(A_LineFile, "\\[^\\]+$") . "\RabbitCandidateBoxGolden.ini"
     if !FileExist(path) {
         throw Error("Candidate box golden file was not found: " . path)
     }

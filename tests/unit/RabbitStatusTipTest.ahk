@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,11 +30,13 @@ TestStatusTipRendersContent() {
         RabbitUIStyleSnapshot(),
         RabbitConfigSnapshot(Map("show_tips_time", 1000)),
         (*) => d2d,
-        (*) => layered_window
+        (*) => layered_window,
+        (*) => RabbitStatusTipGuiProbe()
     )
     try {
         tip.Show("西", A_ScriptDir . "\..\..\Lib\rabbit-ascii.ico")
         AssertEqual("西", tip.text, "The status tip did not retain its label.")
+        AssertEqual(tip.icon_size, tip.loaded_icon_size, "The status tip used the wrong icon target size.")
         AssertEqual(1, d2d.scaled_image_calls, "The status tip did not render its icon.")
         AssertEqual(tip.icon_size, d2d.scaled_image_width, "The status tip did not scale its icon width.")
         AssertEqual(tip.icon_size, d2d.scaled_image_height, "The status tip did not scale its icon height.")
@@ -58,11 +60,13 @@ TestVerticalStatusTipRendersContent() {
         style,
         RabbitConfigSnapshot(Map("show_tips_time", 1000)),
         (*) => d2d,
-        (*) => layered_window
+        (*) => layered_window,
+        (*) => RabbitStatusTipGuiProbe()
     )
     try {
         tip.Show("竖排文字", A_ScriptDir . "\..\..\Lib\rabbit-ascii.ico")
         AssertEqual("竖排文字", tip.text, "The vertical status tip did not retain its label.")
+        AssertEqual(tip.icon_size, tip.loaded_icon_size, "The vertical status tip used the wrong icon target size.")
         AssertEqual(1, d2d.scaled_image_calls, "The vertical status tip did not render its icon.")
         AssertEqual(tip.icon_size, d2d.scaled_image_width, "The vertical status tip changed its icon width.")
         AssertEqual(tip.icon_size, d2d.scaled_image_height, "The vertical status tip changed its icon height.")
@@ -101,6 +105,11 @@ class RabbitStatusTipProbe extends RabbitStatusTip {
             h: 16,
             monitor_info: { work: { left: 0, top: 0, right: 800, bottom: 600 } }
         }
+    }
+
+    GetSavedOrCreateIconBitmap(icon_path, icon_size) {
+        this.loaded_icon_size := icon_size
+        return 1
     }
 }
 
@@ -188,5 +197,20 @@ class RabbitStatusTipLayeredWindowProbe {
     }
 
     Dispose() {
+    }
+}
+
+class RabbitStatusTipGuiProbe {
+    __New() {
+        this.Hwnd := 1
+    }
+
+    Show(options := "") {
+    }
+
+    Hide() {
+    }
+
+    Destroy() {
     }
 }

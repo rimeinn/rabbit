@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,10 +20,17 @@
 #Include RabbitPopupPlacement.ahk
 #Include RabbitUIStyleSnapshot.ahk
 #Include RabbitLayeredWindow.ahk
+#Include RabbitIcon.ahk
 #Include Direct2D/Direct2D.ahk
 
 class RabbitStatusTip {
-    __New(style, config, d2d_constructor := Direct2D, layered_window_constructor := RabbitLayeredWindow) {
+    __New(
+        style,
+        config,
+        d2d_constructor := Direct2D,
+        layered_window_constructor := RabbitLayeredWindow,
+        gui_constructor := Gui
+    ) {
         this.gui := 0
         this.d2d := 0
         this.d2d_constructor := d2d_constructor
@@ -36,7 +43,7 @@ class RabbitStatusTip {
         this.hide_callback := this.Hide.Bind(this)
         try {
             ; WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
-            this.gui := Gui("-Caption -DPIScale +E0x80800A8")
+            this.gui := gui_constructor.Call("-Caption -DPIScale +E0x80800A8")
             this.d2d := this.CreateRenderTarget(1, 1)
             this.layered_window := layered_window_constructor.Call(this.gui.Hwnd)
             this.dpi_scale := this.d2d.GetDesktopDpiScale()
@@ -289,24 +296,20 @@ class RabbitStatusTip {
     }
 
     DrawIcon() {
-        if !HasMethod(this.d2d, "GetSavedOrCreateImgBitmap") {
-            this.d2d.DrawImage(
-                this.icon_path,
-                this.icon_x,
-                this.icon_y,
-                this.icon_size,
-                this.icon_size
-            )
-            return
-        }
-        NumPut("float", this.icon_x, this.d2d.bmpDstRect, 0)
-        NumPut("float", this.icon_y, this.d2d.bmpDstRect, 4)
-        NumPut("float", this.icon_x + this.icon_size, this.d2d.bmpDstRect, 8)
-        NumPut("float", this.icon_y + this.icon_size, this.d2d.bmpDstRect, 12)
-        if (bitmap := this.d2d.GetSavedOrCreateImgBitmap(this.icon_path)) {
+        local icon_x := Round(this.icon_x)
+        local icon_y := Round(this.icon_y)
+        NumPut("float", icon_x, this.d2d.bmpDstRect, 0)
+        NumPut("float", icon_y, this.d2d.bmpDstRect, 4)
+        NumPut("float", icon_x + this.icon_size, this.d2d.bmpDstRect, 8)
+        NumPut("float", icon_y + this.icon_size, this.d2d.bmpDstRect, 12)
+        if (bitmap := this.GetSavedOrCreateIconBitmap(this.icon_path, this.icon_size)) {
             ; Leave the source rectangle empty so Direct2D scales the complete image into bmpDstRect.
             this.d2d.ID2D1RenderTarget.DrawBitmap(bitmap, this.d2d.bmpDstRect, 1, 1)
         }
+    }
+
+    GetSavedOrCreateIconBitmap(icon_path, icon_size) {
+        return RabbitIcon.GetSavedOrCreateBitmap(this.d2d, icon_path, icon_size)
     }
 
     ResolveIconPath(icon_path) {
