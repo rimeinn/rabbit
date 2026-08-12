@@ -22,16 +22,21 @@
 #Include ..\..\Lib\RabbitCommon.ahk
 #Include ..\..\Lib\RabbitDictManagementDialog.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsDialog.ahk
+#Include ..\support\TestCommon.ahk
 
-RunDeployerDialogTests()
+RunTest("deployer dialog ownership", RunDeployerDialogTests.Bind())
 
 RunDeployerDialogTests() {
+    local repository_root := A_ScriptDir . "\..\.."
     local rime := RimeApi(A_ScriptDir . "\..\..\Lib\librime-ahk\rime.dll")
     local traits := RabbitCreateTraits()
     local levers := 0
     local switcher_settings := 0
     local switcher_dialog := 0
     local dict_dialog := 0
+    traits.shared_data_dir := repository_root . "\Data"
+    traits.user_data_dir := repository_root . "\Rime"
+    traits.prebuilt_data_dir := traits.shared_data_dir
     rime.setup(traits)
     rime.deployer_initialize(0)
 
@@ -44,7 +49,6 @@ RunDeployerDialogTests() {
 
         switcher_dialog := SwitcherSettingsDialog(switcher_settings, levers)
         dict_dialog := DictManagementDialog(rime, levers)
-        FileAppend("PASS: deployer dialog ownership`n", "*")
     } finally {
         if dict_dialog {
             dict_dialog.Dispose()

@@ -22,14 +22,19 @@
 #Include ..\..\Lib\RabbitCommon.ahk
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
 #Include ..\..\Lib\RabbitUIStyleSettingsDialog.ahk
+#Include ..\support\TestCommon.ahk
 
-RunUIStylePreviewTest()
+RunTest("UI style preview snapshots", RunUIStylePreviewTest.Bind())
 
 RunUIStylePreviewTest() {
+    local repository_root := A_ScriptDir . "\..\.."
     local dialog := 0
     local settings := 0
     local rime := RimeApi(A_ScriptDir . "\..\..\Lib\librime-ahk\rime.dll")
     local traits := RabbitCreateTraits()
+    traits.shared_data_dir := repository_root . "\Data"
+    traits.user_data_dir := repository_root . "\Rime"
+    traits.prebuilt_data_dir := traits.shared_data_dir
     rime.setup(traits)
     rime.deployer_initialize(0)
 
@@ -58,7 +63,6 @@ RunUIStylePreviewTest() {
             }
         }
 
-        FileAppend("PASS: UI style preview snapshots`n", "*")
     } finally {
         if dialog {
             dialog.Dispose()
