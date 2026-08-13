@@ -14,6 +14,9 @@ show_tips_time: 1200
 # <0: never send by clipboard
 send_by_clipboard_length: 8
 
+# Let physical keystrokes pass through without Rime processing in password fields
+bypass_password_fields: true
+
 app_options:
   cmd.exe:
     ascii_mode: true

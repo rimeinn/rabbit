@@ -80,6 +80,9 @@ class RabbitConfigLoader {
             if rime_api.config_test_get_bool(config, "use_caret_hook", &result) {
                 values["use_caret_hook"] := !!result
             }
+            if rime_api.config_test_get_bool(config, "bypass_password_fields", &result) {
+                values["bypass_password_fields"] := !!result
+            }
 
             dark_mode := RabbitIsUserDarkMode()
             ui_style := RabbitUIStyleSnapshot.FromConfig(rime_api, config, dark_mode)

@@ -79,6 +79,6 @@ rabbit/
 
 - 某些情况无法获得输入光标的坐标；这只会影响候选框定位，候选框会回退到鼠标位置。Rabbit 不会仅因 caret 探测失败而禁用输入，而是根据当前焦点控件判断输入目标。
 - Windows 文件资源管理器的文件视图、桌面图标区和任务栏非编辑控件会透传普通文本按键，以保留系统的按字母定位等行为；资源管理器地址栏、搜索框和重命名框仍可使用 Rabbit 输入。
-- 桌面版 QQ 的密码输入框无法使用：[QQ密码输入框（防键盘钩子）原理分析](https://blog.csdn.net/muyedongfeng/article/details/49308993)，
-（[页面存档备份](https://web.archive.org/web/20240907052640/https://blog.csdn.net/muyedongfeng/article/details/49308993)，存于互联网档案馆），可右键点击任务栏图标选择禁用/启用玉兔毫，或是在 `rabbit.custom.yaml` 里设置 `suspend_hotkey` 指定快捷键来禁用/启用玉兔毫
+- Rabbit 会根据 UI Automation 的 `IsPassword` 属性及原生编辑框的密码字符自动识别通用密码框；聚焦密码框时会临时停止拦截普通输入热键，让物理按键直接交给目标程序，离开后自动恢复。可在 `rabbit.custom.yaml` 中将 `bypass_password_fields` 设为 `false` 关闭此行为。
+- 桌面版 QQ 密码框具有[防键盘钩子机制](https://blog.csdn.net/muyedongfeng/article/details/49308993)（[页面存档备份](https://web.archive.org/web/20240907052640/https://blog.csdn.net/muyedongfeng/article/details/49308993)）；上述自动绕过尚未在 QQ 中验证。若 QQ 的自绘密码框未暴露标准密码属性，仍需右键点击任务栏图标禁用/启用玉兔毫，或设置 `suspend_hotkey` 快捷键手动切换。
 - 在 Windows 7 中打开玉兔毫时可能会造成系统一段时间无响应，需等待初始化完成，原因未知

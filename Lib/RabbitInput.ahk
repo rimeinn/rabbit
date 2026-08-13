@@ -20,6 +20,7 @@
 #Include RabbitKeyTable.ahk
 #Include RabbitInputHotkeys.ahk
 #Include RabbitInputTarget.ahk
+#Include RabbitPasswordField.ahk
 #Include RabbitCaret.ahk
 #Include RabbitMonitors.ahk
 #Include RabbitPopupPlacement.ahk
@@ -30,8 +31,20 @@
 
 class RabbitInputController {
     static FOCUS_POLL_INTERVAL := 50
+    static PASSWORD_POLL_INTERVAL := 250
+    static EVENT_OBJECT_FOCUS := 0x8005
+    static WINEVENT_OUTOFCONTEXT := 0x0000
 
-    __New(rime_api, session_id, candidate_box, config, runtime_state, tray, input_target := 0) {
+    __New(
+        rime_api,
+        session_id,
+        candidate_box,
+        config,
+        runtime_state,
+        tray,
+        input_target := 0,
+        password_field_detector := 0
+    ) {
         this.rime := rime_api
         this.session_id := session_id
         this.candidate_box := candidate_box
@@ -39,6 +52,9 @@ class RabbitInputController {
         this.runtime_state := runtime_state
         this.tray := tray
         this.input_target := input_target ? input_target : RabbitInputTarget
+        this.password_field_detector := config.bypass_password_fields
+            ? (password_field_detector ? password_field_detector : RabbitPasswordFieldDetector())
+            : 0
         this.suspend_hotkey_mask := 0
         this.suspend_hotkey := ""
         this.prev_show := false
@@ -50,8 +66,14 @@ class RabbitInputController {
         this.switcher_state := 0
         this.focus_timer_callback := this.CheckCompositionFocus.Bind(this)
         this.focus_timer_running := false
+        this.focus_event_handler := this.OnFocusEvent.Bind(this)
+        this.focus_event_callback := 0
+        this.focus_event_hook := 0
+        this.password_poll_ticks := 0
+        this.password_bypass_active := false
         this.registered_hotkeys := []
         this.registered_hotkey_names := Map()
+        this.registered_input_hotkeys := []
     }
 
     RegisterHotKeys() {
@@ -68,7 +90,7 @@ class RabbitInputController {
         ; static: schema changes do not repeatedly install and remove hotkeys.
         if this.config.input_hotkeys {
             for registration in this.config.input_hotkeys.GetRegistrations() {
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     (registration.pass_through ? "$~" : "$") . registration.hotkey,
                     this.ProcessConfiguredKey.Bind(
                         this,
@@ -85,7 +107,7 @@ class RabbitInputController {
         Loop 2 {
             local key_map := A_Index = 1 ? KeyDef.plain_keycode : KeyDef.other_keycode
             for key, _ in key_map {
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$" . key,
                     this.ProcessTextKey.Bind(this, key, 0),
                     "S0"
@@ -101,25 +123,25 @@ class RabbitInputController {
         ; Shifted letters and symbols must remain registered even when no
         ; schema binding mentions them: they are required for normal text input.
         for key, _ in KeyDef.shifted_keycode {
-            this.RegisterHotKey(
+            this.RegisterInputHotKey(
                 "$<+" . key,
                 this.ProcessTextKey.Bind(this, key, shift),
                 "S0"
             )
-            this.RegisterHotKey(
+            this.RegisterInputHotKey(
                 "$>+" . key,
                 this.ProcessTextKey.Bind(this, key, shift),
                 "S0"
             )
             if has_lshift {
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$<+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
                     "S0"
                 )
             }
             if has_rshift {
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$>+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
                     "S0"
@@ -132,24 +154,24 @@ class RabbitInputController {
         ; application can handle the native combination itself.
         for key, _ in KeyDef.other_keycode {
             if has_lshift {
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$<+" . key,
                     this.ProcessTextKey.Bind(this, key, shift),
                     "S0"
                 )
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$<+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
                     "S0"
                 )
             }
             if has_rshift {
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$>+" . key,
                     this.ProcessTextKey.Bind(this, key, shift),
                     "S0"
                 )
-                this.RegisterHotKey(
+                this.RegisterInputHotKey(
                     "$>+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
                     "S0"
@@ -161,7 +183,7 @@ class RabbitInputController {
         ; registered yet: they are uncommon and would broaden interception.
 
         ; Special handling
-        this.RegisterHotKey(
+        this.RegisterInputHotKey(
             "$Space Up",
             this.ProcessTextKey.Bind(this, "Space", up),
             "S0"
@@ -234,15 +256,27 @@ class RabbitInputController {
             if update_existing {
                 Hotkey(name, callback, options)
             }
-            return
+            return false
         }
         Hotkey(name, callback, options)
         this.registered_hotkeys.Push(name)
         this.registered_hotkey_names[name] := true
+        return true
+    }
+
+    RegisterInputHotKey(name, callback, options) {
+        if this.RegisterHotKey(name, callback, options) {
+            this.registered_input_hotkeys.Push(name)
+            if this.password_bypass_active {
+                this.SetInputHotKeyEnabled(name, false)
+            }
+        }
     }
 
     StartFocusMonitor() {
         if !this.focus_timer_running {
+            this.RegisterFocusEventHook()
+            this.UpdatePasswordBypass()
             SetTimer(
                 this.focus_timer_callback,
                 RabbitInputController.FOCUS_POLL_INTERVAL
@@ -251,12 +285,98 @@ class RabbitInputController {
         }
     }
 
+    RegisterFocusEventHook() {
+        if !this.password_field_detector || this.focus_event_hook {
+            return false
+        }
+
+        this.focus_event_callback := CallbackCreate(this.focus_event_handler, , 7)
+        this.focus_event_hook := DllCall(
+            "User32\SetWinEventHook",
+            "UInt",
+            RabbitInputController.EVENT_OBJECT_FOCUS,
+            "UInt",
+            RabbitInputController.EVENT_OBJECT_FOCUS,
+            "Ptr",
+            0,
+            "Ptr",
+            this.focus_event_callback,
+            "UInt",
+            0,
+            "UInt",
+            0,
+            "UInt",
+            RabbitInputController.WINEVENT_OUTOFCONTEXT,
+            "Ptr"
+        )
+        if !this.focus_event_hook {
+            CallbackFree(this.focus_event_callback)
+            this.focus_event_callback := 0
+            return false
+        }
+        return true
+    }
+
+    UnregisterFocusEventHook() {
+        if this.focus_event_hook {
+            DllCall("User32\UnhookWinEvent", "Ptr", this.focus_event_hook)
+            this.focus_event_hook := 0
+        }
+        if this.focus_event_callback {
+            CallbackFree(this.focus_event_callback)
+            this.focus_event_callback := 0
+        }
+    }
+
+    OnFocusEvent(*) {
+        try {
+            this.password_poll_ticks := 0
+            this.UpdatePasswordBypass()
+        }
+    }
+
+    UpdatePasswordBypass() {
+        if !this.password_field_detector {
+            return false
+        }
+        return this.SetPasswordBypass(
+            this.password_field_detector.IsFocusedPasswordField()
+        )
+    }
+
+    SetPasswordBypass(enabled) {
+        enabled := !!enabled
+        if enabled = this.password_bypass_active {
+            return false
+        }
+
+        local previous_critical := Critical()
+        try {
+            this.password_bypass_active := enabled
+            local name
+            for name in this.registered_input_hotkeys {
+                this.SetInputHotKeyEnabled(name, !enabled)
+            }
+            if enabled {
+                this.ClearCompositionIfActive()
+            }
+            return true
+        } finally {
+            Critical(previous_critical)
+        }
+    }
+
+    SetInputHotKeyEnabled(name, enabled) {
+        Hotkey(name, , enabled ? "On" : "Off")
+    }
+
     Dispose() {
         local name
         if this.focus_timer_running {
             SetTimer(this.focus_timer_callback, 0)
             this.focus_timer_running := false
         }
+        this.UnregisterFocusEventHook()
         for name in this.registered_hotkeys {
             try {
                 Hotkey(name, , "Off")
@@ -264,6 +384,8 @@ class RabbitInputController {
         }
         this.registered_hotkeys := []
         this.registered_hotkey_names := Map()
+        this.registered_input_hotkeys := []
+        this.password_bypass_active := false
     }
 
     ProcessTextKey(key, mask, this_hotkey := "") {
@@ -515,6 +637,14 @@ class RabbitInputController {
 
     CheckCompositionFocus() {
         this.CancelCompositionIfFocusChanged(this.GetForegroundWindow())
+        if this.password_field_detector {
+            this.password_poll_ticks++
+            if this.password_poll_ticks * RabbitInputController.FOCUS_POLL_INTERVAL
+                >= RabbitInputController.PASSWORD_POLL_INTERVAL {
+                this.password_poll_ticks := 0
+                this.UpdatePasswordBypass()
+            }
+        }
     }
 
     CancelCompositionIfFocusChanged(foreground_hwnd) {

@@ -26,6 +26,7 @@ RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
+RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
 RunTest("switcher temporary schema preserves mode baseline", TestSwitcherTemporarySchemaPreservesModeBaseline.Bind())
 RunTest("switcher ASCII selection shows mode status", TestSwitcherAsciiSelectionShowsModeStatus.Bind())
@@ -61,6 +62,14 @@ TestInputHotkeyOwnership() {
         "A right Ctrl+Shift character combination was registered without a standalone Shift binding."
     )
     AssertTrue(input.registered_hotkeys.Length > 0, "The input owner did not record its hotkeys.")
+    AssertTrue(
+        ArrayContains(input.registered_input_hotkeys, "$A"),
+        "An ordinary text hotkey was not marked as password-field input."
+    )
+    AssertTrue(
+        !ArrayContains(input.registered_input_hotkeys, "$^!Space"),
+        "The suspend hotkey was disabled together with password-field input."
+    )
     input.Dispose()
     input.Dispose()
     Persistent(false)
@@ -374,6 +383,48 @@ TestFocusChangeClearsComposition() {
     AssertEqual(0, input.composition_owner_hwnd, "An empty context retained a composition owner.")
 }
 
+TestPasswordFieldBypassControlsInputHotkeys() {
+    local rime := RabbitInputRimeProbe()
+    local candidate_box := RabbitInputCandidateProbe()
+    local detector := RabbitPasswordFieldDetectorProbe(true)
+    local input := RabbitPasswordBypassControllerProbe(
+        rime,
+        candidate_box,
+        RabbitConfigSnapshot(),
+        detector
+    )
+    input.registered_input_hotkeys := ["$A", "$Space Up"]
+    input.composition_owner_hwnd := 100
+    input.prev_show := true
+
+    AssertTrue(
+        input.UpdatePasswordBypass(),
+        "Entering a password field did not change the bypass state."
+    )
+    AssertTrue(input.password_bypass_active, "The password-field bypass was not activated.")
+    AssertEqual(2, input.hotkey_state_changes.Length, "Not all input hotkeys were disabled.")
+    AssertTrue(!input.hotkey_state_changes[1].enabled, "An input hotkey remained enabled in a password field.")
+    AssertTrue(!input.hotkey_state_changes[2].enabled, "A release hotkey remained enabled in a password field.")
+    AssertEqual(1, rime.clear_calls, "Entering a password field did not clear the Rime composition.")
+    AssertEqual(1, candidate_box.hide_calls, "Entering a password field did not hide the candidate box.")
+
+    AssertTrue(
+        !input.UpdatePasswordBypass(),
+        "An unchanged password-field state rewrote the hotkey state."
+    )
+    AssertEqual(2, input.hotkey_state_changes.Length, "An unchanged state toggled input hotkeys again.")
+
+    detector.is_password := false
+    AssertTrue(
+        input.UpdatePasswordBypass(),
+        "Leaving a password field did not change the bypass state."
+    )
+    AssertTrue(!input.password_bypass_active, "The password-field bypass remained active after focus left.")
+    AssertEqual(4, input.hotkey_state_changes.Length, "Not all input hotkeys were restored.")
+    AssertTrue(input.hotkey_state_changes[3].enabled, "An input hotkey was not restored after leaving.")
+    AssertTrue(input.hotkey_state_changes[4].enabled, "A release hotkey was not restored after leaving.")
+}
+
 TestNonTextTargetBypassesRimeInput() {
     local rime := RabbitInputRimeProbe()
     local candidate_box := RabbitInputCandidateProbe()
@@ -620,5 +671,35 @@ class RabbitInputTargetControllerProbe extends RabbitInputController {
             mask: mask,
             pass_through: pass_through
         })
+    }
+}
+
+class RabbitPasswordFieldDetectorProbe {
+    __New(is_password) {
+        this.is_password := is_password
+    }
+
+    IsFocusedPasswordField() {
+        return this.is_password
+    }
+}
+
+class RabbitPasswordBypassControllerProbe extends RabbitInputController {
+    __New(rime, candidate_box, config, detector) {
+        super.__New(
+            rime,
+            42,
+            candidate_box,
+            config,
+            {},
+            {},
+            RabbitInputTargetProbe(RabbitInputTarget.UNKNOWN),
+            detector
+        )
+        this.hotkey_state_changes := []
+    }
+
+    SetInputHotKeyEnabled(name, enabled) {
+        this.hotkey_state_changes.Push({ name: name, enabled: enabled })
     }
 }

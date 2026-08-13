@@ -21,6 +21,7 @@
 
 RunTest("config snapshot collection boundaries", TestConfigSnapshotCollections.Bind())
 RunTest("caret hook defaults to disabled", TestCaretHookDefaults.Bind())
+RunTest("password field bypass defaults to enabled", TestPasswordFieldBypassDefaults.Bind())
 
 TestConfigSnapshotCollections() {
     local process_modes := Map("code.exe", true)
@@ -68,5 +69,19 @@ TestCaretHookDefaults() {
     AssertTrue(
         enabled_config.use_caret_hook,
         "An explicit caret-hook opt-in was not preserved."
+    )
+}
+
+TestPasswordFieldBypassDefaults() {
+    local default_config := RabbitConfigSnapshot()
+    local disabled_config := RabbitConfigSnapshot(Map("bypass_password_fields", false))
+
+    AssertTrue(
+        default_config.bypass_password_fields,
+        "Password-field bypass was disabled without an explicit setting."
+    )
+    AssertTrue(
+        !disabled_config.bypass_password_fields,
+        "An explicit password-field bypass opt-out was not preserved."
     )
 }
