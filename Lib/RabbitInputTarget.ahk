@@ -21,19 +21,39 @@ class RabbitInputTarget {
     static NO := "no"
     static UNKNOWN := "unknown"
 
+    static UIA_EDIT_CONTROL_TYPE_ID := 50004
+    static UIA_LIST_ITEM_CONTROL_TYPE_ID := 50007
+    static UIA_LIST_CONTROL_TYPE_ID := 50008
+    static UIA_TREE_CONTROL_TYPE_ID := 50023
+    static UIA_TREE_ITEM_CONTROL_TYPE_ID := 50024
+    static UIA_DATA_GRID_CONTROL_TYPE_ID := 50028
+    static UIA_DATA_ITEM_CONTROL_TYPE_ID := 50029
+    static UIA_DOCUMENT_CONTROL_TYPE_ID := 50030
+
     static Classify(foreground_hwnd) {
         if !(descriptor := this.Describe(foreground_hwnd)) {
             return this.UNKNOWN
+        }
+        if this.IsWpfWindow(descriptor) {
+            descriptor.uia_control_types := this.GetFocusedUIAutomationControlTypes(descriptor.process_id)
         }
         return this.ClassifyDescriptor(descriptor)
     }
 
     static Describe(foreground_hwnd) {
         local thread_id, gui_info, active_hwnd, focus_hwnd, target_hwnd
+        local process_id := 0
         if !foreground_hwnd {
             return 0
         }
-        if !(thread_id := DllCall("GetWindowThreadProcessId", "Ptr", foreground_hwnd, "Ptr", 0, "UInt")) {
+        if !(thread_id := DllCall(
+            "GetWindowThreadProcessId",
+            "Ptr",
+            foreground_hwnd,
+            "UInt*",
+            &process_id,
+            "UInt"
+        )) {
             return 0
         }
 
@@ -62,6 +82,7 @@ class RabbitInputTarget {
         return {
             active_hwnd: active_hwnd,
             focus_hwnd: focus_hwnd,
+            process_id: process_id,
             process_name: StrLower(process_name),
             focus_classes: this.GetClassChain(target_hwnd),
             active_classes: active_hwnd ? this.GetClassChain(active_hwnd) : []
@@ -72,10 +93,16 @@ class RabbitInputTarget {
         if this.ContainsEditableClass(descriptor.focus_classes) {
             return this.YES
         }
+        if this.IsWpfTextTarget(descriptor) {
+            return this.YES
+        }
         if this.IsDesktop(descriptor) {
             return this.NO
         }
         if this.IsProcessExplorer(descriptor) {
+            return this.NO
+        }
+        if this.IsWpfSelectionTarget(descriptor) {
             return this.NO
         }
         if this.IsOpenWithDialog(descriptor) {
@@ -151,6 +178,119 @@ class RabbitInputTarget {
                 || this.ContainsClass(descriptor.active_classes, "procexplorer"))
     }
 
+    static IsWpfWindow(descriptor) {
+        return this.ContainsClassPrefix(descriptor.focus_classes, "hwndwrapper[")
+            || this.ContainsClassPrefix(descriptor.active_classes, "hwndwrapper[")
+    }
+
+    static IsWpfTextTarget(descriptor) {
+        if !this.IsWpfWindow(descriptor) {
+            return false
+        }
+        local control_types := this.GetDescriptorUIAutomationControlTypes(descriptor)
+        return this.ContainsControlType(control_types, this.UIA_EDIT_CONTROL_TYPE_ID)
+            || this.ContainsControlType(control_types, this.UIA_DOCUMENT_CONTROL_TYPE_ID)
+    }
+
+    static IsWpfSelectionTarget(descriptor) {
+        if !this.IsWpfWindow(descriptor) {
+            return false
+        }
+        local control_types := this.GetDescriptorUIAutomationControlTypes(descriptor)
+        return this.ContainsControlType(control_types, this.UIA_LIST_ITEM_CONTROL_TYPE_ID)
+            || this.ContainsControlType(control_types, this.UIA_LIST_CONTROL_TYPE_ID)
+            || this.ContainsControlType(control_types, this.UIA_TREE_CONTROL_TYPE_ID)
+            || this.ContainsControlType(control_types, this.UIA_TREE_ITEM_CONTROL_TYPE_ID)
+            || this.ContainsControlType(control_types, this.UIA_DATA_GRID_CONTROL_TYPE_ID)
+            || this.ContainsControlType(control_types, this.UIA_DATA_ITEM_CONTROL_TYPE_ID)
+    }
+
+    static GetDescriptorUIAutomationControlTypes(descriptor) {
+        return descriptor.HasOwnProp("uia_control_types") ? descriptor.uia_control_types : []
+    }
+
+    static GetFocusedUIAutomationControlTypes(expected_process_id) {
+        local control_types := []
+        local uia := this.GetUIAutomation()
+        local focused_element, walker, current_element, parent_element
+        local process_id, control_type
+        if !uia {
+            return control_types
+        }
+
+        try {
+            focused_element := ComValue(13, 0)
+            ComCall(8, uia, "Ptr*", focused_element)
+            if !focused_element.Ptr {
+                return control_types
+            }
+
+            walker := ComValue(13, 0)
+            ComCall(14, uia, "Ptr*", walker)
+            if !walker.Ptr {
+                return control_types
+            }
+
+            current_element := focused_element
+            Loop 16 {
+                process_id := 0
+                ComCall(20, current_element, "Int*", &process_id)
+                if process_id != expected_process_id {
+                    return control_types.Length ? control_types : []
+                }
+
+                control_type := 0
+                ComCall(21, current_element, "Int*", &control_type)
+                control_types.Push(control_type)
+                if this.IsUIAutomationTextControlType(control_type)
+                    || this.IsUIAutomationSelectionControlType(control_type) {
+                    break
+                }
+
+                parent_element := ComValue(13, 0)
+                ComCall(3, walker, "Ptr", current_element, "Ptr*", parent_element)
+                if !parent_element.Ptr {
+                    break
+                }
+                current_element := parent_element
+            }
+        } catch {
+            return []
+        }
+        return control_types
+    }
+
+    static GetUIAutomation() {
+        static uia := 0
+        static uia_unavailable := false
+        if uia || uia_unavailable {
+            return uia
+        }
+        try {
+            uia := ComObject(
+                "{E22AD333-B25F-460C-83D0-0581107395C9}",
+                "{30CBE57D-D9D0-452A-AB13-7AC5AC4825EE}"
+            )
+        } catch {
+            uia_unavailable := true
+        }
+        return uia
+    }
+
+    static IsUIAutomationTextControlType(control_type) {
+        return control_type = this.UIA_EDIT_CONTROL_TYPE_ID
+            || control_type = this.UIA_DOCUMENT_CONTROL_TYPE_ID
+    }
+
+    static IsUIAutomationSelectionControlType(control_type) {
+        return control_type = this.UIA_LIST_ITEM_CONTROL_TYPE_ID
+            || control_type = this.UIA_LIST_CONTROL_TYPE_ID
+            || control_type = this.UIA_TREE_CONTROL_TYPE_ID
+            || control_type = this.UIA_TREE_ITEM_CONTROL_TYPE_ID
+            || control_type = this.UIA_DATA_GRID_CONTROL_TYPE_ID
+            || control_type = this.UIA_DATA_ITEM_CONTROL_TYPE_ID
+    }
+
     static IsOpenWithDialog(descriptor) {
         return descriptor.process_name = "openwith.exe"
             && (this.ContainsClass(descriptor.focus_classes, "open with")
@@ -177,6 +317,26 @@ class RabbitInputTarget {
         local class_name
         for class_name in classes {
             if class_name = expected {
+                return true
+            }
+        }
+        return false
+    }
+
+    static ContainsClassPrefix(classes, expected_prefix) {
+        local class_name
+        for class_name in classes {
+            if InStr(class_name, expected_prefix) = 1 {
+                return true
+            }
+        }
+        return false
+    }
+
+    static ContainsControlType(control_types, expected) {
+        local control_type
+        for control_type in control_types {
+            if control_type = expected {
                 return true
             }
         }

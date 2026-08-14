@@ -23,6 +23,15 @@ RunTest("Explorer file view is a non-text target", TestExplorerFileViewIsNo.Bind
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())
 RunTest("Process Explorer process list is a non-text target", TestProcessExplorerListIsNo.Bind())
 RunTest("Process Explorer edit control remains a text target", TestProcessExplorerEditControlIsYes.Bind())
+RunTest("WPF list is a non-text target", TestWpfListIsNo.Bind())
+RunTest("WPF tree is a non-text target", TestWpfTreeIsNo.Bind())
+RunTest("WPF file grid is a non-text target", TestWpfFileGridIsNo.Bind())
+RunTest("WPF edit control is a text target", TestWpfEditControlIsYes.Bind())
+RunTest("WPF document control is a text target", TestWpfDocumentControlIsYes.Bind())
+RunTest("WPF nested editor takes priority over its list", TestWpfNestedEditorIsYes.Bind())
+RunTest("WPF active window identifies a native child target", TestWpfActiveWindowIdentifiesNativeChild.Bind())
+RunTest("WPF unrecognized control remains unknown", TestWpfUnknownControl.Bind())
+RunTest("UIA list in a non-WPF window remains unknown", TestNonWpfUIAutomationListIsUnknown.Bind())
 RunTest("Open With app list is a non-text target", TestOpenWithListIsNo.Bind())
 RunTest("Open With edit control remains a text target", TestOpenWithEditControlIsYes.Bind())
 RunTest("Open With class in another process remains unknown", TestOpenWithClassInAnotherProcessIsUnknown.Bind())
@@ -77,6 +86,135 @@ TestProcessExplorerEditControlIsYes() {
             ["procexplorer"]
         )),
         "A Process Explorer edit control was classified as a non-text target."
+    )
+}
+
+TestWpfListIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [
+                RabbitInputTarget.UIA_LIST_ITEM_CONTROL_TYPE_ID,
+                RabbitInputTarget.UIA_LIST_CONTROL_TYPE_ID
+            ]
+        )),
+        "A WPF list was not classified as a non-text target."
+    )
+}
+
+TestWpfTreeIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [
+                RabbitInputTarget.UIA_TREE_ITEM_CONTROL_TYPE_ID,
+                RabbitInputTarget.UIA_TREE_CONTROL_TYPE_ID
+            ]
+        )),
+        "A WPF tree was not classified as a non-text target."
+    )
+}
+
+TestWpfFileGridIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [
+                RabbitInputTarget.UIA_DATA_ITEM_CONTROL_TYPE_ID,
+                RabbitInputTarget.UIA_DATA_GRID_CONTROL_TYPE_ID
+            ]
+        )),
+        "A WPF file grid was not classified as a non-text target."
+    )
+}
+
+TestWpfEditControlIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID]
+        )),
+        "A WPF edit control was not classified as a text target."
+    )
+}
+
+TestWpfDocumentControlIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [RabbitInputTarget.UIA_DOCUMENT_CONTROL_TYPE_ID]
+        )),
+        "A WPF document control was not classified as a text target."
+    )
+}
+
+TestWpfNestedEditorIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [
+                RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID,
+                RabbitInputTarget.UIA_DATA_GRID_CONTROL_TYPE_ID
+            ]
+        )),
+        "A WPF editor nested in a list did not take priority over the list."
+    )
+}
+
+TestWpfActiveWindowIdentifiesNativeChild() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "hybrid_wpf_app.exe",
+            ["windowsforms10.window.8.app"],
+            ["hwndwrapper[hybrid_wpf_app.exe;;window-id]"],
+            [RabbitInputTarget.UIA_LIST_CONTROL_TYPE_ID]
+        )),
+        "A native child of an active WPF window was not classified using UIA."
+    )
+}
+
+TestWpfUnknownControl() {
+    AssertEqual(
+        RabbitInputTarget.UNKNOWN,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "wpf_app.exe",
+            ["hwndwrapper[wpf_app.exe;;window-id]"],
+            [],
+            [50000]
+        )),
+        "An unrecognized WPF control did not remain unknown."
+    )
+}
+
+TestNonWpfUIAutomationListIsUnknown() {
+    AssertEqual(
+        RabbitInputTarget.UNKNOWN,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "non_wpf_app.exe",
+            ["customwindow"],
+            [],
+            [RabbitInputTarget.UIA_LIST_CONTROL_TYPE_ID]
+        )),
+        "A UIA list in a non-WPF window was classified as a non-text target."
     )
 }
 
@@ -197,10 +335,11 @@ TestUnknownTarget() {
     )
 }
 
-CreateTargetDescriptor(process_name, focus_classes, active_classes := []) {
+CreateTargetDescriptor(process_name, focus_classes, active_classes := [], uia_control_types := []) {
     return {
         process_name: process_name,
         focus_classes: focus_classes,
-        active_classes: active_classes
+        active_classes: active_classes,
+        uia_control_types: uia_control_types
     }
 }
