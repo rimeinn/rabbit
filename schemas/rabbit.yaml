@@ -1,22 +1,26 @@
-# Rabbit settings
+# 玉兔毫设置
 # encoding: utf-8
 
 config_version: "0.1"
 
-# Define the hotkey to suspend Rabbit
+# 暂停或恢复玉兔毫的快捷键；设为 null 表示不启用
+# 示例：Control+Shift+F12
 suspend_hotkey: null
 
+# 切换输入方案或输入状态时显示状态提示
 show_tips: true
-# How long a period tips shows
+# 状态提示的显示时长，单位为毫秒
 show_tips_time: 1200
-# 0: always send by clipboard
-# >0: send by clipboard if length >= value
-# <0: never send by clipboard
+
+# 候选文字达到此长度时通过剪贴板上屏
+# 设为 0：始终使用剪贴板；设为正数：达到指定长度时使用剪贴板；设为负数：不使用剪贴板
 send_by_clipboard_length: 8
 
-# Let physical keystrokes pass through without Rime processing in password fields
+# 在密码输入框中绕过 Rime 处理，将物理按键直接交给目标程序
 bypass_password_fields: true
 
+# 为指定程序预设西文输入模式
+# 仅在未启用全局中西文状态时生效
 app_options:
   cmd.exe:
     ascii_mode: true
@@ -25,52 +29,59 @@ app_options:
   windowsterminal.exe:
     ascii_mode: true
 
-# Use global ascii mode
+# 在所有程序之间共享中西文状态；启用后忽略 app_options/<app.exe>/ascii_mode
 global_ascii: false
 
-# Always show candidate box at top-left corner
+# 在一次组字过程中保持候选窗位置不随输入光标移动
 fix_candidate_box: false
 
-# Whether to use the legacy candidate box
-# The legacy candidate box is always used on Windows versions earlier than Windows 10
+# 使用旧版候选窗；Windows 10 之前的系统始终使用旧版候选窗
 use_legacy_candidate_box: false
 
-# Whether to use the hook method to get the caret position
-# This may trigger alerts from some antivirus software
-use_caret_hook: false
-
 style:
+  # 使用的配色方案
   color_scheme: aqua
+  # Windows 使用深色应用模式时使用的配色方案；设为 null 时继续使用 color_scheme
+  color_scheme_dark: null
+  # 候选文字、候选标签和候选注释使用的字体
   font_face: Microsoft YaHei UI
   label_font_face: Microsoft YaHei UI
   comment_font_face: Microsoft YaHei UI
+  # 候选文字、候选标签和候选注释的字号
   font_point: 14
   label_font_point: 14
   comment_font_point: 14
-  # 不同于小狼毫，格式化标签文本需符合 AutoHotkey 语法
+  # 候选标签格式需符合 AutoHotkey 的 Format 语法，不同于小狼毫
   # 详见 https://wyagd001.github.io/v2/docs/lib/Format.htm#FormatSpec
   label_format: "{:s}. "
-  # Only used with layout/type: vertical_text. Columns run right-to-left by default.
+  # 竖写文字布局的候选列是否从左向右排列；仅用于 vertical_text 布局
   vertical_text_left_to_right: false
-  # Experimental: display preedit in a transparent window at the target caret.
+  # 在输入光标处以独立窗口显示预编辑文字；仅用于新版候选窗
   floating_preedit: false
-  # Floating preedit window opacity, from 0 (transparent) to 1 (opaque).
+  # 浮动预编辑窗口的不透明度，取值范围为 0 到 1
   floating_preedit_opacity: 0.8
-  # Minimum floating preedit window height in pixels.
+  # 浮动预编辑窗口的最小高度，单位为像素
   floating_preedit_min_height: 20
   layout:
-    # stacked | flow | vertical_text
+    # 候选窗布局：stacked 为纵向堆叠布局，flow 为横向流式布局，vertical_text 为竖写文字布局
     type: stacked
-    # Minimum candidate box width in stacked layout
+    # 窗口外框的圆角半径，单位为像素；仅用于新版候选窗及状态提示
+    corner_radius: 6
+    # 高亮区域的圆角半径，单位为像素；仅用于新版候选窗
+    round_corner: 4
+    # 候选内容的水平和垂直边距，单位为像素
+    margin_x: 6
+    margin_y: 6
+    # 纵向堆叠布局的候选窗最小宽度，单位为像素
     min_width: 160
-    # Minimum candidate box height in vertical_text layout
+    # 竖写文字布局的候选窗最小高度，单位为像素
     min_height: 160
-    # Number of Rime pages shown after flow expands; valid range: 1 - 9
+    # 横向流式布局展开后显示的候选页数，取值范围为 1 到 9
     flow_rows: 5
-    # top | center | bottom
+    # 横向流式布局中文字的垂直对齐方式：top、center 或 bottom
     align_type: top
 
-# Copied from weasel.yaml
+# 以下预设配色方案复制自 weasel.yaml
 # 默认颜色格式为 argb
 preset_color_schemes:
   aqua:
