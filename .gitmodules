@@ -4,6 +4,3 @@
 [submodule "plum"]
 	path = plum
 	url = https://github.com/rime/plum
-[submodule "Lib/Direct2D"]
-	path = Lib/Direct2D
-	url = https://github.com/rawbx/AHK-Direct2D

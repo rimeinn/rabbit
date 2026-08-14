@@ -28,7 +28,8 @@ commit.
 - Configuration and resolved UI styles become read-only snapshots.
 - Business modules ultimately stop depending on the super-global `rime`; librime itself is not mechanically wrapped.
 - Focused first-party AutoHotkey regression tests and lightweight construction substitutes are allowed.
-- The upstream `Lib/librime-ahk`, `Lib/Direct2D`, and `plum` submodules are not modified.
+- The upstream `Lib/librime-ahk` and `plum` submodules are not modified. `Lib/Direct2D` is a Rabbit-maintained copy
+  whose README records its upstream baseline and license.
 - Each implementation phase has its own commit and validation. Work pauses for approval after each phase.
 
 ## 3. Current process lifecycles
