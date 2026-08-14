@@ -155,6 +155,7 @@ end:
     }
 
     getCaretPosFromWpfCaret() {
+        local var := 0
         try {
             uia := ComObject("{E22AD333-B25F-460C-83D0-0581107395C9}", "{30CBE57D-D9D0-452A-AB13-7AC5AC4825EE}")
             ComCall(8, uia, "ptr*", focusedEle := ComValue(13, 0)) ; uia->GetFocusedElement(&focusedEle);
@@ -186,6 +187,12 @@ end:
             ComCall(75, wpfCaret, "ptr", rect := Buffer(16)) ; wpfCaret->get_CachedBoundingRectangle(&rect);
             getRect(rect, &left, &top, &right, &bottom)
             return true
+        } catch {
+            return false
+        } finally {
+            if var {
+                DllCall("OleAut32\VariantClear", "Ptr", var)
+            }
         }
         return false
     }

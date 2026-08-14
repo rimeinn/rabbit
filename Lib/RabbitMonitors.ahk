@@ -144,8 +144,15 @@ class MonitorManage extends Class {
     }
 
     static EnumDisplayMonitors() {
+        local callback
+
         MonitorManage.monitors := Map()
-        return DllCall("EnumDisplayMonitors", "Ptr", 0, "Ptr", 0, "Ptr", CallbackCreate(ObjBindMethod(MonitorManage, "MonitorEnumProc"), , 4), "Ptr", 0)
+        callback := CallbackCreate(ObjBindMethod(MonitorManage, "MonitorEnumProc"), , 4)
+        try {
+            return DllCall("EnumDisplayMonitors", "Ptr", 0, "Ptr", 0, "Ptr", callback, "Ptr", 0)
+        } finally {
+            CallbackFree(callback)
+        }
     }
 
     static MonitorFromWindow(hWnd, flags := MONITOR_DEFAULTTONULL) {
