@@ -271,6 +271,9 @@ index 14b6619..cb0e58a 100644
 +        } finally {
 +            Direct2D.release(pTextLayout)
 +        }
+@@ -377 +549 @@ class Direct2D {
+-            if this.pRT
++            if HasProp(this, "pRT") && this.pRT
 @@ -406,0 +579,2 @@ class Direct2D {
 +            this.VT_PushAxisAlignedClip := Direct2D.vTable(this.pRT, 45)
 +            this.VT_PopAxisAlignedClip := Direct2D.vTable(this.pRT, 46)
@@ -291,6 +294,12 @@ index 14b6619..cb0e58a 100644
 +            DllCall(this.VT_PushAxisAlignedClip, "Ptr", this.pRT, "Ptr", rect, "UInt", antialiasMode)
 +
 +        PopAxisAlignedClip() => DllCall(this.VT_PopAxisAlignedClip, "Ptr", this.pRT)
+@@ -579 +760 @@ class Direct2D {
+-            ; pRT will be released in ID2D1RenderTarget
++            super.__Delete()
+@@ -582 +763 @@ class Direct2D {
+-                Direct2D.release(this.pWICBitmap)
++                Direct2D.release(this.pWICBitmap), this.pWICBitmap := 0
 @@ -635,8 +816,16 @@ class Direct2D {
 -            pSvgDocument := this.CreateSvgDocument(fs, this.width, this.height) ; ID2D1SvgDocument
 -
