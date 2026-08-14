@@ -114,7 +114,6 @@ class CandidateBox {
             ? "flow"
             : style.layout_type = "vertical_text" ? "vertical_text" : "stacked"
         this.verticalTextLeftToRight := style.vertical_text_left_to_right
-        this.candidateSpacing := style.candidate_spacing
         this.alignType := style.align_type
 
         this.mainFont := this.CreateFontObj(style.font_face, style.font_point)
@@ -414,7 +413,7 @@ class CandidateBox {
             cards.Push(card)
             candidates_width += card.width
             if A_Index > 1 {
-                candidates_width += this.candidateSpacing
+                candidates_width += this.padding
             }
             content_height := Max(content_height, card.height)
             this.candidateHighlights.Push(candidate.highlighted)
@@ -423,7 +422,7 @@ class CandidateBox {
         content_width := candidates_width
         if preedit_layout.width {
             if content_width {
-                content_width += this.candidateSpacing
+                content_width += this.padding
             }
             content_width += preedit_layout.width
         }
@@ -434,11 +433,11 @@ class CandidateBox {
         if preedit_layout.width && !this.verticalTextLeftToRight {
             x -= preedit_layout.width
             this.OffsetLayoutX(preedit_layout, x - preedit_layout.left)
-            x -= this.candidateSpacing
+            x -= this.padding
         } else if preedit_layout.width {
             x += preedit_layout.width
             if this.num_candidates {
-                x += this.candidateSpacing
+                x += this.padding
             }
         }
 
@@ -472,7 +471,7 @@ class CandidateBox {
                 text: candidate.comment
             })
             this.candidatesLayout.rows.Push({ x: x, y: base_y, w: card.width, h: content_bottom - base_y })
-            x += this.verticalTextLeftToRight ? card.width + this.candidateSpacing : -this.candidateSpacing
+            x += this.verticalTextLeftToRight ? card.width + this.padding : -this.padding
         }
 
         win_w := this.boxWidth
@@ -566,7 +565,7 @@ class CandidateBox {
         local max_row_width := preedit_width
         local available_width := max_width ? Max(1, max_width - (this.borderWidth + this.padding) * 2) : 0
         local card_max_width := available_width
-            ? Max(1, (available_width - (page_size - 1) * this.candidateSpacing) / page_size)
+            ? Max(1, (available_width - (page_size - 1) * this.padding) / page_size)
             : 0
         local column_count, row_count, column_widths := [], label_widths := [], row_heights := []
         local cards := [], column_x := [], row_y := []
@@ -637,7 +636,7 @@ class CandidateBox {
             column_x.Push(base_x + content_width)
             content_width += column_widths[A_Index]
             if A_Index < column_count {
-                content_width += this.candidateSpacing
+                content_width += this.padding
             }
         }
         max_row_width := Max(max_row_width, content_width)
@@ -645,7 +644,7 @@ class CandidateBox {
             row_y.Push(base_y)
             base_y += row_heights[A_Index]
             if A_Index < row_count {
-                base_y += this.candidateSpacing
+                base_y += this.lineSpacing
             }
         }
 

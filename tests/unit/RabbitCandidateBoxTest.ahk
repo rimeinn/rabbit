@@ -660,7 +660,8 @@ TestModernFlowCandidateLayout(style) {
     local candidate_box := CandidateBox(style.With(Map(
         "layout_type", "flow",
         "min_width", 1000,
-        "candidate_spacing", 7,
+        "margin_x", 7,
+        "margin_y", 9,
         "align_type", "center"
     )))
     local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
@@ -686,6 +687,20 @@ TestModernFlowCandidateLayout(style) {
             candidate_box.candidatesLayout.rows[1].y,
             candidate_box.candidatesLayout.rows[2].y,
             "Candidates from the same flow page were split into separate rows."
+        )
+        AssertEqual(
+            candidate_box.padding,
+            candidate_box.candidatesLayout.rows[2].x
+                - candidate_box.candidatesLayout.rows[1].x
+                - candidate_box.candidatesLayout.rows[1].w,
+            "Flow candidate columns did not use the horizontal margin."
+        )
+        AssertEqual(
+            candidate_box.lineSpacing,
+            candidate_box.candidatesLayout.rows[3].y
+                - candidate_box.candidatesLayout.rows[1].y
+                - candidate_box.candidatesLayout.rows[1].h,
+            "Flow candidate rows did not use the vertical margin."
         )
         AssertEqual(
             candidate_box.candidatesLayout.cands[1].x,
@@ -1008,7 +1023,8 @@ TestModernVerticalTextCandidateLayout(style) {
     local candidate_box := CandidateBox(style.With(Map(
         "layout_type", "vertical_text",
         "min_width", 1000,
-        "min_height", 400
+        "min_height", 400,
+        "margin_x", 7
     )))
     local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
     local width, height
@@ -1021,6 +1037,13 @@ TestModernVerticalTextCandidateLayout(style) {
         AssertTrue(
             candidate_box.candidatesLayout.rows[1].x > candidate_box.candidatesLayout.rows[2].x,
             "Vertical text candidates were not ordered from right to left."
+        )
+        AssertEqual(
+            candidate_box.padding,
+            candidate_box.candidatesLayout.rows[1].x
+                - candidate_box.candidatesLayout.rows[2].x
+                - candidate_box.candidatesLayout.rows[2].w,
+            "Vertical text candidate columns did not use the horizontal margin."
         )
         AssertTrue(
             candidate_box.candidatesLayout.labels[1].y < candidate_box.candidatesLayout.cands[1].y,

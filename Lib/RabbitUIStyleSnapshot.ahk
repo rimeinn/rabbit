@@ -62,8 +62,6 @@ class RabbitUIStyleSnapshot {
             this.GetValue(values, "floating_preedit_min_height", 20)
         ))
         this.flow_rows := this.GetValue(overrides, "flow_rows", this.GetValue(values, "flow_rows", 5))
-        this.candidate_spacing := this.GetValue(
-            overrides, "candidate_spacing", this.GetValue(values, "candidate_spacing", 6))
         this.align_type := this.GetValue(overrides, "align_type", this.GetValue(values, "align_type", "top"))
 
         this.border_color := this.GetValue(
@@ -110,7 +108,7 @@ class RabbitUIStyleSnapshot {
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
         local fmt, cr, r, mx, my, w, h, vertical_text_left_to_right, floating_preedit, floating_preedit_opacity
         local floating_preedit_min_height
-        local flow_rows, candidate_spacing, layout_type, align_type
+        local flow_rows, layout_type, align_type
         local selected_color_scheme, dark_color_scheme
         local values := Map()
 
@@ -197,10 +195,6 @@ class RabbitUIStyleSnapshot {
         }
         if rime_api.config_test_get_int(config, "style/layout/flow_rows", &flow_rows) {
             values["flow_rows"] := Min(9, Max(1, flow_rows))
-        }
-        if rime_api.config_test_get_int(config, "style/layout/candidate_spacing", &candidate_spacing)
-            && candidate_spacing >= 0 {
-            values["candidate_spacing"] := candidate_spacing
         }
         if rime_api.config_test_get_string(config, "style/layout/align_type", &align_type) {
             align_type := StrLower(align_type)

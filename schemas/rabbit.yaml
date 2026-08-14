@@ -67,8 +67,6 @@ style:
     min_height: 160
     # Number of Rime pages shown after flow expands; valid range: 1 - 9
     flow_rows: 5
-    # Space between candidate cards in flow layout
-    candidate_spacing: 6
     # top | center | bottom
     align_type: top
 
