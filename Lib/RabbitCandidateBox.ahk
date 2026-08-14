@@ -117,6 +117,7 @@ class CandidateBox {
         this.alignType := style.align_type
 
         this.mainFont := this.CreateFontObj(style.font_face, style.font_point)
+        this.preeditFont := this.CreateFontObj(style.preedit_font_face, style.font_point)
         this.labFont := this.CreateFontObj(style.label_font_face, style.label_font_point)
         this.commentFont := this.CreateFontObj(style.comment_font_face, style.comment_font_point)
 
@@ -333,7 +334,7 @@ class CandidateBox {
                 x += this.padding
             }
             for segment in group.segments {
-                local metrics := this.GetTextMetrics(segment.text, this.mainFont)
+                local metrics := this.GetTextMetrics(segment.text, this.preeditFont)
                 layout.segments.Push({
                     x: x,
                     y: base_y,
@@ -499,7 +500,7 @@ class CandidateBox {
                 y += this.padding
             }
             for segment in group.segments {
-                local metrics := this.GetVerticalTextMetrics(segment.text, this.mainFont)
+                local metrics := this.GetVerticalTextMetrics(segment.text, this.preeditFont)
                 layout.segments.Push({
                     x: base_x,
                     y: y,
@@ -914,7 +915,7 @@ class CandidateBox {
                     this.hlCornerR, this.hlCornerR, this.hlBgColor)
             }
             for segment in preedit_layout.segments {
-                this.DrawLayoutText(segment, this.mainFont, segment.highlighted ? this.hlTxtColor : this.textColor)
+                this.DrawLayoutText(segment, this.preeditFont, segment.highlighted ? this.hlTxtColor : this.textColor)
             }
 
             highlight_width := this.boxWidth - this.borderWidth * 2 - this.padding * 2

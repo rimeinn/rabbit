@@ -36,6 +36,9 @@ if A_Args.Length {
             RunTest("modern factory selection", TestModernFactorySelection.Bind(candidate_style))
         case "legacy-build-no-direct2d":
             RunTest("legacy build without Direct2D", TestLegacyBuildWithoutDirect2D.Bind(candidate_style))
+        case "modern-preedit-style":
+            RunTest("modern preedit uses its independent font", TestModernPreeditFont.Bind(candidate_style))
+            RunTest("floating preedit uses its independent style", TestFloatingPreeditStyle.Bind(candidate_style))
         case "visual-modern":
             ShowVisualCandidate(CandidateBox(candidate_style), candidate_context)
         case "visual-legacy":
@@ -80,6 +83,8 @@ RunTest(
     TestModernVerticalTextLeftToRightCandidateLayout.Bind(candidate_style)
 )
 RunTest("horizontal preedit text stays unconstrained", TestHorizontalPreeditTextDraw.Bind(candidate_style))
+RunTest("modern preedit uses its independent font", TestModernPreeditFont.Bind(candidate_style))
+RunTest("floating preedit uses its independent style", TestFloatingPreeditStyle.Bind(candidate_style))
 RunTest(
     "legacy candidate lifecycle",
     TestBackendLifecycle.Bind(
@@ -926,13 +931,18 @@ TestFloatingPreeditLayout(style) {
             )
             AssertEqual(102, candidate_box.floating_preedit.x, "Floating preedit did not start after the caret.")
             AssertEqual(
-                candidate_box.mainFont.size * 20 / candidate_box.d2d.GetMetrics(
+                candidate_box.preeditFont.name,
+                candidate_box.floating_preedit.font_face,
+                "Floating preedit did not use the independent preedit font."
+            )
+            AssertEqual(
+                candidate_box.preeditFont.size * 20 / candidate_box.d2d.GetMetrics(
                     RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT,
-                    candidate_box.mainFont.name,
-                    candidate_box.mainFont.size
+                    candidate_box.preeditFont.name,
+                    candidate_box.preeditFont.size
                 ).h,
                 candidate_box.floating_preedit.font_size,
-                "Floating preedit did not scale the candidate font to the caret height."
+                "Floating preedit did not scale the preedit font to the caret height."
             )
             AssertEqual(204, candidate_box.floating_preedit.opacity, "Floating preedit did not use 80% opacity.")
             AssertEqual(24, candidate_box.floating_preedit.box_height, "Floating preedit did not match the caret height.")
@@ -1119,6 +1129,62 @@ TestHorizontalPreeditTextDraw(style) {
     }
 }
 
+TestModernPreeditFont(style) {
+    local candidate_box := CandidateBox(style.With(Map(
+        "font_face", "Arial",
+        "preedit_font_face", "Segoe UI"
+    )), RabbitTextMetricsProbe)
+    local metrics_probe := candidate_box.d2d
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+
+    try {
+        candidate_box.BuildPreeditLayout(presentation, 0, 0)
+        candidate_box.BuildVerticalPreeditLayout(presentation, 0, 0)
+        AssertTrue(metrics_probe.font_faces.Length > 0, "Preedit layout did not measure any text.")
+        for font_face in metrics_probe.font_faces {
+            AssertEqual("Segoe UI", font_face, "Preedit layout used the candidate font.")
+        }
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestFloatingPreeditStyle(style) {
+    local configured_style := style.With(Map(
+        "floating_preedit", true,
+        "preedit_font_face", "Segoe UI",
+        "preedit_back_color", 0xff123456,
+        "floating_preedit_hilited_back_color", 0xff654321
+    ))
+    local candidate_box := CandidateBox(configured_style, RabbitTextMetricsProbe)
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height
+
+    try {
+        candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 24, &width, &height)
+        AssertTrue(candidate_box.floating_preedit_active, "The floating preedit style probe did not build.")
+        AssertEqual(
+            "Segoe UI",
+            candidate_box.floating_preedit.font_face,
+            "Floating preedit did not use the independent preedit font."
+        )
+        AssertEqual(
+            0xff123456,
+            candidate_box.floating_preedit.background_color,
+            "Floating preedit did not use the preedit background."
+        )
+        AssertEqual(
+            0xff654321,
+            candidate_box.floating_preedit.highlighted_background_color,
+            "Floating preedit did not use its resolved highlighted background."
+        )
+        AssertEqual(style.back_color, candidate_box.backgroundColor, "Candidate background used preedit color.")
+        AssertEqual(style.hilited_back_color, candidate_box.hlBgColor, "Candidate highlight used preedit color.")
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
 class RabbitDrawTextProbe {
     DrawText(args*) {
         this.args := args
@@ -1128,6 +1194,22 @@ class RabbitDrawTextProbe {
     DrawTextWithLayout(args*) {
         this.args := args
         this.method := "DrawTextWithLayout"
+    }
+}
+
+class RabbitTextMetricsProbe {
+    font_faces := []
+
+    SetRenderTarget(parameters*) {
+    }
+
+    GetDesktopDpiScale() {
+        return 1
+    }
+
+    GetMetrics(text, font_face, font_size, options*) {
+        this.font_faces.Push(font_face)
+        return { w: StrLen(text) * font_size, h: font_size }
     }
 }
 

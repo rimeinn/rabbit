@@ -43,8 +43,9 @@ style:
   color_scheme: aqua
   # Windows 使用深色应用模式时使用的配色方案；设为 null 时继续使用 color_scheme
   color_scheme_dark: null
-  # 候选文字、候选标签和候选注释使用的字体
+  # 候选文字、预编辑文字、候选标签和候选注释使用的字体
   font_face: Microsoft YaHei UI
+  preedit_font_face: Microsoft YaHei UI
   label_font_face: Microsoft YaHei UI
   comment_font_face: Microsoft YaHei UI
   # 候选文字、候选标签和候选注释的字号
@@ -65,6 +66,8 @@ style:
   layout:
     # 候选窗布局：stacked 为纵向堆叠布局，flow 为横向流式布局，vertical_text 为竖写文字布局
     type: stacked
+    # 窗口边框宽度，单位为像素；仅用于新版候选窗、浮动预编辑窗口及状态提示
+    border_width: 2
     # 窗口外框的圆角半径，单位为像素；仅用于新版候选窗及状态提示
     corner_radius: 6
     # 高亮区域的圆角半径，单位为像素；仅用于新版候选窗
@@ -90,6 +93,7 @@ preset_color_schemes:
     color_format: abgr
     text_color: 0x000000                          #默认文字颜色
     back_color: 0xeceeee                          #候选窗背景色
+    preedit_back_color: 0xeceeee                  #预编辑窗背景色
     shadow_color: 0x00000000                      #候选窗阴影色，默认全透明（无阴影）
     border_color: 0xe0e0e0                        #候选窗边框颜色
     hilited_text_color: 0x000000                  #编码文字颜色

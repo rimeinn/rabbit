@@ -74,12 +74,12 @@ class RabbitFloatingPreedit {
     UpdateStyle(style) {
         this.AssertNotDisposed()
         this.style := style
-        this.font_face := style.font_face
+        this.font_face := style.preedit_font_face
         this.base_font_size := style.font_point * (96.0 / 72.0) * this.dpi_scale
         this.text_color := style.text_color
         this.highlighted_text_color := style.hilited_text_color
-        this.background_color := style.back_color
-        this.highlighted_background_color := style.hilited_back_color
+        this.background_color := style.preedit_back_color
+        this.highlighted_background_color := style.floating_preedit_hilited_back_color
         this.border_width := style.border_width
         this.border_color := style.border_color
         this.corner_radius := style.corner_radius

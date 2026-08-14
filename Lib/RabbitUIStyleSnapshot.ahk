@@ -22,6 +22,11 @@ class RabbitUIStyleSnapshot {
         this.use_dark := this.GetValue(overrides, "use_dark", this.GetValue(values, "use_dark", false))
         this.font_face := this.GetValue(
             overrides, "font_face", this.GetValue(values, "font_face", "Microsoft YaHei UI"))
+        this.preedit_font_face := this.GetValue(
+            overrides,
+            "preedit_font_face",
+            this.GetValue(values, "preedit_font_face", "Microsoft YaHei UI")
+        )
         this.label_font_face := this.GetValue(
             overrides, "label_font_face", this.GetValue(values, "label_font_face", "Microsoft YaHei UI"))
         this.comment_font_face := this.GetValue(
@@ -70,6 +75,11 @@ class RabbitUIStyleSnapshot {
             overrides, "text_color", this.GetValue(values, "text_color", 0xff000000))
         this.back_color := this.GetValue(
             overrides, "back_color", this.GetValue(values, "back_color", 0xffeeeeec))
+        this.preedit_back_color := this.GetValue(
+            overrides,
+            "preedit_back_color",
+            this.GetValue(values, "preedit_back_color", this.back_color)
+        )
         this.candidate_text_color := this.GetValue(
             overrides, "candidate_text_color", this.GetValue(values, "candidate_text_color", 0xff000000))
         this.candidate_back_color := this.GetValue(
@@ -82,6 +92,11 @@ class RabbitUIStyleSnapshot {
             overrides, "hilited_text_color", this.GetValue(values, "hilited_text_color", 0xff000000))
         this.hilited_back_color := this.GetValue(
             overrides, "hilited_back_color", this.GetValue(values, "hilited_back_color", 0xffd4d4d4))
+        this.floating_preedit_hilited_back_color := this.GetValue(
+            overrides,
+            "floating_preedit_hilited_back_color",
+            this.GetValue(values, "floating_preedit_hilited_back_color", this.preedit_back_color)
+        )
         this.hilited_candidate_text_color := this.GetValue(
             overrides,
             "hilited_candidate_text_color",
@@ -106,7 +121,8 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, cr, r, mx, my, w, h, vertical_text_left_to_right, floating_preedit, floating_preedit_opacity
+        local fmt, bw, cr, r, mx, my, w, h, vertical_text_left_to_right, floating_preedit
+        local floating_preedit_opacity
         local floating_preedit_min_height
         local flow_rows, layout_type, align_type
         local selected_color_scheme, dark_color_scheme
@@ -119,6 +135,10 @@ class RabbitUIStyleSnapshot {
         values["font_face"] := rime_api.config_get_string(config, "style/font_face")
         if !values["font_face"] {
             values["font_face"] := "Microsoft YaHei UI"
+        }
+        values["preedit_font_face"] := rime_api.config_get_string(config, "style/preedit_font_face")
+        if !values["preedit_font_face"] {
+            values["preedit_font_face"] := "Microsoft YaHei UI"
         }
         values["label_font_face"] := rime_api.config_get_string(config, "style/label_font_face")
         if !values["label_font_face"] {
@@ -144,6 +164,9 @@ class RabbitUIStyleSnapshot {
 
         if rime_api.config_test_get_string(config, "style/label_format", &fmt) && fmt {
             values["label_format"] := fmt
+        }
+        if rime_api.config_test_get_int(config, "style/layout/border_width", &bw) && bw >= 0 {
+            values["border_width"] := bw
         }
         if rime_api.config_test_get_int(config, "style/layout/corner_radius", &cr) && cr >= 0 {
             values["corner_radius"] := cr
@@ -236,6 +259,8 @@ class RabbitUIStyleSnapshot {
             rime_api, config, prefix . "/text_color", fmt, 0xff000000)
         values["back_color"] := this.GetColor(
             rime_api, config, prefix . "/back_color", fmt, 0xffeceeee)
+        values["preedit_back_color"] := this.GetColor(
+            rime_api, config, prefix . "/preedit_back_color", fmt, values["back_color"])
         values["candidate_text_color"] := this.GetColor(
             rime_api, config, prefix . "/candidate_text_color", fmt, values["text_color"])
         values["candidate_back_color"] := this.GetColor(
@@ -253,6 +278,13 @@ class RabbitUIStyleSnapshot {
             rime_api, config, prefix . "/hilited_text_color", fmt, values["text_color"])
         values["hilited_back_color"] := this.GetColor(
             rime_api, config, prefix . "/hilited_back_color", fmt, values["back_color"])
+        values["floating_preedit_hilited_back_color"] := this.GetColor(
+            rime_api,
+            config,
+            prefix . "/hilited_back_color",
+            fmt,
+            values["preedit_back_color"]
+        )
         values["hilited_candidate_text_color"] := this.GetColor(
             rime_api,
             config,

@@ -24,13 +24,29 @@ RunTest("style snapshot parses active and dark styles", TestStyleSnapshotParsing
 RunTest("style preview snapshot is independent", TestStylePreviewSnapshotIndependence.Bind())
 
 TestStyleSnapshotCopiesValues() {
-    local values := Map("font_face", "Snapshot Font", "font_point", 17)
+    local values := Map(
+        "font_face", "Snapshot Font",
+        "preedit_font_face", "Snapshot Preedit Font",
+        "font_point", 17
+    )
     local style := RabbitUIStyleSnapshot(values)
     values["font_face"] := "Mutated Font"
+    values["preedit_font_face"] := "Mutated Preedit Font"
     values["font_point"] := 19
 
     AssertEqual("Snapshot Font", style.font_face, "The snapshot retained its constructor Map.")
+    AssertEqual(
+        "Snapshot Preedit Font",
+        style.preedit_font_face,
+        "The snapshot retained its preedit font constructor value."
+    )
     AssertEqual(17, style.font_point, "The snapshot retained its constructor Map value.")
+    AssertEqual(
+        "Microsoft YaHei UI",
+        RabbitUIStyleSnapshot(Map("font_face", "Candidate Font")).preedit_font_face,
+        "The default preedit font unexpectedly inherited the candidate font."
+    )
+    AssertEqual(2, style.border_width, "The default border width changed.")
     AssertEqual("stacked", style.layout_type, "The default candidate layout is not stacked.")
     AssertEqual(160, style.min_width, "The default stacked minimum width changed.")
     AssertEqual(160, style.min_height, "The default vertical text minimum height changed.")
@@ -53,7 +69,9 @@ TestStyleSnapshotParsing() {
     local dark_style := RabbitUIStyleSnapshot.FromConfig(rime_probe, config, true)
 
     AssertEqual("Configured Font", light_style.font_face, "The active font was not parsed.")
+    AssertEqual("Configured Preedit Font", light_style.preedit_font_face, "The preedit font was not parsed.")
     AssertEqual(18, light_style.font_point, "The active font size was not parsed.")
+    AssertEqual(5, light_style.border_width, "The active border width was not parsed.")
     AssertEqual(9, light_style.margin_x, "The active horizontal margin was not parsed.")
     AssertEqual(11, light_style.margin_y, "The active vertical margin was not parsed.")
     AssertEqual(180, light_style.min_width, "The stacked minimum width was not parsed.")
@@ -66,9 +84,30 @@ TestStyleSnapshotParsing() {
     AssertEqual(9, light_style.flow_rows, "Flow rows were not clamped to the supported range.")
     AssertEqual("center", light_style.align_type, "Candidate alignment was not parsed.")
     AssertEqual(0xff112233, light_style.text_color, "The active color scheme was not parsed.")
+    AssertEqual(0xff778899, light_style.preedit_back_color, "The preedit background was not parsed.")
+    AssertEqual(
+        0xff445566,
+        light_style.hilited_back_color,
+        "The candidate-box preedit highlight did not retain the candidate background fallback."
+    )
+    AssertEqual(
+        0xff778899,
+        light_style.floating_preedit_hilited_back_color,
+        "The floating preedit highlight did not inherit the floating background."
+    )
     AssertEqual(false, light_style.use_dark, "The light snapshot was marked as dark.")
 
     AssertEqual("Configured Font", dark_style.font_face, "Dark selection changed the configured font.")
+    AssertEqual(
+        0xff010203,
+        dark_style.preedit_back_color,
+        "A missing dark preedit background did not inherit the dark candidate background."
+    )
+    AssertEqual(
+        0xff010203,
+        dark_style.floating_preedit_hilited_back_color,
+        "A missing dark preedit highlight did not inherit the dark preedit background."
+    )
     AssertEqual(0xffddeeff, dark_style.text_color, "The dark color scheme was not parsed.")
     AssertEqual(true, dark_style.use_dark, "The dark snapshot was not marked as dark.")
 }
@@ -87,11 +126,13 @@ TestStylePreviewSnapshotIndependence() {
 CreateStyleConfigValues() {
     return Map(
         "style/font_face", "Configured Font",
+        "style/preedit_font_face", "Configured Preedit Font",
         "style/font_point", 18,
         "style/label_font_point", 16,
         "style/comment_font_point", 15,
         "style/layout/margin_x", 9,
         "style/layout/margin_y", 11,
+        "style/layout/border_width", 5,
         "style/layout/min_width", 180,
         "style/layout/min_height", 240,
         "style/layout/type", "flow",
@@ -105,6 +146,7 @@ CreateStyleConfigValues() {
         "style/color_scheme_dark", "dark",
         "preset_color_schemes/light/text_color", "0x112233",
         "preset_color_schemes/light/back_color", "0x445566",
+        "preset_color_schemes/light/preedit_back_color", "0x778899",
         "preset_color_schemes/dark/text_color", "0xddeeff",
         "preset_color_schemes/dark/back_color", "0x010203"
     )
