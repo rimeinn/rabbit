@@ -1,5 +1,5 @@
 diff --git a/Direct2D.ahk b/Direct2D.ahk
-index 14b6619..518a502 100644
+index 14b6619..cb0e58a 100644
 --- a/Direct2D.ahk
 +++ b/Direct2D.ahk
 @@ -22,0 +23,2 @@ class Direct2D {
@@ -14,6 +14,11 @@ index 14b6619..518a502 100644
 +        for _, pBitmap in this.d2dBitmaps
 +            if pBitmap
 +                Direct2D.release(pBitmap)
+@@ -59,2 +67,2 @@ class Direct2D {
+-        this.IDWriteFactory.__Delete(), this.IDWriteFactory := ""
+-        this.ID2D1Factory.__Delete(), this.ID2D1Factory := ""
++        this.IDWriteFactory := ""
++        this.ID2D1Factory := ""
 @@ -62,2 +69,0 @@ class Direct2D {
 -
 -        OnMessage(WM_ERASEBKGND := 0x14, (wParam, lParam, msg, hwnd) => this.hwnd == hwnd ? 0 : "", 0)
