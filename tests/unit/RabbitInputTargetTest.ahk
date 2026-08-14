@@ -23,6 +23,13 @@ RunTest("Explorer file view is a non-text target", TestExplorerFileViewIsNo.Bind
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())
 RunTest("Process Explorer process list is a non-text target", TestProcessExplorerListIsNo.Bind())
 RunTest("Process Explorer edit control remains a text target", TestProcessExplorerEditControlIsYes.Bind())
+RunTest("Open With app list is a non-text target", TestOpenWithListIsNo.Bind())
+RunTest("Open With edit control remains a text target", TestOpenWithEditControlIsYes.Bind())
+RunTest("Open With class in another process remains unknown", TestOpenWithClassInAnotherProcessIsUnknown.Bind())
+RunTest("Common file dialog view is a non-text target", TestCommonFileDialogViewIsNo.Bind())
+RunTest("Common folder dialog tree is a non-text target", TestCommonFolderDialogTreeIsNo.Bind())
+RunTest("Common file dialog edit control remains a text target", TestCommonFileDialogEditIsYes.Bind())
+RunTest("Unrecognized common dialog remains unknown", TestUnknownCommonDialog.Bind())
 RunTest("Desktop is a non-text target", TestDesktopIsNo.Bind())
 RunTest("Taskbar button is a non-text target", TestTaskbarButtonIsNo.Bind())
 RunTest("Unrecognized target remains unknown", TestUnknownTarget.Bind())
@@ -70,6 +77,90 @@ TestProcessExplorerEditControlIsYes() {
             ["procexplorer"]
         )),
         "A Process Explorer edit control was classified as a non-text target."
+    )
+}
+
+TestOpenWithListIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "openwith.exe",
+            ["open with"],
+            ["open with"]
+        )),
+        "The Open With app list was not classified as a non-text target."
+    )
+}
+
+TestOpenWithEditControlIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "openwith.exe",
+            ["edit", "open with"],
+            ["open with"]
+        )),
+        "An Open With edit control was classified as a non-text target."
+    )
+}
+
+TestOpenWithClassInAnotherProcessIsUnknown() {
+    AssertEqual(
+        RabbitInputTarget.UNKNOWN,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "other.exe",
+            ["open with"],
+            ["open with"]
+        )),
+        "An Open With class owned by another process was classified as a non-text target."
+    )
+}
+
+TestCommonFileDialogViewIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "node.exe",
+            ["directuihwnd", "shelldll_defview", "duiviewwndclassname", "#32770"],
+            ["#32770"]
+        )),
+        "A common file dialog view was not classified as a non-text target."
+    )
+}
+
+TestCommonFolderDialogTreeIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "node.exe",
+            ["systreeview32", "#32770"],
+            ["#32770"]
+        )),
+        "A common folder dialog tree was not classified as a non-text target."
+    )
+}
+
+TestCommonFileDialogEditIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "node.exe",
+            ["edit", "combobox", "#32770"],
+            ["#32770"]
+        )),
+        "A common file dialog edit control was classified as a non-text target."
+    )
+}
+
+TestUnknownCommonDialog() {
+    AssertEqual(
+        RabbitInputTarget.UNKNOWN,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "node.exe",
+            ["button", "#32770"],
+            ["#32770"]
+        )),
+        "An unrecognized common dialog was classified as a non-text target."
     )
 }
 

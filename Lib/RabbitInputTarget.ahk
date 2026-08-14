@@ -78,6 +78,12 @@ class RabbitInputTarget {
         if this.IsProcessExplorer(descriptor) {
             return this.NO
         }
+        if this.IsOpenWithDialog(descriptor) {
+            return this.NO
+        }
+        if this.IsCommonFileDialogView(descriptor) {
+            return this.NO
+        }
         if descriptor.process_name != "explorer.exe" {
             return this.UNKNOWN
         }
@@ -143,6 +149,21 @@ class RabbitInputTarget {
                 || process_name = "procexp64a.exe")
             && (this.ContainsClass(descriptor.focus_classes, "procexplorer")
                 || this.ContainsClass(descriptor.active_classes, "procexplorer"))
+    }
+
+    static IsOpenWithDialog(descriptor) {
+        return descriptor.process_name = "openwith.exe"
+            && (this.ContainsClass(descriptor.focus_classes, "open with")
+                || this.ContainsClass(descriptor.active_classes, "open with"))
+    }
+
+    static IsCommonFileDialogView(descriptor) {
+        local focus_classes := descriptor.focus_classes
+        return (this.ContainsClass(focus_classes, "#32770")
+                || this.ContainsClass(descriptor.active_classes, "#32770"))
+            && (this.IsExplorerFileView(descriptor)
+                || this.ContainsClass(focus_classes, "systreeview32")
+                || this.ContainsClass(focus_classes, "namespacetreecontrol"))
     }
 
     static IsTaskbarControl(descriptor) {
