@@ -1,5 +1,5 @@
 diff --git a/Direct2D.ahk b/Direct2D.ahk
-index 14b6619..cb0e58a 100644
+index 14b6619..7552792 100644
 --- a/Direct2D.ahk
 +++ b/Direct2D.ahk
 @@ -22,0 +23,2 @@ class Direct2D {
@@ -667,3 +667,8 @@ index 14b6619..cb0e58a 100644
 @@ -1351 +1753 @@ class Direct2D {
 -            this.ResizeRenderTarget(this.width := w, this.height := h)
 +            this.ResizeRenderTarget(w, h)
+@@ -1374,2 +1776,2 @@ class Direct2D {
+-        if !DllCall("GetModuleHandleW", "Wstr", "gdiplus", "UPtr")
+-            DllCall("LoadLibraryW", "Wstr", "gdiplus", "UPtr")
++        if !DllCall("LoadLibraryW", "Wstr", "gdiplus", "UPtr")
++            throw Error("Failed to load gdiplus.")
