@@ -20,11 +20,17 @@
 #Include ..\..\Lib\RabbitConfigSnapshot.ahk
 #Include ..\..\Lib\RabbitInput.ahk
 
+if A_Args.Length && A_Args[1] = "floating-preedit-placement" {
+    RunTest("candidate placement uses the floating preedit bottom", TestFloatingPreeditCandidatePlacement.Bind())
+    ExitApp()
+}
+
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.Bind())
 RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind())
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
+RunTest("candidate placement uses the floating preedit bottom", TestFloatingPreeditCandidatePlacement.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
@@ -336,6 +342,32 @@ TestLatestCandidateUpdateOrdering() {
     )
 }
 
+TestFloatingPreeditCandidatePlacement() {
+    local candidate_box := RabbitInputPlacementCandidateProbe(220)
+    local input := RabbitInputController(
+        {},
+        1,
+        candidate_box,
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    local placement := {
+        mode: "caret",
+        caret_x: 120,
+        caret_y: 200,
+        caret_w: 3,
+        caret_h: 13,
+        monitor_info: { work: { left: 0, top: 0, right: 1000, bottom: 600 } }
+    }
+
+    input.ApplyCandidateUpdate({}, placement, false)
+
+    AssertEqual(213, candidate_box.received_caret_bottom, "The candidate box received the wrong caret bottom.")
+    AssertEqual(123, candidate_box.show_x, "The candidate box did not align with the caret edge.")
+    AssertEqual(224, candidate_box.show_y, "The candidate box overlapped the floating preedit.")
+}
+
 TestFocusChangeClearsComposition() {
     local rime := RabbitInputRimeProbe()
     local candidate_box := RabbitInputCandidateProbe()
@@ -589,6 +621,33 @@ class RabbitInputCandidateProbe {
 
     Hide() {
         this.hide_calls++
+    }
+}
+
+class RabbitInputPlacementCandidateProbe {
+    __New(anchor_bottom) {
+        this.anchor_bottom := anchor_bottom
+        this.received_caret_bottom := 0
+        this.show_x := 0
+        this.show_y := 0
+    }
+
+    Build(context, &width, &height) {
+        width := 140
+        height := 50
+    }
+
+    GetPopupAnchorBottom(caret_bottom) {
+        this.received_caret_bottom := caret_bottom
+        return this.anchor_bottom
+    }
+
+    SetFlowAnimationAnchor(anchor_bottom) {
+    }
+
+    Show(x, y) {
+        this.show_x := x
+        this.show_y := y
     }
 }
 

@@ -39,6 +39,15 @@ if A_Args.Length {
         case "modern-preedit-style":
             RunTest("modern preedit uses its independent font", TestModernPreeditFont.Bind(candidate_style))
             RunTest("floating preedit uses its independent style", TestFloatingPreeditStyle.Bind(candidate_style))
+        case "floating-preedit-placement":
+            RunTest(
+                "floating preedit anchors candidates below its minimum height",
+                TestFloatingPreeditMinimumHeight.Bind(candidate_style)
+            )
+            RunTest(
+                "inactive floating preedit keeps the caret anchor",
+                TestFloatingPreeditFallback.Bind(candidate_style)
+            )
         case "visual-modern":
             ShowVisualCandidate(CandidateBox(candidate_style), candidate_context)
         case "visual-legacy":
@@ -992,6 +1001,11 @@ TestFloatingPreeditMinimumHeight(style) {
         candidate_box.BuildFloatingPresentation(presentation, 100, 200, 1, 13, &width, &height)
         AssertEqual(20, candidate_box.floating_preedit.box_height, "Floating preedit did not apply its minimum height.")
         AssertEqual(16, candidate_box.floating_preedit.content_height, "Floating preedit used the wrong minimum-height content area.")
+        AssertEqual(
+            220,
+            candidate_box.GetPopupAnchorBottom(213),
+            "The candidate anchor did not clear the minimum-height floating preedit."
+        )
     } finally {
         candidate_box.Dispose()
     }
@@ -1023,6 +1037,11 @@ TestFloatingPreeditFallback(style) {
         AssertTrue(
             candidate_box.preeditLayout.segments.Length > 0,
             "An invalid caret did not restore docked preedit text."
+        )
+        AssertEqual(
+            200,
+            candidate_box.GetPopupAnchorBottom(200),
+            "An inactive floating preedit changed the candidate anchor."
         )
     } finally {
         candidate_box.Dispose()

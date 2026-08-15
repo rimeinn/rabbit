@@ -754,7 +754,7 @@ class RabbitInputController {
     }
 
     ApplyCandidateUpdate(context, placement, hide_candidate) {
-        local box_width, box_height, new_x, new_y, info, position
+        local box_width, box_height, new_x, new_y, info, position, content_bottom
         switch placement.mode {
             case "hide":
                 this.HideCandidate()
@@ -781,6 +781,10 @@ class RabbitInputController {
                     new_x := position.x
                     new_y := position.y
                 } else {
+                    content_bottom := placement.caret_y + placement.caret_h
+                    if HasMethod(this.candidate_box, "GetPopupAnchorBottom") {
+                        content_bottom := this.candidate_box.GetPopupAnchorBottom(content_bottom)
+                    }
                     position := RabbitPopupPlacement.PlaceBelowCaret(
                         placement.caret_x,
                         placement.caret_y,
@@ -788,7 +792,8 @@ class RabbitInputController {
                         placement.caret_h,
                         box_width,
                         box_height,
-                        info
+                        info,
+                        content_bottom
                     )
                     new_x := position.x
                     new_y := position.y

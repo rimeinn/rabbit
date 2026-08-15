@@ -29,9 +29,13 @@ class RabbitPopupPlacement {
         return hmon ? MonitorManage.GetMonitorInfo(hmon) : 0
     }
 
-    static PlaceBelowCaret(caret_x, caret_y, caret_w, caret_h, box_w, box_h, monitor_info) {
+    static PlaceBelowCaret(caret_x, caret_y, caret_w, caret_h, box_w, box_h, monitor_info, content_bottom?) {
         local x := caret_x + caret_w
-        local y := caret_y + caret_h + this.GAP
+        local lower_edge := caret_y + caret_h
+        if IsSet(content_bottom) {
+            lower_edge := Max(lower_edge, content_bottom)
+        }
+        local y := lower_edge + this.GAP
         local above := false
         if monitor_info && y + box_h > monitor_info.work.bottom {
             y := caret_y - this.GAP - box_h

@@ -20,7 +20,10 @@
 #Include ..\..\Lib\RabbitPopupPlacement.ahk
 
 RunTest("popup placement below caret", TestPlacementBelowCaret.Bind())
+RunTest("popup placement clears lower floating content", TestPlacementClearsLowerFloatingContent.Bind())
+RunTest("popup placement keeps the lower caret edge", TestPlacementKeepsLowerCaretEdge.Bind())
 RunTest("popup placement flips above caret", TestPlacementFlipsAboveCaret.Bind())
+RunTest("popup placement accounts for floating content when flipping", TestPlacementFloatingContentFlips.Bind())
 RunTest("popup placement clamps horizontal edges", TestPlacementClampsHorizontalEdges.Bind())
 RunTest("popup placement clamps mouse fallback", TestPlacementClampsMouseFallback.Bind())
 
@@ -31,10 +34,29 @@ TestPlacementBelowCaret() {
     AssertTrue(!position.above, "A below-caret popup incorrectly requested a bottom animation anchor.")
 }
 
+TestPlacementClearsLowerFloatingContent() {
+    local position := RabbitPopupPlacement.PlaceBelowCaret(120, 200, 3, 13, 140, 50, TestWorkArea(), 220)
+    AssertEqual(224, position.y, "The popup overlapped floating content below a short caret.")
+    AssertTrue(!position.above, "A popup with enough lower space incorrectly flipped above the caret.")
+}
+
+TestPlacementKeepsLowerCaretEdge() {
+    local position := RabbitPopupPlacement.PlaceBelowCaret(120, 200, 3, 20, 140, 50, TestWorkArea(), 213)
+    AssertEqual(224, position.y, "Floating content moved the popup above the lower caret edge.")
+    AssertTrue(!position.above, "A popup with enough lower space incorrectly flipped above the caret.")
+}
+
 TestPlacementFlipsAboveCaret() {
     local position := RabbitPopupPlacement.PlaceBelowCaret(120, 560, 3, 20, 140, 50, TestWorkArea())
     AssertEqual(506, position.y, "The popup did not move above a bottom-edge caret.")
     AssertTrue(position.above, "An above-caret popup did not request a bottom animation anchor.")
+}
+
+TestPlacementFloatingContentFlips() {
+    local monitor_info := { work: { left: 0, top: 0, right: 1000, bottom: 290 } }
+    local position := RabbitPopupPlacement.PlaceBelowCaret(120, 200, 3, 13, 140, 50, monitor_info, 240)
+    AssertEqual(146, position.y, "The popup did not flip when floating content consumed the lower space.")
+    AssertTrue(position.above, "A popup flipped by floating content did not request a bottom animation anchor.")
 }
 
 TestPlacementClampsHorizontalEdges() {

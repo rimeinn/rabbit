@@ -150,6 +150,13 @@ class CandidateBox {
         this.flow_animation_anchor_bottom := !!anchor_bottom
     }
 
+    GetPopupAnchorBottom(caret_bottom) {
+        if this.floating_preedit_active {
+            return this.floating_preedit.y + this.floating_preedit.box_height
+        }
+        return caret_bottom
+    }
+
     CreateFontObj(name, size) {
         local em_to_pt := 96.0 / 72.0
         local px := size * em_to_pt * this.dpiScale
