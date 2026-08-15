@@ -73,7 +73,7 @@ RunTest(
     "modern candidate lifecycle",
     TestBackendLifecycle.Bind(
         "modern",
-        CandidateBox(candidate_style),
+        CandidateBox(candidate_style, RabbitGoldenDirect2D),
         candidate_context,
         candidate_style,
         candidate_golden
@@ -748,6 +748,20 @@ TestBackendLifecycle(name, candidate_box, context, style, golden) {
     local first_width, first_height, second_width, second_height
     local updated_width, updated_height, restored_width, restored_height
     local window_x, window_y
+    local previous_dpi_context
+    previous_dpi_context := 0
+    if name = "legacy" {
+        ; The golden dimensions use the 96-DPI coordinate space that the legacy GUI was designed against.
+        previous_dpi_context := DllCall(
+            "user32\SetThreadDpiAwarenessContext",
+            "Ptr",
+            -1, ; DPI_AWARENESS_CONTEXT_UNAWARE
+            "Ptr"
+        )
+        if !previous_dpi_context {
+            throw OSError(A_LastError, "SetThreadDpiAwarenessContext failed.")
+        }
+    }
     try {
         candidate_box.Hide()
         candidate_box.Hide()
@@ -795,7 +809,13 @@ TestBackendLifecycle(name, candidate_box, context, style, golden) {
         candidate_box.Hide()
         candidate_box.Hide()
     } finally {
-        candidate_box.Dispose()
+        try {
+            candidate_box.Dispose()
+        } finally {
+            if previous_dpi_context {
+                DllCall("user32\SetThreadDpiAwarenessContext", "Ptr", previous_dpi_context, "Ptr")
+            }
+        }
     }
 
     candidate_box.Hide()
@@ -1233,6 +1253,13 @@ class RabbitTextMetricsProbe {
 }
 
 class RabbitFakeDirect2D {
+    GetDesktopDpiScale() {
+        return 1
+    }
+}
+
+class RabbitGoldenDirect2D extends Direct2D {
+    ; Golden dimensions use a 96-DPI font baseline regardless of the desktop scaling setting.
     GetDesktopDpiScale() {
         return 1
     }
