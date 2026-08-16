@@ -19,6 +19,9 @@
 #Include RabbitCommon.ahk
 #Include RabbitDictManagementDialog.ahk
 #Include RabbitSwitcherSettingsDialog.ahk
+#Include RabbitSystemInputDialog.ahk
+#Include RabbitSystemInputProfiles.ahk
+#Include RabbitSystemInputSettings.ahk
 #Include RabbitUIStyleSettings.ahk
 #Include RabbitUIStyleSettingsDialog.ahk
 
@@ -47,6 +50,18 @@ class RabbitDeployerWorkflow {
 
     CreateMutex() {
         return RabbitMutex()
+    }
+
+    CreateSystemInputProfiles() {
+        return RabbitSystemInputProfiles()
+    }
+
+    CreateSystemInputSettings(levers) {
+        return RabbitSystemInputSettings(this.rime, levers)
+    }
+
+    CreateSystemInputDialog(enabled, available, configured_klid) {
+        return RabbitSystemInputDialog(enabled, available, configured_klid)
     }
 
     Run(installing) {
@@ -142,6 +157,132 @@ class RabbitDeployerWorkflow {
             return true
         }
         return false
+    }
+
+    ConfigureSystemInput(serialized_state) {
+        local profiles := this.CreateSystemInputProfiles()
+        local levers := this.CreateLevers()
+        local settings := this.CreateSystemInputSettings(levers)
+        local configured_value := ""
+        if !settings.Load(&configured_value) {
+            this.ShowSystemInputError("未能读取系统键盘布局设置。")
+            return this.SystemInputOutcome(1, false, serialized_state)
+        }
+
+        local configured_klid := this.NormalizeSystemInputKlid(configured_value)
+        local enabled := []
+        for profile in profiles.EnumerateProfiles() {
+            if profile.IsEnabled() && profiles.IsRabbitCompatible(profile) {
+                enabled.Push(profile)
+            }
+        }
+        if this.FindSystemInputByKlid(enabled, configured_klid) {
+            local deploy_result := this.UpdateWorkspace(true)
+            return this.SystemInputOutcome(
+                deploy_result,
+                deploy_result == 0,
+                serialized_state
+            )
+        }
+
+        local available := profiles.EnumerateAvailableLayouts(enabled)
+        local dialog := this.CreateSystemInputDialog(enabled, available, configured_klid)
+        try {
+            dialog.accept_callback := (profile, window) => profiles.Activate(
+                profile,
+                !profile.IsEnabled(),
+                window
+            )
+            this.ShowSystemInputDialog(dialog)
+        } finally {
+            dialog.Dispose()
+        }
+
+        if !dialog.accepted {
+            MsgBox(
+                "必须选择一个键盘布局，否则系统输入法会与玉兔毫冲突。",
+                "【玉兔毫】",
+                "Ok Icon!"
+            )
+            return this.SystemInputOutcome(1, false, serialized_state)
+        }
+        if !dialog.activation_attempted || !dialog.activation_succeeded {
+            this.ShowSystemInputError("Windows 未能切换到所选键盘布局。")
+            return this.SystemInputOutcome(1, false, serialized_state)
+        }
+
+        local selected_klid := StrUpper(dialog.selected_profile.klid)
+        if !settings.Save(selected_klid) {
+            this.RestoreSystemInput(profiles, serialized_state)
+            this.ShowSystemInputError("未能保存系统键盘布局设置。")
+            return this.SystemInputOutcome(1, false, serialized_state)
+        }
+
+        deploy_result := this.UpdateWorkspace(true)
+        if deploy_result != 0 {
+            this.RestoreSystemInput(profiles, serialized_state)
+            return this.SystemInputOutcome(deploy_result, false, serialized_state)
+        }
+        return this.SystemInputOutcome(
+            0,
+            true,
+            this.MarkSystemInputRestorePending(serialized_state)
+        )
+    }
+
+    ShowSystemInputDialog(dialog) {
+        dialog.Show()
+        WinWaitClose(dialog)
+    }
+
+    SystemInputOutcome(result, restart, serialized_state) {
+        return {
+            result: result,
+            restart: restart,
+            serialized_state: serialized_state
+        }
+    }
+
+    MarkSystemInputRestorePending(serialized_state) {
+        local state := RabbitSystemInputRestoreState.Deserialize(serialized_state)
+        if state.profile {
+            state.pending := true
+        }
+        return state.Serialize()
+    }
+
+    RestoreSystemInput(profiles, serialized_state) {
+        try {
+            local state := RabbitSystemInputRestoreState.Deserialize(serialized_state)
+            if state.profile {
+                profiles.Activate(state.profile)
+            }
+        }
+    }
+
+    FindSystemInputByKlid(profiles, klid) {
+        if !klid {
+            return 0
+        }
+        for profile in profiles {
+            if StrUpper(profile.klid) = klid {
+                return profile
+            }
+        }
+        return 0
+    }
+
+    NormalizeSystemInputKlid(value) {
+        local klid := StrUpper(value)
+        return RegExMatch(klid, "^[0-9A-F]{8}$") ? klid : ""
+    }
+
+    ShowSystemInputError(message) {
+        MsgBox(
+            "无法配置系统键盘布局。`r`n`r`n" . message,
+            "【玉兔毫】",
+            "Ok Iconx"
+        )
     }
 
     UpdateWorkspace(report_errors := false) {

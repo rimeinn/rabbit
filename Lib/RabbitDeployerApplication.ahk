@@ -30,7 +30,7 @@ class RabbitDeployerApplication {
 
     Run(args) {
         this.context.command := args.Length > 0 ? args[1] : ""
-        this.context.keyboard_layout := args.Length >= 2 ? Number(args[2]) : 0
+        this.context.system_input_state := args.Length >= 2 ? args[2] : "none"
 
         TrayTip()
         TrayTip("维护中", RABBIT_IME_NAME)
@@ -50,6 +50,14 @@ class RabbitDeployerApplication {
             case "sync":
                 this.context.result := this.workflow.SyncUserData()
                 this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
+            case "system_input":
+                local outcome := this.workflow.ConfigureSystemInput(
+                    this.context.system_input_state
+                )
+                this.context.result := outcome.result
+                this.context.restart_rabbit := outcome.restart
+                this.context.system_input_state := outcome.serialized_state
+                this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
             default:
                 this.context.result := this.workflow.Run(this.context.command = "install")
                 this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
@@ -57,7 +65,9 @@ class RabbitDeployerApplication {
 
         if args.Length > 1 {
             this.Shutdown()
-            this.RestartRabbit()
+            if this.context.restart_rabbit {
+                this.RestartRabbit()
+            }
             ExitApp()
         }
         return this.context.result
@@ -66,20 +76,20 @@ class RabbitDeployerApplication {
     RestartRabbit() {
         if A_IsCompiled {
             Run(Format(
-                "`"{}\Rabbit.exe`" {} {} {}",
+                "`"{}\Rabbit.exe`" {} {} `"{}`"",
                 A_ScriptDir,
                 this.context.maintenance_mode,
                 this.context.result,
-                this.context.keyboard_layout
+                this.context.system_input_state
             ))
         } else {
             Run(Format(
-                "{} `"{}\Rabbit.ahk`" {} {} {}",
+                "{} `"{}\Rabbit.ahk`" {} {} `"{}`"",
                 A_AhkPath,
                 A_ScriptDir,
                 this.context.maintenance_mode,
                 this.context.result,
-                this.context.keyboard_layout
+                this.context.system_input_state
             ))
         }
     }

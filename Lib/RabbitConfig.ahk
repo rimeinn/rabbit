@@ -43,6 +43,10 @@ class RabbitConfigLoader {
 
         if (config := rime_api.config_open("rabbit")) {
             values["suspend_hotkey"] := rime_api.config_get_string(config, "suspend_hotkey")
+            values["system_input_layout"] := rime_api.config_get_string(
+                config,
+                "system_input_layout"
+            )
             if rime_api.config_test_get_bool(config, "show_tips", &result) {
                 values["show_tips"] := !!result
             }

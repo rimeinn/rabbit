@@ -22,6 +22,7 @@
 #Include RabbitInput.ahk
 #Include RabbitRuntimeState.ahk
 #Include RabbitStatusTip.ahk
+#Include RabbitSystemInputManager.ahk
 #Include RabbitTrayMenu.ahk
 #Include RabbitUIStyle.ahk
 
@@ -39,10 +40,17 @@ class RabbitApplication {
 
     Run(args) {
         local fail_count, status
-        this.context.keyboard_layout := this.ResolveKeyboardLayout(args)
-        this.SetDefaultKeyboard()
         OnExit(this.exit_callback)
         this.exit_registered := true
+
+        this.context.system_input := RabbitSystemInputManager(this.context.rime)
+        try {
+            this.context.system_input.Initialize(args.Length >= 3 ? args[3] : "")
+        } catch as caught_error {
+            this.ShowSystemInputError(caught_error)
+            this.ExitApplication(1)
+            return
+        }
 
         fail_count := 0
         while !this.context.mutex.Create() {
@@ -72,7 +80,7 @@ class RabbitApplication {
         if maintenance != RABBIT_NO_MAINTENANCE {
             RabbitUpdateMaintenanceTrayIcon()
             if first_run {
-                this.RunDeployer("install", this.context.keyboard_layout)
+                this.RunDeployer("install")
             } else if this.context.rime.start_maintenance(
                 maintenance == RABBIT_FULL_MAINTENANCE) {
                 this.context.rime.join_maintenance_thread()
@@ -85,7 +93,6 @@ class RabbitApplication {
 
         this.context.session_id := this.context.rime.create_session()
         if !this.context.session_id {
-            this.SetDefaultKeyboard(this.context.keyboard_layout)
             throw Error("未能成功创建 RIME 会话。")
         }
 
@@ -95,6 +102,20 @@ class RabbitApplication {
         this.context.config := loaded.config
         if loaded.dark_mode {
             DarkMode.set(loaded.dark_mode)
+        }
+        try {
+            if !this.context.system_input.Prepare(this.context.config) {
+                if this.context.system_input.configuration_required {
+                    this.RunDeployer("system_input")
+                } else {
+                    this.ExitApplication(0)
+                }
+                return
+            }
+        } catch as caught_error {
+            this.ShowSystemInputError(caught_error)
+            this.ExitApplication(0)
+            return
         }
 
         local use_legacy_candidate_box := RabbitIsOldWindows()
@@ -115,7 +136,6 @@ class RabbitApplication {
             this.context.candidate_box,
             this.context.config,
             this.context.runtime_state,
-            this.context.keyboard_layout,
             this.RunDeployer.Bind(this),
             this.context.status_tip
         )
@@ -159,9 +179,11 @@ class RabbitApplication {
         this.context.runtime_state.StartTimer()
     }
 
-    RunDeployer(command, args*) {
+    RunDeployer(command) {
+        local system_input_state := this.context.system_input
+            ? this.context.system_input.SerializeState() : "none"
         this.Shutdown(1)
-        this.LaunchDeployer(command, args*)
+        this.LaunchDeployer(command, system_input_state)
         this.ExitApplication(1)
     }
 
@@ -173,29 +195,11 @@ class RabbitApplication {
         ExitApp(code)
     }
 
-    ResolveKeyboardLayout(args) {
-        local layout
-        if args.Length >= 3 {
-            layout := Number(args[3])
-        }
-        if !IsSet(layout) || layout == 0 {
-            layout := DllCall("GetKeyboardLayout", "UInt", 0)
-        }
-        return layout
-    }
-
-    SetDefaultKeyboard(locale_id := 0x0409) {
-        local lang, WM_INPUTLANGCHANGEREQUEST, HWND_BROADCAST
-        if FileExist(RabbitUserDataPath() . "\.lang") {
-            return
-        }
-        local locale_id_hex := Format("{:08x}", locale_id & 0xffff)
-        lang := DllCall("LoadKeyboardLayout", "Str", locale_id_hex, "Int", 0)
-        PostMessage(
-            WM_INPUTLANGCHANGEREQUEST := 0x0050,
-            0,
-            lang,
-            HWND_BROADCAST := 0xffff
+    ShowSystemInputError(error) {
+        MsgBox(
+            "无法配置系统键盘布局。`r`n`r`n" . error.Message,
+            "【玉兔毫】",
+            "Ok Iconx"
         )
     }
 
@@ -228,8 +232,8 @@ class RabbitApplication {
             return
         }
         this.shutting_down := true
-        if code == 0 {
-            this.SetDefaultKeyboard(this.context.keyboard_layout)
+        if code == 0 && this.context.system_input {
+            this.context.system_input.Restore()
         }
         TrayTip()
         ToolTip(, , , STATUS_TOOLTIP)

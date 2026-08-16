@@ -23,9 +23,10 @@ class RabbitDeployerContext {
         this.rime := rime_api
         this.traits := 0
         this.command := ""
-        this.keyboard_layout := 0
+        this.system_input_state := "none"
         this.result := 0
         this.maintenance_mode := RABBIT_NO_MAINTENANCE
+        this.restart_rabbit := true
         this.rime_initialized := false
         this.disposed := false
     }

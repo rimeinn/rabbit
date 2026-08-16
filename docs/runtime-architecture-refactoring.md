@@ -111,7 +111,7 @@ lookup data. “Target owner” describes the planned boundary, not an implement
 | `on_tray_icon_click` | tray controller | runtime state | one tray interaction | implemented runtime-state ownership |
 | `active_win` | runtime state | tray controller | active-window interaction | implemented runtime-state ownership |
 | `current_schema_icon` | tray controller | tray controller | Rime schema/session | implemented tray ownership |
-| `keyboard_layout` | application coordinator | tray and shutdown | main process | implemented app-context ownership |
+| system input restore state | `RabbitSystemInputManager` | deployer restart and shutdown | main process | implemented cohesive ownership |
 
 These properties did not share one useful lifecycle. Phase 4 removed `RabbitGlobals` and moved each property to its
 cohesive owner.

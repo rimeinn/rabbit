@@ -22,6 +22,7 @@
 RunTest("config snapshot collection boundaries", TestConfigSnapshotCollections.Bind())
 RunTest("caret hook defaults to disabled", TestCaretHookDefaults.Bind())
 RunTest("password field bypass defaults to enabled", TestPasswordFieldBypassDefaults.Bind())
+RunTest("system input layout defaults to empty", TestSystemInputLayoutDefaults.Bind())
 
 TestConfigSnapshotCollections() {
     local process_modes := Map("code.exe", true)
@@ -83,5 +84,21 @@ TestPasswordFieldBypassDefaults() {
     AssertTrue(
         !disabled_config.bypass_password_fields,
         "An explicit password-field bypass opt-out was not preserved."
+    )
+}
+
+TestSystemInputLayoutDefaults() {
+    local default_config := RabbitConfigSnapshot()
+    local configured := RabbitConfigSnapshot(Map("system_input_layout", "00000809"))
+
+    AssertEqual(
+        "",
+        default_config.system_input_layout,
+        "The system input layout did not default to an empty value."
+    )
+    AssertEqual(
+        "00000809",
+        configured.system_input_layout,
+        "The configured system input layout was not preserved."
     )
 }

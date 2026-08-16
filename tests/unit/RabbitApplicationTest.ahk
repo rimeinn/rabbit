@@ -35,13 +35,14 @@ TestDeployerLaunchAfterShutdown() {
     application.context.input := RabbitApplicationDisposeProbe(calls, "input")
     application.context.runtime_state := RabbitApplicationDisposeProbe(calls, "runtime")
     application.context.appearance := RabbitApplicationDisposeProbe(calls, "appearance")
+    application.context.system_input := RabbitApplicationSystemInputProbe()
 
-    application.RunDeployer("dict", 1033)
+    application.RunDeployer("dict")
     application.OnExit("Exit", 1)
 
     AssertEqual(
         "input,runtime,appearance,candidate,destroy:42,finalize,close,"
-            . "launch:dict:1033,exit:1",
+            . "launch:dict:state,exit:1",
         JoinApplicationCalls(calls),
         "The deployer started before the main application released Rime."
     )
@@ -49,13 +50,13 @@ TestDeployerLaunchAfterShutdown() {
 
 TestTrayDelegatesDeployerLaunch() {
     local calls := []
-    local callback := (command, layout) => calls.Push(command . ":" . layout)
-    local tray := RabbitTrayController(0, 0, 0, 0, 0, 1033, callback)
+    local callback := (command) => calls.Push(command)
+    local tray := RabbitTrayController(0, 0, 0, 0, 0, callback)
 
     tray.StartDeployer("deploy")
 
     AssertEqual(
-        "deploy:1033",
+        "deploy",
         JoinApplicationCalls(calls),
         "The tray did not delegate deployment through the application owner."
     )
@@ -116,5 +117,11 @@ class RabbitApplicationCloseProbe {
 
     Close() {
         this.calls.Push("close")
+    }
+}
+
+class RabbitApplicationSystemInputProbe {
+    SerializeState() {
+        return "state"
     }
 }

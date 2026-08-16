@@ -7,6 +7,9 @@ config_version: "0.1"
 # 示例：Control+Shift+F12
 suspend_hotkey: null
 
+# 玉兔毫运行时用于避让系统输入法的键盘布局；请通过启动时的选择窗口设置
+system_input_layout: null
+
 # 切换输入方案或输入状态时显示状态提示
 show_tips: true
 # 状态提示的显示时长，单位为毫秒

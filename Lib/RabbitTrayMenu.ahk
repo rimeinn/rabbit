@@ -38,7 +38,7 @@ RabbitUpdateMaintenanceTrayIcon() {
 RabbitLaunchDeployer(command, args*) {
     local arguments := ""
     for argument in args {
-        arguments .= " " . argument
+        arguments .= " `"" . StrReplace(argument, "`"", "`"`"") . "`""
     }
     arguments := LTrim(arguments, " ")
     if A_IsCompiled {
@@ -55,7 +55,6 @@ class RabbitTrayController {
         candidate_box,
         config,
         runtime_state,
-        keyboard_layout,
         deployer_callback,
         status_tip := 0
     ) {
@@ -64,7 +63,6 @@ class RabbitTrayController {
         this.candidate_box := candidate_box
         this.config := config
         this.runtime_state := runtime_state
-        this.keyboard_layout := keyboard_layout
         this.deployer_callback := deployer_callback
         this.status_tip := status_tip
         this.schema_name := ""
@@ -157,7 +155,7 @@ class RabbitTrayController {
     }
 
     StartDeployer(command) {
-        this.deployer_callback.Call(command, this.keyboard_layout)
+        this.deployer_callback.Call(command)
     }
 
     ToggleSuspend() {

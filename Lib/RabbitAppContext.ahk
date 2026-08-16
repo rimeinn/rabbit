@@ -27,7 +27,7 @@ class RabbitAppContext {
         this.candidate_box := 0
         this.status_tip := 0
         this.config := 0
-        this.keyboard_layout := 0
+        this.system_input := 0
         this.rime_initialized := false
         this.input := 0
         this.runtime_state := 0

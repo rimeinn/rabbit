@@ -19,6 +19,7 @@
 class RabbitConfigSnapshot {
     __New(values := 0) {
         this.suspend_hotkey := this.GetValue(values, "suspend_hotkey", "")
+        this.system_input_layout := this.GetValue(values, "system_input_layout", "")
         this.show_tips := this.GetValue(values, "show_tips", true)
         this.show_tips_time := this.GetValue(values, "show_tips_time", 1200)
         this.global_ascii := this.GetValue(values, "global_ascii", false)

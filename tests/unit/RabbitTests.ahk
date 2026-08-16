@@ -31,6 +31,7 @@
 #Include RabbitPopupPlacementTest.ahk
 #Include RabbitShutdownTest.ahk
 #Include RabbitStatusTipTest.ahk
+#Include RabbitSystemInputManagerTest.ahk
 #Include RabbitTestCommonTest.ahk
 #Include RabbitTrayClickTest.ahk
 #Include RabbitTrayStatusTipTest.ahk
