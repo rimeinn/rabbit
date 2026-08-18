@@ -16,6 +16,8 @@
  *
  */
 
+#Include RabbitCommon.ahk
+
 class RabbitInputTarget {
     static YES := "yes"
     static NO := "no"
@@ -24,17 +26,20 @@ class RabbitInputTarget {
     static UIA_EDIT_CONTROL_TYPE_ID := 50004
     static UIA_LIST_ITEM_CONTROL_TYPE_ID := 50007
     static UIA_LIST_CONTROL_TYPE_ID := 50008
+    static UIA_MENU_ITEM_CONTROL_TYPE_ID := 50010
     static UIA_TREE_CONTROL_TYPE_ID := 50023
     static UIA_TREE_ITEM_CONTROL_TYPE_ID := 50024
     static UIA_DATA_GRID_CONTROL_TYPE_ID := 50028
     static UIA_DATA_ITEM_CONTROL_TYPE_ID := 50029
     static UIA_DOCUMENT_CONTROL_TYPE_ID := 50030
+    static UIA_IS_READONLY_PROPERTY_ID := 30048
+    static VT_BOOL := 11
 
     static Classify(foreground_hwnd) {
         if !(descriptor := this.Describe(foreground_hwnd)) {
             return this.UNKNOWN
         }
-        if this.IsWpfWindow(descriptor) {
+        if this.IsWpfWindow(descriptor) || this.IsBrowserWindow(descriptor) {
             descriptor.uia_control_types := this.GetFocusedUIAutomationControlTypes(descriptor.process_id)
         }
         return this.ClassifyDescriptor(descriptor)
@@ -110,6 +115,9 @@ class RabbitInputTarget {
         }
         if this.IsCommonFileDialogView(descriptor) {
             return this.NO
+        }
+        if this.IsBrowserWindow(descriptor) {
+            return this.ClassifyBrowser(descriptor)
         }
         if descriptor.process_name != "explorer.exe" {
             return this.UNKNOWN
@@ -313,6 +321,115 @@ class RabbitInputTarget {
             || this.ContainsClass(classes, "toolbarwindow32")
     }
 
+    ; Chrome, Edge, Brave and other Chromium browsers use the Chrome_WidgetWin_1
+    ; top-level class. Without a text control, letter keys must pass through so
+    ; the browser keeps its shortcuts (e.g. pressing S on a right-click menu
+    ; searches the selected text).
+    ;
+    ; Electron apps also use Chrome_WidgetWin_1 but are deliberately excluded:
+    ; their editable areas are not guaranteed to surface as UIA text controls,
+    ; so they keep the previous unknown behavior instead of risking a missed
+    ; input field.
+    static IsBrowserWindow(descriptor) {
+        return this.IsBrowserProcess(descriptor.process_name)
+            && (this.ContainsClass(descriptor.focus_classes, "chrome_widgetwin_1")
+                || this.ContainsClass(descriptor.active_classes, "chrome_widgetwin_1"))
+    }
+
+    static IsBrowserProcess(process_name) {
+        switch process_name {
+            case "brave.exe", "chrome.exe", "chromium.exe", "msedge.exe", "opera.exe", "vivaldi.exe":
+                return true
+        }
+        return false
+    }
+
+    static ClassifyBrowser(descriptor) {
+        local control_types := []
+        local control_type, result, focus_text, uia_text
+        if this.ContainsEditableClass(descriptor.focus_classes) {
+            return this.YES
+        }
+        ; A native popup menu (#32768) must receive its letter shortcuts.
+        if this.ContainsClass(descriptor.focus_classes, "#32768")
+            || this.ContainsClass(descriptor.active_classes, "#32768") {
+            return this.NO
+        }
+        control_types := this.GetDescriptorUIAutomationControlTypes(descriptor)
+        if !control_types.Length {
+            ; UIA is unavailable or reports no focused element; keep the
+            ; previous behavior so a real input field is never missed.
+            result := this.UNKNOWN
+        } else {
+            ; The first entry is the focused element itself.
+            control_type := control_types[1]
+            if control_type = this.UIA_EDIT_CONTROL_TYPE_ID {
+                result := this.YES
+            } else if control_type = this.UIA_DOCUMENT_CONTROL_TYPE_ID {
+                result := this.IsFocusedDocumentEditable(descriptor.process_id)
+            } else {
+                ; Menu items, buttons, panes and other non-text elements pass keys
+                ; through to the browser.
+                result := this.NO
+            }
+        }
+        focus_text := RabbitJoinList(descriptor.focus_classes)
+        uia_text := RabbitJoinList(control_types)
+        RabbitDebug(
+            Format(
+                "browser target {} -> {} focus=[{}] uia=[{}]",
+                descriptor.process_name,
+                result,
+                focus_text,
+                uia_text
+            ),
+            Format("RabbitInputTarget.ahk:{}", A_LineNumber),
+            1
+        )
+        return result
+    }
+
+    ; A web document (contenteditable) is a text target only when it is not
+    ; read-only. Failure to read the property keeps the previous behavior.
+    static IsFocusedDocumentEditable(expected_process_id) {
+        local uia := this.GetUIAutomation()
+        local property_value
+        if !uia {
+            return this.UNKNOWN
+        }
+        try {
+            local focused_element := ComValue(13, 0)
+            ComCall(8, uia, "Ptr*", focused_element)
+            if !focused_element.Ptr {
+                return this.UNKNOWN
+            }
+            local process_id := 0
+            ComCall(20, focused_element, "Int*", &process_id)
+            if process_id != expected_process_id {
+                return this.UNKNOWN
+            }
+            property_value := Buffer(24, 0)
+            ComCall(
+                10,
+                focused_element,
+                "Int",
+                this.UIA_IS_READONLY_PROPERTY_ID,
+                "Ptr",
+                property_value
+            )
+            if NumGet(property_value, 0, "UShort") != this.VT_BOOL {
+                return this.UNKNOWN
+            }
+            return NumGet(property_value, 8, "Short") = 0 ? this.YES : this.NO
+        } catch {
+            return this.UNKNOWN
+        } finally {
+            if IsSet(property_value) {
+                DllCall("OleAut32\VariantClear", "Ptr", property_value)
+            }
+        }
+    }
+
     static ContainsClass(classes, expected) {
         local class_name
         for class_name in classes {
@@ -342,4 +459,18 @@ class RabbitInputTarget {
         }
         return false
     }
+}
+
+RabbitJoinList(list) {
+    local text := ""
+    local first := true
+    for item in list {
+        if first {
+            text := item
+            first := false
+        } else {
+            text .= ", " . item
+        }
+    }
+    return text
 }

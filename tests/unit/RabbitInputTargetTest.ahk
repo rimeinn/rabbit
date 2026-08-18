@@ -41,6 +41,13 @@ RunTest("Common file dialog edit control remains a text target", TestCommonFileD
 RunTest("Unrecognized common dialog remains unknown", TestUnknownCommonDialog.Bind())
 RunTest("Desktop is a non-text target", TestDesktopIsNo.Bind())
 RunTest("Taskbar button is a non-text target", TestTaskbarButtonIsNo.Bind())
+RunTest("Chrome address bar is a text target", TestChromeAddressBarIsYes.Bind())
+RunTest("Chrome native menu is a non-text target", TestChromeNativeMenuIsNo.Bind())
+RunTest("Chrome page edit control is a text target", TestChromePageEditIsYes.Bind())
+RunTest("Chrome context menu item is a non-text target", TestChromeContextMenuItemIsNo.Bind())
+RunTest("Chrome page without UIA focus remains unknown", TestChromePageWithoutUIAFocusIsUnknown.Bind())
+RunTest("Edge non-editable page area is a non-text target", TestEdgePageAreaIsNo.Bind())
+RunTest("Electron app keeps the previous behavior", TestElectronAppIsUnknown.Bind())
 RunTest("Unrecognized target remains unknown", TestUnknownTarget.Bind())
 
 TestExplorerFileViewIsNo() {
@@ -321,6 +328,91 @@ TestTaskbarButtonIsNo() {
             ["mstasklistwclass", "shell_traywnd"]
         )),
         "The taskbar button area was not classified as a non-text target."
+    )
+}
+
+TestChromeAddressBarIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["edit", "chrome_widgetwin_1"]
+        )),
+        "A Chrome address bar edit control was classified as a non-text target."
+    )
+}
+
+TestChromeNativeMenuIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "msedge.exe",
+            ["#32768", "chrome_widgetwin_1"]
+        )),
+        "A Chrome native popup menu was not passed through to the browser."
+    )
+}
+
+TestChromePageEditIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID]
+        )),
+        "A Chrome page edit control was classified as a non-text target."
+    )
+}
+
+TestChromeContextMenuItemIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_MENU_ITEM_CONTROL_TYPE_ID]
+        )),
+        "A Chrome context menu item was not passed through to the browser."
+    )
+}
+
+TestChromePageWithoutUIAFocusIsUnknown() {
+    AssertEqual(
+        RabbitInputTarget.UNKNOWN,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"]
+        )),
+        "A Chrome page without UIA focus did not keep the previous behavior."
+    )
+}
+
+TestEdgePageAreaIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "msedge.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [50033] ; UIA_PANE_CONTROL_TYPE_ID
+        )),
+        "An Edge non-editable page area was not passed through to the browser."
+    )
+}
+
+TestElectronAppIsUnknown() {
+    AssertEqual(
+        RabbitInputTarget.UNKNOWN,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "Code.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID]
+        )),
+        "An Electron app using Chrome_WidgetWin_1 did not keep the previous behavior."
     )
 }
 
