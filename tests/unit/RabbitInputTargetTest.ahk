@@ -44,6 +44,8 @@ RunTest("Taskbar button is a non-text target", TestTaskbarButtonIsNo.Bind())
 RunTest("Chrome address bar is a text target", TestChromeAddressBarIsYes.Bind())
 RunTest("Chrome native menu is a non-text target", TestChromeNativeMenuIsNo.Bind())
 RunTest("Chrome page edit control is a text target", TestChromePageEditIsYes.Bind())
+RunTest("Chrome search combo box is a text target", TestChromeSearchComboboxIsYes.Bind())
+RunTest("Chrome dropdown picker list item is a text target", TestChromeDropdownListItemIsYes.Bind())
 RunTest("Chrome context menu item is a non-text target", TestChromeContextMenuItemIsNo.Bind())
 RunTest("Chrome page without UIA focus remains unknown", TestChromePageWithoutUIAFocusIsUnknown.Bind())
 RunTest("Edge non-editable page area is a non-text target", TestEdgePageAreaIsNo.Bind())
@@ -363,6 +365,32 @@ TestChromePageEditIsYes() {
             [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID]
         )),
         "A Chrome page edit control was classified as a non-text target."
+    )
+}
+
+TestChromeSearchComboboxIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_COMBOBOX_CONTROL_TYPE_ID]
+        )),
+        "A Chrome search combo box was classified as a non-text target."
+    )
+}
+
+TestChromeDropdownListItemIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_LIST_ITEM_CONTROL_TYPE_ID]
+        )),
+        "A Chrome dropdown picker list item was classified as a non-text target."
     )
 }
 

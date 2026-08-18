@@ -24,6 +24,7 @@ class RabbitInputTarget {
     static UNKNOWN := "unknown"
 
     static UIA_EDIT_CONTROL_TYPE_ID := 50004
+    static UIA_COMBOBOX_CONTROL_TYPE_ID := 50003
     static UIA_LIST_ITEM_CONTROL_TYPE_ID := 50007
     static UIA_LIST_CONTROL_TYPE_ID := 50008
     static UIA_MENU_ITEM_CONTROL_TYPE_ID := 50010
@@ -363,7 +364,19 @@ class RabbitInputTarget {
         } else {
             ; The first entry is the focused element itself.
             control_type := control_types[1]
-            if control_type = this.UIA_EDIT_CONTROL_TYPE_ID {
+            if control_type = this.UIA_EDIT_CONTROL_TYPE_ID
+                || control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID {
+                ; Plain text fields and search boxes with a suggestion dropdown
+                ; (e.g. GitHub, exposed as a UIA combo box) accept input. Chrome
+                ; reports the combo box IsReadOnly property unreliably, so the
+                ; writable/read-only distinction is deliberately not consulted.
+                result := this.YES
+            } else if control_type = this.UIA_LIST_ITEM_CONTROL_TYPE_ID {
+                ; Dropdown pickers keep the keyboard focus on their highlighted
+                ; list item (aria-activedescendant) while the real input target
+                ; is the filter box on top, e.g. the GitHub repo switcher.
+                ; Accepting input here matches the pre-browser behavior, so it
+                ; does not regress plain page lists.
                 result := this.YES
             } else if control_type = this.UIA_DOCUMENT_CONTROL_TYPE_ID {
                 result := this.IsFocusedDocumentEditable(descriptor.process_id)
