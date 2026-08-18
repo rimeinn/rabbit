@@ -16,7 +16,20 @@
  *
  */
 
+#Include RabbitCommon.ahk
+
 RabbitShutdownRuntime(candidate_box, rime_api, session, mutex_instance, rime_initialized := true, status_tip := 0) {
+    RabbitDebug(
+        Format(
+            "shutdown runtime: candidate_box={} status_tip={} session={} rime_initialized={} mutex={}",
+            !!candidate_box,
+            !!status_tip,
+            session,
+            rime_initialized,
+            !!mutex_instance
+        ),
+        Format("RabbitShutdown.ahk:{}", A_LineNumber)
+    )
     try {
         if candidate_box && HasMethod(candidate_box, "Dispose") {
             candidate_box.Dispose()

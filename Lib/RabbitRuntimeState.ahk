@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitConfigSnapshot.ahk
 
 class RabbitRuntimeState {
@@ -33,6 +34,12 @@ class RabbitRuntimeState {
         this.active_window := 0
         this.timer_callback := this.UpdateWinAscii.Bind(this)
         this.timer_running := false
+        ; Last (process, ascii) pair the tray tip and icon were refreshed for.
+        ; UpdateWinAscii runs on the runtime state timer (SetTimer without a
+        ; period, i.e. the default 250 ms), so refreshing the tray on every
+        ; tick would reload the tray icon file about four times per second.
+        this.tray_tip_process := ""
+        this.tray_tip_ascii := false
 
         this.ascii_mode_false_label := "中文"
         this.ascii_mode_true_label := "西文"
@@ -176,7 +183,10 @@ class RabbitRuntimeState {
                 this.rime.set_option(this.session_id, "ascii_mode", target)
             }
         }
-        if this.tray {
+        if this.tray
+            && (this.tray_tip_process != proc_name || this.tray_tip_ascii != !!target) {
+            this.tray_tip_process := proc_name
+            this.tray_tip_ascii := !!target
             this.tray.UpdateTip(, target)
             this.tray.UpdateIcon()
         }

@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitCaret.ahk
 #Include RabbitPopupPlacement.ahk
 #Include RabbitUIStyleSnapshot.ahk
@@ -24,6 +25,10 @@
 #Include Direct2D/Direct2D.ahk
 
 class RabbitStatusTip {
+    ; Track render target recreations: the tip box size changes with the shown
+    ; text, and each change rebuilds the whole Direct2D stack.
+    static render_target_recreate_count := 0
+
     __New(
         style,
         config,
@@ -147,6 +152,19 @@ class RabbitStatusTip {
     EnsureRenderTarget() {
         if this.render_width = this.box_width && this.render_height = this.box_height {
             return
+        }
+        RabbitStatusTip.render_target_recreate_count++
+        if RabbitStatusTip.render_target_recreate_count <= 3
+            || Mod(RabbitStatusTip.render_target_recreate_count, 100) == 0 {
+            RabbitDebug(
+                Format(
+                    "status tip recreated Direct2D render target to {}x{} (total {})",
+                    this.box_width,
+                    this.box_height,
+                    RabbitStatusTip.render_target_recreate_count
+                ),
+                Format("RabbitStatusTip.ahk:{}", A_LineNumber)
+            )
         }
         this.d2d := 0
         this.d2d := this.CreateRenderTarget(this.box_width, this.box_height)

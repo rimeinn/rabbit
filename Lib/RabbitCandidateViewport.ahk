@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitCandidatePresentation.ahk
 
 class RabbitCandidateViewport {
@@ -104,11 +105,14 @@ class RabbitCandidateViewport {
     }
 
     LoadPages(rime_api, session_id, start_page, page_size, flow_rows) {
+        static begin_count := 0
+        static end_count := 0
         local result := []
         local iterator := rime_api.candidate_list_begin(session_id)
         if !iterator {
             return result
         }
+        begin_count++
         try {
             if !rime_api.candidate_list_from_index(session_id, iterator, start_page * page_size) {
                 return result
@@ -125,6 +129,17 @@ class RabbitCandidateViewport {
             }
         } finally {
             rime_api.candidate_list_end(iterator)
+            end_count++
+            if Mod(end_count, 100) == 0 {
+                RabbitDebug(
+                    Format(
+                        "candidate_list iterators: begin={} end={}",
+                        begin_count,
+                        end_count
+                    ),
+                    Format("RabbitCandidateViewport.ahk:{}", A_LineNumber)
+                )
+            }
         }
         return result
     }

@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitShutdown.ahk
 
 class RabbitAppContext {
@@ -40,6 +41,19 @@ class RabbitAppContext {
             return
         }
         this.disposed := true
+        RabbitDebug(
+            Format(
+                "disposing app context: input={} runtime_state={} appearance={} candidate_box={} status_tip={} session={} rime_initialized={}",
+                !!this.input,
+                !!this.runtime_state,
+                !!this.appearance,
+                !!this.candidate_box,
+                !!this.status_tip,
+                this.session_id,
+                this.rime_initialized
+            ),
+            Format("RabbitAppContext.ahk:{}", A_LineNumber)
+        )
         try {
             if this.input {
                 this.input.Dispose()

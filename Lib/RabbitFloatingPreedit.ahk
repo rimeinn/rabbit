@@ -24,6 +24,9 @@
 class RabbitFloatingPreedit {
     static FONT_HEIGHT_CALIBRATION_TEXT := "中M"
     static DEBUG_OUTPUT := true
+    ; Track render target recreations: the preedit box resizes with the text,
+    ; and each change rebuilds the whole Direct2D stack.
+    static render_target_recreate_count := 0
 
     __New(style, d2d_constructor := Direct2D) {
         this.gui := 0
@@ -273,6 +276,19 @@ class RabbitFloatingPreedit {
     EnsureRenderTarget() {
         if this.render_width = this.box_width && this.render_height = this.box_height {
             return
+        }
+        RabbitFloatingPreedit.render_target_recreate_count++
+        if RabbitFloatingPreedit.render_target_recreate_count <= 3
+            || Mod(RabbitFloatingPreedit.render_target_recreate_count, 100) == 0 {
+            RabbitDebug(
+                Format(
+                    "floating preedit recreated Direct2D render target to {}x{} (total {})",
+                    this.box_width,
+                    this.box_height,
+                    RabbitFloatingPreedit.render_target_recreate_count
+                ),
+                Format("RabbitFloatingPreedit.ahk:{}", A_LineNumber)
+            )
         }
         this.d2d := 0
         this.d2d := this.CreateRenderTarget(this.box_width, this.box_height)

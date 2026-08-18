@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitAppContext.ahk
 #Include RabbitCandidateBoxFactory.ahk
 #Include RabbitConfig.ahk
@@ -69,6 +70,15 @@ class RabbitApplication {
         this.context.rime_initialized := true
 
         local maintenance := args.Length == 0 ? RABBIT_PARTIAL_MAINTENANCE : args[1]
+        RabbitDebug(
+            Format(
+                "startup: keyboard_layout=0x{:04x} maintenance={} first_run={}",
+                this.context.keyboard_layout & 0xffff,
+                maintenance,
+                first_run
+            ),
+            Format("RabbitApplication.ahk:{}", A_LineNumber)
+        )
         if maintenance != RABBIT_NO_MAINTENANCE {
             RabbitUpdateMaintenanceTrayIcon()
             if first_run {
@@ -88,6 +98,10 @@ class RabbitApplication {
             this.SetDefaultKeyboard(this.context.keyboard_layout)
             throw Error("未能成功创建 RIME 会话。")
         }
+        RabbitDebug(
+            Format("startup: rime session created (id={})", this.context.session_id),
+            Format("RabbitApplication.ahk:{}", A_LineNumber)
+        )
 
         RabbitCleanOldLogs()
         RabbitCleanMisplacedConfigs()

@@ -32,6 +32,8 @@
 class RabbitInputController {
     static FOCUS_POLL_INTERVAL := 50
     static PASSWORD_POLL_INTERVAL := 250
+    ; 6000 * FOCUS_POLL_INTERVAL (50 ms) = one resource sample every 5 minutes.
+    static RESOURCE_SAMPLE_INTERVAL := 6000
     static EVENT_OBJECT_FOCUS := 0x8005
     static WINEVENT_OUTOFCONTEXT := 0x0000
 
@@ -74,6 +76,7 @@ class RabbitInputController {
         this.registered_hotkeys := []
         this.registered_hotkey_names := Map()
         this.registered_input_hotkeys := []
+        this.resource_poll_ticks := 0
     }
 
     RegisterHotKeys() {
@@ -449,22 +452,36 @@ class RabbitInputController {
         }
 
         if (status := this.rime.get_status(this.session_id)) {
-            local old_schema_id := status.schema_id
-            local old_ascii_mode := status.is_ascii_mode
-            local old_full_shape := status.is_full_shape
-            local old_ascii_punct := status.is_ascii_punct
-            this.rime.free_status(status)
+            try {
+                local old_schema_id := status.schema_id
+                local old_ascii_mode := status.is_ascii_mode
+                local old_full_shape := status.is_full_shape
+                local old_ascii_punct := status.is_ascii_punct
+            } finally {
+                this.rime.free_status(status)
+            }
         }
 
         processed := this.rime.process_key(this.session_id, code, mask)
 
         status := this.rime.get_status(this.session_id)
-        local new_schema_id := status.schema_id
-        local new_schema_name := status.schema_name
-        local new_ascii_mode := status.is_ascii_mode
-        local new_full_shape := status.is_full_shape
-        local new_ascii_punct := status.is_ascii_punct
-        this.rime.free_status(status)
+        if status {
+            try {
+                local new_schema_id := status.schema_id
+                local new_schema_name := status.schema_name
+                local new_ascii_mode := status.is_ascii_mode
+                local new_full_shape := status.is_full_shape
+                local new_ascii_punct := status.is_ascii_punct
+            } finally {
+                this.rime.free_status(status)
+            }
+        } else {
+            RabbitWarn(
+                "get_status returned 0 after process_key",
+                Format("RabbitInput.ahk:{}", A_LineNumber),
+                1
+            )
+        }
 
         local switcher_status := this.ResolveSwitcherStatus(
             old_schema_id,
@@ -516,19 +533,22 @@ class RabbitInputController {
         }
 
         if (commit := this.rime.get_commit(this.session_id)) {
-            if ascii_changed {
-                hide_candidate := true
+            try {
+                if ascii_changed {
+                    hide_candidate := true
+                }
+                if StrLen(commit.text) >= this.config.send_by_clipboard_length {
+                    this.SendTextByClipboard(commit.text)
+                } else {
+                    SendText(commit.text)
+                }
+                this.RunCandidateUpdate(
+                    candidate_revision,
+                    () => this.HideCandidate()
+                )
+            } finally {
+                this.rime.free_commit(commit)
             }
-            if StrLen(commit.text) >= this.config.send_by_clipboard_length {
-                this.SendTextByClipboard(commit.text)
-            } else {
-                SendText(commit.text)
-            }
-            this.RunCandidateUpdate(
-                candidate_revision,
-                () => this.HideCandidate()
-            )
-            this.rime.free_commit(commit)
         }
         if this.suspend_hotkey && this.suspend_hotkey_mask
             && (key = this.suspend_hotkey || SubStr(key, 2) = this.suspend_hotkey)
@@ -538,11 +558,14 @@ class RabbitInputController {
         }
 
         if (context := this.rime.get_context(this.session_id)) {
-            this.UpdateCompositionOwner(context, foreground_hwnd)
-            if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
-                this.UpdateCandidate(context, candidate_revision, hide_candidate)
+            try {
+                this.UpdateCompositionOwner(context, foreground_hwnd)
+                if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
+                    this.UpdateCandidate(context, candidate_revision, hide_candidate)
+                }
+            } finally {
+                this.rime.free_context(context)
             }
-            this.rime.free_context(context)
         }
 
         if !processed && !pass_through {
@@ -645,6 +668,36 @@ class RabbitInputController {
                 this.UpdatePasswordBypass()
             }
         }
+        this.resource_poll_ticks++
+        if this.resource_poll_ticks >= RabbitInputController.RESOURCE_SAMPLE_INTERVAL {
+            this.resource_poll_ticks := 0
+            this.LogResourceSample()
+        }
+    }
+
+    LogResourceSample() {
+        local process := DllCall("GetCurrentProcess", "ptr")
+        local gdi := DllCall("GetGuiResources", "ptr", process, "uint", 0, "uint") ; GR_GDIOBJECTS
+        local user := DllCall("GetGuiResources", "ptr", process, "uint", 1, "uint") ; GR_USEROBJECTS
+        local handle_count := 0
+        local working_set := 0
+        DllCall("GetProcessHandleCount", "ptr", process, "uint*", &handle_count)
+        ; PROCESS_MEMORY_COUNTERS: cb + PageFaultCount + PeakWorkingSetSize + WorkingSetSize.
+        local pmc := Buffer(A_PtrSize = 8 ? 72 : 40, 0)
+        NumPut("uint", pmc.Size, pmc, 0)
+        if DllCall("psapi\GetProcessMemoryInfo", "ptr", process, "ptr", pmc, "uint", pmc.Size) {
+            working_set := NumGet(pmc, A_PtrSize = 8 ? 16 : 12, "uptr")
+        }
+        RabbitDebug(
+            Format(
+                "resource sample: gdi={} user={} handles={} working_set={} KiB",
+                gdi,
+                user,
+                handle_count,
+                working_set // 1024
+            ),
+            Format("RabbitInput.ahk:{}", A_LineNumber)
+        )
     }
 
     CancelCompositionIfFocusChanged(foreground_hwnd) {

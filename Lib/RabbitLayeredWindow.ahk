@@ -16,7 +16,13 @@
  *
  */
 
+#Include RabbitCommon.ahk
+
 class RabbitLayeredWindow {
+    ; Each EnsureBitmap rebuilds the compatible DC and DIB section. Track the
+    ; count together with the render target recreations to spot size churn.
+    static dib_recreate_count := 0
+
     __New(hwnd) {
         this.hwnd := hwnd
         this.hdc := 0
@@ -103,6 +109,20 @@ class RabbitLayeredWindow {
         local bitmap_info, bitmap, bits := 0
         if this.width = width && this.height = height {
             return
+        }
+
+        RabbitLayeredWindow.dib_recreate_count++
+        if RabbitLayeredWindow.dib_recreate_count <= 3
+            || Mod(RabbitLayeredWindow.dib_recreate_count, 100) == 0 {
+            RabbitDebug(
+                Format(
+                    "layered window recreated DC/DIB to {}x{} (total {})",
+                    width,
+                    height,
+                    RabbitLayeredWindow.dib_recreate_count
+                ),
+                Format("RabbitLayeredWindow.ahk:{}", A_LineNumber)
+            )
         }
 
         this.ReleaseBitmap()

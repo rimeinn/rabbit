@@ -17,6 +17,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitUIStyleSnapshot.ahk
 #Include RabbitCandidateBoxCommon.ahk
 #Include RabbitCandidatePresentation.ahk
@@ -28,6 +29,10 @@ class CandidateBox {
     gui := 0
     static FLOW_ANIMATION_DURATION := 160
     static FLOW_ANIMATION_INTERVAL := 15
+    ; Each recreation builds a new Direct2D stack (GDI+ token, D2D1/DWrite
+    ; factories, WIC bitmap render target). Track the count to watch for
+    ; size oscillation and for old instances not being released.
+    static render_target_recreate_count := 0
 
     __New(style, d2d_constructor := Direct2D) {
         this.gui := 0
@@ -1044,6 +1049,19 @@ class CandidateBox {
     EnsureRenderTarget() {
         if this.render_width = this.boxWidth && this.render_height = this.boxHeight {
             return
+        }
+        CandidateBox.render_target_recreate_count++
+        if CandidateBox.render_target_recreate_count <= 3
+            || Mod(CandidateBox.render_target_recreate_count, 100) == 0 {
+            RabbitDebug(
+                Format(
+                    "candidate box recreated Direct2D render target to {}x{} (total {})",
+                    this.boxWidth,
+                    this.boxHeight,
+                    CandidateBox.render_target_recreate_count
+                ),
+                Format("RabbitCandidateBox.ahk:{}", A_LineNumber)
+            )
         }
         this.d2d := 0
         this.d2d := this.CreateRenderTarget(this.boxWidth, this.boxHeight)

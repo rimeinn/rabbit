@@ -72,6 +72,10 @@ class RabbitTrayController {
         this.full_shape := false
         this.ascii_punct := false
         this.current_schema_icon := ""
+        ; TraySetIcon loads the icon from disk or the executable resource on
+        ; every call. Remember the last resolved icon so repeated calls with an
+        ; unchanged key do not reload it.
+        this.last_icon_key := ""
     }
 
     SetupMenu() {
@@ -240,6 +244,8 @@ class RabbitTrayController {
             icon_path := ""
         }
         this.current_schema_icon := icon_path
+        ; The schema icon file may have been replaced by a deployment.
+        this.last_icon_key := ""
         this.UpdateIcon()
     }
 
@@ -265,21 +271,33 @@ class RabbitTrayController {
     UpdateIcon() {
         local icon_path := this.current_schema_icon
         local icon_num
+        local icon_key
         if !icon_path {
             icon_path := "Lib\rabbit.ico"
         }
         if A_IsCompiled {
             icon_num := this.ascii_mode ? 2 : (this.current_schema_icon ? 0 : 1)
+            icon_key := icon_num ? Format("compiled:{}", icon_num) : Format("file:{}", this.current_schema_icon)
+            if icon_key == this.last_icon_key {
+                return
+            }
             if icon_num {
                 TraySetIcon(A_ScriptFullPath, icon_num)
+                this.last_icon_key := icon_key
             } else if FileExist(this.current_schema_icon) {
                 TraySetIcon(this.current_schema_icon)
+                this.last_icon_key := icon_key
             }
         } else {
             icon_path := A_IsSuspended
                 ? "Lib\rabbit-alt.ico"
                 : (this.ascii_mode ? "Lib\rabbit-ascii.ico" : icon_path)
             if FileExist(icon_path) {
+                icon_key := "file:" . icon_path
+                if icon_key == this.last_icon_key {
+                    return
+                }
+                this.last_icon_key := icon_key
                 TraySetIcon(icon_path, , true)
             }
         }
