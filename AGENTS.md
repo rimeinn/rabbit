@@ -1,5 +1,31 @@
 # Repository Guidelines
 
+## Agent Operating Rules (Read First)
+
+The rules in this section bind every agent run of this repository's scripts and take precedence over convenience. Read them before running anything.
+
+### Catch every AutoHotkey exception at the top level
+
+An uncaught AutoHotkey exception pops up a native error dialog on the machine running the script. No agent tool can see that dialog; it can leave the process hanging, exiting with a misleading status, or failing silently while the GUI waits for a click. Therefore:
+
+- When running or testing any AutoHotkey script, MUST wrap its top-level startup or test entry point in `try/catch` and print the exception details (message, location, stack) to standard output.
+- MUST NOT rely on the default error dialog as the record of a failure — the dialog is invisible to the agent, so the failure must be observable on stdout and in the exit status.
+- MUST NOT treat `/ErrorStdOut` as the exception boundary; it only covers startup and load diagnostics, and destructor or callback-thread errors can still surface as dialogs.
+- If a run hangs or ends with an unclear status, suspect an invisible dialog first and re-run through the wrapper below.
+
+Copy this wrapper around any top-level entry point — a `main()` call or the script's inline startup statements:
+
+```ahk
+try {
+    main() ; or the script's actual top-level statements
+} catch as err {
+    FileAppend "Uncaught exception: " err.Message "`n  at " err.What "`n  " err.Line "`nStack:`n" err.Stack "`n", "*"
+    ExitApp 1
+}
+```
+
+`FileAppend ..., "*"` writes the details to stdout, and `ExitApp 1` yields a non-zero exit status, so the failure is visible to the agent. When a runner already provides this boundary (for example `RunTest` in the unit tests), prefer it over hand-rolling the wrapper.
+
 ## Project Structure & Module Organization
 
 Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the main entry point; `RabbitDeployer.ahk` handles installation and maintenance workflows. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml` defines the bundled Rime schema, while `assets/` contains source SVG icons. `Data/` and `Rime/` are generated or runtime data and are intentionally ignored.
@@ -44,7 +70,7 @@ Match surrounding YAML indentation and comments. No formatter or linter is curre
 
 There is no CI-enforced coverage threshold. Run focused tests directly or use the unit test runner. Always use `/ErrorStdOut` for startup and load diagnostics, but do not treat it as an exception boundary: each test body must run through `RunTest`, which catches callback exceptions and prints the test name, error, location, and stack to standard output. Test scripts use explicit relative includes and must remain runnable without a root-level test launcher.
 
-AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. When running or testing an AutoHotkey script, wrap the top-level startup or test entry point in `try/catch` and explicitly report the exception details. `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for this top-level exception boundary.
+AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. Always run through the top-level `try/catch` boundary required by Agent Operating Rules above; `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for that boundary.
 
 ```powershell
 AutoHotkey.exe /ErrorStdOut tests\unit\RabbitTests.ahk
