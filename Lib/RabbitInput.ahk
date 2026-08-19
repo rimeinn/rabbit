@@ -107,12 +107,22 @@ class RabbitInputController {
         }
 
         ; Plain keys are always needed for ordinary text input.
+        ; Key-up variants forward key release events to librime, matching TSF
+        ; frontends such as Weasel. Processors that act on key release (for
+        ; example ascii_composer switches) rely on receiving the release event;
+        ; without it a key that librime reports as handled on release would
+        ; stay swallowed and never reach the application.
         Loop 2 {
             local key_map := A_Index = 1 ? KeyDef.plain_keycode : KeyDef.other_keycode
             for key, _ in key_map {
                 this.RegisterInputHotKey(
                     "$" . key,
                     this.ProcessTextKey.Bind(this, key, 0),
+                    "S0"
+                )
+                this.RegisterInputHotKey(
+                    "$" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, up),
                     "S0"
                 )
             }
@@ -136,10 +146,25 @@ class RabbitInputController {
                 this.ProcessTextKey.Bind(this, key, shift),
                 "S0"
             )
+            this.RegisterInputHotKey(
+                "$<+" . key . " Up",
+                this.ProcessTextKey.Bind(this, key, shift | up),
+                "S0"
+            )
+            this.RegisterInputHotKey(
+                "$>+" . key . " Up",
+                this.ProcessTextKey.Bind(this, key, shift | up),
+                "S0"
+            )
             if has_lshift {
                 this.RegisterInputHotKey(
                     "$<+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
+                    "S0"
+                )
+                this.RegisterInputHotKey(
+                    "$<+^" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl | up),
                     "S0"
                 )
             }
@@ -147,6 +172,11 @@ class RabbitInputController {
                 this.RegisterInputHotKey(
                     "$>+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
+                    "S0"
+                )
+                this.RegisterInputHotKey(
+                    "$>+^" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl | up),
                     "S0"
                 )
             }
@@ -167,6 +197,16 @@ class RabbitInputController {
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
                     "S0"
                 )
+                this.RegisterInputHotKey(
+                    "$<+" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, shift | up),
+                    "S0"
+                )
+                this.RegisterInputHotKey(
+                    "$<+^" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl | up),
+                    "S0"
+                )
             }
             if has_rshift {
                 this.RegisterInputHotKey(
@@ -177,6 +217,16 @@ class RabbitInputController {
                 this.RegisterInputHotKey(
                     "$>+^" . key,
                     this.ProcessTextKey.Bind(this, key, shift | ctrl),
+                    "S0"
+                )
+                this.RegisterInputHotKey(
+                    "$>+" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, shift | up),
+                    "S0"
+                )
+                this.RegisterInputHotKey(
+                    "$>+^" . key . " Up",
+                    this.ProcessTextKey.Bind(this, key, shift | ctrl | up),
                     "S0"
                 )
             }
