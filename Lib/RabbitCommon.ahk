@@ -102,6 +102,53 @@ RabbitUserDataPath() {
     return A_ScriptDir . "\Rime"
 }
 
+; Return the Rime user directory in the path form expected by the bash that
+; rime-install.bat resolves to. Git Bash (MSYS2) accepts forward slashes
+; (D:/...), while WSL needs the /mnt/<drive>/... form. Backslashes must never
+; reach bash: it treats them as escape characters, so D:\... would be mangled
+; (or, under WSL, mistaken for a relative path).
+RabbitRimeDirForBash() {
+    local path, m
+    path := RabbitUserDataPath()
+    if RabbitBashIsWsl() {
+        if RegExMatch(path, "i)^([a-z]):(.*)$", &m) {
+            return "/mnt/" . StrLower(m[1]) . StrReplace(m[2], "\", "/")
+        }
+    }
+    return StrReplace(path, "\", "/")
+}
+
+; True when rime-install.bat would resolve `bash` to the WSL launcher (either
+; C:\Windows\System32\bash.exe or the %LOCALAPPDATA%\Microsoft\WindowsApps
+; alias) rather than Git Bash or another MSYS-style bash. The lookup replicates
+; rime-install.bat's :find_git_bash: it prefers the standard Git for Windows
+; directories, then falls back to scanning PATH the way cmd's where.exe does.
+RabbitBashIsWsl() {
+    local pf, dir, dirs := [], path, bash
+    for pf in [EnvGet("ProgramFiles"), EnvGet("ProgramW6432"), EnvGet("ProgramFiles(x86)")] {
+        if pf {
+            dirs.Push(pf . "\Git\cmd", pf . "\Git\mingw64\bin", pf . "\Git\mingw32\bin", pf . "\Git\usr\bin")
+        }
+    }
+    for dir in dirs {
+        if FileExist(dir . "\bash.exe") {
+            return false
+        }
+    }
+    for path in StrSplit(EnvGet("PATH"), ";") {
+        path := Trim(path, " `t`"")
+        if path && FileExist(path . "\bash.exe") {
+            bash := StrLower(path . "\bash.exe")
+            if InStr(bash, StrLower(A_WinDir . "\System32\bash.exe"))
+                || InStr(bash, "\microsoft\windowsapps\bash.exe") {
+                return true
+            }
+            return false
+        }
+    }
+    return false
+}
+
 RabbitSharedDataPath() {
     return A_ScriptDir . "\Data"
 }

@@ -179,7 +179,10 @@ class SwitcherSettingsDialog extends Gui {
         } else {
             EnvSet("use_plum", "0")
         }
-        EnvSet("rime_dir", RabbitUserDataPath())
+        ; Give rime_dir the form the resolved bash expects: forward slashes for
+        ; Git Bash (MSYS2), /mnt/<drive>/... for WSL. Backslashes would be
+        ; interpreted as escape characters by bash.
+        EnvSet("rime_dir", RabbitRimeDirForBash())
         this.Opt("+Disabled")
         RunWait(Format("cmd.exe /k {}\rime-install.bat", A_ScriptDir), A_ScriptDir)
         this.Opt("-Disabled")
