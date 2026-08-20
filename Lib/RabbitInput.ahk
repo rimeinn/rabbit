@@ -77,6 +77,7 @@ class RabbitInputController {
         this.registered_hotkey_names := Map()
         this.registered_input_hotkeys := []
         this.resource_poll_ticks := 0
+        this.replayed_down := Map()
     }
 
     RegisterHotKeys() {
@@ -439,6 +440,7 @@ class RabbitInputController {
         this.registered_hotkey_names := Map()
         this.registered_input_hotkeys := []
         this.password_bypass_active := false
+        this.replayed_down := Map()
     }
 
     ProcessTextKey(key, mask, this_hotkey := "") {
@@ -454,6 +456,7 @@ class RabbitInputController {
         local candidate_revision, foreground_hwnd, hide_candidate := false
         local input_target
         local code := 0
+        local previous_critical, commit_text := ""
         Loop 4 {
             local key_map
             switch A_Index {
@@ -484,120 +487,151 @@ class RabbitInputController {
         foreground_hwnd := this.GetForegroundWindow()
         input_target := this.input_target.Classify(foreground_hwnd)
         if input_target = RabbitInputTarget.NO {
-            this.ClearCompositionIfActive()
+            ; Serialize the Rime cleanup against other key sequences; the
+            ; replay itself stays outside the critical section.
+            previous_critical := Critical()
+            try {
+                this.ClearCompositionIfActive()
+            } finally {
+                Critical(previous_critical)
+            }
             if requires_text_target {
                 this.ReplayInput(key, mask, pass_through)
+                if mask & KeyDef.mask["Up"] {
+                    ; The key-down may have been handled by Rime in a text
+                    ; target while the release arrives here: no mark exists.
+                    if this.replayed_down.Has(key) {
+                        this.replayed_down.Delete(key)
+                    }
+                } else {
+                    this.replayed_down[key] := true
+                }
                 return
             }
             if pass_through {
                 return
             }
         }
-        this.CancelCompositionIfFocusChanged(foreground_hwnd)
-        candidate_revision := ++this.candidate_revision
-        if (caps := GetKeyState("CapsLock", "T")) {
-            if StrLen(key) == 1 && Ord(key) >= Ord("a") && Ord(key) <= Ord("z") { ; small case letters
-                code += (Ord("A") - Ord("a"))
-            }
-        }
-
-        if (status := this.rime.get_status(this.session_id)) {
-            try {
-                local old_schema_id := status.schema_id
-                local old_ascii_mode := status.is_ascii_mode
-                local old_full_shape := status.is_full_shape
-                local old_ascii_punct := status.is_ascii_punct
-            } finally {
-                this.rime.free_status(status)
-            }
-        }
-
-        processed := this.rime.process_key(this.session_id, code, mask)
-
-        status := this.rime.get_status(this.session_id)
-        if status {
-            try {
-                local new_schema_id := status.schema_id
-                local new_schema_name := status.schema_name
-                local new_ascii_mode := status.is_ascii_mode
-                local new_full_shape := status.is_full_shape
-                local new_ascii_punct := status.is_ascii_punct
-            } finally {
-                this.rime.free_status(status)
-            }
-        } else {
-            RabbitWarn(
-                "get_status returned 0 after process_key",
-                Format("RabbitInput.ahk:{}", A_LineNumber),
-                1
-            )
-        }
-
-        local switcher_status := this.ResolveSwitcherStatus(
-            old_schema_id,
-            old_ascii_mode,
-            old_full_shape,
-            old_ascii_punct,
-            new_schema_id
-        )
-        local processing_switcher := switcher_status.processing_switcher
-        old_schema_id := switcher_status.schema_id
-        old_ascii_mode := switcher_status.ascii_mode
-        old_full_shape := switcher_status.full_shape
-        old_ascii_punct := switcher_status.ascii_punct
-        local schema_changed := !processing_switcher && old_schema_id !== new_schema_id
-        local status_text := ""
-        local status_changed := false
-        local ascii_changed := false
-        if !processing_switcher && schema_changed {
-            this.runtime_state.UpdateStateLabels()
-        }
-        if !processing_switcher {
-            this.tray.UpdateTip(new_schema_name, new_ascii_mode, new_full_shape, new_ascii_punct)
-            if schema_changed {
-                this.tray.UpdateSchemaIcon(new_schema_id)
-            }
-        }
-        if !processing_switcher && old_ascii_mode != new_ascii_mode {
-            ascii_changed := true
-            this.runtime_state.UpdateWinAscii(new_ascii_mode, true)
-            status_text := new_ascii_mode
-                ? this.runtime_state.ascii_mode_true_label_abbr
-                : this.runtime_state.ascii_mode_false_label_abbr
-        } else if !processing_switcher && old_full_shape != new_full_shape {
-            status_changed := true
-            status_text := new_full_shape
-                ? this.runtime_state.full_shape_true_label_abbr
-                : this.runtime_state.full_shape_false_label_abbr
-        } else if !processing_switcher && old_ascii_punct != new_ascii_punct {
-            status_changed := true
-            status_text := new_ascii_punct
-                ? this.runtime_state.ascii_punct_true_label_abbr
-                : this.runtime_state.ascii_punct_false_label_abbr
-        }
-
-        if this.config.show_tips && schema_changed {
-            this.tray.ShowStatusTip(new_schema_name, true)
-        } else if this.config.show_tips && (status_changed || ascii_changed) {
-            this.tray.ShowStatusTip(status_text, ascii_changed)
-        }
-
-        if (commit := this.rime.get_commit(this.session_id)) {
-            try {
-                if ascii_changed {
-                    hide_candidate := true
+        ; Serialize the whole Rime key sequence so concurrent hotkey threads
+        ; cannot interleave librime calls on the same session (librime is not
+        ; thread-safe). State updates stay inside; text sending and replay
+        ; happen outside the critical section because they block.
+        previous_critical := Critical()
+        try {
+            this.CancelCompositionIfFocusChanged(foreground_hwnd)
+            candidate_revision := ++this.candidate_revision
+            if (caps := GetKeyState("CapsLock", "T")) {
+                if StrLen(key) == 1 && Ord(key) >= Ord("a") && Ord(key) <= Ord("z") { ; small case letters
+                    code += (Ord("A") - Ord("a"))
                 }
-                if StrLen(commit.text) >= this.config.send_by_clipboard_length {
-                    this.SendTextByClipboard(commit.text)
-                } else {
-                    SendText(commit.text)
+            }
+
+            if (status := this.rime.get_status(this.session_id)) {
+                try {
+                    local old_schema_id := status.schema_id
+                    local old_ascii_mode := status.is_ascii_mode
+                    local old_full_shape := status.is_full_shape
+                    local old_ascii_punct := status.is_ascii_punct
+                } finally {
+                    this.rime.free_status(status)
                 }
-                this.RunCandidateUpdate(
-                    candidate_revision,
-                    () => this.HideCandidate()
+            }
+
+            processed := this.rime.process_key(this.session_id, code, mask)
+
+            status := this.rime.get_status(this.session_id)
+            if status {
+                try {
+                    local new_schema_id := status.schema_id
+                    local new_schema_name := status.schema_name
+                    local new_ascii_mode := status.is_ascii_mode
+                    local new_full_shape := status.is_full_shape
+                    local new_ascii_punct := status.is_ascii_punct
+                } finally {
+                    this.rime.free_status(status)
+                }
+            } else {
+                RabbitWarn(
+                    "get_status returned 0 after process_key",
+                    Format("RabbitInput.ahk:{}", A_LineNumber),
+                    1
                 )
-            } finally {
-                this.rime.free_commit(commit)
+            }
+
+            local switcher_status := this.ResolveSwitcherStatus(
+                old_schema_id,
+                old_ascii_mode,
+                old_full_shape,
+                old_ascii_punct,
+                new_schema_id
+            )
+            local processing_switcher := switcher_status.processing_switcher
+            old_schema_id := switcher_status.schema_id
+            old_ascii_mode := switcher_status.ascii_mode
+            old_full_shape := switcher_status.full_shape
+            old_ascii_punct := switcher_status.ascii_punct
+            local schema_changed := !processing_switcher && old_schema_id !== new_schema_id
+            local status_text := ""
+            local status_changed := false
+            local ascii_changed := false
+            if !processing_switcher && schema_changed {
+                this.runtime_state.UpdateStateLabels()
+            }
+            if !processing_switcher {
+                this.tray.UpdateTip(new_schema_name, new_ascii_mode, new_full_shape, new_ascii_punct)
+                if schema_changed {
+                    this.tray.UpdateSchemaIcon(new_schema_id)
+                }
+            }
+            if !processing_switcher && old_ascii_mode != new_ascii_mode {
+                ascii_changed := true
+                this.runtime_state.UpdateWinAscii(new_ascii_mode, true)
+                status_text := new_ascii_mode
+                    ? this.runtime_state.ascii_mode_true_label_abbr
+                    : this.runtime_state.ascii_mode_false_label_abbr
+            } else if !processing_switcher && old_full_shape != new_full_shape {
+                status_changed := true
+                status_text := new_full_shape
+                    ? this.runtime_state.full_shape_true_label_abbr
+                    : this.runtime_state.full_shape_false_label_abbr
+            } else if !processing_switcher && old_ascii_punct != new_ascii_punct {
+                status_changed := true
+                status_text := new_ascii_punct
+                    ? this.runtime_state.ascii_punct_true_label_abbr
+                    : this.runtime_state.ascii_punct_false_label_abbr
+            }
+
+            if this.config.show_tips && schema_changed {
+                this.tray.ShowStatusTip(new_schema_name, true)
+            } else if this.config.show_tips && (status_changed || ascii_changed) {
+                this.tray.ShowStatusTip(status_text, ascii_changed)
+            }
+
+            if (commit := this.rime.get_commit(this.session_id)) {
+                try {
+                    if ascii_changed {
+                        hide_candidate := true
+                    }
+                    commit_text := commit.text
+                    this.RunCandidateUpdate(
+                        candidate_revision,
+                        () => this.HideCandidate()
+                    )
+                } finally {
+                    this.rime.free_commit(commit)
+                }
+            }
+        } finally {
+            Critical(previous_critical)
+        }
+
+        ; Send committed text outside the critical section: SendText and the
+        ; clipboard path block (ClipWait) and would hold up all input.
+        if commit_text != "" {
+            if StrLen(commit_text) >= this.config.send_by_clipboard_length {
+                this.SendTextByClipboard(commit_text)
+            } else {
+                SendText(commit_text)
             }
         }
         if this.suspend_hotkey && this.suspend_hotkey_mask
@@ -607,19 +641,39 @@ class RabbitInputController {
             return
         }
 
-        if (context := this.rime.get_context(this.session_id)) {
-            try {
-                this.UpdateCompositionOwner(context, foreground_hwnd)
-                if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
-                    this.UpdateCandidate(context, candidate_revision, hide_candidate)
+        ; The context snapshot is rendered inside the same serialization:
+        ; its internal pointers are only valid until free_context, and the
+        ; candidate update reads them.
+        previous_critical := Critical()
+        try {
+            if (context := this.rime.get_context(this.session_id)) {
+                try {
+                    this.UpdateCompositionOwner(context, foreground_hwnd)
+                    if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
+                        this.UpdateCandidate(context, candidate_revision, hide_candidate)
+                    }
+                } finally {
+                    this.rime.free_context(context)
                 }
-            } finally {
-                this.rime.free_context(context)
             }
+        } finally {
+            Critical(previous_critical)
         }
 
+        ; Replay an unhandled key outside the critical section. A key-up is
+        ; replayed only when its key-down was replayed, so the application
+        ; never receives an orphaned release; a key-down that Rime swallowed
+        ; is invisible to the application, and so is its release.
         if !processed && !pass_through {
-            this.ReplayInput(key, mask)
+            if mask & KeyDef.mask["Up"] {
+                if this.replayed_down.Has(key) && this.replayed_down[key] {
+                    this.replayed_down.Delete(key)
+                    this.ReplayInput(key, mask)
+                }
+            } else {
+                this.replayed_down[key] := true
+                this.ReplayInput(key, mask)
+            }
         }
     }
 
@@ -709,14 +763,21 @@ class RabbitInputController {
     }
 
     CheckCompositionFocus() {
-        this.CancelCompositionIfFocusChanged(this.GetForegroundWindow())
-        if this.password_field_detector {
-            this.password_poll_ticks++
-            if this.password_poll_ticks * RabbitInputController.FOCUS_POLL_INTERVAL
-                >= RabbitInputController.PASSWORD_POLL_INTERVAL {
-                this.password_poll_ticks := 0
-                this.UpdatePasswordBypass()
+        ; Serialize the Rime calls so the focus poll cannot interleave with a
+        ; key's Rime sequence.
+        local previous_critical := Critical()
+        try {
+            this.CancelCompositionIfFocusChanged(this.GetForegroundWindow())
+            if this.password_field_detector {
+                this.password_poll_ticks++
+                if this.password_poll_ticks * RabbitInputController.FOCUS_POLL_INTERVAL
+                    >= RabbitInputController.PASSWORD_POLL_INTERVAL {
+                    this.password_poll_ticks := 0
+                    this.UpdatePasswordBypass()
+                }
             }
+        } finally {
+            Critical(previous_critical)
         }
         this.resource_poll_ticks++
         if this.resource_poll_ticks >= RabbitInputController.RESOURCE_SAMPLE_INTERVAL {

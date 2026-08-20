@@ -29,6 +29,11 @@ RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.Bind())
 RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind())
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
+RunTest("up replay pairs with a replayed down", TestUpReplayPairsWithReplayedDown.Bind())
+RunTest("up is not replayed when down was handled", TestUpNotReplayedWhenDownHandled.Bind())
+RunTest("pass-through keys do not set replay marks", TestPassThroughKeyNotMarked.Bind())
+RunTest("non-text target tracks replay pairing", TestNonTextTargetTracksReplayPairing.Bind())
+RunTest("non-text key-up without a replay mark is safe", TestNoTargetUpWithoutReplayMarkIsSafe.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("candidate placement uses the floating preedit bottom", TestFloatingPreeditCandidatePlacement.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
@@ -706,6 +711,16 @@ class RabbitInputTargetProbe {
     }
 }
 
+class RabbitInputTargetSwitchProbe {
+    __New(result) {
+        this.result := result
+    }
+
+    Classify(*) {
+        return this.result
+    }
+}
+
 class RabbitInputTargetControllerProbe extends RabbitInputController {
     __New(rime, candidate_box, input_target) {
         super.__New(
@@ -760,5 +775,164 @@ class RabbitPasswordBypassControllerProbe extends RabbitInputController {
 
     SetInputHotKeyEnabled(name, enabled) {
         this.hotkey_state_changes.Push({ name: name, enabled: enabled })
+    }
+}
+
+TestUpReplayPairsWithReplayedDown() {
+    local rime := RabbitKeyReplayRimeProbe([false, false])
+    local candidate_box := RabbitInputCandidateProbe()
+    local runtime_state := RabbitSwitcherStatusRuntimeProbe()
+    local tray := RabbitSwitcherStatusTrayProbe()
+    local input := RabbitKeyReplayControllerProbe(rime, candidate_box, runtime_state, tray)
+
+    input.ProcessTextKey("h", 0)
+    AssertEqual(1, input.replayed_keys.Length, "The unhandled key-down was not replayed.")
+    AssertEqual("h", input.replayed_keys[1].key, "The wrong key-down was replayed.")
+    AssertTrue(
+        input.replayed_down.Has("h") && input.replayed_down["h"],
+        "The replayed key-down was not marked."
+    )
+
+    input.ProcessTextKey("h", KeyDef.mask["Up"])
+    AssertEqual(2, input.replayed_keys.Length, "The paired key-up was not replayed.")
+    AssertEqual("h", input.replayed_keys[2].key, "The wrong key-up was replayed.")
+    AssertTrue(
+        input.replayed_keys[2].mask & KeyDef.mask["Up"],
+        "The replayed key-up lost its release mask."
+    )
+    AssertTrue(!input.replayed_down.Has("h"), "The replay mark survived the key-up.")
+}
+
+TestUpNotReplayedWhenDownHandled() {
+    local rime := RabbitKeyReplayRimeProbe([true, false])
+    local candidate_box := RabbitInputCandidateProbe()
+    local runtime_state := RabbitSwitcherStatusRuntimeProbe()
+    local tray := RabbitSwitcherStatusTrayProbe()
+    local input := RabbitKeyReplayControllerProbe(rime, candidate_box, runtime_state, tray)
+
+    input.ProcessTextKey("h", 0)
+    AssertEqual(0, input.replayed_keys.Length, "The handled key-down was replayed.")
+    AssertTrue(!input.replayed_down.Has("h"), "A handled key-down was marked as replayed.")
+
+    input.ProcessTextKey("h", KeyDef.mask["Up"])
+    AssertEqual(0, input.replayed_keys.Length, "The orphaned key-up was replayed to the target.")
+    AssertTrue(!input.replayed_down.Has("h"), "An unhandled release left a replay mark.")
+}
+
+TestPassThroughKeyNotMarked() {
+    local rime := RabbitKeyReplayRimeProbe([false, false])
+    local candidate_box := RabbitInputCandidateProbe()
+    local runtime_state := RabbitSwitcherStatusRuntimeProbe()
+    local tray := RabbitSwitcherStatusTrayProbe()
+    local input := RabbitKeyReplayControllerProbe(rime, candidate_box, runtime_state, tray)
+
+    input.ProcessConfiguredKey("h", 0, true)
+    AssertEqual(0, input.replayed_keys.Length, "A pass-through key was replayed.")
+    AssertTrue(!input.replayed_down.Has("h"), "A pass-through key set a replay mark.")
+}
+
+TestNonTextTargetTracksReplayPairing() {
+    local rime := RabbitInputRimeProbe()
+    local candidate_box := RabbitInputCandidateProbe()
+    local input := RabbitInputTargetControllerProbe(
+        rime,
+        candidate_box,
+        RabbitInputTargetProbe(RabbitInputTarget.NO)
+    )
+    input.composition_owner_hwnd := 100
+    input.prev_show := true
+
+    input.ProcessTextKey("h", 0)
+    AssertTrue(input.replayed_down.Has("h"), "A non-text key-down was not marked.")
+
+    input.ProcessTextKey("h", KeyDef.mask["Up"])
+    AssertTrue(!input.replayed_down.Has("h"), "A non-text key-up did not clear the replay mark.")
+}
+
+TestNoTargetUpWithoutReplayMarkIsSafe() {
+    local rime := RabbitKeyReplayRimeProbe([true])
+    local candidate_box := RabbitInputCandidateProbe()
+    local runtime_state := RabbitSwitcherStatusRuntimeProbe()
+    local tray := RabbitSwitcherStatusTrayProbe()
+    local target := RabbitInputTargetSwitchProbe(RabbitInputTarget.UNKNOWN)
+    local input := RabbitKeyReplayControllerProbe(
+        rime,
+        candidate_box,
+        runtime_state,
+        tray,
+        target
+    )
+
+    ; The key-down is handled by Rime in a text target: not replayed, not marked.
+    input.ProcessTextKey("w", 0)
+    AssertEqual(0, input.replayed_keys.Length, "The handled key-down was replayed.")
+    AssertTrue(!input.replayed_down.Has("w"), "A handled key-down was marked as replayed.")
+
+    ; The release arrives after focus moved to a non-text target: the missing
+    ; mark must not crash the replay-bookkeeping path.
+    target.result := RabbitInputTarget.NO
+    input.ProcessTextKey("w", KeyDef.mask["Up"])
+    AssertEqual(1, input.replayed_keys.Length, "The non-text key-up was not replayed.")
+    AssertTrue(!input.replayed_down.Has("w"), "The key-up left a replay mark behind.")
+}
+
+class RabbitKeyReplayControllerProbe extends RabbitInputController {
+    __New(rime, candidate_box, runtime_state, tray, input_target := 0) {
+        super.__New(
+            rime,
+            42,
+            candidate_box,
+            RabbitConfigSnapshot(),
+            runtime_state,
+            tray,
+            input_target ? input_target : RabbitInputTargetProbe(RabbitInputTarget.UNKNOWN)
+        )
+        this.replayed_keys := []
+    }
+
+    GetForegroundWindow() {
+        return 100
+    }
+
+    ReplayInput(key, mask, pass_through := false) {
+        this.replayed_keys.Push({
+            key: key,
+            mask: mask,
+            pass_through: pass_through
+        })
+    }
+}
+
+class RabbitKeyReplayRimeProbe {
+    __New(process_results) {
+        this.process_results := process_results
+        this.process_index := 0
+        this.status := {
+            schema_id: "probe",
+            schema_name: "probe",
+            is_ascii_mode: false,
+            is_full_shape: false,
+            is_ascii_punct: false
+        }
+    }
+
+    get_status(session_id) {
+        return this.status
+    }
+
+    free_status(status) {
+    }
+
+    process_key(session_id, keycode, mask) {
+        this.process_index++
+        return this.process_results[this.process_index]
+    }
+
+    get_commit(session_id) {
+        return 0
+    }
+
+    get_context(session_id) {
+        return 0
     }
 }
