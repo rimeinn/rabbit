@@ -86,6 +86,9 @@ rabbit/
 |  ├─ ...               其他依赖，编译后可删除
 ├─ plum/                若使用东风破，将被安装到此路径
 ├─ Rime/                Rime 用户文件夹，运行后会自动生成；可修改注册表 "HKEY_CURRENT_USER\Software\Rime\Rabbit" 中的 "RimeUserDir" 来指定不同的用户文件夹
+├─ docs/                文档资源，包含 README 使用的截图
+|  └─ images/
+|     └─ candidate-layouts/
 ├─ LICENSE              开源许可，可删除
 ├─ Rabbit.ahk           玉兔毫主程序脚本
 ├─ Rabbit.exe           AutoHotkey 可执行文件，若本机已安装 AutoHotkey 或已编译，可删除

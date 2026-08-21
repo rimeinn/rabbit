@@ -188,6 +188,7 @@ jobs:
             !*Tests.ahk
             LICENSE
             README.md
+            docs/images/candidate-layouts/*.png
             rime-install.bat
 
       - name: Upload Full Zip of Rabbit ${{ matrix.target }}
@@ -211,6 +212,7 @@ jobs:
             !*Tests.ahk
             LICENSE
             README.md
+            docs/images/candidate-layouts/*.png
             rime-install.bat
 
   create-nightly:
