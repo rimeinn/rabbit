@@ -21,7 +21,17 @@
 
 每夜构建版可在 [`latest`](https://github.com/rimeinn/rabbit/releases/tag/latest) 页面下载。
 
-## 候选窗布局
+### 通过 [scoop](https://scoop.sh/) 安装
+
+```PowerShell
+scoop bucket add siku https://github.com/amorphobia/siku
+# 正式发行版
+scoop install siku/rabbit
+# 每夜构建版
+scoop install siku/rabbit-nightly
+```
+
+## 界面预览
 
 玉兔毫的现代候选窗提供三种布局，可以在 `rabbit.custom.yaml` 的 `style/layout/type` 中选择：
 
@@ -53,16 +63,6 @@
 style:
   layout:
     type: flow
-```
-
-### 通过 [scoop](https://scoop.sh/) 安装
-
-```PowerShell
-scoop bucket add siku https://github.com/amorphobia/siku
-# 正式发行版
-scoop install siku/rabbit
-# 每夜构建版
-scoop install siku/rabbit-nightly
 ```
 
 ## 脚本编译
