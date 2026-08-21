@@ -13,11 +13,47 @@
 > [!NOTE]
 > 发现程序漏洞请在 [Issues](https://github.com/rimeinn/rabbit/issues/new/choose) 反馈。使用问题可以在 [Discussions](https://github.com/rimeinn/rabbit/discussions) 讨论，或者加入 [Telegram 群聊](https://t.me/rime_rabbit)。
 
+玉兔毫可以直接解压运行，适合没有管理员权限的 Windows 环境。它不会要求安装系统输入法或写入系统范围的配置。若你拥有管理员权限，并且希望获得 Windows 上最完整、最成熟的 Rime 集成体验，建议优先选择[小狼毫](https://github.com/rime/weasel)。
+
 ### 通过发布页面下载
 
 正式发行版会在 [Release](https://github.com/rimeinn/rabbit/releases) 页面的 Assets 中，下载最新的 `rabbit-v<版本号>.zip`，解压到一个新建文件夹，运行 `Rabbit.exe` 即可。
 
 每夜构建版可在 [`latest`](https://github.com/rimeinn/rabbit/releases/tag/latest) 页面下载。
+
+## 候选窗布局
+
+玉兔毫的现代候选窗提供三种布局，可以在 `rabbit.custom.yaml` 的 `style/layout/type` 中选择：
+
+### 堆叠布局（`stacked`）
+
+默认布局。候选逐行显示，适合一般的拼音、注音和形码输入。
+
+![堆叠布局](docs/images/candidate-layouts/stacked.png)
+
+### 流式布局（`flow`）
+
+候选按行横向排列，可以在较宽的屏幕上同时看到更多候选。候选超过一行时，玉兔毫会以多行分页显示，并在展开和收起时使用平滑过渡。
+
+![流式布局](docs/images/candidate-layouts/flow.png)
+
+![流式布局的多行分页](docs/images/candidate-layouts/flow_paging.png)
+
+### 竖排文字布局（`vertical_text`）
+
+候选文字从上到下排列，适合竖排文字输入。候选列可以设置为从左向右或从右向左排列，分别对应 `vertical_text_left_to_right` 的 `true` 和 `false`。
+
+![竖排文字布局：候选列从左向右](docs/images/candidate-layouts/vertical_text_left_to_right.png)
+
+![竖排文字布局：候选列从右向左](docs/images/candidate-layouts/vertical_text_right_to_left.png)
+
+例如，使用流式布局可以配置为：
+
+```yaml
+style:
+  layout:
+    type: flow
+```
 
 ### 通过 [scoop](https://scoop.sh/) 安装
 
@@ -32,8 +68,6 @@ scoop install siku/rabbit-nightly
 ## 脚本编译
 
 本仓库提供*源码形式的玉兔毫脚本*以及*仅修改主图标的 AutoHotkey 可执行文件*，用户可根据需要自行编译为可执行文件以及压缩。编译方式可参照 AutoHotkey 的[官方文档](https://www.autohotkey.com/docs/v2/Scripts.htm#ahk2exe)。
-
-编译并使用 `upx` 压缩后，64 位的可执行文件大小可减少为 `Rabbit.exe` - 约 570+ KB, `RabbitDeployer.exe` - 约 560+ KB。
 
 ## 目录结构
 
@@ -75,10 +109,13 @@ rabbit/
 
 以及一些代码片段，在注释中注明了来源链接
 
-## 已知问题
+## 问题反馈
 
-- 某些情况无法获得输入光标的坐标；这只会影响候选框定位，候选框会回退到鼠标位置。Rabbit 不会仅因 caret 探测失败而禁用输入，而是根据当前焦点控件判断输入目标。
-- Windows 文件资源管理器的文件视图、桌面图标区和任务栏非编辑控件会透传普通文本按键，以保留系统的按字母定位等行为；资源管理器地址栏、搜索框和重命名框仍可使用 Rabbit 输入。
-- Rabbit 会根据 UI Automation 的 `IsPassword` 属性及原生编辑框的密码字符自动识别通用密码框；聚焦密码框时会临时停止拦截普通输入热键，让物理按键直接交给目标程序，离开后自动恢复。可在 `rabbit.custom.yaml` 中将 `bypass_password_fields` 设为 `false` 关闭此行为。
-- 桌面版 QQ 密码框具有[防键盘钩子机制](https://blog.csdn.net/muyedongfeng/article/details/49308993)（[页面存档备份](https://web.archive.org/web/20240907052640/https://blog.csdn.net/muyedongfeng/article/details/49308993)）；上述自动绕过尚未在 QQ 中验证。若 QQ 的自绘密码框未暴露标准密码属性，仍需右键点击任务栏图标禁用/启用玉兔毫，或设置 `suspend_hotkey` 快捷键手动切换。
-- 在 Windows 7 中打开玉兔毫时可能会造成系统一段时间无响应，需等待初始化完成，原因未知
+如果遇到程序崩溃、输入异常、候选窗显示错误或其他问题，请在 [Issues](https://github.com/rimeinn/rabbit/issues/new/choose) 反馈。提交时请尽量说明：
+
+- Windows 版本、玉兔毫版本以及使用的 Rime 方案；
+- 出现问题的具体程序和可复现步骤；
+- 使用的是哪种候选窗布局，提供 `rabbit.custom.yaml` 内容；
+- 相关截图、错误信息或日志。
+
+使用配置、方案或日常操作方面的问题，可以在 [Discussions](https://github.com/rimeinn/rabbit/discussions) 讨论，也欢迎加入 [Telegram 群聊](https://t.me/rime_rabbit)。
