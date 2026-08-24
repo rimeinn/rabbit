@@ -20,6 +20,7 @@
 
 #Include RabbitAppContextTest.ahk
 #Include RabbitApplicationTest.ahk
+#Include RabbitBehaviorSettingsModelTest.ahk
 #Include RabbitCandidatePresentationTest.ahk
 #Include RabbitCandidateViewportTest.ahk
 #Include RabbitConfigSnapshotTest.ahk

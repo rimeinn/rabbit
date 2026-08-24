@@ -43,6 +43,7 @@ RunSettingsWindowPreview() {
         window.Show("w820 h500 Center")
         if A_Args.Length > 0 && A_Args[1] = "ci" {
             window.SelectPage(2)
+            window.SelectPage(3)
             SetTimer(window.OnClose.Bind(window), -100)
         }
         window.WaitClose()
