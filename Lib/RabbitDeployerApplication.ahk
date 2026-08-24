@@ -18,6 +18,7 @@
 
 #Include RabbitDeployerContext.ahk
 #Include RabbitDeployerWorkflow.ahk
+#Include RabbitSettingsWindow.ahk
 #Include RabbitTrayMenu.ahk
 
 class RabbitDeployerApplication {
@@ -50,6 +51,9 @@ class RabbitDeployerApplication {
             case "sync":
                 this.context.result := this.workflow.SyncUserData()
                 this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
+            case "settings":
+                this.context.result := this.ShowSettings()
+                this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
             default:
                 this.context.result := this.workflow.Run(this.context.command = "install")
                 this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
@@ -61,6 +65,21 @@ class RabbitDeployerApplication {
             ExitApp()
         }
         return this.context.result
+    }
+
+    CreateSettingsWindow() {
+        return RabbitSettingsWindow(this.workflow)
+    }
+
+    ShowSettings() {
+        local window := this.CreateSettingsWindow()
+        try {
+            window.Show("w820 h500 Center")
+            window.WaitClose()
+        } finally {
+            window.Dispose()
+        }
+        return 0
     }
 
     RestartRabbit() {

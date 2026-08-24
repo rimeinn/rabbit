@@ -23,6 +23,7 @@
 #Include RabbitCandidatePresentationTest.ahk
 #Include RabbitCandidateViewportTest.ahk
 #Include RabbitConfigSnapshotTest.ahk
+#Include RabbitDeployerApplicationTest.ahk
 #Include RabbitDeployerContextTest.ahk
 #Include RabbitDeployerWorkflowTest.ahk
 #Include RabbitInputControllerTest.ahk
@@ -32,6 +33,7 @@
 #Include RabbitPopupPlacementTest.ahk
 #Include RabbitShutdownTest.ahk
 #Include RabbitStatusTipTest.ahk
+#Include RabbitSettingsWindowTest.ahk
 #Include RabbitTestCommonTest.ahk
 #Include RabbitTrayClickTest.ahk
 #Include RabbitTrayStatusTipTest.ahk
