@@ -28,6 +28,7 @@
 #Include RabbitDeployerApplicationTest.ahk
 #Include RabbitDeployerContextTest.ahk
 #Include RabbitDeployerWorkflowTest.ahk
+#Include RabbitDictionarySettingsModelTest.ahk
 #Include RabbitInputControllerTest.ahk
 #Include RabbitInputTargetTest.ahk
 #Include RabbitIconTest.ahk
