@@ -76,8 +76,10 @@ class RabbitSettingsWindow extends Gui {
         for page in RabbitSettingsWindow.pages {
             page_names.Push(page.title)
         }
-        this.navigation := this.AddListBox("x20 y88 w170 h390 -Multi", page_names)
+        this.navigation := this.AddListBox("x20 y88 w170 h330 -Multi", page_names)
         this.navigation.OnEvent("Change", (*) => this.SelectPage(this.navigation.Value))
+        this.apply_button := this.AddButton("x20 y434 w170 h36 Disabled", "应用并重新部署")
+        this.apply_button.OnEvent("Click", (*) => this.ApplyAllPendingSettings())
 
         this.AddText("x205 y20 w1 h458 +0x10")
         this.SetFont("s18 w600")
@@ -216,13 +218,9 @@ class RabbitSettingsWindow extends Gui {
         this.operation_status := this.AddText("x254 y302 w520 h28 Hidden", "")
 
         this.footer_status := this.AddText(
-            "x230 y452 w340 h22 cGray",
+            "x230 y452 w570 h22 cGray",
             "设置内容将在确认后统一保存和部署。"
         )
-        this.apply_button := this.AddButton("x580 y444 w110 h32 Hidden Disabled", "保存并部署")
-        this.apply_button.OnEvent("Click", (*) => this.ApplyCurrentPage())
-        this.close_button := this.AddButton("x700 y444 w100 h32", "关闭")
-        this.close_button.OnEvent("Click", this.OnClose.Bind(this))
         this.OnEvent("Close", this.OnClose.Bind(this))
         this.OnEvent("Escape", this.OnClose.Bind(this))
 
@@ -279,9 +277,6 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_preview_img.Visible := visible && !this.old_windows
         this.appearance_preview_unavailable.Visible := visible && this.old_windows
         this.appearance_status.Visible := visible
-        if visible {
-            this.apply_button.Visible := true
-        }
     }
 
     SetSwitcherVisible(visible) {
@@ -291,9 +286,6 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_hotkeys_label.Visible := visible
         this.switcher_hotkeys.Visible := visible
         this.switcher_status.Visible := visible
-        if visible {
-            this.apply_button.Visible := true
-        }
     }
 
     SetBehaviorVisible(visible) {
@@ -618,21 +610,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     UpdateApplyButton() {
-        this.apply_button.Visible := this.selected_page >= 1 && this.selected_page <= 5
-        switch this.selected_page {
-            case 1:
-                this.apply_button.Enabled := this.appearance_dirty
-            case 2:
-                this.apply_button.Enabled := this.switcher_dirty
-            case 3:
-                this.apply_button.Enabled := this.behavior_dirty
-            case 4:
-                this.apply_button.Enabled := this.application_dirty
-            case 5:
-                this.apply_button.Enabled := false
-            default:
-                this.apply_button.Enabled := false
-        }
+        this.apply_button.Enabled := this.HasUnsavedSettings()
     }
 
     EnsureBehaviorSettings() {

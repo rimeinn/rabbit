@@ -27,6 +27,7 @@ RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitch
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
 RunTest("settings window embeds dictionary management", TestSettingsWindowEmbedsDictionaryManagement.Bind())
+RunTest("settings window uses a global apply action", TestSettingsWindowUsesGlobalApplyAction.Bind())
 RunTest("settings window preserves canceled close", TestSettingsWindowPreservesCanceledClose.Bind())
 RunTest("settings window saves all settings on close", TestSettingsWindowSavesAllSettingsOnClose.Bind())
 
@@ -176,8 +177,8 @@ TestSettingsWindowEmbedsDictionaryManagement() {
             ControlGetItems(window.dictionary_list).Length,
             "The dictionary page showed the wrong item count."
         )
-        AssertTrue(window.apply_button.Visible, "The dictionary page hid the apply button.")
-        AssertTrue(!window.apply_button.Enabled, "The dictionary page enabled the irrelevant apply button.")
+        AssertTrue(window.apply_button.Visible, "The dictionary page hid the global apply button.")
+        AssertTrue(!window.apply_button.Enabled, "The dictionary page enabled apply without pending changes.")
         AssertTrue(!window.dictionary_backup.Enabled, "The dictionary page enabled backup without a selection.")
         AssertTrue(window.dictionary_restore.Enabled, "The dictionary page disabled snapshot restore.")
         window.dictionary_list.Choose(1)
@@ -192,6 +193,33 @@ TestSettingsWindowEmbedsDictionaryManagement() {
         "create_dictionary,dispose_dictionary",
         JoinSettingsWorkflowCalls(calls),
         "The dictionary page did not own its model."
+    )
+}
+
+TestSettingsWindowUsesGlobalApplyAction() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsCombinedWorkflowProbe(calls), true)
+    try {
+        AssertEqual(
+            "应用并重新部署",
+            window.apply_button.Text,
+            "The global apply button used the wrong label."
+        )
+        AssertTrue(!HasProp(window, "close_button"), "The settings window retained a redundant close button.")
+        AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
+        window.switcher_dirty := true
+        AssertTrue(window.SelectPage(5), "The settings window rejected the dictionary page.")
+        AssertTrue(window.apply_button.Visible, "Changing pages hid the global apply button.")
+        AssertTrue(window.apply_button.Enabled, "A dirty non-current page did not enable apply.")
+        AssertTrue(window.ApplyAllPendingSettings(), "The settings window failed to save all dirty pages.")
+        AssertTrue(!window.apply_button.Enabled, "Applying all changes left the global button enabled.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_style,create_model,save:schema_a:Control+grave,deploy,dispose_style,dispose_model",
+        JoinSettingsWorkflowCalls(calls),
+        "Save all did not save the dirty page and deploy exactly once."
     )
 }
 
