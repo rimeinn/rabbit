@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitDeployerContext.ahk
 #Include RabbitDeployerWorkflow.ahk
 #Include RabbitSettingsWindow.ahk
@@ -71,7 +72,15 @@ class RabbitDeployerApplication {
         return RabbitSettingsWindow(this.workflow)
     }
 
+    UseLegacySettings() {
+        return RabbitIsOldWindows()
+    }
+
     ShowSettings() {
+        if this.UseLegacySettings() {
+            return this.workflow.Run(false)
+        }
+
         local window := this.CreateSettingsWindow()
         try {
             window.Show("w820 h500 Center")
