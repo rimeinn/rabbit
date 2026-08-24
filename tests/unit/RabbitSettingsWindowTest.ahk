@@ -22,6 +22,8 @@
 RunTest("settings window navigation", TestSettingsWindowNavigation.Bind())
 RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalidPage.Bind())
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
+RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
+RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 
 TestSettingsWindowNavigation() {
     local window := RabbitSettingsWindow()
@@ -64,6 +66,48 @@ TestSettingsWindowMaintenanceActions() {
     }
 }
 
+TestSettingsWindowSavesAppearanceSettings() {
+    local calls := []
+    local workflow := RabbitSettingsAppearanceWorkflowProbe(calls)
+    local window := RabbitSettingsWindow(workflow, true)
+    try {
+        AssertEqual(2, window.appearance_presets.Length, "The appearance page showed the wrong preset count.")
+        AssertEqual(1, window.appearance_list.Value, "The appearance page did not select the active preset.")
+        window.appearance_list.Choose(2)
+        window.OnAppearanceSelectionChange()
+        AssertTrue(window.ApplyAppearanceSettings(), "The appearance page failed to save valid settings.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_style,select:theme_b,save_style,deploy,dispose_style",
+        JoinSettingsWorkflowCalls(calls),
+        "The appearance page did not save, deploy, and dispose in order."
+    )
+}
+
+TestSettingsWindowSavesSwitcherSettings() {
+    local calls := []
+    local workflow := RabbitSettingsSwitcherWorkflowProbe(calls)
+    local window := RabbitSettingsWindow(workflow)
+    try {
+        AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
+        AssertEqual(2, window.switcher_list.GetCount(), "The switcher page showed the wrong schema count.")
+        window.switcher_list.Modify(1, "-Check")
+        window.switcher_list.Modify(2, "Check")
+        window.switcher_hotkeys.Value := "F4"
+        window.MarkSwitcherDirty()
+        AssertTrue(window.ApplySwitcherSettings(), "The switcher page failed to save valid settings.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_model,save:schema_b:F4,deploy,dispose_model",
+        JoinSettingsWorkflowCalls(calls),
+        "The switcher page did not save, deploy, and dispose in order."
+    )
+}
+
 JoinSettingsWorkflowCalls(calls) {
     local result := ""
     for call in calls {
@@ -90,5 +134,88 @@ class RabbitSettingsWorkflowProbe {
     DictManagement() {
         this.calls.Push("dict")
         return 0
+    }
+}
+
+class RabbitSettingsSwitcherWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateSwitcherSettingsModel() {
+        this.calls.Push("create_model")
+        return RabbitSettingsSwitcherModelProbe(this.calls)
+    }
+
+    UpdateWorkspace(report_errors := false) {
+        this.calls.Push("deploy")
+        return 0
+    }
+}
+
+class RabbitSettingsAppearanceWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateUIStyleSettings() {
+        this.calls.Push("create_style")
+        return RabbitSettingsAppearanceModelProbe(this.calls)
+    }
+
+    UpdateWorkspace(report_errors := false) {
+        this.calls.Push("deploy")
+        return 0
+    }
+}
+
+class RabbitSettingsAppearanceModelProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    GetActiveColorScheme() {
+        return "theme_a"
+    }
+
+    GetPresetColorSchemes() {
+        return [
+            { color_scheme_id: "theme_a", name: "主题 A", author: "甲", style: 0 },
+            { color_scheme_id: "theme_b", name: "主题 B", author: "乙", style: 0 },
+        ]
+    }
+
+    SelectColorScheme(color_scheme_id) {
+        this.calls.Push("select:" . color_scheme_id)
+        return true
+    }
+
+    Save() {
+        this.calls.Push("save_style")
+        return true
+    }
+
+    Dispose() {
+        this.calls.Push("dispose_style")
+    }
+}
+
+class RabbitSettingsSwitcherModelProbe {
+    __New(calls) {
+        this.calls := calls
+        this.hotkeys := "Control+grave"
+        this.items := [
+            { id: "schema_a", name: "方案 A", author: "", description: "A", selected: true },
+            { id: "schema_b", name: "方案 B", author: "", description: "B", selected: false },
+        ]
+    }
+
+    Save(schema_ids, hotkeys) {
+        this.calls.Push("save:" . schema_ids[1] . ":" . hotkeys)
+        return true
+    }
+
+    Dispose() {
+        this.calls.Push("dispose_model")
     }
 }

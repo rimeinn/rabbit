@@ -33,6 +33,7 @@
 #Include RabbitShutdownTest.ahk
 #Include RabbitStatusTipTest.ahk
 #Include RabbitSettingsWindowTest.ahk
+#Include RabbitSwitcherSettingsModelTest.ahk
 #Include RabbitTestCommonTest.ahk
 #Include RabbitTrayClickTest.ahk
 #Include RabbitTrayStatusTipTest.ahk

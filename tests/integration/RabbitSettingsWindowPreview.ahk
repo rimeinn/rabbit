@@ -19,6 +19,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
+#Include ..\..\Lib\RabbitCommon.ahk
+#Include ..\..\Lib\RabbitDeployerWorkflow.ahk
 #Include ..\..\Lib\RabbitSettingsWindow.ahk
 #Include ..\support\TestCommon.ahk
 
@@ -26,14 +28,28 @@ RunTest("settings window preview", RunSettingsWindowPreview.Bind())
 ExitApp()
 
 RunSettingsWindowPreview() {
-    local window := RabbitSettingsWindow()
+    local repository_root := A_ScriptDir . "\..\.."
+    local rime := RimeApi(repository_root . "\Lib\librime-ahk\rime.dll")
+    local traits := RabbitCreateTraits()
+    local window := 0
+    traits.shared_data_dir := repository_root . "\Data"
+    traits.user_data_dir := repository_root . "\Rime"
+    traits.prebuilt_data_dir := traits.shared_data_dir
+    rime.setup(traits)
+    rime.deployer_initialize(0)
+
     try {
+        window := RabbitSettingsWindow(RabbitDeployerWorkflow(rime))
         window.Show("w820 h500 Center")
         if A_Args.Length > 0 && A_Args[1] = "ci" {
+            window.SelectPage(2)
             SetTimer(window.OnClose.Bind(window), -100)
         }
         window.WaitClose()
     } finally {
-        window.Dispose()
+        if window {
+            window.Dispose()
+        }
+        rime.finalize()
     }
 }
