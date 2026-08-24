@@ -18,6 +18,7 @@
 
 #Include RabbitCandidatePreview.ahk
 #Include RabbitCommon.ahk
+#Include RabbitApplicationSettingsModel.ahk
 
 class RabbitSettingsWindow extends Gui {
     static pages := [
@@ -44,6 +45,11 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_model := 0
         this.behavior_loading := false
         this.behavior_dirty := false
+        this.application_model := 0
+        this.application_rules := Map()
+        this.application_changes := Map()
+        this.application_loading := false
+        this.application_dirty := false
         this.switcher_model := 0
         this.switcher_items := Map()
         this.switcher_loading := false
@@ -123,6 +129,25 @@ class RabbitSettingsWindow extends Gui {
         this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
         this.behavior_status := this.AddText("x254 y382 w496 h28 Hidden", "")
 
+        this.application_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "应用适配")
+        this.application_list := this.AddListView(
+            "x254 y174 w320 h174 -Multi NoSort Hidden",
+            ["应用程序", "默认状态"]
+        )
+        this.application_list.OnEvent(
+            "ItemSelect",
+            (ctrl, row, selected) => this.OnApplicationSelection(row, selected)
+        )
+        this.application_process_label := this.AddText("x596 y176 w178 h22 Hidden", "进程文件名：")
+        this.application_process := this.AddEdit("x596 y200 w178 r1 -Multi Hidden")
+        this.application_mode_label := this.AddText("x596 y238 w178 h22 Hidden", "默认输入状态：")
+        this.application_mode := this.AddDropDownList("x596 y262 w178 Choose2 Hidden", ["中文", "英文"])
+        this.application_update_button := this.AddButton("x596 y304 w178 h32 Hidden", "添加或更新")
+        this.application_update_button.OnEvent("Click", (*) => this.StageApplicationRule())
+        this.application_reset_button := this.AddButton("x596 y346 w178 h32 Hidden", "恢复默认或移除")
+        this.application_reset_button.OnEvent("Click", (*) => this.ResetSelectedApplicationRule())
+        this.application_status := this.AddText("x254 y390 w320 h24 Hidden", "")
+
         this.about_group := this.AddGroupBox("x230 y136 w570 h250 Hidden", "关于玉兔毫")
         this.SetFont("s14 w600")
         this.about_name := this.AddText("x254 y176 w496 h30 Hidden", "玉兔毫")
@@ -196,11 +221,12 @@ class RabbitSettingsWindow extends Gui {
         this.page_title.Value := page.title
         this.page_description.Value := page.description
         this.SetPlaceholderVisible(
-            index != 1 && index != 2 && index != 3 && index != 5 && index != 6 && index != 7
+            index != 1 && index != 2 && index != 3 && index != 4 && index != 5 && index != 6 && index != 7
         )
         this.SetAppearanceVisible(index = 1)
         this.SetSwitcherVisible(index = 2)
         this.SetBehaviorVisible(index = 3)
+        this.SetApplicationVisible(index = 4)
         this.SetDictionaryVisible(index = 5)
         this.SetMaintenanceVisible(index = 6)
         this.SetAboutVisible(index = 7)
@@ -210,6 +236,8 @@ class RabbitSettingsWindow extends Gui {
             this.EnsureSwitcherSettings()
         } else if index = 3 {
             this.EnsureBehaviorSettings()
+        } else if index = 4 {
+            this.EnsureApplicationSettings()
         }
         this.UpdateApplyButton()
         return true
@@ -255,6 +283,18 @@ class RabbitSettingsWindow extends Gui {
         this.use_legacy_candidate_box.Visible := visible
         this.bypass_password_fields.Visible := visible
         this.behavior_status.Visible := visible
+    }
+
+    SetApplicationVisible(visible) {
+        this.application_group.Visible := visible
+        this.application_list.Visible := visible
+        this.application_process_label.Visible := visible
+        this.application_process.Visible := visible
+        this.application_mode_label.Visible := visible
+        this.application_mode.Visible := visible
+        this.application_update_button.Visible := visible
+        this.application_reset_button.Visible := visible
+        this.application_status.Visible := visible
     }
 
     SetDictionaryVisible(visible) {
@@ -430,12 +470,14 @@ class RabbitSettingsWindow extends Gui {
                 return this.ApplySwitcherSettings()
             case 3:
                 return this.ApplyBehaviorSettings()
+            case 4:
+                return this.ApplyApplicationSettings()
         }
         return false
     }
 
     UpdateApplyButton() {
-        this.apply_button.Visible := this.selected_page >= 1 && this.selected_page <= 3
+        this.apply_button.Visible := this.selected_page >= 1 && this.selected_page <= 4
         switch this.selected_page {
             case 1:
                 this.apply_button.Enabled := this.appearance_dirty
@@ -443,6 +485,8 @@ class RabbitSettingsWindow extends Gui {
                 this.apply_button.Enabled := this.switcher_dirty
             case 3:
                 this.apply_button.Enabled := this.behavior_dirty
+            case 4:
+                this.apply_button.Enabled := this.application_dirty
             default:
                 this.apply_button.Enabled := false
         }
@@ -539,6 +583,167 @@ class RabbitSettingsWindow extends Gui {
             return true
         } catch as error {
             this.behavior_status.Value := "保存失败：" . error.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
+    }
+
+    EnsureApplicationSettings() {
+        if this.application_model {
+            return true
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateApplicationSettingsModel") {
+            this.application_status.Value := "当前环境无法读取应用适配设置。"
+            return false
+        }
+        try {
+            this.application_model := this.workflow.CreateApplicationSettingsModel()
+            this.PopulateApplicationSettings()
+            return true
+        } catch as error {
+            this.application_status.Value := error.Message
+            return false
+        }
+    }
+
+    PopulateApplicationSettings() {
+        local ascii_mode, process_name
+        local first_row := 0
+        this.application_loading := true
+        try {
+            this.application_list.Delete()
+            this.application_rules := Map()
+            this.application_changes := Map()
+            for process_name, ascii_mode in this.application_model.rules {
+                this.application_rules[process_name] := ascii_mode
+                if !first_row {
+                    first_row := this.application_list.Add("", process_name, this.ApplicationModeText(ascii_mode))
+                } else {
+                    this.application_list.Add("", process_name, this.ApplicationModeText(ascii_mode))
+                }
+            }
+            this.application_list.ModifyCol(1, 210)
+            this.application_list.ModifyCol(2, 86)
+            this.application_process.Value := ""
+            this.application_mode.Choose(2)
+            this.application_dirty := false
+            this.UpdateApplyButton()
+            this.application_status.Value := this.application_rules.Count ? "" : "尚未设置应用规则。"
+        } finally {
+            this.application_loading := false
+        }
+        if first_row {
+            this.application_list.Modify(first_row, "Select Focus")
+            this.OnApplicationSelection(first_row, true)
+        }
+    }
+
+    ApplicationModeText(ascii_mode) {
+        return ascii_mode ? "英文" : "中文"
+    }
+
+    OnApplicationSelection(row, selected) {
+        local process_name
+        if this.application_loading || !selected || row < 1 {
+            return
+        }
+        process_name := this.application_list.GetText(row, 1)
+        if !this.application_rules.Has(process_name) {
+            return
+        }
+        this.application_process.Value := process_name
+        this.application_mode.Choose(this.application_rules[process_name] ? 2 : 1)
+    }
+
+    StageApplicationRule() {
+        local ascii_mode, process_name, row
+        if !this.application_model {
+            return false
+        }
+        process_name := RabbitApplicationSettingsModel.NormalizeProcessName(this.application_process.Value)
+        if !RabbitApplicationSettingsModel.IsValidProcessName(process_name) {
+            this.application_status.Value := "请输入进程文件名，例如 code.exe。"
+            return false
+        }
+        ascii_mode := this.application_mode.Value = 2
+        row := this.FindApplicationRow(process_name)
+        if row {
+            this.application_list.Modify(row, "", process_name, this.ApplicationModeText(ascii_mode))
+        } else {
+            row := this.application_list.Add("", process_name, this.ApplicationModeText(ascii_mode))
+        }
+        this.application_rules[process_name] := ascii_mode
+        this.application_changes[process_name] := { reset: false, ascii_mode: ascii_mode }
+        this.application_process.Value := process_name
+        this.application_list.Modify(row, "Select Focus Vis")
+        this.MarkApplicationDirty("应用规则尚未保存。")
+        return true
+    }
+
+    ResetSelectedApplicationRule() {
+        local process_name
+        local row := this.application_list.GetNext(0)
+        if !this.application_model {
+            return false
+        }
+        if !row {
+            this.application_status.Value := "请先选择一条应用规则。"
+            return false
+        }
+        process_name := this.application_list.GetText(row, 1)
+        this.application_changes[process_name] := { reset: true }
+        this.application_rules.Delete(process_name)
+        this.application_list.Delete(row)
+        this.application_process.Value := ""
+        this.application_mode.Choose(2)
+        this.MarkApplicationDirty("保存后将恢复默认值或移除自定义规则。")
+        return true
+    }
+
+    FindApplicationRow(process_name) {
+        Loop this.application_list.GetCount() {
+            if this.application_list.GetText(A_Index, 1) = process_name {
+                return A_Index
+            }
+        }
+        return 0
+    }
+
+    MarkApplicationDirty(message) {
+        this.application_dirty := true
+        this.application_status.Value := message
+        this.footer_status.Value := "应用适配设置尚未保存。"
+        this.UpdateApplyButton()
+    }
+
+    ApplyApplicationSettings() {
+        local deploy_result
+        if !this.application_model || !this.application_dirty {
+            return false
+        }
+        this.Opt("+Disabled")
+        this.application_status.Value := "正在保存…"
+        try {
+            if !this.application_model.Save(this.application_changes) {
+                this.application_status.Value := "未能保存应用适配设置。"
+                return false
+            }
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.application_status.Value := "设置已保存，但重新部署失败。"
+                return false
+            }
+            if !this.application_model.Load() {
+                this.application_status.Value := "设置已保存，但无法重新读取应用规则。"
+                return false
+            }
+            this.PopulateApplicationSettings()
+            this.application_status.Value := "应用适配设置已保存。"
+            this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
+            return true
+        } catch as error {
+            this.application_status.Value := "保存失败：" . error.Message
             return false
         } finally {
             this.Opt("-Disabled")
@@ -745,7 +950,14 @@ class RabbitSettingsWindow extends Gui {
                             this.behavior_model := 0
                         }
                     } finally {
-                        try this.Destroy()
+                        try {
+                            if this.application_model {
+                                this.application_model.Dispose()
+                                this.application_model := 0
+                            }
+                        } finally {
+                            try this.Destroy()
+                        }
                     }
                 }
             }

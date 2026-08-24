@@ -25,6 +25,7 @@ RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActi
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
+RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
 
 TestSettingsWindowNavigation() {
     local window := RabbitSettingsWindow()
@@ -131,6 +132,37 @@ TestSettingsWindowSavesBehaviorSettings() {
     )
 }
 
+TestSettingsWindowSavesApplicationSettings() {
+    local calls := []
+    local workflow := RabbitSettingsApplicationWorkflowProbe(calls)
+    local window := RabbitSettingsWindow(workflow)
+    try {
+        AssertTrue(window.SelectPage(4), "The settings window rejected the application page.")
+        AssertEqual(1, window.application_list.GetCount(), "The application page showed the wrong rule count.")
+        AssertEqual(
+            "cmd.exe",
+            window.application_process.Value,
+            "The application page did not show the selected process."
+        )
+        AssertTrue(
+            window.ResetSelectedApplicationRule(),
+            "The application page failed to stage a rule reset."
+        )
+        window.application_process.Value := "NOTEPAD.EXE"
+        window.application_mode.Choose(1)
+        AssertTrue(window.StageApplicationRule(), "The application page rejected a valid rule.")
+        AssertTrue(window.ApplyApplicationSettings(), "The application page failed to save valid settings.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_application,save_application:cmd.exe:reset,save_application:notepad.exe:0," .
+            "deploy,load_application,dispose_application",
+        JoinSettingsWorkflowCalls(calls),
+        "The application page did not save, deploy, reload, and dispose in order."
+    )
+}
+
 JoinSettingsWorkflowCalls(calls) {
     local result := ""
     for call in calls {
@@ -205,6 +237,48 @@ class RabbitSettingsBehaviorWorkflowProbe {
     UpdateWorkspace(report_errors := false) {
         this.calls.Push("deploy")
         return 0
+    }
+}
+
+class RabbitSettingsApplicationWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateApplicationSettingsModel() {
+        this.calls.Push("create_application")
+        return RabbitSettingsApplicationModelProbe(this.calls)
+    }
+
+    UpdateWorkspace(report_errors := false) {
+        this.calls.Push("deploy")
+        return 0
+    }
+}
+
+class RabbitSettingsApplicationModelProbe {
+    __New(calls) {
+        this.calls := calls
+        this.rules := Map("cmd.exe", true)
+    }
+
+    Save(changes) {
+        local change, process_name
+        for process_name, change in changes {
+            this.calls.Push(
+                "save_application:" . process_name . ":" . (change.reset ? "reset" : change.ascii_mode)
+            )
+        }
+        return true
+    }
+
+    Load() {
+        this.calls.Push("load_application")
+        return true
+    }
+
+    Dispose() {
+        this.calls.Push("dispose_application")
     }
 }
 

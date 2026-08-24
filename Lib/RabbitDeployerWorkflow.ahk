@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitApplicationSettingsModel.ahk
 #Include RabbitBehaviorSettingsModel.ahk
 #Include RabbitDictManagementDialog.ahk
 #Include RabbitSwitcherSettingsModel.ahk
@@ -53,6 +54,10 @@ class RabbitDeployerWorkflow {
 
     CreateBehaviorSettingsModel() {
         return RabbitBehaviorSettingsModel(this.CreateLevers(), this.rime)
+    }
+
+    CreateApplicationSettingsModel() {
+        return RabbitApplicationSettingsModel(this.CreateLevers(), this.rime)
     }
 
     CreateUIStyleSettings() {
