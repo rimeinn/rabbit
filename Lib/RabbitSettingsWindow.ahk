@@ -71,7 +71,7 @@ class RabbitSettingsWindow extends Gui {
         this.SetFont("s16 w600")
         this.AddText("x20 y20 w170 h32 Center", "玉兔毫")
         this.SetFont("s9 w400")
-        this.AddText("x20 y52 w170 h22 Center cGray", "Windows 设置")
+        this.AddText("x20 y52 w170 h22 Center cGray", "控制面板")
 
         for page in RabbitSettingsWindow.pages {
             page_names.Push(page.title)
