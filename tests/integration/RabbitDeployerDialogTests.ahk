@@ -20,6 +20,7 @@
 #SingleInstance Off
 
 #Include ..\..\Lib\RabbitCommon.ahk
+#Include ..\..\Lib\RabbitDictionarySettingsModel.ahk
 #Include ..\..\Lib\RabbitDictManagementDialog.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsDialog.ahk
 #Include ..\support\TestCommon.ahk
@@ -34,6 +35,7 @@ RunDeployerDialogTests() {
     local switcher_settings := 0
     local switcher_dialog := 0
     local dict_dialog := 0
+    local dict_model := 0
     traits.shared_data_dir := repository_root . "\Data"
     traits.user_data_dir := repository_root . "\Rime"
     traits.prebuilt_data_dir := traits.shared_data_dir
@@ -48,10 +50,14 @@ RunDeployerDialogTests() {
         }
 
         switcher_dialog := SwitcherSettingsDialog(switcher_settings, levers)
-        dict_dialog := DictManagementDialog(rime, levers)
+        dict_model := RabbitDictionarySettingsModel(rime, levers, (*) => RabbitDeployerDialogMutex())
+        dict_dialog := DictManagementDialog(dict_model)
     } finally {
         if dict_dialog {
             dict_dialog.Dispose()
+        }
+        if dict_model {
+            dict_model.Dispose()
         }
         if switcher_dialog {
             switcher_dialog.Dispose()
@@ -60,5 +66,18 @@ RunDeployerDialogTests() {
             levers.custom_settings_destroy(switcher_settings)
         }
         rime.finalize()
+    }
+}
+
+class RabbitDeployerDialogMutex {
+    __New() {
+        this.lasterr := 0
+    }
+
+    Create() {
+        return true
+    }
+
+    Close() {
     }
 }

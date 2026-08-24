@@ -19,6 +19,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitBehaviorSettingsModel.ahk
+#Include RabbitDictionarySettingsModel.ahk
 #Include RabbitDictManagementDialog.ahk
 #Include RabbitSwitcherSettingsModel.ahk
 #Include RabbitSwitcherSettingsDialog.ahk
@@ -58,6 +59,14 @@ class RabbitDeployerWorkflow {
 
     CreateApplicationSettingsModel() {
         return RabbitApplicationSettingsModel(this.CreateLevers(), this.rime)
+    }
+
+    CreateDictionarySettingsModel() {
+        return RabbitDictionarySettingsModel(
+            this.rime,
+            this.CreateLevers(),
+            this.CreateMutex.Bind(this)
+        )
     }
 
     CreateUIStyleSettings() {
@@ -202,35 +211,30 @@ class RabbitDeployerWorkflow {
     }
 
     DictManagement() {
-        local mutex, levers, dialog
-        mutex := this.CreateMutex()
-        if !mutex.Create() {
-            ; TODO: log error
-            return 1
-        }
-
+        local dialog, model, result
+        model := 0
+        dialog := 0
+        result := 1
         try {
-            if mutex.lasterr == ERROR_ALREADY_EXISTS {
-                ; TODO: log error
-                MsgBox("正在执行另一项部署任务，请稍后再试。", "【玉兔毫】", "Ok Iconi")
-                return 1
-            }
-
-            if this.rime.api_available("run_task") {
-                this.rime.run_task("installation_update")
-            }
-            levers := this.CreateLevers()
-            dialog := DictManagementDialog(this.rime, levers)
-            try {
-                dialog.Show()
-                WinWaitClose(dialog)
-            } finally {
-                dialog.Dispose()
-            }
-            return 0
+            model := this.CreateDictionarySettingsModel()
+            dialog := DictManagementDialog(model)
+            dialog.Show()
+            WinWaitClose(dialog)
+            result := 0
+        } catch as error {
+            MsgBox("未能打开用户词典管理：`n" . error.Message, "【玉兔毫】", "Ok Iconx")
         } finally {
-            mutex.Close()
+            try {
+                if dialog {
+                    dialog.Dispose()
+                }
+            } finally {
+                if model {
+                    model.Dispose()
+                }
+            }
         }
+        return result
     }
 
     SyncUserData() {

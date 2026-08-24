@@ -26,6 +26,7 @@ RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppe
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
+RunTest("settings window embeds dictionary management", TestSettingsWindowEmbedsDictionaryManagement.Bind())
 
 TestSettingsWindowNavigation() {
     local window := RabbitSettingsWindow()
@@ -163,6 +164,35 @@ TestSettingsWindowSavesApplicationSettings() {
     )
 }
 
+TestSettingsWindowEmbedsDictionaryManagement() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsDictionaryWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(5), "The settings window rejected the dictionary page.")
+        AssertEqual(
+            2,
+            ControlGetItems(window.dictionary_list).Length,
+            "The dictionary page showed the wrong item count."
+        )
+        AssertTrue(window.apply_button.Visible, "The dictionary page hid the apply button.")
+        AssertTrue(!window.apply_button.Enabled, "The dictionary page enabled the irrelevant apply button.")
+        AssertTrue(!window.dictionary_backup.Enabled, "The dictionary page enabled backup without a selection.")
+        AssertTrue(window.dictionary_restore.Enabled, "The dictionary page disabled snapshot restore.")
+        window.dictionary_list.Choose(1)
+        window.OnDictionarySelectionChange()
+        AssertTrue(window.dictionary_backup.Enabled, "The dictionary page did not enable backup for a selection.")
+        AssertTrue(window.dictionary_export.Enabled, "The dictionary page did not enable export for a selection.")
+        AssertTrue(window.dictionary_import.Enabled, "The dictionary page did not enable import for a selection.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_dictionary,dispose_dictionary",
+        JoinSettingsWorkflowCalls(calls),
+        "The dictionary page did not own its model."
+    )
+}
+
 JoinSettingsWorkflowCalls(calls) {
     local result := ""
     for call in calls {
@@ -253,6 +283,28 @@ class RabbitSettingsApplicationWorkflowProbe {
     UpdateWorkspace(report_errors := false) {
         this.calls.Push("deploy")
         return 0
+    }
+}
+
+class RabbitSettingsDictionaryWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateDictionarySettingsModel() {
+        this.calls.Push("create_dictionary")
+        return RabbitSettingsDictionaryModelProbe(this.calls)
+    }
+}
+
+class RabbitSettingsDictionaryModelProbe {
+    __New(calls) {
+        this.calls := calls
+        this.dictionaries := ["rabbit", "luna"]
+    }
+
+    Dispose() {
+        this.calls.Push("dispose_dictionary")
     }
 }
 

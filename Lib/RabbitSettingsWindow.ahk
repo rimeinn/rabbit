@@ -50,6 +50,7 @@ class RabbitSettingsWindow extends Gui {
         this.application_changes := Map()
         this.application_loading := false
         this.application_dirty := false
+        this.dictionary_model := 0
         this.switcher_model := 0
         this.switcher_items := Map()
         this.switcher_loading := false
@@ -175,13 +176,27 @@ class RabbitSettingsWindow extends Gui {
             "Copyright © 2023 - 2026 Xuesong Peng"
         )
 
-        this.dictionary_group := this.AddGroupBox("x230 y136 w570 h180 Hidden", "用户词典")
-        this.dictionary_text := this.AddText(
-            "x254 y174 w520 h52 Hidden",
-            "管理用户词典快照，或以文本码表格式导入、导出词条。"
+        this.dictionary_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "用户词典")
+        this.dictionary_list_label := this.AddText("x254 y170 w218 h22 Hidden", "用户词典列表：")
+        this.dictionary_list := this.AddListBox("x254 y194 w218 h204 -Multi Hidden")
+        this.dictionary_list.OnEvent("Change", (*) => this.OnDictionarySelectionChange())
+        this.dictionary_snapshot_text := this.AddText(
+            "x496 y170 w278 h44 Hidden",
+            "使用词典快照在不同的 Rime 系统之间迁移输入习惯。"
         )
-        this.dictionary_button := this.AddButton("x254 y246 w160 h32 Hidden", "打开词典管理")
-        this.dictionary_button.OnEvent("Click", (*) => this.RunDictionaryManagement())
+        this.dictionary_backup := this.AddButton("x496 y220 w134 h32 Disabled Hidden", "输出词典快照")
+        this.dictionary_backup.OnEvent("Click", (*) => this.BackupSelectedDictionary())
+        this.dictionary_restore := this.AddButton("x640 y220 w134 h32 Disabled Hidden", "合入词典快照")
+        this.dictionary_restore.OnEvent("Click", (*) => this.RestoreDictionarySnapshot())
+        this.dictionary_table_text := this.AddText(
+            "x496 y270 w278 h44 Hidden",
+            "使用文本码表查看、编辑或导入词条；迁移数据请优先使用快照。"
+        )
+        this.dictionary_export := this.AddButton("x496 y320 w134 h32 Disabled Hidden", "导出文本码表")
+        this.dictionary_export.OnEvent("Click", (*) => this.ExportSelectedDictionary())
+        this.dictionary_import := this.AddButton("x640 y320 w134 h32 Disabled Hidden", "导入文本码表")
+        this.dictionary_import.OnEvent("Click", (*) => this.ImportSelectedDictionary())
+        this.dictionary_status := this.AddText("x496 y370 w278 h32 Hidden", "")
 
         this.maintenance_group := this.AddGroupBox("x230 y136 w570 h220 Hidden", "维护与同步")
         this.maintenance_text := this.AddText(
@@ -238,6 +253,8 @@ class RabbitSettingsWindow extends Gui {
             this.EnsureBehaviorSettings()
         } else if index = 4 {
             this.EnsureApplicationSettings()
+        } else if index = 5 {
+            this.EnsureDictionarySettings()
         }
         this.UpdateApplyButton()
         return true
@@ -299,8 +316,15 @@ class RabbitSettingsWindow extends Gui {
 
     SetDictionaryVisible(visible) {
         this.dictionary_group.Visible := visible
-        this.dictionary_text.Visible := visible
-        this.dictionary_button.Visible := visible
+        this.dictionary_list_label.Visible := visible
+        this.dictionary_list.Visible := visible
+        this.dictionary_snapshot_text.Visible := visible
+        this.dictionary_backup.Visible := visible
+        this.dictionary_restore.Visible := visible
+        this.dictionary_table_text.Visible := visible
+        this.dictionary_export.Visible := visible
+        this.dictionary_import.Visible := visible
+        this.dictionary_status.Visible := visible
     }
 
     SetMaintenanceVisible(visible) {
@@ -477,7 +501,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     UpdateApplyButton() {
-        this.apply_button.Visible := this.selected_page >= 1 && this.selected_page <= 4
+        this.apply_button.Visible := this.selected_page >= 1 && this.selected_page <= 5
         switch this.selected_page {
             case 1:
                 this.apply_button.Enabled := this.appearance_dirty
@@ -487,6 +511,8 @@ class RabbitSettingsWindow extends Gui {
                 this.apply_button.Enabled := this.behavior_dirty
             case 4:
                 this.apply_button.Enabled := this.application_dirty
+            case 5:
+                this.apply_button.Enabled := false
             default:
                 this.apply_button.Enabled := false
         }
@@ -864,6 +890,160 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    EnsureDictionarySettings() {
+        if this.dictionary_model {
+            return true
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateDictionarySettingsModel") {
+            this.dictionary_status.Value := "当前环境无法读取用户词典。"
+            return false
+        }
+        try {
+            this.dictionary_model := this.workflow.CreateDictionarySettingsModel()
+            this.PopulateDictionarySettings()
+            return true
+        } catch as error {
+            this.dictionary_restore.Enabled := false
+            this.dictionary_status.Value := error.Message
+            return false
+        }
+    }
+
+    PopulateDictionarySettings() {
+        local dict_name
+        this.dictionary_list.Delete()
+        for dict_name in this.dictionary_model.dictionaries {
+            this.dictionary_list.Add([dict_name])
+        }
+        this.dictionary_list.Choose(0)
+        this.OnDictionarySelectionChange()
+        this.dictionary_restore.Enabled := true
+        this.dictionary_status.Value := this.dictionary_model.dictionaries.Length ? "" : "没有找到用户词典。"
+    }
+
+    OnDictionarySelectionChange() {
+        local enabled := this.dictionary_list.Value > 0
+        this.dictionary_backup.Enabled := enabled
+        this.dictionary_export.Enabled := enabled
+        this.dictionary_import.Enabled := enabled
+    }
+
+    SelectedDictionaryName() {
+        local index := this.dictionary_list.Value
+        if !this.dictionary_model {
+            this.dictionary_status.Value := "当前环境无法访问用户词典。"
+            return ""
+        }
+        if index <= 0 || index > this.dictionary_model.dictionaries.Length {
+            this.dictionary_status.Value := "请先选择一个用户词典。"
+            return ""
+        }
+        return this.dictionary_list.Text
+    }
+
+    BackupSelectedDictionary() {
+        local dict_name, file, path
+        if !(dict_name := this.SelectedDictionaryName()) {
+            return false
+        }
+        try {
+            path := this.dictionary_model.GetUserDataSyncDir()
+            if !DirExist(path) {
+                DirCreate(path)
+            }
+            file := path . "\" . dict_name . ".userdb.txt"
+            this.dictionary_status.Value := "正在输出词典快照…"
+            if !this.dictionary_model.Backup(dict_name) {
+                throw Error("未能输出词典快照。")
+            }
+            if !FileExist(file) {
+                throw Error("输出的词典快照文件没有找到。")
+            }
+            this.dictionary_status.Value := "词典快照已输出。"
+            Run("explorer.exe /select,`"" . file . "`"")
+            return true
+        } catch as error {
+            this.dictionary_status.Value := error.Message
+            return false
+        }
+    }
+
+    RestoreDictionarySnapshot() {
+        local selected_path
+        local filter := "词典快照 (*.userdb.txt; *.userdb.kct.snapshot)"
+        if !this.dictionary_model {
+            this.dictionary_status.Value := "当前环境无法访问用户词典。"
+            return false
+        }
+        if !(selected_path := FileSelect("1", , "打开", filter)) {
+            return false
+        }
+        try {
+            this.dictionary_status.Value := "正在合入词典快照…"
+            if !this.dictionary_model.Restore(selected_path) {
+                throw Error("未能合入词典快照。")
+            }
+            this.dictionary_status.Value := "词典快照已合入。"
+            return true
+        } catch as error {
+            this.dictionary_status.Value := error.Message
+            return false
+        }
+    }
+
+    ExportSelectedDictionary() {
+        local dict_name, result, selected_path
+        local filter := "文本文档 (*.txt)"
+        if !(dict_name := this.SelectedDictionaryName()) {
+            return false
+        }
+        if !(selected_path := FileSelect("S18", dict_name . "_export.txt", "另存为", filter)) {
+            return false
+        }
+        if StrLower(SubStr(selected_path, -4)) != ".txt" {
+            selected_path .= ".txt"
+        }
+        try {
+            this.dictionary_status.Value := "正在导出文本码表…"
+            result := this.dictionary_model.Export(dict_name, selected_path)
+            if result < 0 {
+                throw Error("未能导出文本码表。")
+            }
+            if !FileExist(selected_path) {
+                throw Error("导出的文本码表文件没有找到。")
+            }
+            this.dictionary_status.Value := "已导出 " . result . " 条记录。"
+            Run("explorer.exe /select,`"" . selected_path . "`"")
+            return true
+        } catch as error {
+            this.dictionary_status.Value := error.Message
+            return false
+        }
+    }
+
+    ImportSelectedDictionary() {
+        local dict_name, result, selected_path
+        local filter := "文本文档 (*.txt)"
+        if !(dict_name := this.SelectedDictionaryName()) {
+            return false
+        }
+        if !(selected_path := FileSelect("1", dict_name . "_export.txt", "打开", filter)) {
+            return false
+        }
+        try {
+            this.dictionary_status.Value := "正在导入文本码表…"
+            result := this.dictionary_model.Import(dict_name, selected_path)
+            if result < 0 {
+                throw Error("未能导入文本码表。")
+            }
+            this.dictionary_status.Value := "已导入 " . result . " 条记录。"
+            return true
+        } catch as error {
+            this.dictionary_status.Value := error.Message
+            return false
+        }
+    }
+
     RunDictionaryManagement() {
         if !this.workflow {
             return false
@@ -956,7 +1136,14 @@ class RabbitSettingsWindow extends Gui {
                                 this.application_model := 0
                             }
                         } finally {
-                            try this.Destroy()
+                            try {
+                                if this.dictionary_model {
+                                    this.dictionary_model.Dispose()
+                                    this.dictionary_model := 0
+                                }
+                            } finally {
+                                try this.Destroy()
+                            }
                         }
                     }
                 }

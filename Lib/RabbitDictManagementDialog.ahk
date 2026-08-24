@@ -19,10 +19,9 @@
 #Include RabbitCommon.ahk
 
 class DictManagementDialog extends Gui {
-    __New(rime_api, levers_api) {
+    __New(manager) {
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】用户词典管理", this)
-        this.rime := rime_api
-        this.api := levers_api
+        this.manager := manager
         this.disposed := false
 
         ; Layout
@@ -45,16 +44,8 @@ class DictManagementDialog extends Gui {
     }
 
     Populate() {
-        local iter, dict
-        if !(iter := this.api.user_dict_iterator_init()) {
-            return
-        }
-        try {
-            while (dict := this.api.next_user_dict(iter)) {
-                this.dict_list.Add([dict])
-            }
-        } finally {
-            this.api.user_dict_iterator_destroy(iter)
+        for dict in this.manager.dictionaries {
+            this.dict_list.Add([dict])
         }
         this.dict_list.Choose(0)
     }
@@ -67,7 +58,7 @@ class DictManagementDialog extends Gui {
             return
         }
 
-        local path := this.rime.get_user_data_sync_dir()
+        local path := this.manager.GetUserDataSyncDir()
         if !DirExist(path) {
             try {
                 DirCreate(path)
@@ -79,24 +70,32 @@ class DictManagementDialog extends Gui {
 
         local dict_name := this.dict_list.Text
         backup_path := path . "\" . dict_name . ".userdb.txt"
-        if !this.api.backup_user_dict(dict_name) {
-            MsgBox("不知哪里出错了，未能完成导出操作。", ":-(", "Ok Iconx")
-            return
-        } else if !FileExist(backup_path) {
-            MsgBox("咦，输出的快照文件找不着了。", ":-(", "Ok Iconx")
-            return
+        try {
+            if !this.manager.Backup(dict_name) {
+                MsgBox("不知哪里出错了，未能完成导出操作。", ":-(", "Ok Iconx")
+                return
+            } else if !FileExist(backup_path) {
+                MsgBox("咦，输出的快照文件找不着了。", ":-(", "Ok Iconx")
+                return
+            }
+            Run(A_ComSpec . " /c explorer.exe /select,`"" . backup_path . "`"", , "Hide")
+        } catch as error {
+            MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
         }
-        Run(A_ComSpec . " /c explorer.exe /select,`"" . backup_path . "`"", , "Hide")
     }
 
     OnRestore() {
         local selected_path
         local filter := "词典快照 (*.userdb.txt; *.userdb.kct.snapshot)"
         if (selected_path := FileSelect("1", , "打开", filter)) { ; file must exist
-            if !this.api.restore_user_dict(selected_path) {
-                MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
-            } else {
-                MsgBox("完成了。", ":-)", "Ok Iconi")
+            try {
+                if !this.manager.Restore(selected_path) {
+                    MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
+                } else {
+                    MsgBox("完成了。", ":-)", "Ok Iconi")
+                }
+            } catch as error {
+                MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
             }
         }
     }
@@ -115,14 +114,18 @@ class DictManagementDialog extends Gui {
             if SubStr(selected_path, -4) != ".txt" {
                 selected_path .= ".txt"
             }
-            local result := this.api.export_user_dict(dict_name, selected_path)
-            if result < 0 {
-                MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
-            } else if !FileExist(selected_path) {
-                MsgBox("咦，导出的文件找不着了。", ":-(", "Ok Iconx")
-            } else {
-                MsgBox("导出了 " . result . " 条记录。", ":-)", "Ok Iconi")
-                Run(A_ComSpec . " /c explorer.exe /select,`"" . selected_path . "`"", , "Hide")
+            try {
+                local result := this.manager.Export(dict_name, selected_path)
+                if result < 0 {
+                    MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
+                } else if !FileExist(selected_path) {
+                    MsgBox("咦，导出的文件找不着了。", ":-(", "Ok Iconx")
+                } else {
+                    MsgBox("导出了 " . result . " 条记录。", ":-)", "Ok Iconi")
+                    Run(A_ComSpec . " /c explorer.exe /select,`"" . selected_path . "`"", , "Hide")
+                }
+            } catch as error {
+                MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
             }
         }
     }
@@ -132,11 +135,15 @@ class DictManagementDialog extends Gui {
         local file_name := dict_name . "_export.txt"
         local filter := "文本文档 (*.txt)"
         if (selected_path := FileSelect("1", file_name, "打开", filter)) { ; file must exist
-            local result := this.api.import_user_dict(dict_name, selected_path)
-            if result < 0 {
-                MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
-            } else {
-                MsgBox("导入了 " . result . " 条记录。", ":-)", "Ok Iconi")
+            try {
+                local result := this.manager.Import(dict_name, selected_path)
+                if result < 0 {
+                    MsgBox("不知哪里出错了，未能完成操作。", ":-(", "Ok Iconx")
+                } else {
+                    MsgBox("导入了 " . result . " 条记录。", ":-)", "Ok Iconi")
+                }
+            } catch as error {
+                MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
             }
         }
     }
