@@ -102,7 +102,7 @@ class RabbitSettingsWindow extends Gui {
             "x526 y174 w248 h178 Hidden",
             "选择左侧方案以查看简介。"
         )
-        this.switcher_hotkeys_label := this.AddText("x254 y374 w100 h24 Hidden", "方案选单快捷键：")
+        this.switcher_hotkeys_label := this.AddText("x254 y374 w116 h24 Hidden", "方案选单快捷键：")
         this.switcher_hotkeys := this.AddEdit("x374 y370 w400 r1 -Multi Hidden")
         this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
         this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
@@ -110,7 +110,7 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入与行为")
         this.show_tips := this.AddCheckbox("x254 y174 w230 h24 Hidden", "显示输入状态提示")
         this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.show_tips_time_label := this.AddText("x526 y176 w92 h22 Hidden", "显示时长（毫秒）：")
+        this.show_tips_time_label := this.AddText("x526 y176 w120 h22 Hidden", "显示时长（毫秒）：")
         this.show_tips_time := this.AddEdit("x650 y172 w100 r1 Number -Multi Hidden")
         this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.global_ascii := this.AddCheckbox("x254 y214 w496 h24 Hidden", "在所有程序之间共享中西文状态")
