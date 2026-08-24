@@ -46,7 +46,7 @@ TestBehaviorSettingsModelLifecycle() {
     AssertEqual(
         "init,load,config,get_bool:show_tips,get_int:show_tips_time,get_bool:global_ascii," .
             "get_bool:fix_candidate_box,get_bool:use_legacy_candidate_box,get_bool:bypass_password_fields," .
-            "set_bool:show_tips:0,set_int:show_tips_time:900,set_bool:global_ascii:1," .
+            "load,set_bool:show_tips:0,set_int:show_tips_time:900,set_bool:global_ascii:1," .
             "set_bool:fix_candidate_box:1,set_bool:use_legacy_candidate_box:0," .
             "set_bool:bypass_password_fields:0,save,destroy",
         JoinBehaviorCalls(calls),

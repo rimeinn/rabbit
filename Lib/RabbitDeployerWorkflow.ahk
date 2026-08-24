@@ -50,7 +50,7 @@ class RabbitDeployerWorkflow {
     }
 
     CreateSwitcherSettingsModel() {
-        return RabbitSwitcherSettingsModel(this.CreateLevers())
+        return RabbitSwitcherSettingsModel(this.CreateLevers(), this.rime)
     }
 
     CreateBehaviorSettingsModel() {

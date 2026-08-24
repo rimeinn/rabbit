@@ -62,6 +62,9 @@ class RabbitBehaviorSettingsModel {
     }
 
     Save(values) {
+        if !this.api.load_settings(this.settings) {
+            return false
+        }
         if !this.api.customize_bool(this.settings, "show_tips", values.show_tips) {
             return false
         }

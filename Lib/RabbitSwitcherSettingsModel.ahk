@@ -19,8 +19,9 @@
 #Include RabbitCommon.ahk
 
 class RabbitSwitcherSettingsModel {
-    __New(levers_api) {
+    __New(levers_api, rime_api) {
         this.api := levers_api
+        this.rime := rime_api
         this.settings := 0
         this.items := []
         this.hotkeys := ""
@@ -124,13 +125,41 @@ class RabbitSwitcherSettingsModel {
         if schema_ids.Length = 0 {
             return false
         }
+        if !this.api.load_settings(this.settings) {
+            return false
+        }
         if !this.api.select_schemas(this.settings, schema_ids) {
             return false
         }
-        if !this.api.set_hotkeys(this.settings, hotkeys) {
+        if !this.CustomizeHotkeys(hotkeys) {
             return false
         }
         return !!this.api.save_settings(this.settings)
+    }
+
+    CustomizeHotkeys(hotkeys) {
+        local config := 0
+        local escaped, hotkey, item_count := 0
+        local yaml := "["
+        Loop Parse hotkeys, "," {
+            hotkey := Trim(A_LoopField)
+            if !hotkey {
+                continue
+            }
+            escaped := StrReplace(StrReplace(hotkey, "\", "\\"), '"', '\"')
+            yaml .= (item_count ? ", " : "") . '"' . escaped . '"'
+            item_count += 1
+        }
+        yaml .= "]"
+
+        if !(config := this.rime.config_load_string(yaml)) {
+            return false
+        }
+        try {
+            return !!this.api.customize_item(this.settings, "switcher/hotkeys", config)
+        } finally {
+            this.rime.config_close(config)
+        }
     }
 
     Dispose() {

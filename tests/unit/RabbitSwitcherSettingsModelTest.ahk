@@ -24,7 +24,7 @@ RunTest("switcher settings model lifecycle", TestSwitcherSettingsModelLifecycle.
 TestSwitcherSettingsModelLifecycle() {
     local calls := []
     local api := RabbitSwitcherModelLeversProbe(calls)
-    local model := RabbitSwitcherSettingsModelProbe(api)
+    local model := RabbitSwitcherSettingsModelProbe(api, RabbitSwitcherModelRimeProbe(calls))
 
     try {
         AssertEqual(2, model.items.Length, "The switcher model loaded the wrong number of schemas.")
@@ -33,14 +33,19 @@ TestSwitcherSettingsModelLifecycle() {
         AssertEqual("schema_a", model.items[2].id, "The switcher model lost an available schema.")
         AssertTrue(!model.items[2].selected, "The switcher model selected an available schema.")
         AssertEqual("Control+grave", model.hotkeys, "The switcher model loaded the wrong hotkeys.")
-        AssertTrue(model.Save(["schema_a"], "F4"), "The switcher model failed to save valid settings.")
+        AssertTrue(
+            model.Save(["schema_a"], "F4, Control+grave"),
+            "The switcher model failed to save valid settings."
+        )
     } finally {
         model.Dispose()
         model.Dispose()
     }
 
     AssertEqual(
-        "init,load,available,selected,hotkeys,destroy,destroy,select:schema_a,hotkeys_set:F4,save,settings_destroy",
+        "init,load,available,selected,hotkeys,destroy,destroy,load,select:schema_a," .
+            'yaml:["F4", "Control+grave"],hotkeys_set:switcher/hotkeys:84,config_close,' .
+            "save,settings_destroy",
         JoinSwitcherModelCalls(calls),
         "The switcher model did not own or save its Rime settings correctly."
     )
@@ -110,8 +115,8 @@ class RabbitSwitcherModelLeversProbe {
         return true
     }
 
-    set_hotkeys(settings, hotkeys) {
-        this.calls.Push("hotkeys_set:" . hotkeys)
+    customize_item(settings, key, value) {
+        this.calls.Push("hotkeys_set:" . key . ":" . value)
         return true
     }
 
@@ -122,5 +127,21 @@ class RabbitSwitcherModelLeversProbe {
 
     custom_settings_destroy(settings) {
         this.calls.Push("settings_destroy")
+    }
+}
+
+class RabbitSwitcherModelRimeProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    config_load_string(yaml) {
+        this.calls.Push("yaml:" . yaml)
+        return 84
+    }
+
+    config_close(config) {
+        this.calls.Push("config_close")
+        return true
     }
 }

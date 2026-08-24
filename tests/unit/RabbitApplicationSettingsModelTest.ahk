@@ -42,7 +42,7 @@ TestApplicationSettingsModelLifecycle() {
     }
     AssertEqual(
         "init,load,config,begin,next:cmd.exe,get:cmd.exe,next:notepad.exe,get:notepad.exe,end," .
-            "reset:cmd.exe,set:notepad.exe:1,save,destroy",
+            "load,reset:cmd.exe,set:notepad.exe:1,save,destroy",
         JoinApplicationSettingsCalls(calls),
         "The application model did not load, save, and dispose in order."
     )

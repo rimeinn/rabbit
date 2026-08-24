@@ -23,6 +23,7 @@ class UIStyleSettings {
     rime := 0
     api := 0
     settings := 0
+    selected_color_scheme := ""
     disposed := false
 
     __New(rime_api, levers_api := 0) {
@@ -83,12 +84,21 @@ class UIStyleSettings {
     }
 
     SelectColorScheme(color_scheme_id) {
-        this.api.customize_string(this.settings, "style/color_scheme", color_scheme_id)
-        return true
+        this.selected_color_scheme := color_scheme_id
+        return !!this.api.customize_string(this.settings, "style/color_scheme", color_scheme_id)
     }
 
     Save() {
-        return this.api.save_settings(this.settings)
+        if !this.selected_color_scheme || !this.api.load_settings(this.settings) {
+            return false
+        }
+        if !this.api.customize_string(this.settings, "style/color_scheme", this.selected_color_scheme) {
+            return false
+        }
+        if !this.api.save_settings(this.settings) {
+            return false
+        }
+        return true
     }
 
     Dispose() {
