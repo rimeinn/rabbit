@@ -31,12 +31,18 @@ class RabbitSettingsWindow extends Gui {
         { title: "关于", description: "查看版本、许可证和项目链接。" },
     ]
 
-    __New(workflow := 0, old_windows := RabbitIsOldWindows(), preview_factory := CandidatePreview) {
+    __New(
+        workflow := 0,
+        old_windows := RabbitIsOldWindows(),
+        preview_factory := CandidatePreview,
+        close_prompt := 0
+    ) {
         local page_names := []
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】设置", this)
         this.workflow := workflow
         this.old_windows := old_windows
         this.preview_factory := preview_factory
+        this.close_prompt := close_prompt
         this.appearance_settings := 0
         this.appearance_presets := []
         this.appearance_preview := 0
@@ -498,6 +504,117 @@ class RabbitSettingsWindow extends Gui {
                 return this.ApplyApplicationSettings()
         }
         return false
+    }
+
+    HasUnsavedSettings() {
+        return this.appearance_dirty || this.switcher_dirty || this.behavior_dirty ||
+            this.application_dirty
+    }
+
+    PromptUnsavedSettings() {
+        if this.close_prompt {
+            return this.close_prompt.Call()
+        }
+        return MsgBox(
+            "设置窗口中有尚未保存的更改。`n`n" .
+                "选择“是”保存并部署；选择“否”放弃更改；选择“取消”继续编辑。",
+            "【玉兔毫】",
+            "YesNoCancel Icon!"
+        )
+    }
+
+    ApplyAllPendingSettings() {
+        local behavior_values := 0
+        local deploy_result, schema_ids := 0
+        if !this.HasUnsavedSettings() {
+            return true
+        }
+
+        if this.switcher_dirty {
+            schema_ids := this.SelectedSchemaIds()
+            if schema_ids.Length = 0 {
+                this.SelectPage(2)
+                this.switcher_status.Value := "至少要选用一项输入方案。"
+                return false
+            }
+        }
+        if this.behavior_dirty {
+            try {
+                behavior_values := this.GetBehaviorValues()
+            } catch as error {
+                this.SelectPage(3)
+                this.behavior_status.Value := error.Message
+                return false
+            }
+        }
+
+        this.Opt("+Disabled")
+        this.footer_status.Value := "正在保存所有更改…"
+        try {
+            if this.appearance_dirty {
+                if !this.appearance_settings || !this.appearance_settings.Save() {
+                    this.SelectPage(1)
+                    this.appearance_status.Value := "未能保存外观设置。"
+                    return false
+                }
+            }
+            if this.switcher_dirty {
+                if !this.switcher_model || !this.switcher_model.Save(
+                    schema_ids,
+                    Trim(this.switcher_hotkeys.Value)
+                ) {
+                    this.SelectPage(2)
+                    this.switcher_status.Value := "未能保存输入方案设置。"
+                    return false
+                }
+            }
+            if this.behavior_dirty {
+                if !this.behavior_model || !this.behavior_model.Save(behavior_values) {
+                    this.SelectPage(3)
+                    this.behavior_status.Value := "未能保存输入与行为设置。"
+                    return false
+                }
+            }
+            if this.application_dirty {
+                if !this.application_model || !this.application_model.Save(this.application_changes) {
+                    this.SelectPage(4)
+                    this.application_status.Value := "未能保存应用适配设置。"
+                    return false
+                }
+            }
+
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.footer_status.Value := "设置已保存，但重新部署失败。"
+                return false
+            }
+
+            if this.appearance_dirty {
+                this.appearance_dirty := false
+                this.appearance_status.Value := "外观设置已保存。"
+            }
+            if this.switcher_dirty {
+                this.switcher_dirty := false
+                this.switcher_status.Value := "输入方案设置已保存。"
+            }
+            if this.behavior_dirty {
+                this.behavior_dirty := false
+                this.behavior_status.Value := "输入与行为设置已保存。"
+            }
+            if this.application_dirty {
+                this.application_dirty := false
+                this.application_changes := Map()
+                this.application_status.Value := "应用适配设置已保存。"
+            }
+            this.footer_status.Value := "所有更改均已保存并部署。"
+            this.UpdateApplyButton()
+            return true
+        } catch as error {
+            this.footer_status.Value := "保存失败：" . error.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
     }
 
     UpdateApplyButton() {
@@ -1097,6 +1214,19 @@ class RabbitSettingsWindow extends Gui {
     }
 
     OnClose(*) {
+        local decision
+        if this.disposed {
+            return true
+        }
+        if this.HasUnsavedSettings() {
+            decision := this.PromptUnsavedSettings()
+            if decision = "Cancel" {
+                return true
+            }
+            if decision = "Yes" && !this.ApplyAllPendingSettings() {
+                return true
+            }
+        }
         this.Dispose()
         return true
     }

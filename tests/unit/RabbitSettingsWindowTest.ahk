@@ -27,6 +27,8 @@ RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitch
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
 RunTest("settings window embeds dictionary management", TestSettingsWindowEmbedsDictionaryManagement.Bind())
+RunTest("settings window preserves canceled close", TestSettingsWindowPreservesCanceledClose.Bind())
+RunTest("settings window saves all settings on close", TestSettingsWindowSavesAllSettingsOnClose.Bind())
 
 TestSettingsWindowNavigation() {
     local window := RabbitSettingsWindow()
@@ -193,6 +195,58 @@ TestSettingsWindowEmbedsDictionaryManagement() {
     )
 }
 
+TestSettingsWindowPreservesCanceledClose() {
+    local window := RabbitSettingsWindow(0, true, CandidatePreview, (*) => "Cancel")
+    try {
+        window.appearance_dirty := true
+        AssertTrue(window.OnClose(), "The settings window did not handle a canceled close.")
+        AssertTrue(!window.disposed, "The settings window closed after the user canceled.")
+        window.close_prompt := (*) => "No"
+        AssertTrue(window.OnClose(), "The settings window did not handle discarded changes.")
+        AssertTrue(window.disposed, "The settings window stayed open after changes were discarded.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowSavesAllSettingsOnClose() {
+    local calls := []
+    local workflow := RabbitSettingsCombinedWorkflowProbe(calls)
+    local window := RabbitSettingsWindow(
+        workflow,
+        true,
+        CandidatePreview,
+        RabbitSettingsClosePrompt.Bind(calls, "Yes")
+    )
+    try {
+        AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
+        AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        AssertTrue(window.SelectPage(4), "The settings window rejected the application page.")
+        window.appearance_dirty := true
+        window.switcher_dirty := true
+        window.behavior_dirty := true
+        window.application_dirty := true
+        window.application_changes["code.exe"] := { reset: false, ascii_mode: false }
+        AssertTrue(window.OnClose(), "The settings window did not handle a saved close.")
+        AssertTrue(window.disposed, "The settings window stayed open after saving all settings.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_style,create_model,create_behavior,create_application,prompt," .
+            "save_style,save:schema_a:Control+grave,save_behavior:1:0," .
+            "save_application:code.exe:0,deploy,dispose_style,dispose_model," .
+            "dispose_behavior,dispose_application",
+        JoinSettingsWorkflowCalls(calls),
+        "The settings window did not save every dirty page before one deployment."
+    )
+}
+
+RabbitSettingsClosePrompt(calls, decision) {
+    calls.Push("prompt")
+    return decision
+}
+
 JoinSettingsWorkflowCalls(calls) {
     local result := ""
     for call in calls {
@@ -273,6 +327,37 @@ class RabbitSettingsBehaviorWorkflowProbe {
 class RabbitSettingsApplicationWorkflowProbe {
     __New(calls) {
         this.calls := calls
+    }
+
+    CreateApplicationSettingsModel() {
+        this.calls.Push("create_application")
+        return RabbitSettingsApplicationModelProbe(this.calls)
+    }
+
+    UpdateWorkspace(report_errors := false) {
+        this.calls.Push("deploy")
+        return 0
+    }
+}
+
+class RabbitSettingsCombinedWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateUIStyleSettings() {
+        this.calls.Push("create_style")
+        return RabbitSettingsAppearanceModelProbe(this.calls)
+    }
+
+    CreateSwitcherSettingsModel() {
+        this.calls.Push("create_model")
+        return RabbitSettingsSwitcherModelProbe(this.calls)
+    }
+
+    CreateBehaviorSettingsModel() {
+        this.calls.Push("create_behavior")
+        return RabbitSettingsBehaviorModelProbe(this.calls)
     }
 
     CreateApplicationSettingsModel() {
