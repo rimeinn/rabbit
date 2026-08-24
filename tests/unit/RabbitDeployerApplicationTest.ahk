@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitDeployerApplication.ahk
 
 RunTest("settings window ownership", TestSettingsWindowOwnership.Bind())
+RunTest("old Windows uses legacy deployer", TestOldWindowsUsesLegacyDeployer.Bind())
 
 TestSettingsWindowOwnership() {
     local calls := []
@@ -30,6 +31,18 @@ TestSettingsWindowOwnership() {
         "create,show,wait,dispose",
         JoinSettingsWindowCalls(calls),
         "The deployer application did not own the settings window for its complete lifetime."
+    )
+}
+
+TestOldWindowsUsesLegacyDeployer() {
+    local calls := []
+    local application := RabbitLegacyDeployerApplicationProbe(calls)
+
+    AssertEqual(7, application.ShowSettings(), "The legacy deployer result was not returned.")
+    AssertEqual(
+        "legacy:0",
+        JoinSettingsWindowCalls(calls),
+        "The old-Windows settings path constructed the new settings window."
     )
 }
 
@@ -50,6 +63,38 @@ class RabbitDeployerApplicationProbe extends RabbitDeployerApplication {
     CreateSettingsWindow() {
         this.calls.Push("create")
         return RabbitSettingsWindowProbe(this.calls)
+    }
+
+    UseLegacySettings() {
+        return false
+    }
+}
+
+class RabbitLegacyDeployerApplicationProbe extends RabbitDeployerApplication {
+    __New(calls) {
+        this.calls := calls
+        super.__New(0)
+        this.workflow := RabbitLegacySettingsWorkflowProbe(calls)
+    }
+
+    CreateSettingsWindow() {
+        this.calls.Push("create")
+        throw Error("The new settings window must not be created on old Windows.")
+    }
+
+    UseLegacySettings() {
+        return true
+    }
+}
+
+class RabbitLegacySettingsWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    Run(installing) {
+        this.calls.Push("legacy:" . installing)
+        return 7
     }
 }
 
