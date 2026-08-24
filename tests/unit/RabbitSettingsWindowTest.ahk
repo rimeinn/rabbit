@@ -24,6 +24,7 @@ RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalid
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
+RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 
 TestSettingsWindowNavigation() {
     local window := RabbitSettingsWindow()
@@ -33,6 +34,8 @@ TestSettingsWindowNavigation() {
         AssertTrue(window.SelectPage(4), "The settings window rejected a valid page.")
         AssertEqual(4, window.selected_page, "The settings window did not update its selected page.")
         AssertEqual("应用适配", window.page_title.Value, "The settings window showed the wrong selected page.")
+        AssertTrue(window.SelectPage(7), "The settings window rejected the about page.")
+        AssertTrue(window.about_group.Visible, "The settings window did not show the about page.")
     } finally {
         window.Dispose()
     }
@@ -108,6 +111,26 @@ TestSettingsWindowSavesSwitcherSettings() {
     )
 }
 
+TestSettingsWindowSavesBehaviorSettings() {
+    local calls := []
+    local workflow := RabbitSettingsBehaviorWorkflowProbe(calls)
+    local window := RabbitSettingsWindow(workflow)
+    try {
+        AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        window.show_tips.Value := false
+        window.global_ascii.Value := true
+        window.OnBehaviorChanged()
+        AssertTrue(window.ApplyBehaviorSettings(), "The behavior page failed to save valid settings.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_behavior,save_behavior:0:1,deploy,dispose_behavior",
+        JoinSettingsWorkflowCalls(calls),
+        "The behavior page did not save, deploy, and dispose in order."
+    )
+}
+
 JoinSettingsWorkflowCalls(calls) {
     local result := ""
     for call in calls {
@@ -166,6 +189,43 @@ class RabbitSettingsAppearanceWorkflowProbe {
     UpdateWorkspace(report_errors := false) {
         this.calls.Push("deploy")
         return 0
+    }
+}
+
+class RabbitSettingsBehaviorWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateBehaviorSettingsModel() {
+        this.calls.Push("create_behavior")
+        return RabbitSettingsBehaviorModelProbe(this.calls)
+    }
+
+    UpdateWorkspace(report_errors := false) {
+        this.calls.Push("deploy")
+        return 0
+    }
+}
+
+class RabbitSettingsBehaviorModelProbe {
+    __New(calls) {
+        this.calls := calls
+        this.show_tips := true
+        this.show_tips_time := 1200
+        this.global_ascii := false
+        this.fix_candidate_box := false
+        this.use_legacy_candidate_box := false
+        this.bypass_password_fields := true
+    }
+
+    Save(values) {
+        this.calls.Push("save_behavior:" . values.show_tips . ":" . values.global_ascii)
+        return true
+    }
+
+    Dispose() {
+        this.calls.Push("dispose_behavior")
     }
 }
 

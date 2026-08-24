@@ -41,6 +41,9 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_preview := 0
         this.appearance_loading := false
         this.appearance_dirty := false
+        this.behavior_model := 0
+        this.behavior_loading := false
+        this.behavior_dirty := false
         this.switcher_model := 0
         this.switcher_items := Map()
         this.switcher_loading := false
@@ -104,6 +107,49 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
         this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
 
+        this.behavior_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入与行为")
+        this.show_tips := this.AddCheckbox("x254 y174 w230 h24 Hidden", "显示输入状态提示")
+        this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.show_tips_time_label := this.AddText("x526 y176 w92 h22 Hidden", "显示时长（毫秒）：")
+        this.show_tips_time := this.AddEdit("x650 y172 w100 r1 Number -Multi Hidden")
+        this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.global_ascii := this.AddCheckbox("x254 y214 w496 h24 Hidden", "在所有程序之间共享中西文状态")
+        this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.fix_candidate_box := this.AddCheckbox("x254 y254 w496 h24 Hidden", "组字时保持候选窗位置不变")
+        this.fix_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.use_legacy_candidate_box := this.AddCheckbox("x254 y294 w496 h24 Hidden", "使用旧版候选窗")
+        this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.bypass_password_fields := this.AddCheckbox("x254 y334 w496 h24 Hidden", "在密码输入框中绕过 Rime")
+        this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.behavior_status := this.AddText("x254 y382 w496 h28 Hidden", "")
+
+        this.about_group := this.AddGroupBox("x230 y136 w570 h250 Hidden", "关于玉兔毫")
+        this.SetFont("s14 w600")
+        this.about_name := this.AddText("x254 y176 w496 h30 Hidden", "玉兔毫")
+        this.SetFont("s10 w400")
+        this.about_version := this.AddText(
+            "x254 y216 w496 h24 Hidden",
+            "版本：" . RABBIT_VERSION . (A_IsCompiled ? "（已编译）" : "（源代码运行）")
+        )
+        this.about_description := this.AddText(
+            "x254 y252 w496 h48 Hidden",
+            "由 AutoHotkey 实现的 Rime 输入法引擎 Windows 前端。"
+        )
+        this.about_project_link := this.AddLink(
+            "x254 y316 w160 h24 Hidden",
+            '<a href="https://github.com/rimeinn/rabbit">访问项目主页</a>'
+        )
+        this.about_project_link.OnEvent("Click", this.OnLinkClick.Bind(this))
+        this.about_license_link := this.AddLink(
+            "x430 y316 w160 h24 Hidden",
+            '<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 许可证</a>'
+        )
+        this.about_license_link.OnEvent("Click", this.OnLinkClick.Bind(this))
+        this.about_copyright := this.AddText(
+            "x254 y356 w496 h24 Hidden cGray",
+            "Copyright © 2023 - 2026 Xuesong Peng"
+        )
+
         this.dictionary_group := this.AddGroupBox("x230 y136 w570 h180 Hidden", "用户词典")
         this.dictionary_text := this.AddText(
             "x254 y174 w520 h52 Hidden",
@@ -149,15 +195,21 @@ class RabbitSettingsWindow extends Gui {
         page := RabbitSettingsWindow.pages[index]
         this.page_title.Value := page.title
         this.page_description.Value := page.description
-        this.SetPlaceholderVisible(index != 1 && index != 2 && index != 5 && index != 6)
+        this.SetPlaceholderVisible(
+            index != 1 && index != 2 && index != 3 && index != 5 && index != 6 && index != 7
+        )
         this.SetAppearanceVisible(index = 1)
         this.SetSwitcherVisible(index = 2)
+        this.SetBehaviorVisible(index = 3)
         this.SetDictionaryVisible(index = 5)
         this.SetMaintenanceVisible(index = 6)
+        this.SetAboutVisible(index = 7)
         if index = 1 {
             this.EnsureAppearanceSettings()
         } else if index = 2 {
             this.EnsureSwitcherSettings()
+        } else if index = 3 {
+            this.EnsureBehaviorSettings()
         }
         this.UpdateApplyButton()
         return true
@@ -193,6 +245,18 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    SetBehaviorVisible(visible) {
+        this.behavior_group.Visible := visible
+        this.show_tips.Visible := visible
+        this.show_tips_time_label.Visible := visible
+        this.show_tips_time.Visible := visible
+        this.global_ascii.Visible := visible
+        this.fix_candidate_box.Visible := visible
+        this.use_legacy_candidate_box.Visible := visible
+        this.bypass_password_fields.Visible := visible
+        this.behavior_status.Visible := visible
+    }
+
     SetDictionaryVisible(visible) {
         this.dictionary_group.Visible := visible
         this.dictionary_text.Visible := visible
@@ -205,6 +269,30 @@ class RabbitSettingsWindow extends Gui {
         this.deploy_button.Visible := visible
         this.sync_button.Visible := visible
         this.operation_status.Visible := visible
+    }
+
+    SetAboutVisible(visible) {
+        this.about_group.Visible := visible
+        this.about_name.Visible := visible
+        this.about_version.Visible := visible
+        this.about_description.Visible := visible
+        this.about_project_link.Visible := visible
+        this.about_license_link.Visible := visible
+        this.about_copyright.Visible := visible
+    }
+
+    OnLinkClick(ctrl, index, link) {
+        return this.OpenLink(link)
+    }
+
+    OpenLink(link) {
+        try {
+            Run(link)
+            return true
+        } catch as error {
+            MsgBox("无法打开链接：`n" . error.Message, "【玉兔毫】", "Ok Iconx")
+            return false
+        }
     }
 
     EnsureAppearanceSettings() {
@@ -340,13 +428,121 @@ class RabbitSettingsWindow extends Gui {
                 return this.ApplyAppearanceSettings()
             case 2:
                 return this.ApplySwitcherSettings()
+            case 3:
+                return this.ApplyBehaviorSettings()
         }
         return false
     }
 
     UpdateApplyButton() {
-        this.apply_button.Visible := this.selected_page = 1 || this.selected_page = 2
-        this.apply_button.Enabled := this.selected_page = 1 ? this.appearance_dirty : this.switcher_dirty
+        this.apply_button.Visible := this.selected_page >= 1 && this.selected_page <= 3
+        switch this.selected_page {
+            case 1:
+                this.apply_button.Enabled := this.appearance_dirty
+            case 2:
+                this.apply_button.Enabled := this.switcher_dirty
+            case 3:
+                this.apply_button.Enabled := this.behavior_dirty
+            default:
+                this.apply_button.Enabled := false
+        }
+    }
+
+    EnsureBehaviorSettings() {
+        if this.behavior_model {
+            return true
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateBehaviorSettingsModel") {
+            this.behavior_status.Value := "当前环境无法读取输入与行为设置。"
+            return false
+        }
+        try {
+            this.behavior_model := this.workflow.CreateBehaviorSettingsModel()
+            this.PopulateBehaviorSettings()
+            return true
+        } catch as error {
+            this.behavior_status.Value := error.Message
+            return false
+        }
+    }
+
+    PopulateBehaviorSettings() {
+        this.behavior_loading := true
+        try {
+            this.show_tips.Value := this.behavior_model.show_tips
+            this.show_tips_time.Value := this.behavior_model.show_tips_time
+            this.global_ascii.Value := this.behavior_model.global_ascii
+            this.fix_candidate_box.Value := this.behavior_model.fix_candidate_box
+            this.use_legacy_candidate_box.Value := this.behavior_model.use_legacy_candidate_box
+            this.bypass_password_fields.Value := this.behavior_model.bypass_password_fields
+            this.show_tips_time.Enabled := !!this.show_tips.Value
+            this.behavior_dirty := false
+            this.behavior_status.Value := ""
+        } finally {
+            this.behavior_loading := false
+        }
+    }
+
+    OnBehaviorChanged() {
+        if this.behavior_loading || !this.behavior_model {
+            return
+        }
+        this.show_tips_time.Enabled := !!this.show_tips.Value
+        this.behavior_dirty := true
+        this.footer_status.Value := "输入与行为设置尚未保存。"
+        this.UpdateApplyButton()
+    }
+
+    GetBehaviorValues() {
+        local show_tips_time := Trim(this.show_tips_time.Value)
+        if !RegExMatch(show_tips_time, "^\d+$") || Number(show_tips_time) > 2147483647 {
+            throw ValueError("状态提示显示时长必须是非负整数。")
+        }
+        return {
+            show_tips: !!this.show_tips.Value,
+            show_tips_time: Number(show_tips_time),
+            global_ascii: !!this.global_ascii.Value,
+            fix_candidate_box: !!this.fix_candidate_box.Value,
+            use_legacy_candidate_box: !!this.use_legacy_candidate_box.Value,
+            bypass_password_fields: !!this.bypass_password_fields.Value,
+        }
+    }
+
+    ApplyBehaviorSettings() {
+        local deploy_result, values
+        if !this.behavior_model || !this.behavior_dirty {
+            return false
+        }
+        try {
+            values := this.GetBehaviorValues()
+        } catch as error {
+            this.behavior_status.Value := error.Message
+            return false
+        }
+
+        this.Opt("+Disabled")
+        this.behavior_status.Value := "正在保存…"
+        try {
+            if !this.behavior_model.Save(values) {
+                this.behavior_status.Value := "未能保存输入与行为设置。"
+                return false
+            }
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.behavior_status.Value := "设置已保存，但重新部署失败。"
+                return false
+            }
+            this.behavior_dirty := false
+            this.behavior_status.Value := "输入与行为设置已保存。"
+            this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
+            this.UpdateApplyButton()
+            return true
+        } catch as error {
+            this.behavior_status.Value := "保存失败：" . error.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
     }
 
     EnsureSwitcherSettings() {
@@ -543,7 +739,14 @@ class RabbitSettingsWindow extends Gui {
                         this.switcher_model := 0
                     }
                 } finally {
-                    try this.Destroy()
+                    try {
+                        if this.behavior_model {
+                            this.behavior_model.Dispose()
+                            this.behavior_model := 0
+                        }
+                    } finally {
+                        try this.Destroy()
+                    }
                 }
             }
         }
