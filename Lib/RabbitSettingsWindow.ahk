@@ -16,10 +16,13 @@
  *
  */
 
+#Include RabbitCandidatePreview.ahk
+#Include RabbitCommon.ahk
+
 class RabbitSettingsWindow extends Gui {
     static pages := [
-        { title: "外观", description: "设置配色、字体和现代候选窗布局。" },
-        { title: "输入方案", description: "选择、排序输入方案并设置方案选单快捷键。" },
+        { title: "外观", description: "选择玉兔毫候选窗使用的配色。" },
+        { title: "输入方案", description: "选择输入方案并设置方案选单快捷键。" },
         { title: "输入与行为", description: "设置玉兔毫的输入、提示和候选行为。" },
         { title: "应用适配", description: "按应用程序设置默认输入状态。" },
         { title: "用户词典", description: "备份、恢复、导入和导出用户词典。" },
@@ -27,10 +30,21 @@ class RabbitSettingsWindow extends Gui {
         { title: "关于", description: "查看版本、许可证和项目链接。" },
     ]
 
-    __New(workflow := 0) {
+    __New(workflow := 0, old_windows := RabbitIsOldWindows(), preview_factory := CandidatePreview) {
         local page_names := []
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】设置", this)
         this.workflow := workflow
+        this.old_windows := old_windows
+        this.preview_factory := preview_factory
+        this.appearance_settings := 0
+        this.appearance_presets := []
+        this.appearance_preview := 0
+        this.appearance_loading := false
+        this.appearance_dirty := false
+        this.switcher_model := 0
+        this.switcher_items := Map()
+        this.switcher_loading := false
+        this.switcher_dirty := false
         this.disposed := false
         this.selected_page := 0
 
@@ -56,11 +70,39 @@ class RabbitSettingsWindow extends Gui {
         this.page_description := this.AddText("x230 y72 w570 h28 cGray", "")
         this.AddText("x230 y112 w570 h1 +0x10")
 
+        this.appearance_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "候选窗配色")
+        this.appearance_list := this.AddListBox("x254 y174 w250 h174 -Multi Hidden")
+        this.appearance_list.OnEvent("Change", (*) => this.OnAppearanceSelectionChange())
+        this.appearance_details := this.AddText("x254 y358 w250 h44 Hidden", "")
+        this.appearance_preview_group := this.AddGroupBox("x526 y174 w248 h178 Hidden", "预览")
+        this.appearance_preview_img := this.AddPicture("x560 y202 w180 h126 0xE BackgroundWhite Hidden")
+        this.appearance_preview_unavailable := this.AddText(
+            "x546 y210 w208 h108 Center +0x200 Hidden",
+            "旧版 Windows 暂不支持预览"
+        )
+        this.appearance_status := this.AddText("x526 y370 w248 h32 Hidden", "")
+
         this.placeholder := this.AddGroupBox("x230 y136 w570 h290", "页面内容")
         this.placeholder_text := this.AddText(
             "x254 y174 w520 h80",
             "这里将逐步迁入现有部署器功能。当前页面骨架不会读取或修改配置。"
         )
+
+        this.switcher_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入方案")
+        this.switcher_list := this.AddListView(
+            "x254 y174 w250 h178 Checked NoSort -Multi Hidden",
+            ["方案名称"]
+        )
+        this.switcher_list.OnEvent("Click", (ctrl, row) => this.ShowSwitcherDetails(row))
+        this.switcher_list.OnEvent("ItemCheck", (*) => this.MarkSwitcherDirty())
+        this.switcher_details := this.AddText(
+            "x526 y174 w248 h178 Hidden",
+            "选择左侧方案以查看简介。"
+        )
+        this.switcher_hotkeys_label := this.AddText("x254 y374 w100 h24 Hidden", "方案选单快捷键：")
+        this.switcher_hotkeys := this.AddEdit("x374 y370 w400 r1 -Multi Hidden")
+        this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
+        this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
 
         this.dictionary_group := this.AddGroupBox("x230 y136 w570 h180 Hidden", "用户词典")
         this.dictionary_text := this.AddText(
@@ -81,7 +123,12 @@ class RabbitSettingsWindow extends Gui {
         this.sync_button.OnEvent("Click", (*) => this.RunSync())
         this.operation_status := this.AddText("x254 y302 w520 h28 Hidden", "")
 
-        this.AddText("x230 y452 w420 h22 cGray", "设置内容将在确认后统一保存和部署。")
+        this.footer_status := this.AddText(
+            "x230 y452 w340 h22 cGray",
+            "设置内容将在确认后统一保存和部署。"
+        )
+        this.apply_button := this.AddButton("x580 y444 w110 h32 Hidden Disabled", "保存并部署")
+        this.apply_button.OnEvent("Click", (*) => this.ApplyCurrentPage())
         this.close_button := this.AddButton("x700 y444 w100 h32", "关闭")
         this.close_button.OnEvent("Click", this.OnClose.Bind(this))
         this.OnEvent("Close", this.OnClose.Bind(this))
@@ -102,15 +149,48 @@ class RabbitSettingsWindow extends Gui {
         page := RabbitSettingsWindow.pages[index]
         this.page_title.Value := page.title
         this.page_description.Value := page.description
-        this.SetPlaceholderVisible(index != 5 && index != 6)
+        this.SetPlaceholderVisible(index != 1 && index != 2 && index != 5 && index != 6)
+        this.SetAppearanceVisible(index = 1)
+        this.SetSwitcherVisible(index = 2)
         this.SetDictionaryVisible(index = 5)
         this.SetMaintenanceVisible(index = 6)
+        if index = 1 {
+            this.EnsureAppearanceSettings()
+        } else if index = 2 {
+            this.EnsureSwitcherSettings()
+        }
+        this.UpdateApplyButton()
         return true
     }
 
     SetPlaceholderVisible(visible) {
         this.placeholder.Visible := visible
         this.placeholder_text.Visible := visible
+    }
+
+    SetAppearanceVisible(visible) {
+        this.appearance_group.Visible := visible
+        this.appearance_list.Visible := visible
+        this.appearance_details.Visible := visible
+        this.appearance_preview_group.Visible := visible
+        this.appearance_preview_img.Visible := visible && !this.old_windows
+        this.appearance_preview_unavailable.Visible := visible && this.old_windows
+        this.appearance_status.Visible := visible
+        if visible {
+            this.apply_button.Visible := true
+        }
+    }
+
+    SetSwitcherVisible(visible) {
+        this.switcher_group.Visible := visible
+        this.switcher_list.Visible := visible
+        this.switcher_details.Visible := visible
+        this.switcher_hotkeys_label.Visible := visible
+        this.switcher_hotkeys.Visible := visible
+        this.switcher_status.Visible := visible
+        if visible {
+            this.apply_button.Visible := true
+        }
     }
 
     SetDictionaryVisible(visible) {
@@ -125,6 +205,262 @@ class RabbitSettingsWindow extends Gui {
         this.deploy_button.Visible := visible
         this.sync_button.Visible := visible
         this.operation_status.Visible := visible
+    }
+
+    EnsureAppearanceSettings() {
+        if this.appearance_settings {
+            return true
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateUIStyleSettings") {
+            this.appearance_status.Value := "当前环境无法读取外观设置。"
+            return false
+        }
+        try {
+            this.appearance_settings := this.workflow.CreateUIStyleSettings()
+            this.PopulateAppearanceSettings()
+            try {
+                this.CreateAppearancePreview()
+                this.PreviewAppearance(this.appearance_list.Value)
+            } catch as error {
+                this.appearance_status.Value := "无法显示预览：" . error.Message
+            }
+            return true
+        } catch as error {
+            this.appearance_status.Value := error.Message
+            return false
+        }
+    }
+
+    CreateAppearancePreview() {
+        local factory
+        if this.old_windows || this.appearance_preview {
+            return
+        }
+        factory := this.preview_factory
+        this.appearance_preview := factory(this.appearance_preview_img)
+    }
+
+    PopulateAppearanceSettings() {
+        local active, active_index, i, info, names := []
+        this.appearance_loading := true
+        try {
+            active := this.appearance_settings.GetActiveColorScheme()
+            active_index := 0
+            this.appearance_presets := this.appearance_settings.GetPresetColorSchemes()
+            for i, info in this.appearance_presets {
+                names.Push(info.name)
+                if info.color_scheme_id = active {
+                    active_index := i
+                }
+            }
+            this.appearance_list.Delete()
+            this.appearance_list.Add(names)
+            if active_index > 0 {
+                this.appearance_list.Choose(active_index)
+                this.ShowAppearanceDetails(active_index)
+                this.PreviewAppearance(active_index)
+            }
+            this.appearance_dirty := false
+            this.appearance_status.Value := names.Length ? "" : "没有找到可用的配色。"
+        } finally {
+            this.appearance_loading := false
+        }
+    }
+
+    OnAppearanceSelectionChange() {
+        local index := this.appearance_list.Value
+        if this.appearance_loading || index < 1 || index > this.appearance_presets.Length {
+            return
+        }
+        this.appearance_settings.SelectColorScheme(this.appearance_presets[index].color_scheme_id)
+        this.ShowAppearanceDetails(index)
+        this.PreviewAppearance(index)
+        this.appearance_dirty := true
+        this.footer_status.Value := "外观设置尚未保存。"
+        this.UpdateApplyButton()
+    }
+
+    ShowAppearanceDetails(index) {
+        local info
+        if index < 1 || index > this.appearance_presets.Length {
+            return
+        }
+        info := this.appearance_presets[index]
+        this.appearance_details.Value := info.author ? "作者：" . info.author : ""
+    }
+
+    PreviewAppearance(index) {
+        local box_height, box_width, box_x, box_y, info
+        if !this.appearance_preview || index < 1 || index > this.appearance_presets.Length {
+            return
+        }
+        info := this.appearance_presets[index]
+        this.appearance_preview.Build(info.style, &box_width, &box_height)
+        box_width /= this.appearance_preview.dpiScale
+        box_height /= this.appearance_preview.dpiScale
+        box_x := 526 + Round((248 - box_width) / 2)
+        box_y := 196 + Round((144 - box_height) / 2)
+        this.appearance_preview_img.Move(box_x, box_y, box_width, box_height)
+        this.appearance_preview.Render(["输入法", "输入", "数", "书", "输"], 1)
+    }
+
+    ApplyAppearanceSettings() {
+        local deploy_result
+        if !this.appearance_settings || !this.appearance_dirty {
+            return false
+        }
+        this.Opt("+Disabled")
+        this.appearance_status.Value := "正在保存…"
+        try {
+            if !this.appearance_settings.Save() {
+                this.appearance_status.Value := "未能保存外观设置。"
+                return false
+            }
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.appearance_status.Value := "设置已保存，但重新部署失败。"
+                return false
+            }
+            this.appearance_dirty := false
+            this.appearance_status.Value := "外观设置已保存。"
+            this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
+            this.UpdateApplyButton()
+            return true
+        } catch as error {
+            this.appearance_status.Value := "保存失败：" . error.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
+    }
+
+    ApplyCurrentPage() {
+        switch this.selected_page {
+            case 1:
+                return this.ApplyAppearanceSettings()
+            case 2:
+                return this.ApplySwitcherSettings()
+        }
+        return false
+    }
+
+    UpdateApplyButton() {
+        this.apply_button.Visible := this.selected_page = 1 || this.selected_page = 2
+        this.apply_button.Enabled := this.selected_page = 1 ? this.appearance_dirty : this.switcher_dirty
+    }
+
+    EnsureSwitcherSettings() {
+        if this.switcher_model {
+            return true
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateSwitcherSettingsModel") {
+            this.switcher_status.Value := "当前环境无法读取输入方案。"
+            return false
+        }
+        try {
+            this.switcher_model := this.workflow.CreateSwitcherSettingsModel()
+            this.PopulateSwitcherSettings()
+            return true
+        } catch as error {
+            this.switcher_status.Value := error.Message
+            return false
+        }
+    }
+
+    PopulateSwitcherSettings() {
+        local row
+        this.switcher_loading := true
+        try {
+            this.switcher_items := Map()
+            this.switcher_list.Delete()
+            for item in this.switcher_model.items {
+                row := this.switcher_list.Add(item.selected ? "Check" : "", item.name)
+                this.switcher_items[row] := item
+            }
+            this.switcher_list.ModifyCol(1, 228)
+            this.switcher_hotkeys.Value := this.switcher_model.hotkeys
+            this.switcher_dirty := false
+            this.UpdateApplyButton()
+            this.switcher_status.Value := ""
+            if this.switcher_list.GetCount() > 0 {
+                this.switcher_list.Modify(1, "Select Focus")
+                this.ShowSwitcherDetails(1)
+            }
+        } finally {
+            this.switcher_loading := false
+        }
+    }
+
+    ShowSwitcherDetails(row) {
+        local details, item
+        if row < 1 || !this.switcher_items.Has(row) {
+            return
+        }
+        item := this.switcher_items[row]
+        details := item.name
+        if item.author {
+            details .= "`r`n`r`n" . item.author
+        }
+        if item.description {
+            details .= "`r`n`r`n" . item.description
+        }
+        this.switcher_details.Value := details
+    }
+
+    MarkSwitcherDirty() {
+        if this.switcher_loading || !this.switcher_model {
+            return
+        }
+        this.switcher_dirty := true
+        this.footer_status.Value := "输入方案设置尚未保存。"
+        this.UpdateApplyButton()
+    }
+
+    SelectedSchemaIds() {
+        local ids := []
+        local row := 0
+        while (row := this.switcher_list.GetNext(row, "Checked")) {
+            if this.switcher_items.Has(row) {
+                ids.Push(this.switcher_items[row].id)
+            }
+        }
+        return ids
+    }
+
+    ApplySwitcherSettings() {
+        local schema_ids, deploy_result
+        if !this.switcher_model || !this.switcher_dirty {
+            return false
+        }
+        schema_ids := this.SelectedSchemaIds()
+        if schema_ids.Length = 0 {
+            MsgBox("至少要选用一项输入方案。", "【玉兔毫】", "Ok Icon!")
+            return false
+        }
+
+        this.Opt("+Disabled")
+        this.switcher_status.Value := "正在保存…"
+        try {
+            if !this.switcher_model.Save(schema_ids, Trim(this.switcher_hotkeys.Value)) {
+                this.switcher_status.Value := "未能保存输入方案设置。"
+                return false
+            }
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.switcher_status.Value := "设置已保存，但重新部署失败。"
+                return false
+            }
+            this.switcher_dirty := false
+            this.switcher_status.Value := "输入方案设置已保存。"
+            this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
+            this.UpdateApplyButton()
+            return true
+        } catch as error {
+            this.switcher_status.Value := "保存失败：" . error.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
     }
 
     RunDictionaryManagement() {
@@ -189,6 +525,27 @@ class RabbitSettingsWindow extends Gui {
             return
         }
         this.disposed := true
-        try this.Destroy()
+        try {
+            if this.appearance_preview {
+                this.appearance_preview.Dispose()
+                this.appearance_preview := 0
+            }
+        } finally {
+            try {
+                if this.appearance_settings {
+                    this.appearance_settings.Dispose()
+                    this.appearance_settings := 0
+                }
+            } finally {
+                try {
+                    if this.switcher_model {
+                        this.switcher_model.Dispose()
+                        this.switcher_model := 0
+                    }
+                } finally {
+                    try this.Destroy()
+                }
+            }
+        }
     }
 }

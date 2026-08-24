@@ -51,7 +51,7 @@ class RabbitDeployerApplication {
             case "sync":
                 this.context.result := this.workflow.SyncUserData()
                 this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
-            case "settings":
+            case "settings", "configure":
                 this.context.result := this.ShowSettings()
                 this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
             default:

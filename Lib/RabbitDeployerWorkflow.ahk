@@ -18,6 +18,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitDictManagementDialog.ahk
+#Include RabbitSwitcherSettingsModel.ahk
 #Include RabbitSwitcherSettingsDialog.ahk
 #Include RabbitUIStyleSettings.ahk
 #Include RabbitUIStyleSettingsDialog.ahk
@@ -43,6 +44,23 @@ class RabbitDeployerWorkflow {
 
     CreateLevers() {
         return RimeLeversApi(this.rime)
+    }
+
+    CreateSwitcherSettingsModel() {
+        return RabbitSwitcherSettingsModel(this.CreateLevers())
+    }
+
+    CreateUIStyleSettings() {
+        local settings := UIStyleSettings(this.rime, this.CreateLevers())
+        try {
+            if !settings.Load() {
+                throw Error("Failed to load UI style settings.")
+            }
+            return settings
+        } catch {
+            settings.Dispose()
+            throw
+        }
     }
 
     CreateMutex() {

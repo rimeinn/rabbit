@@ -31,6 +31,10 @@ class UIStyleSettings {
         this.settings := this.api.custom_settings_init("rabbit", "Rabbit.UIStyleSettings")
     }
 
+    Load() {
+        return this.api.load_settings(this.settings)
+    }
+
     GetPresetColorSchemes() {
         local config, preset, name, style
         local result := []
@@ -81,6 +85,10 @@ class UIStyleSettings {
     SelectColorScheme(color_scheme_id) {
         this.api.customize_string(this.settings, "style/color_scheme", color_scheme_id)
         return true
+    }
+
+    Save() {
+        return this.api.save_settings(this.settings)
     }
 
     Dispose() {
