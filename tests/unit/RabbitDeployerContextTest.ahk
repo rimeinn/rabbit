@@ -24,6 +24,7 @@
 RunTest("deployer context lifecycle", TestDeployerContextLifecycle.Bind())
 RunTest("partial deployer context disposal", TestPartialDeployerContextDisposal.Bind())
 RunTest("UI style settings ownership", TestUIStyleSettingsOwnership.Bind())
+RunTest("UI style settings reload before save", TestUIStyleSettingsReloadBeforeSave.Bind())
 RunTest("old Windows preview stays lazy", TestOldWindowsPreviewStaysLazy.Bind())
 RunTest("supported Windows preview creation", TestSupportedWindowsPreviewCreation.Bind())
 
@@ -68,6 +69,25 @@ TestUIStyleSettingsOwnership() {
         "settings_init,settings_destroy",
         JoinDeployerCalls(calls),
         "UI style settings did not release their custom settings exactly once."
+    )
+}
+
+TestUIStyleSettingsReloadBeforeSave() {
+    local calls := []
+    local levers := RabbitUIStyleLeversProbe(calls)
+    local settings := UIStyleSettings(RabbitDeployerRimeProbe(calls), levers)
+
+    try {
+        AssertTrue(settings.SelectColorScheme("theme_b"), "The UI style settings rejected a color scheme.")
+        AssertTrue(settings.Save(), "The UI style settings failed to save a color scheme.")
+        AssertTrue(settings.Save(), "The UI style settings could not retry a staged color scheme.")
+    } finally {
+        settings.Dispose()
+    }
+    AssertEqual(
+        "settings_init,select:theme_b,load,select:theme_b,save,load,select:theme_b,save,settings_destroy",
+        JoinDeployerCalls(calls),
+        "The UI style settings did not reload the shared config before saving."
     )
 }
 
@@ -158,6 +178,21 @@ class RabbitUIStyleLeversProbe {
 
     custom_settings_destroy(settings) {
         this.calls.Push("settings_destroy")
+    }
+
+    customize_string(settings, key, value) {
+        this.calls.Push("select:" . value)
+        return true
+    }
+
+    load_settings(settings) {
+        this.calls.Push("load")
+        return true
+    }
+
+    save_settings(settings) {
+        this.calls.Push("save")
+        return true
     }
 }
 

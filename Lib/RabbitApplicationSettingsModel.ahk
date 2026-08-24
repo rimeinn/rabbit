@@ -70,6 +70,9 @@ class RabbitApplicationSettingsModel {
         if changes.Count = 0 {
             return false
         }
+        if !this.api.load_settings(this.settings) {
+            return false
+        }
         for process_name, change in changes {
             key := "app_options/" . process_name . "/ascii_mode"
             if change.reset {
