@@ -27,6 +27,7 @@
 #Include RabbitDeployerWorkflowTest.ahk
 #Include RabbitInputControllerTest.ahk
 #Include RabbitInputTargetTest.ahk
+#Include RabbitNativeListViewTest.ahk
 #Include RabbitIconTest.ahk
 #Include RabbitPopupPlacementTest.ahk
 #Include RabbitShutdownTest.ahk

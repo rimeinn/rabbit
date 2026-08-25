@@ -39,6 +39,9 @@ RunTest("candidate placement uses the floating preedit bottom", TestFloatingPree
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
+RunTest("type-ahead target uses Rime input", TestTypeAheadTargetUsesRimeInput.Bind())
+RunTest("type-ahead commit always uses SendText", TestTypeAheadCommitAlwaysUsesSendText.Bind())
+RunTest("long editable commit uses clipboard", TestLongEditableCommitUsesClipboard.Bind())
 RunTest("switcher temporary schema preserves mode baseline", TestSwitcherTemporarySchemaPreservesModeBaseline.Bind())
 RunTest("switcher ASCII selection shows mode status", TestSwitcherAsciiSelectionShowsModeStatus.Bind())
 
@@ -481,6 +484,47 @@ TestNonTextTargetBypassesRimeInput() {
     AssertEqual("A", input.replayed_keys[1].key, "The wrong key was replayed to the target.")
 }
 
+TestTypeAheadTargetUsesRimeInput() {
+    local rime := RabbitKeyReplayRimeProbe([true])
+    local candidate_box := RabbitInputCandidateProbe()
+    local runtime_state := RabbitSwitcherStatusRuntimeProbe()
+    local tray := RabbitSwitcherStatusTrayProbe()
+    local input := RabbitKeyReplayControllerProbe(
+        rime,
+        candidate_box,
+        runtime_state,
+        tray,
+        RabbitInputTargetProbe(RabbitInputTarget.TYPE_AHEAD)
+    )
+
+    input.ProcessTextKey("h", 0)
+
+    AssertEqual(1, rime.process_index, "A type-ahead key bypassed Rime input.")
+    AssertEqual(0, input.replayed_keys.Length, "A Rime-handled type-ahead key was replayed.")
+}
+
+TestTypeAheadCommitAlwaysUsesSendText() {
+    local input := RabbitCommitSenderProbe(8)
+    local text := "123456789"
+
+    input.SendCommittedText(text, RabbitInputTarget.TYPE_AHEAD)
+
+    AssertEqual(1, input.direct_texts.Length, "A long type-ahead commit did not use SendText.")
+    AssertEqual(text, input.direct_texts[1], "SendText received the wrong type-ahead commit.")
+    AssertEqual(0, input.clipboard_texts.Length, "A type-ahead commit used the clipboard.")
+}
+
+TestLongEditableCommitUsesClipboard() {
+    local input := RabbitCommitSenderProbe(8)
+    local text := "123456789"
+
+    input.SendCommittedText(text, RabbitInputTarget.YES)
+
+    AssertEqual(0, input.direct_texts.Length, "A long editable commit unexpectedly used SendText.")
+    AssertEqual(1, input.clipboard_texts.Length, "A long editable commit did not use the clipboard.")
+    AssertEqual(text, input.clipboard_texts[1], "The clipboard received the wrong editable commit.")
+}
+
 TestSwitcherTemporarySchemaPreservesModeBaseline() {
     local input := RabbitInputController(
         {},
@@ -745,6 +789,22 @@ class RabbitInputTargetControllerProbe extends RabbitInputController {
             mask: mask,
             pass_through: pass_through
         })
+    }
+}
+
+class RabbitCommitSenderProbe extends RabbitInputController {
+    __New(send_by_clipboard_length) {
+        this.config := { send_by_clipboard_length: send_by_clipboard_length }
+        this.direct_texts := []
+        this.clipboard_texts := []
+    }
+
+    SendTextDirect(text) {
+        this.direct_texts.Push(text)
+    }
+
+    SendTextByClipboard(text) {
+        this.clipboard_texts.Push(text)
     }
 }
 

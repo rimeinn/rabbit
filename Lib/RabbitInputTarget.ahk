@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,12 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitNativeListView.ahk
 
 class RabbitInputTarget {
     static YES := "yes"
     static NO := "no"
+    static TYPE_AHEAD := "type_ahead"
     static UNKNOWN := "unknown"
 
     static UIA_EDIT_CONTROL_TYPE_ID := 50004
@@ -36,14 +38,23 @@ class RabbitInputTarget {
     static UIA_IS_READONLY_PROPERTY_ID := 30048
     static VT_BOOL := 11
 
+    static native_list_view_detector := RabbitNativeListViewDetector()
+
     static Classify(foreground_hwnd) {
+        local result
         if !(descriptor := this.Describe(foreground_hwnd)) {
+            this.native_list_view_detector.Reset()
             return this.UNKNOWN
         }
         if this.IsWpfWindow(descriptor) || this.IsBrowserWindow(descriptor) {
             descriptor.uia_control_types := this.GetFocusedUIAutomationControlTypes(descriptor.process_id)
         }
-        return this.ClassifyDescriptor(descriptor)
+        result := this.ClassifyDescriptor(descriptor)
+        if result != this.UNKNOWN {
+            this.native_list_view_detector.Reset()
+            return result
+        }
+        return this.native_list_view_detector.IsCompatible(descriptor) ? this.TYPE_AHEAD : this.UNKNOWN
     }
 
     static Describe(foreground_hwnd) {
@@ -103,19 +114,19 @@ class RabbitInputTarget {
             return this.YES
         }
         if this.IsDesktop(descriptor) {
-            return this.NO
+            return this.TYPE_AHEAD
         }
         if this.IsProcessExplorer(descriptor) {
-            return this.NO
+            return this.TYPE_AHEAD
         }
         if this.IsWpfSelectionTarget(descriptor) {
-            return this.NO
+            return this.TYPE_AHEAD
         }
         if this.IsOpenWithDialog(descriptor) {
             return this.NO
         }
         if this.IsCommonFileDialogView(descriptor) {
-            return this.NO
+            return this.TYPE_AHEAD
         }
         if this.IsBrowserWindow(descriptor) {
             return this.ClassifyBrowser(descriptor)
@@ -123,7 +134,10 @@ class RabbitInputTarget {
         if descriptor.process_name != "explorer.exe" {
             return this.UNKNOWN
         }
-        if this.IsExplorerFileView(descriptor) || this.IsTaskbarControl(descriptor) {
+        if this.IsExplorerFileView(descriptor) {
+            return this.TYPE_AHEAD
+        }
+        if this.IsTaskbarControl(descriptor) {
             return this.NO
         }
         return this.UNKNOWN

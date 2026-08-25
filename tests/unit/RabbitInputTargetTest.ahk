@@ -19,13 +19,13 @@
 #Include ..\support\TestCommon.ahk
 #Include ..\..\Lib\RabbitInputTarget.ahk
 
-RunTest("Explorer file view is a non-text target", TestExplorerFileViewIsNo.Bind())
+RunTest("Explorer file view is a type-ahead target", TestExplorerFileViewIsTypeAhead.Bind())
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())
-RunTest("Process Explorer process list is a non-text target", TestProcessExplorerListIsNo.Bind())
+RunTest("Process Explorer process list is a type-ahead target", TestProcessExplorerListIsTypeAhead.Bind())
 RunTest("Process Explorer edit control remains a text target", TestProcessExplorerEditControlIsYes.Bind())
-RunTest("WPF list is a non-text target", TestWpfListIsNo.Bind())
-RunTest("WPF tree is a non-text target", TestWpfTreeIsNo.Bind())
-RunTest("WPF file grid is a non-text target", TestWpfFileGridIsNo.Bind())
+RunTest("WPF list is a type-ahead target", TestWpfListIsTypeAhead.Bind())
+RunTest("WPF tree is a type-ahead target", TestWpfTreeIsTypeAhead.Bind())
+RunTest("WPF file grid is a type-ahead target", TestWpfFileGridIsTypeAhead.Bind())
 RunTest("WPF edit control is a text target", TestWpfEditControlIsYes.Bind())
 RunTest("WPF document control is a text target", TestWpfDocumentControlIsYes.Bind())
 RunTest("WPF nested editor takes priority over its list", TestWpfNestedEditorIsYes.Bind())
@@ -35,11 +35,11 @@ RunTest("UIA list in a non-WPF window remains unknown", TestNonWpfUIAutomationLi
 RunTest("Open With app list is a non-text target", TestOpenWithListIsNo.Bind())
 RunTest("Open With edit control remains a text target", TestOpenWithEditControlIsYes.Bind())
 RunTest("Open With class in another process remains unknown", TestOpenWithClassInAnotherProcessIsUnknown.Bind())
-RunTest("Common file dialog view is a non-text target", TestCommonFileDialogViewIsNo.Bind())
-RunTest("Common folder dialog tree is a non-text target", TestCommonFolderDialogTreeIsNo.Bind())
+RunTest("Common file dialog view is a type-ahead target", TestCommonFileDialogViewIsTypeAhead.Bind())
+RunTest("Common folder dialog tree is a type-ahead target", TestCommonFolderDialogTreeIsTypeAhead.Bind())
 RunTest("Common file dialog edit control remains a text target", TestCommonFileDialogEditIsYes.Bind())
 RunTest("Unrecognized common dialog remains unknown", TestUnknownCommonDialog.Bind())
-RunTest("Desktop is a non-text target", TestDesktopIsNo.Bind())
+RunTest("Desktop is a type-ahead target", TestDesktopIsTypeAhead.Bind())
 RunTest("Taskbar button is a non-text target", TestTaskbarButtonIsNo.Bind())
 RunTest("Chrome address bar is a text target", TestChromeAddressBarIsYes.Bind())
 RunTest("Chrome native menu is a non-text target", TestChromeNativeMenuIsNo.Bind())
@@ -52,14 +52,14 @@ RunTest("Edge non-editable page area is a non-text target", TestEdgePageAreaIsNo
 RunTest("Electron app keeps the previous behavior", TestElectronAppIsUnknown.Bind())
 RunTest("Unrecognized target remains unknown", TestUnknownTarget.Bind())
 
-TestExplorerFileViewIsNo() {
+TestExplorerFileViewIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "explorer.exe",
             ["directuihwnd", "shelldll_defview"]
         )),
-        "The Explorer file view was not classified as a non-text target."
+        "The Explorer file view was not classified as a type-ahead target."
     )
 }
 
@@ -74,15 +74,15 @@ TestExplorerEditControlIsYes() {
     )
 }
 
-TestProcessExplorerListIsNo() {
+TestProcessExplorerListIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "procexp64.exe",
             ["syslistview32", "procexplorer"],
             ["procexplorer"]
         )),
-        "The Process Explorer process list was not classified as a non-text target."
+        "The Process Explorer process list was not classified as a type-ahead target."
     )
 }
 
@@ -98,9 +98,9 @@ TestProcessExplorerEditControlIsYes() {
     )
 }
 
-TestWpfListIsNo() {
+TestWpfListIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "wpf_app.exe",
             ["hwndwrapper[wpf_app.exe;;window-id]"],
@@ -110,13 +110,13 @@ TestWpfListIsNo() {
                 RabbitInputTarget.UIA_LIST_CONTROL_TYPE_ID
             ]
         )),
-        "A WPF list was not classified as a non-text target."
+        "A WPF list was not classified as a type-ahead target."
     )
 }
 
-TestWpfTreeIsNo() {
+TestWpfTreeIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "wpf_app.exe",
             ["hwndwrapper[wpf_app.exe;;window-id]"],
@@ -126,13 +126,13 @@ TestWpfTreeIsNo() {
                 RabbitInputTarget.UIA_TREE_CONTROL_TYPE_ID
             ]
         )),
-        "A WPF tree was not classified as a non-text target."
+        "A WPF tree was not classified as a type-ahead target."
     )
 }
 
-TestWpfFileGridIsNo() {
+TestWpfFileGridIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "wpf_app.exe",
             ["hwndwrapper[wpf_app.exe;;window-id]"],
@@ -142,7 +142,7 @@ TestWpfFileGridIsNo() {
                 RabbitInputTarget.UIA_DATA_GRID_CONTROL_TYPE_ID
             ]
         )),
-        "A WPF file grid was not classified as a non-text target."
+        "A WPF file grid was not classified as a type-ahead target."
     )
 }
 
@@ -190,7 +190,7 @@ TestWpfNestedEditorIsYes() {
 
 TestWpfActiveWindowIdentifiesNativeChild() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "hybrid_wpf_app.exe",
             ["windowsforms10.window.8.app"],
@@ -263,27 +263,27 @@ TestOpenWithClassInAnotherProcessIsUnknown() {
     )
 }
 
-TestCommonFileDialogViewIsNo() {
+TestCommonFileDialogViewIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "node.exe",
             ["directuihwnd", "shelldll_defview", "duiviewwndclassname", "#32770"],
             ["#32770"]
         )),
-        "A common file dialog view was not classified as a non-text target."
+        "A common file dialog view was not classified as a type-ahead target."
     )
 }
 
-TestCommonFolderDialogTreeIsNo() {
+TestCommonFolderDialogTreeIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "node.exe",
             ["systreeview32", "#32770"],
             ["#32770"]
         )),
-        "A common folder dialog tree was not classified as a non-text target."
+        "A common folder dialog tree was not classified as a type-ahead target."
     )
 }
 
@@ -311,14 +311,14 @@ TestUnknownCommonDialog() {
     )
 }
 
-TestDesktopIsNo() {
+TestDesktopIsTypeAhead() {
     AssertEqual(
-        RabbitInputTarget.NO,
+        RabbitInputTarget.TYPE_AHEAD,
         RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
             "explorer.exe",
             ["workerw"]
         )),
-        "The desktop was not classified as a non-text target."
+        "The desktop was not classified as a type-ahead target."
     )
 }
 

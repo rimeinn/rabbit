@@ -628,11 +628,7 @@ class RabbitInputController {
         ; Send committed text outside the critical section: SendText and the
         ; clipboard path block (ClipWait) and would hold up all input.
         if commit_text != "" {
-            if StrLen(commit_text) >= this.config.send_by_clipboard_length {
-                this.SendTextByClipboard(commit_text)
-            } else {
-                SendText(commit_text)
-            }
+            this.SendCommittedText(commit_text, input_target)
         }
         if this.suspend_hotkey && this.suspend_hotkey_mask
             && (key = this.suspend_hotkey || SubStr(key, 2) = this.suspend_hotkey)
@@ -1020,6 +1016,21 @@ class RabbitInputController {
             return
         }
         this.candidate_box.BuildPresentation(presentation, &box_width, &box_height, max_width)
+    }
+
+    SendCommittedText(text, input_target) {
+        ; Type-ahead controls interpret text input, not paste.
+        if input_target = RabbitInputTarget.TYPE_AHEAD {
+            this.SendTextDirect(text)
+        } else if StrLen(text) >= this.config.send_by_clipboard_length {
+            this.SendTextByClipboard(text)
+        } else {
+            this.SendTextDirect(text)
+        }
+    }
+
+    SendTextDirect(text) {
+        SendText(text)
     }
 
     ; by rawbx (https://github.com/rimeinn/rabbit/issues/13#issuecomment-3072554342)
