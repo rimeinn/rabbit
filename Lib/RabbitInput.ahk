@@ -856,23 +856,15 @@ class RabbitInputController {
     }
 
     UpdateCandidate(context, candidate_revision, hide_candidate) {
-        local info, caret_x, caret_y, caret_w, caret_h, hmon
-        local backup_mouse_ref, mouse_x, mouse_y, placement, start_menu, start_menu_rect, start_menu_caret
+        local info, caret_x, caret_y, caret_w, caret_h
+        local backup_mouse_ref, mouse_x, mouse_y, placement, start_menu_info, start_menu_caret
         if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
             placement := { mode: "hide" }
         } else {
-            DetectHiddenWindows True
-            start_menu := WinActive(
-                "ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe"
-            )
-                || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
-                || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
-            DetectHiddenWindows False
-            if start_menu
-                && (hmon := MonitorManage.MonitorFromWindow(start_menu))
-                && (info := MonitorManage.GetMonitorInfo(hmon)) {
-                start_menu_rect := RabbitPopupPlacement.GetVisibleWindowBounds(start_menu)
-                if RabbitPopupPlacement.IsUsableAnchorRect(start_menu_rect, info) {
+            start_menu_info := RabbitPopupPlacement.GetActiveStartMenuInfo()
+            if start_menu_info {
+                info := start_menu_info.monitor_info
+                if start_menu_info.usable {
                     start_menu_caret := 0
                     if RabbitGetCaretPos(
                         &caret_x,
@@ -885,7 +877,7 @@ class RabbitInputController {
                     }
                     placement := {
                         mode: "start_menu",
-                        anchor_rect: start_menu_rect,
+                        anchor_rect: start_menu_info.anchor_rect,
                         caret: start_menu_caret,
                         monitor_info: info
                     }

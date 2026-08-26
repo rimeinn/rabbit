@@ -46,6 +46,37 @@ class RabbitPopupPlacement {
         return 0
     }
 
+    static GetActiveStartMenuInfo() {
+        local start_menu
+        local previous_detect_hidden_windows := A_DetectHiddenWindows
+        local hmon, monitor_info, anchor_rect
+        try {
+            DetectHiddenWindows True
+            start_menu := WinActive(
+                "ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe"
+            )
+            if !start_menu {
+                start_menu := WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
+            }
+            if !start_menu {
+                start_menu := WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
+            }
+        } finally {
+            DetectHiddenWindows previous_detect_hidden_windows
+        }
+        if !start_menu || !(hmon := MonitorManage.MonitorFromWindow(start_menu))
+            || !(monitor_info := MonitorManage.GetMonitorInfo(hmon)) {
+            return 0
+        }
+        anchor_rect := this.GetVisibleWindowBounds(start_menu)
+        return {
+            hwnd: start_menu,
+            anchor_rect: anchor_rect,
+            monitor_info: monitor_info,
+            usable: this.IsUsableAnchorRect(anchor_rect, monitor_info)
+        }
+    }
+
     static IsUsableAnchorRect(anchor, monitor_info) {
         local work
         if !anchor || !monitor_info {

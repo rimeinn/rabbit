@@ -105,23 +105,34 @@ class RabbitStatusTip {
             icon_path,
             monitor_info ? monitor_info.work.right - monitor_info.work.left : 0
         )
-        position := placement.mode = "caret"
-            ? RabbitPopupPlacement.PlaceBelowCaret(
-                placement.x,
-                placement.y,
-                placement.w,
-                placement.h,
-                this.box_width,
-                this.box_height,
-                monitor_info
-            )
-            : RabbitPopupPlacement.PlaceAtPoint(
-                placement.x,
-                placement.y,
-                this.box_width,
-                this.box_height,
-                monitor_info
-            )
+        switch placement.mode {
+            case "caret":
+                position := RabbitPopupPlacement.PlaceBelowCaret(
+                    placement.x,
+                    placement.y,
+                    placement.w,
+                    placement.h,
+                    this.box_width,
+                    this.box_height,
+                    monitor_info
+                )
+            case "start_menu":
+                position := RabbitPopupPlacement.PlaceOutsideRect(
+                    placement.anchor_rect,
+                    this.box_width,
+                    this.box_height,
+                    monitor_info,
+                    placement.caret
+                )
+            default:
+                position := RabbitPopupPlacement.PlaceAtPoint(
+                    placement.x,
+                    placement.y,
+                    this.box_width,
+                    this.box_height,
+                    monitor_info
+                )
+        }
         this.EnsureRenderTarget()
         this.d2d.BeginDraw()
         this.Draw()
@@ -182,7 +193,35 @@ class RabbitStatusTip {
 
     GetAnchor() {
         local caret_x, caret_y, caret_w, caret_h, mouse_x, mouse_y
-        local mouse_coord_mode, monitor_info
+        local mouse_coord_mode, monitor_info, start_menu_info, start_menu_caret
+        start_menu_info := RabbitPopupPlacement.GetActiveStartMenuInfo()
+        if start_menu_info {
+            monitor_info := start_menu_info.monitor_info
+            if start_menu_info.usable {
+                start_menu_caret := 0
+                if RabbitGetCaretPos(
+                    &caret_x,
+                    &caret_y,
+                    &caret_w,
+                    &caret_h,
+                    this.config.use_caret_hook
+                ) {
+                    start_menu_caret := { x: caret_x, y: caret_y, w: caret_w, h: caret_h }
+                }
+                return {
+                    mode: "start_menu",
+                    anchor_rect: start_menu_info.anchor_rect,
+                    caret: start_menu_caret,
+                    monitor_info: monitor_info
+                }
+            }
+            return {
+                mode: "top_left",
+                x: monitor_info.work.left + RabbitPopupPlacement.GAP,
+                y: monitor_info.work.top + RabbitPopupPlacement.GAP,
+                monitor_info: monitor_info
+            }
+        }
         if RabbitGetCaretPos(
             &caret_x,
             &caret_y,

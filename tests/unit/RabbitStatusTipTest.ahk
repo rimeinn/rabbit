@@ -22,6 +22,7 @@
 
 RunTest("themed status tip renders icons and text", TestStatusTipRendersContent.Bind())
 RunTest("vertical status tip keeps its icon upright", TestVerticalStatusTipRendersContent.Bind())
+RunTest("Start menu status tip stays outside the menu", TestStartMenuStatusTipPlacement.Bind())
 
 TestStatusTipRendersContent() {
     RabbitStatusTipLayeredWindowProbe.events := []
@@ -106,6 +107,30 @@ TestVerticalStatusTipRendersContent() {
     }
 }
 
+TestStartMenuStatusTipPlacement() {
+    RabbitStatusTipLayeredWindowProbe.events := []
+    local d2d := RabbitStatusTipDirect2DProbe(0)
+    local layered_window := RabbitStatusTipLayeredWindowProbe(0)
+    local tip := RabbitStartMenuStatusTipProbe(
+        RabbitUIStyleSnapshot(),
+        RabbitConfigSnapshot(Map("show_tips_time", 1000)),
+        (*) => d2d,
+        (*) => layered_window,
+        (*) => RabbitStatusTipGuiProbe()
+    )
+    try {
+        tip.Show("西")
+        AssertEqual(
+            300 - RabbitPopupPlacement.GAP - tip.box_width,
+            layered_window.x,
+            "The Start menu status tip did not use the nearest outside edge."
+        )
+        AssertEqual(400, layered_window.y, "The Start menu status tip did not align with the caret.")
+    } finally {
+        tip.Dispose()
+    }
+}
+
 class RabbitStatusTipProbe extends RabbitStatusTip {
     GetAnchor() {
         return {
@@ -121,6 +146,17 @@ class RabbitStatusTipProbe extends RabbitStatusTip {
     GetSavedOrCreateIconBitmap(icon_path, icon_size) {
         this.loaded_icon_size := icon_size
         return 1
+    }
+}
+
+class RabbitStartMenuStatusTipProbe extends RabbitStatusTipProbe {
+    GetAnchor() {
+        return {
+            mode: "start_menu",
+            anchor_rect: { left: 300, top: 200, right: 700, bottom: 600 },
+            caret: { x: 320, y: 400, w: 2, h: 20 },
+            monitor_info: { work: { left: 0, top: 0, right: 1000, bottom: 800 } }
+        }
     }
 }
 
@@ -208,6 +244,8 @@ class RabbitStatusTipLayeredWindowProbe {
     Update(wic_bitmap, width, height, x, y) {
         RabbitStatusTipLayeredWindowProbe.events.Push("update")
         this.update_calls++
+        this.x := x
+        this.y := y
     }
 
     Dispose() {
