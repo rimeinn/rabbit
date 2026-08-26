@@ -856,13 +856,13 @@ class RabbitInputController {
     }
 
     UpdateCandidate(context, candidate_revision, hide_candidate) {
-        local info, caret_x, caret_y, caret_w, caret_h
-        local backup_mouse_ref, mouse_x, mouse_y, placement
+        local info, caret_x, caret_y, caret_w, caret_h, hmon
+        local backup_mouse_ref, mouse_x, mouse_y, placement, start_menu, start_menu_rect, start_menu_caret
         if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
             placement := { mode: "hide" }
         } else {
             DetectHiddenWindows True
-            local start_menu := WinActive(
+            start_menu := WinActive(
                 "ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe"
             )
                 || WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
@@ -871,11 +871,31 @@ class RabbitInputController {
             if start_menu
                 && (hmon := MonitorManage.MonitorFromWindow(start_menu))
                 && (info := MonitorManage.GetMonitorInfo(hmon)) {
-                placement := {
-                    mode: "top_left",
-                    x: info.work.left + 4,
-                    y: info.work.top + 4,
-                    monitor_info: info
+                start_menu_rect := RabbitPopupPlacement.GetVisibleWindowBounds(start_menu)
+                if RabbitPopupPlacement.IsUsableAnchorRect(start_menu_rect, info) {
+                    start_menu_caret := 0
+                    if RabbitGetCaretPos(
+                        &caret_x,
+                        &caret_y,
+                        &caret_w,
+                        &caret_h,
+                        this.config.use_caret_hook
+                    ) {
+                        start_menu_caret := { x: caret_x, y: caret_y, w: caret_w, h: caret_h }
+                    }
+                    placement := {
+                        mode: "start_menu",
+                        anchor_rect: start_menu_rect,
+                        caret: start_menu_caret,
+                        monitor_info: info
+                    }
+                } else {
+                    placement := {
+                        mode: "top_left",
+                        x: info.work.left + RabbitPopupPlacement.GAP,
+                        y: info.work.top + RabbitPopupPlacement.GAP,
+                        monitor_info: info
+                    }
                 }
             } else if RabbitGetCaretPos(
                 &caret_x,
@@ -926,6 +946,24 @@ class RabbitInputController {
                 }
                 this.prev_x := placement.x
                 this.prev_y := placement.y
+            case "start_menu":
+                info := placement.monitor_info
+                this.BuildCandidate(context, &box_width, &box_height, info)
+                position := RabbitPopupPlacement.PlaceOutsideRect(
+                    placement.anchor_rect,
+                    box_width,
+                    box_height,
+                    info,
+                    placement.caret
+                )
+                if !hide_candidate {
+                    if HasMethod(this.candidate_box, "SetFlowAnimationAnchor") {
+                        this.candidate_box.SetFlowAnimationAnchor(position.above)
+                    }
+                    this.candidate_box.Show(position.x, position.y)
+                }
+                this.prev_x := position.x
+                this.prev_y := position.y
             case "caret":
                 info := placement.monitor_info
                 this.BuildCandidate(context, &box_width, &box_height, info, placement)

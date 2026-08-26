@@ -36,6 +36,7 @@ RunTest("non-text target tracks replay pairing", TestNonTextTargetTracksReplayPa
 RunTest("non-text key-up without a replay mark is safe", TestNoTargetUpWithoutReplayMarkIsSafe.Bind())
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("candidate placement uses the floating preedit bottom", TestFloatingPreeditCandidatePlacement.Bind())
+RunTest("Start placement forwards upward flow anchoring", TestStartPlacementForwardsUpwardFlow.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
@@ -484,6 +485,30 @@ TestNonTextTargetBypassesRimeInput() {
     AssertEqual("A", input.replayed_keys[1].key, "The wrong key was replayed to the target.")
 }
 
+TestStartPlacementForwardsUpwardFlow() {
+    local candidate_box := RabbitInputPlacementCandidateProbe(0)
+    local input := RabbitInputController(
+        {},
+        1,
+        candidate_box,
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    local placement := {
+        mode: "start_menu",
+        anchor_rect: { left: 100, top: 200, right: 900, bottom: 590 },
+        caret: { x: 430, y: 260, w: 2, h: 20 },
+        monitor_info: { work: { left: 0, top: 0, right: 1000, bottom: 600 } }
+    }
+
+    input.ApplyCandidateUpdate({}, placement, false)
+
+    AssertEqual(430, candidate_box.show_x, "The above-Start popup did not align with the caret.")
+    AssertEqual(146, candidate_box.show_y, "The above-Start popup used the wrong vertical position.")
+    AssertTrue(candidate_box.flow_anchor_bottom, "The above-Start popup did not flip flow expansion.")
+}
+
 TestTypeAheadTargetUsesRimeInput() {
     local rime := RabbitKeyReplayRimeProbe([true])
     local candidate_box := RabbitInputCandidateProbe()
@@ -679,6 +704,7 @@ class RabbitInputPlacementCandidateProbe {
         this.received_caret_bottom := 0
         this.show_x := 0
         this.show_y := 0
+        this.flow_anchor_bottom := false
     }
 
     Build(context, &width, &height) {
@@ -692,6 +718,7 @@ class RabbitInputPlacementCandidateProbe {
     }
 
     SetFlowAnimationAnchor(anchor_bottom) {
+        this.flow_anchor_bottom := anchor_bottom
     }
 
     Show(x, y) {
