@@ -50,9 +50,9 @@ class RabbitFloatingPreedit {
             this.layered_window := RabbitLayeredWindow(this.gui.Hwnd)
             this.dpi_scale := this.d2d.GetDesktopDpiScale()
             this.UpdateStyle(style)
-        } catch as error {
+        } catch as err {
             this.Dispose()
-            throw error
+            throw err
         }
     }
 

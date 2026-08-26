@@ -80,9 +80,9 @@ class CandidateBox {
             this.layered_window := RabbitLayeredWindow(this.gui.Hwnd)
             this.dpiScale := this.d2d.GetDesktopDpiScale()
             this.UpdateStyle(style)
-        } catch as error {
+        } catch as err {
             this.Dispose()
-            throw error
+            throw err
         }
     }
 
@@ -210,9 +210,9 @@ class CandidateBox {
                 this.floating_preedit := RabbitFloatingPreedit(this.style, this.d2d_constructor)
             }
             this.floating_preedit.Build(presentation.preedit, caret_x, caret_y, caret_w, caret_h)
-        } catch as error {
+        } catch as err {
             this.floating_preedit_failed := true
-            this.floating_preedit_error := error.Message
+            this.floating_preedit_error := err.Message
             if this.floating_preedit {
                 this.floating_preedit.Hide()
             }

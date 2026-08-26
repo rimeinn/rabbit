@@ -34,9 +34,9 @@ class LegacyCandidateBox {
 
         try {
             this.UpdateStyle(style)
-        } catch as error {
+        } catch as err {
             this.Dispose()
-            throw error
+            throw err
         }
     }
 

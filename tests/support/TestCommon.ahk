@@ -25,12 +25,12 @@ RunTest(name, test, failure_reporter := 0) {
     global test_failure_count
     try {
         test.Call()
-    } catch as error {
+    } catch as err {
         test_failure_count += 1
         if failure_reporter {
-            failure_reporter.Call(name, error)
+            failure_reporter.Call(name, err)
         } else {
-            TestReportFailure(name, error)
+            TestReportFailure(name, err)
         }
         return false
     }
@@ -38,10 +38,10 @@ RunTest(name, test, failure_reporter := 0) {
     return true
 }
 
-TestUnhandledError(error, *) {
+TestUnhandledError(err, *) {
     global test_failure_count
     test_failure_count += 1
-    TestReportFailure("unhandled test error", error)
+    TestReportFailure("unhandled test error", err)
     ExitApp(1)
     return true
 }
@@ -53,29 +53,29 @@ TestExit(exit_reason, exit_code) {
     }
 }
 
-TestReportFailure(name, error) {
+TestReportFailure(name, err) {
     local message := "FAIL: " . name . "`n"
-    if !IsObject(error) {
-        TestWrite(message . "  Error: " . error . "`n")
+    if !IsObject(err) {
+        TestWrite(message . "  Error: " . err . "`n")
         return
     }
-    if HasProp(error, "Message") {
-        message .= "  Error: " . error.Message . "`n"
+    if HasProp(err, "Message") {
+        message .= "  Error: " . err.Message . "`n"
     } else {
-        message .= "  Error: " . Type(error) . "`n"
+        message .= "  Error: " . Type(err) . "`n"
     }
-    if HasProp(error, "What") && error.What {
-        message .= "  What: " . error.What . "`n"
+    if HasProp(err, "What") && err.What {
+        message .= "  What: " . err.What . "`n"
     }
-    if HasProp(error, "File") && error.File {
-        message .= "  Location: " . error.File
-        if HasProp(error, "Line") && error.Line {
-            message .= ":" . error.Line
+    if HasProp(err, "File") && err.File {
+        message .= "  Location: " . err.File
+        if HasProp(err, "Line") && err.Line {
+            message .= ":" . err.Line
         }
         message .= "`n"
     }
-    if HasProp(error, "Stack") && error.Stack {
-        message .= "  Stack:`n" . error.Stack . "`n"
+    if HasProp(err, "Stack") && err.Stack {
+        message .= "  Stack:`n" . err.Stack . "`n"
     }
     TestWrite(message)
 }
@@ -83,7 +83,7 @@ TestReportFailure(name, error) {
 TestWrite(message) {
     try {
         FileAppend(message, "*")
-    } catch as error {
+    } catch as err {
         ; A GUI-launched test has no inherited stdout handle.  Preserve the
         ; original test outcome and leave its report available to a debugger.
         OutputDebug(message)

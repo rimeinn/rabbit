@@ -53,9 +53,9 @@ class RabbitStatusTip {
             this.layered_window := layered_window_constructor.Call(this.gui.Hwnd)
             this.dpi_scale := this.d2d.GetDesktopDpiScale()
             this.UpdateStyle(style)
-        } catch as error {
+        } catch as err {
             this.Dispose()
-            throw error
+            throw err
         }
     }
 

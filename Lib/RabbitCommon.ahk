@@ -163,7 +163,7 @@ RabbitLogPath() {
 }
 
 RabbitCleanOldLogs() {
-    local app_name, dir, files, file
+    local app_name, dir, files, log_path
     app_name := "rime.rabbit"
     dir := RabbitLogPath()
     if !DirExist(dir) {
@@ -181,9 +181,9 @@ RabbitCleanOldLogs() {
         }
     }
 
-    for file in files {
+    for log_path in files {
         try {
-            FileDelete(file)
+            FileDelete(log_path)
         }
     }
 }

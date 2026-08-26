@@ -60,7 +60,7 @@ class DictManagementDialog extends Gui {
     }
 
     OnBackup() {
-        local file
+        local backup_path
         local sel := this.dict_list.Value
         if sel <= 0 || sel > ControlGetItems(this.dict_list).Length {
             MsgBox("请在左列选择要导出的词典名称。", ":-(", "Ok Iconi")
@@ -78,15 +78,15 @@ class DictManagementDialog extends Gui {
         }
 
         local dict_name := this.dict_list.Text
-        file := path . "\" . dict_name . ".userdb.txt"
+        backup_path := path . "\" . dict_name . ".userdb.txt"
         if !this.api.backup_user_dict(dict_name) {
             MsgBox("不知哪里出错了，未能完成导出操作。", ":-(", "Ok Iconx")
             return
-        } else if !FileExist(file) {
+        } else if !FileExist(backup_path) {
             MsgBox("咦，输出的快照文件找不着了。", ":-(", "Ok Iconx")
             return
         }
-        Run(A_ComSpec . " /c explorer.exe /select,`"" . file . "`"", , "Hide")
+        Run(A_ComSpec . " /c explorer.exe /select,`"" . backup_path . "`"", , "Hide")
     }
 
     OnRestore() {

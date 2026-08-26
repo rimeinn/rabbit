@@ -45,6 +45,6 @@ TestThrowCallbackException() {
     throw Error("callback exception")
 }
 
-TestCaptureFailure(reported, name, error) {
-    reported.Push(name . ": " . error.Message)
+TestCaptureFailure(reported, name, err) {
+    reported.Push(name . ": " . err.Message)
 }

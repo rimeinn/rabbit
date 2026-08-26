@@ -184,8 +184,9 @@ end:
             if !wpfCaret.Ptr
                 return false
 
-            ComCall(75, wpfCaret, "ptr", rect := Buffer(16)) ; wpfCaret->get_CachedBoundingRectangle(&rect);
-            getRect(rect, &left, &top, &right, &bottom)
+            ; wpfCaret->get_CachedBoundingRectangle(&bounding_rect);
+            ComCall(75, wpfCaret, "ptr", bounding_rect := Buffer(16))
+            getRect(bounding_rect, &left, &top, &right, &bottom)
             return true
         } catch {
             return false
@@ -241,10 +242,23 @@ end:
         if !DllCall("GetExitCodeThread", "ptr", hThread, "uint*", exitCode := 0) || exitCode !== 0
             return false
 
-        rect := Buffer(16)
-        if !DllCall("ReadProcessMemory", "ptr", hProcess, "ptr", pRect, "ptr", rect, "uptr", rect.Size, "uptr*", &bytesRead := 0) || bytesRead !== rect.Size
+        caret_rect := Buffer(16)
+        if !DllCall(
+            "ReadProcessMemory",
+            "ptr",
+            hProcess,
+            "ptr",
+            pRect,
+            "ptr",
+            caret_rect,
+            "uptr",
+            caret_rect.Size,
+            "uptr*",
+            &bytesRead := 0
+        ) || bytesRead !== caret_rect.Size {
             return false
-        getRect(rect, &left, &top, &right, &bottom)
+        }
+        getRect(caret_rect, &left, &top, &right, &bottom)
         physicalToScreenRect(hwnd, &left, &top, &right, &bottom)
         return true
 
