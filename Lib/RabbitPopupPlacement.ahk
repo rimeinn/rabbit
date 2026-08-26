@@ -97,6 +97,9 @@ class RabbitPopupPlacement {
     static PlaceOutsideRect(anchor, box_w, box_h, monitor_info, caret := 0) {
         local work := monitor_info.work
         local gap := this.GAP
+        local choices
+        local best_choice := 0
+        local choice
         local position
         local align_x := anchor.left
         local align_y := anchor.top
@@ -105,59 +108,98 @@ class RabbitPopupPlacement {
             align_x := caret.x
             align_y := caret.y
             align_bottom := caret.y
+            ; Measure the top from the caret bottom and the bottom from its top.
+            choices := [
+                { side: "left", distance: caret.x - anchor.left },
+                { side: "right", distance: anchor.right - caret.x },
+                { side: "above", distance: caret.y + caret.h - anchor.top },
+                { side: "below", distance: anchor.bottom - caret.y }
+            ]
+        } else {
+            choices := [
+                { side: "right", distance: 0 },
+                { side: "left", distance: 1 },
+                { side: "above", distance: 2 },
+                { side: "below", distance: 3 }
+            ]
         }
-        if work.right - anchor.right >= box_w + gap {
-            position := this.PlaceBesideRect(
-                anchor.right + gap,
-                align_y,
-                align_bottom,
-                box_w,
-                box_h,
-                monitor_info
-            )
-            position.side := "right"
-            return position
+
+        for choice in choices {
+            if !this.CanPlaceOutsideRect(choice.side, anchor, box_w, box_h, work) {
+                continue
+            }
+            if !best_choice || choice.distance < best_choice.distance {
+                best_choice := choice
+            }
         }
-        if anchor.left - work.left >= box_w + gap {
-            position := this.PlaceBesideRect(
-                anchor.left - gap - box_w,
-                align_y,
-                align_bottom,
-                box_w,
-                box_h,
-                monitor_info
-            )
-            position.side := "left"
-            return position
-        }
-        if anchor.top - work.top >= box_h + gap {
-            position := this.ClampToWorkArea(
-                align_x,
-                anchor.top - gap - box_h,
-                box_w,
-                box_h,
-                monitor_info
-            )
-            position.side := "above"
-            position.above := true
-            return position
-        }
-        if work.bottom - anchor.bottom >= box_h + gap {
-            position := this.ClampToWorkArea(
-                align_x,
-                anchor.bottom + gap,
-                box_w,
-                box_h,
-                monitor_info
-            )
-            position.side := "below"
+
+        if !best_choice {
+            position := this.PlaceAtPoint(work.left + gap, work.top + gap, box_w, box_h, monitor_info)
+            position.side := "fallback"
             position.above := false
             return position
         }
-        position := this.PlaceAtPoint(work.left + gap, work.top + gap, box_w, box_h, monitor_info)
-        position.side := "fallback"
-        position.above := false
-        return position
+
+        switch best_choice.side {
+            case "right":
+                position := this.PlaceBesideRect(
+                    anchor.right + gap,
+                    align_y,
+                    align_bottom,
+                    box_w,
+                    box_h,
+                    monitor_info
+                )
+                position.side := "right"
+                return position
+            case "left":
+                position := this.PlaceBesideRect(
+                    anchor.left - gap - box_w,
+                    align_y,
+                    align_bottom,
+                    box_w,
+                    box_h,
+                    monitor_info
+                )
+                position.side := "left"
+                return position
+            case "above":
+                position := this.ClampToWorkArea(
+                    align_x,
+                    anchor.top - gap - box_h,
+                    box_w,
+                    box_h,
+                    monitor_info
+                )
+                position.side := "above"
+                position.above := true
+                return position
+            case "below":
+                position := this.ClampToWorkArea(
+                    align_x,
+                    anchor.bottom + gap,
+                    box_w,
+                    box_h,
+                    monitor_info
+                )
+                position.side := "below"
+                position.above := false
+                return position
+        }
+    }
+
+    static CanPlaceOutsideRect(side, anchor, box_w, box_h, work) {
+        switch side {
+            case "right":
+                return work.right - anchor.right >= box_w + this.GAP
+            case "left":
+                return anchor.left - work.left >= box_w + this.GAP
+            case "above":
+                return anchor.top - work.top >= box_h + this.GAP
+            case "below":
+                return work.bottom - anchor.bottom >= box_h + this.GAP
+        }
+        return false
     }
 
     static IsCaretInsideRect(caret, anchor) {

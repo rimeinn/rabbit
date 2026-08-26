@@ -27,10 +27,12 @@ RunTest("popup placement accounts for floating content when flipping", TestPlace
 RunTest("popup placement clamps horizontal edges", TestPlacementClampsHorizontalEdges.Bind())
 RunTest("popup placement clamps mouse fallback", TestPlacementClampsMouseFallback.Bind())
 RunTest("visible window bounds can be queried", TestVisibleWindowBounds.Bind())
-RunTest("Start popup placement prefers the right side", TestStartPlacementPrefersRight.Bind())
-RunTest("Start popup placement falls back to the left", TestStartPlacementFallsBackLeft.Bind())
-RunTest("Start popup placement flips above", TestStartPlacementFlipsAbove.Bind())
-RunTest("Start popup placement falls back below", TestStartPlacementFallsBackBelow.Bind())
+RunTest("Start popup placement uses the nearest left edge", TestStartPlacementUsesNearestLeftEdge.Bind())
+RunTest("Start popup placement uses the nearest right edge", TestStartPlacementUsesNearestRightEdge.Bind())
+RunTest("Start popup placement uses the nearest top edge", TestStartPlacementUsesNearestTopEdge.Bind())
+RunTest("Start popup placement uses the nearest bottom edge", TestStartPlacementUsesNearestBottomEdge.Bind())
+RunTest("Start popup top distance includes caret height", TestStartTopDistanceIncludesCaretHeight.Bind())
+RunTest("Start popup skips a nearest edge without space", TestStartPlacementSkipsUnavailableEdge.Bind())
 RunTest("Start popup side placement grows upward near the bottom", TestStartSidePlacementGrowsUpward.Bind())
 RunTest("Start popup ignores a caret outside the menu", TestStartPlacementIgnoresOutsideCaret.Bind())
 RunTest("Start popup rejects a full-work-area host", TestStartPlacementRejectsFullWorkAreaHost.Bind())
@@ -93,50 +95,64 @@ TestVisibleWindowBounds() {
     }
 }
 
-TestStartPlacementPrefersRight() {
-    local anchor := { left: 200, top: 100, right: 600, bottom: 500 }
-    local caret := { x: 350, y: 260, w: 2, h: 20 }
-    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TestWorkArea(), caret)
-    AssertEqual("right", position.side, "The popup did not prefer the right side of Start.")
-    AssertEqual(604, position.x, "The right-side popup overlapped Start.")
-    AssertEqual(260, position.y, "The right-side popup did not align with the caret.")
-    AssertTrue(!position.above, "The right-side popup unexpectedly requested upward flow.")
+TestStartPlacementUsesNearestLeftEdge() {
+    local anchor := { left: 300, top: 200, right: 700, bottom: 600 }
+    local caret := { x: 320, y: 400, w: 2, h: 20 }
+    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TallTestWorkArea(), caret)
+    AssertEqual("left", position.side, "The popup did not use the nearest left edge of Start.")
+    AssertEqual(156, position.x, "The left-side popup overlapped Start.")
+    AssertEqual(400, position.y, "The left-side popup did not align with the caret.")
+    AssertTrue(!position.above, "The left-side popup unexpectedly requested upward flow.")
 }
 
-TestStartPlacementFallsBackLeft() {
-    local anchor := { left: 200, top: 100, right: 900, bottom: 500 }
-    local caret := { x: 350, y: 260, w: 2, h: 20 }
-    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TestWorkArea(), caret)
-    AssertEqual("left", position.side, "The popup did not fall back to the left side of Start.")
-    AssertEqual(56, position.x, "The left-side popup overlapped Start.")
-    AssertEqual(260, position.y, "The left-side popup did not align with the caret.")
+TestStartPlacementUsesNearestRightEdge() {
+    local anchor := { left: 300, top: 200, right: 700, bottom: 600 }
+    local caret := { x: 680, y: 400, w: 2, h: 20 }
+    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TallTestWorkArea(), caret)
+    AssertEqual("right", position.side, "The popup did not use the nearest right edge of Start.")
+    AssertEqual(704, position.x, "The right-side popup overlapped Start.")
+    AssertEqual(400, position.y, "The right-side popup did not align with the caret.")
 }
 
-TestStartPlacementFlipsAbove() {
-    local anchor := { left: 100, top: 200, right: 900, bottom: 590 }
-    local caret := { x: 430, y: 260, w: 2, h: 20 }
-    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TestWorkArea(), caret)
-    AssertEqual("above", position.side, "The popup did not fall back above Start.")
-    AssertEqual(430, position.x, "The above-Start popup did not align with the caret.")
+TestStartPlacementUsesNearestTopEdge() {
+    local anchor := { left: 300, top: 200, right: 700, bottom: 600 }
+    local caret := { x: 500, y: 220, w: 2, h: 20 }
+    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TallTestWorkArea(), caret)
+    AssertEqual("above", position.side, "The popup did not use the nearest top edge of Start.")
+    AssertEqual(500, position.x, "The above-Start popup did not align with the caret.")
     AssertEqual(146, position.y, "The above-Start popup did not preserve its lower edge.")
     AssertTrue(position.above, "The above-Start popup did not request upward flow.")
 }
 
-TestStartPlacementFallsBackBelow() {
-    local anchor := { left: 100, top: 50, right: 900, bottom: 200 }
-    local caret := { x: 430, y: 100, w: 2, h: 20 }
-    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TestWorkArea(), caret)
-    AssertEqual("below", position.side, "The popup did not fall back below Start.")
-    AssertEqual(430, position.x, "The below-Start popup did not align with the caret.")
-    AssertEqual(204, position.y, "The below-Start popup overlapped Start.")
+TestStartPlacementUsesNearestBottomEdge() {
+    local anchor := { left: 300, top: 200, right: 700, bottom: 600 }
+    local caret := { x: 500, y: 570, w: 2, h: 20 }
+    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TallTestWorkArea(), caret)
+    AssertEqual("below", position.side, "The popup did not use the nearest bottom edge of Start.")
+    AssertEqual(500, position.x, "The below-Start popup did not align with the caret.")
+    AssertEqual(604, position.y, "The below-Start popup overlapped Start.")
     AssertTrue(!position.above, "The below-Start popup unexpectedly requested upward flow.")
 }
 
+TestStartTopDistanceIncludesCaretHeight() {
+    local anchor := { left: 200, top: 100, right: 800, bottom: 500 }
+    local caret := { x: 500, y: 285, w: 2, h: 50 }
+    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TallTestWorkArea(), caret)
+    AssertEqual("below", position.side, "The top-edge distance ignored the caret height.")
+}
+
+TestStartPlacementSkipsUnavailableEdge() {
+    local anchor := { left: 200, top: 100, right: 600, bottom: 590 }
+    local caret := { x: 550, y: 570, w: 2, h: 20 }
+    local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 50, TestWorkArea(), caret)
+    AssertEqual("right", position.side, "The popup did not use the nearest edge with enough screen space.")
+}
+
 TestStartSidePlacementGrowsUpward() {
-    local anchor := { left: 200, top: 500, right: 600, bottom: 590 }
-    local caret := { x: 350, y: 550, w: 2, h: 20 }
+    local anchor := { left: 200, top: 300, right: 600, bottom: 590 }
+    local caret := { x: 550, y: 550, w: 2, h: 20 }
     local position := RabbitPopupPlacement.PlaceOutsideRect(anchor, 140, 150, TestWorkArea(), caret)
-    AssertEqual("right", position.side, "The bottom-edge popup left the preferred side.")
+    AssertEqual("right", position.side, "The bottom-edge popup left the nearest available side.")
     AssertEqual(400, position.y, "The bottom-edge popup did not align its lower edge with the caret.")
     AssertTrue(position.above, "The bottom-edge popup did not request upward flow.")
 }
@@ -164,4 +180,8 @@ TestStartPlacementRejectsFullWorkAreaHost() {
 
 TestWorkArea() {
     return { work: { left: 0, top: 0, right: 1000, bottom: 600 } }
+}
+
+TallTestWorkArea() {
+    return { work: { left: 0, top: 0, right: 1000, bottom: 800 } }
 }
