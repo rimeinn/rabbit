@@ -26,6 +26,15 @@ try {
 
 `FileAppend ..., "*"` writes the details to stdout, and `ExitApp 1` yields a non-zero exit status, so the failure is visible to the agent. When a runner already provides this boundary (for example `RunTest` in the unit tests), prefer it over hand-rolling the wrapper.
 
+### Preserve release tag signatures
+
+Release tags are part of the repository's release identity and must not be silently weakened for convenience. Therefore:
+
+- When creating or recreating a release tag, preserve the signing policy and signing method used by the existing release tags.
+- MUST NOT replace a signed tag with an unsigned tag, or downgrade to another signing method, merely because signing fails.
+- If signing fails or the signing key is unavailable, stop before creating or pushing the tag, report the failure, and request explicit user approval before using any fallback.
+- Do not delete, force-update, or recreate a tag that has already been pushed without explicit user approval, even if the replacement points to the same commit.
+
 ## Project Structure & Module Organization
 
 Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the main entry point; `RabbitDeployer.ahk` handles installation and maintenance workflows. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml` defines the bundled Rime schema, while `assets/` contains source SVG icons. `Data/` and `Rime/` are generated or runtime data and are intentionally ignored.
