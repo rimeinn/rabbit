@@ -881,7 +881,8 @@ class CandidateBox {
 
     RenderFrame(height) {
         local background_x, background_y, background_width, background_height, background_radius, highlight_width
-        local row_rect, label_color, candidate_color, comment_color, label, cand, comment
+        local row_rect, row_width, row_background
+        local label_color, candidate_color, comment_color, label, cand, comment
         local segment, selected_box, source_y, display_y
         local num_candidates, preedit_layout, candidates_layout, candidate_highlights
         if !this.BeginRender() {
@@ -934,23 +935,26 @@ class CandidateBox {
             ; Draw candidates
             Loop num_candidates {
                 row_rect := candidates_layout.rows[A_Index]
+                row_width := this.layoutType != "stacked" ? row_rect.w : highlight_width
+                row_background := this.candBgColor
                 label_color := this.labelColor
                 candidate_color := this.candTxtColor
                 comment_color := this.commentTxtColor
                 if candidate_highlights[A_Index] { ; Draw highlight if selected
+                    row_background := this.hlCandBgColor
                     label_color := this.hlLabelColor
                     candidate_color := this.hlCandTxtColor
                     comment_color := this.hlCommentTxtColor
-                    this.d2d.FillRoundedRectangle(
-                        row_rect.x,
-                        row_rect.y,
-                        this.layoutType != "stacked" ? row_rect.w : highlight_width,
-                        row_rect.h,
-                        this.hlCornerR,
-                        this.hlCornerR,
-                        this.hlCandBgColor
-                    )
                 }
+                this.d2d.FillRoundedRectangle(
+                    row_rect.x,
+                    row_rect.y,
+                    row_width,
+                    row_rect.h,
+                    this.hlCornerR,
+                    this.hlCornerR,
+                    row_background
+                )
 
                 label := candidates_layout.labels[A_Index]
                 this.DrawLayoutText(label, this.labFont, label_color)

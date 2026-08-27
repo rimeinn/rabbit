@@ -97,7 +97,8 @@ class CandidatePreview {
     Render(candidates, selected_index) {
         local wic_render_target, background_x, background_y, background_width, background_height, background_radius
         local current_y, preedit_text_rect, highlighted_preedit_rect, i, candidate, candidate_color
-        local highlight_x, highlight_y, highlight_width, highlight_height, text_to_draw, candidate_row_rect
+        local highlight_x, highlight_y, highlight_width, highlight_height, candidate_background
+        local text_to_draw, candidate_row_rect
         local new_bitmap, old_bitmap
         local STM_SETIMAGE
         local IMAGE_BITMAP
@@ -188,22 +189,24 @@ class CandidatePreview {
         ; Draw candidates
         for i, candidate in candidates {
             candidate_color := this.candTxtColor
+            highlight_x := this.borderWidth + this.padding / 2
+            highlight_y := current_y - this.lineSpacing / 2
+            highlight_width := this.previewWidth - this.borderWidth * 2 - this.padding
+            highlight_height := this.candSize.h + this.lineSpacing
+            candidate_background := this.candBgColor
             if A_Index == selected_index { ; Draw highlight if selected
                 candidate_color := this.hlCandTxtColor
-                highlight_x := this.borderWidth + this.padding / 2
-                highlight_y := current_y - this.lineSpacing / 2
-                highlight_width := this.previewWidth - this.borderWidth * 2 - this.padding
-                highlight_height := this.candSize.h + this.lineSpacing
-                this.d2d.FillRoundedRectangle(
-                    highlight_x,
-                    highlight_y,
-                    highlight_width,
-                    highlight_height,
-                    this.hlCornerR,
-                    this.hlCornerR,
-                    this.hlCandBgColor
-                )
+                candidate_background := this.hlCandBgColor
             }
+            this.d2d.FillRoundedRectangle(
+                highlight_x,
+                highlight_y,
+                highlight_width,
+                highlight_height,
+                this.hlCornerR,
+                this.hlCornerR,
+                candidate_background
+            )
 
             text_to_draw := i . ". " . candidate
             candidate_row_rect := {

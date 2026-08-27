@@ -79,6 +79,7 @@ RunTest(
         candidate_golden
     )
 )
+RunTest("modern candidate rows use candidate background colors", TestModernCandidateBackgroundColors.Bind(candidate_style))
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
 RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLayout.Bind(candidate_style))
@@ -744,6 +745,80 @@ TestModernFlowCandidateLayout(style) {
     }
 }
 
+TestModernCandidateBackgroundColors(style) {
+    local render_probe := RabbitCandidateRenderProbe()
+    local candidate_box := CandidateBox(style.With(Map(
+        "back_color", 0xff101010,
+        "candidate_back_color", 0xff202020,
+        "hilited_candidate_back_color", 0xff303030
+    )), ReturnCandidateRenderProbe.Bind(render_probe))
+    local width := 200
+    local height := 100
+
+    candidate_box.boxWidth := width
+    candidate_box.boxHeight := height
+    candidate_box.render_width := width
+    candidate_box.render_height := height
+    candidate_box.num_candidates := 2
+    candidate_box.preeditLayout := { selectedBox: 0, segments: [] }
+    candidate_box.candidatesLayout := {
+        labels: [
+            { x: 10, y: 10, w: 12, h: 20, text: "1. " },
+            { x: 10, y: 30, w: 12, h: 20, text: "2. " }
+        ],
+        cands: [
+            { x: 24, y: 10, w: 40, h: 20, text: "普通" },
+            { x: 24, y: 30, w: 40, h: 20, text: "选中" }
+        ],
+        comments: [
+            { x: 64, y: 10, w: 0, h: 20, text: "" },
+            { x: 64, y: 30, w: 0, h: 20, text: "" }
+        ],
+        rows: [
+            { x: 10, y: 10, w: 100, h: 20 },
+            { x: 10, y: 30, w: 100, h: 20 }
+        ]
+    }
+    candidate_box.candidateHighlights := [false, true]
+    candidate_box.visible := true
+    candidate_box.layered_window := RabbitCandidateLayeredWindowProbe()
+
+    try {
+        candidate_box.RenderFrame(height)
+        AssertEqual(
+            1,
+            CountCandidateRenderColor(render_probe, 0xff202020),
+            "The ordinary candidate row did not use candidate_back_color."
+        )
+        AssertEqual(
+            1,
+            CountCandidateRenderColor(render_probe, 0xff303030),
+            "The highlighted candidate row did not retain its highlight background."
+        )
+        AssertEqual(
+            1,
+            CountCandidateRenderColor(render_probe, 0xff101010),
+            "The candidate box did not retain back_color for its base background."
+        )
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+ReturnCandidateRenderProbe(probe, parameters*) {
+    return probe
+}
+
+CountCandidateRenderColor(probe, color) {
+    local count := 0
+    for call in probe.fill_calls {
+        if call.color == color {
+            count++
+        }
+    }
+    return count
+}
+
 TestBackendLifecycle(name, candidate_box, context, style, golden) {
     local first_width, first_height, second_width, second_height
     local updated_width, updated_height, restored_width, restored_height
@@ -1249,6 +1324,53 @@ class RabbitTextMetricsProbe {
     GetMetrics(text, font_face, font_size, options*) {
         this.font_faces.Push(font_face)
         return { w: StrLen(text) * font_size, h: font_size }
+    }
+}
+
+class RabbitCandidateRenderProbe {
+    __New() {
+        this.fill_calls := []
+        this.ID2D1RenderTarget := RabbitCandidateRenderTargetProbe()
+    }
+
+    GetDesktopDpiScale() {
+        return 1
+    }
+
+    SetRenderTarget(parameters*) {
+    }
+
+    BeginDraw() {
+    }
+
+    EndDraw() {
+    }
+
+    PushAxisAlignedClip(parameters*) {
+    }
+
+    PopAxisAlignedClip() {
+    }
+
+    FillRoundedRectangle(x, y, width, height, radius_x, radius_y, color) {
+        this.fill_calls.Push({ x: x, y: y, width: width, height: height, color: color })
+    }
+
+    DrawText(parameters*) {
+    }
+
+    DrawTextWithLayout(parameters*) {
+    }
+}
+
+class RabbitCandidateRenderTargetProbe {
+    GetWICBitmap() {
+        return 1
+    }
+}
+
+class RabbitCandidateLayeredWindowProbe {
+    Update(parameters*) {
     }
 }
 
