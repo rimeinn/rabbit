@@ -351,8 +351,8 @@ class RabbitSettingsWindow extends Gui {
         try {
             Run(link)
             return true
-        } catch as error {
-            MsgBox("无法打开链接：`n" . error.Message, "【玉兔毫】", "Ok Iconx")
+        } catch as err {
+            MsgBox("无法打开链接：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
             return false
         }
     }
@@ -371,12 +371,12 @@ class RabbitSettingsWindow extends Gui {
             try {
                 this.CreateAppearancePreview()
                 this.PreviewAppearance(this.appearance_list.Value)
-            } catch as error {
-                this.appearance_status.Value := "无法显示预览：" . error.Message
+            } catch as err {
+                this.appearance_status.Value := "无法显示预览：" . err.Message
             }
             return true
-        } catch as error {
-            this.appearance_status.Value := error.Message
+        } catch as err {
+            this.appearance_status.Value := err.Message
             return false
         }
     }
@@ -476,8 +476,8 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
             this.UpdateApplyButton()
             return true
-        } catch as error {
-            this.appearance_status.Value := "保存失败：" . error.Message
+        } catch as err {
+            this.appearance_status.Value := "保存失败：" . err.Message
             return false
         } finally {
             this.Opt("-Disabled")
@@ -533,9 +533,9 @@ class RabbitSettingsWindow extends Gui {
         if this.behavior_dirty {
             try {
                 behavior_values := this.GetBehaviorValues()
-            } catch as error {
+            } catch as err {
                 this.SelectPage(3)
-                this.behavior_status.Value := error.Message
+                this.behavior_status.Value := err.Message
                 return false
             }
         }
@@ -601,8 +601,8 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := "所有更改均已保存并部署。"
             this.UpdateApplyButton()
             return true
-        } catch as error {
-            this.footer_status.Value := "保存失败：" . error.Message
+        } catch as err {
+            this.footer_status.Value := "保存失败：" . err.Message
             return false
         } finally {
             this.Opt("-Disabled")
@@ -625,8 +625,8 @@ class RabbitSettingsWindow extends Gui {
             this.behavior_model := this.workflow.CreateBehaviorSettingsModel()
             this.PopulateBehaviorSettings()
             return true
-        } catch as error {
-            this.behavior_status.Value := error.Message
+        } catch as err {
+            this.behavior_status.Value := err.Message
             return false
         }
     }
@@ -680,8 +680,8 @@ class RabbitSettingsWindow extends Gui {
         }
         try {
             values := this.GetBehaviorValues()
-        } catch as error {
-            this.behavior_status.Value := error.Message
+        } catch as err {
+            this.behavior_status.Value := err.Message
             return false
         }
 
@@ -702,8 +702,8 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
             this.UpdateApplyButton()
             return true
-        } catch as error {
-            this.behavior_status.Value := "保存失败：" . error.Message
+        } catch as err {
+            this.behavior_status.Value := "保存失败：" . err.Message
             return false
         } finally {
             this.Opt("-Disabled")
@@ -722,8 +722,8 @@ class RabbitSettingsWindow extends Gui {
             this.application_model := this.workflow.CreateApplicationSettingsModel()
             this.PopulateApplicationSettings()
             return true
-        } catch as error {
-            this.application_status.Value := error.Message
+        } catch as err {
+            this.application_status.Value := err.Message
             return false
         }
     }
@@ -863,8 +863,8 @@ class RabbitSettingsWindow extends Gui {
             this.application_status.Value := "应用适配设置已保存。"
             this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
             return true
-        } catch as error {
-            this.application_status.Value := "保存失败：" . error.Message
+        } catch as err {
+            this.application_status.Value := "保存失败：" . err.Message
             return false
         } finally {
             this.Opt("-Disabled")
@@ -883,8 +883,8 @@ class RabbitSettingsWindow extends Gui {
             this.switcher_model := this.workflow.CreateSwitcherSettingsModel()
             this.PopulateSwitcherSettings()
             return true
-        } catch as error {
-            this.switcher_status.Value := error.Message
+        } catch as err {
+            this.switcher_status.Value := err.Message
             return false
         }
     }
@@ -977,8 +977,8 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := "设置内容将在确认后统一保存和部署。"
             this.UpdateApplyButton()
             return true
-        } catch as error {
-            this.switcher_status.Value := "保存失败：" . error.Message
+        } catch as err {
+            this.switcher_status.Value := "保存失败：" . err.Message
             return false
         } finally {
             this.Opt("-Disabled")
@@ -997,9 +997,9 @@ class RabbitSettingsWindow extends Gui {
             this.dictionary_model := this.workflow.CreateDictionarySettingsModel()
             this.PopulateDictionarySettings()
             return true
-        } catch as error {
+        } catch as err {
             this.dictionary_restore.Enabled := false
-            this.dictionary_status.Value := error.Message
+            this.dictionary_status.Value := err.Message
             return false
         }
     }
@@ -1057,8 +1057,8 @@ class RabbitSettingsWindow extends Gui {
             this.dictionary_status.Value := "词典快照已输出。"
             Run("explorer.exe /select,`"" . file . "`"")
             return true
-        } catch as error {
-            this.dictionary_status.Value := error.Message
+        } catch as err {
+            this.dictionary_status.Value := err.Message
             return false
         }
     }
@@ -1080,8 +1080,8 @@ class RabbitSettingsWindow extends Gui {
             }
             this.dictionary_status.Value := "词典快照已合入。"
             return true
-        } catch as error {
-            this.dictionary_status.Value := error.Message
+        } catch as err {
+            this.dictionary_status.Value := err.Message
             return false
         }
     }
@@ -1110,8 +1110,8 @@ class RabbitSettingsWindow extends Gui {
             this.dictionary_status.Value := "已导出 " . result . " 条记录。"
             Run("explorer.exe /select,`"" . selected_path . "`"")
             return true
-        } catch as error {
-            this.dictionary_status.Value := error.Message
+        } catch as err {
+            this.dictionary_status.Value := err.Message
             return false
         }
     }
@@ -1133,8 +1133,8 @@ class RabbitSettingsWindow extends Gui {
             }
             this.dictionary_status.Value := "已导入 " . result . " 条记录。"
             return true
-        } catch as error {
-            this.dictionary_status.Value := error.Message
+        } catch as err {
+            this.dictionary_status.Value := err.Message
             return false
         }
     }
@@ -1145,8 +1145,8 @@ class RabbitSettingsWindow extends Gui {
         }
         try {
             return this.workflow.DictManagement() = 0
-        } catch as error {
-            MsgBox("未能打开用户词典管理：`n" . error.Message, "【玉兔毫】", "Ok Iconx")
+        } catch as err {
+            MsgBox("未能打开用户词典管理：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
             return false
         }
     }
@@ -1178,8 +1178,8 @@ class RabbitSettingsWindow extends Gui {
             result := action.Call()
             this.operation_status.Value := result = 0 ? success_message : failure_message
             return result = 0
-        } catch as error {
-            this.operation_status.Value := failure_message . " " . error.Message
+        } catch as err {
+            this.operation_status.Value := failure_message . " " . err.Message
             return false
         } finally {
             this.Opt("-Disabled")

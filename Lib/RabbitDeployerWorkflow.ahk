@@ -221,8 +221,8 @@ class RabbitDeployerWorkflow {
             dialog.Show()
             WinWaitClose(dialog)
             result := 0
-        } catch as error {
-            MsgBox("未能打开用户词典管理：`n" . error.Message, "【玉兔毫】", "Ok Iconx")
+        } catch as err {
+            MsgBox("未能打开用户词典管理：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
         } finally {
             try {
                 if dialog {

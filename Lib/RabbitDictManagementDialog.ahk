@@ -79,8 +79,8 @@ class DictManagementDialog extends Gui {
                 return
             }
             Run(A_ComSpec . " /c explorer.exe /select,`"" . backup_path . "`"", , "Hide")
-        } catch as error {
-            MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
+        } catch as err {
+            MsgBox(err.Message, "【玉兔毫】", "Ok Iconx")
         }
     }
 
@@ -94,8 +94,8 @@ class DictManagementDialog extends Gui {
                 } else {
                     MsgBox("完成了。", ":-)", "Ok Iconi")
                 }
-            } catch as error {
-                MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
+            } catch as err {
+                MsgBox(err.Message, "【玉兔毫】", "Ok Iconx")
             }
         }
     }
@@ -124,8 +124,8 @@ class DictManagementDialog extends Gui {
                     MsgBox("导出了 " . result . " 条记录。", ":-)", "Ok Iconi")
                     Run(A_ComSpec . " /c explorer.exe /select,`"" . selected_path . "`"", , "Hide")
                 }
-            } catch as error {
-                MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
+            } catch as err {
+                MsgBox(err.Message, "【玉兔毫】", "Ok Iconx")
             }
         }
     }
@@ -142,8 +142,8 @@ class DictManagementDialog extends Gui {
                 } else {
                     MsgBox("导入了 " . result . " 条记录。", ":-)", "Ok Iconi")
                 }
-            } catch as error {
-                MsgBox(error.Message, "【玉兔毫】", "Ok Iconx")
+            } catch as err {
+                MsgBox(err.Message, "【玉兔毫】", "Ok Iconx")
             }
         }
     }
