@@ -137,7 +137,8 @@ TestSettingsWindowSavesAppearanceSettings() {
 
 TestSettingsWindowExposesAppearanceControls() {
     local calls := []
-    local color_details_y, color_list_height, height_label_width, opacity_label_width
+    local color_details_y, color_list_height, color_list_width
+    local font_group_width, height_label_width, layout_group_width, opacity_label_width, tabs_width
     local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
     try {
         AssertEqual(1, window.appearance_tabs.Value, "The appearance page did not start on the color tab.")
@@ -145,27 +146,51 @@ TestSettingsWindowExposesAppearanceControls() {
             !HasProp(window, "appearance_preview_img"),
             "The appearance page retained its embedded bitmap preview."
         )
-        window.appearance_list.GetPos(, , , &color_list_height)
+        window.appearance_tabs.GetPos(, , &tabs_width)
+        window.appearance_list.GetPos(, , &color_list_width, &color_list_height)
         window.appearance_details.GetPos(, &color_details_y)
+        AssertEqual(570, tabs_width, "The appearance tabs did not fill the main content width.")
+        AssertTrue(color_list_width >= 500, "The color scheme list did not use the available width.")
         AssertTrue(color_list_height >= 260, "The color scheme list did not fill the color tab.")
         AssertEqual(528, color_details_y, "The color scheme details did not follow the enlarged list.")
         window.appearance_tabs.Choose(2)
         window.OnAppearanceTabChanged()
         AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")
         AssertTrue(!window.appearance_list.Visible, "The typography tab left color controls visible.")
+        window.appearance_font_group.GetPos(, , &font_group_width)
+        window.appearance_layout_group.GetPos(, , &layout_group_width)
+        AssertTrue(font_group_width >= 530, "The font group did not fill the appearance tab.")
+        AssertTrue(layout_group_width >= 530, "The layout group did not fill the appearance tab.")
         window.appearance_floating_opacity_label.GetPos(, , &opacity_label_width)
         window.appearance_floating_height_label.GetPos(, , &height_label_width)
         AssertTrue(opacity_label_width >= 72, "The floating opacity label remained too narrow.")
         AssertTrue(height_label_width >= 72, "The floating height label remained too narrow.")
+        AssertEqual(
+            "候选及高亮圆角：",
+            window.appearance_round_corner_label.Text,
+            "The candidate and highlight corner label is inaccurate."
+        )
+        AssertTrue(window.appearance_min_width.Enabled, "Stacked layout did not enable its minimum width.")
+        AssertTrue(!window.appearance_min_height.Enabled, "Stacked layout enabled vertical text minimum height.")
 
         window.appearance_layout_type.Choose(2)
         window.OnAppearanceControlsChanged()
         AssertTrue(window.appearance_align_type.Enabled, "Flow layout did not enable alignment.")
         AssertTrue(window.appearance_flow_rows.Enabled, "Flow layout did not enable expanded pages.")
+        AssertTrue(!window.appearance_min_width.Enabled, "Flow layout enabled stacked minimum width.")
+        AssertTrue(!window.appearance_min_height.Enabled, "Flow layout enabled vertical text minimum height.")
         AssertTrue(
             !window.appearance_vertical_direction.Enabled,
             "Flow layout enabled the vertical text direction setting."
         )
+
+        window.appearance_layout_type.Choose(3)
+        window.OnAppearanceControlsChanged()
+        AssertTrue(!window.appearance_min_width.Enabled, "Vertical text layout enabled stacked minimum width.")
+        AssertTrue(window.appearance_min_height.Enabled, "Vertical text layout did not enable its minimum height.")
+
+        window.appearance_layout_type.Choose(2)
+        window.OnAppearanceControlsChanged()
 
         window.appearance_floating_preedit.Value := true
         window.OnAppearanceControlsChanged()
