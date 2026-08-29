@@ -19,11 +19,15 @@
 #Include RabbitAppearancePreview.ahk
 #Include RabbitCommon.ahk
 #Include RabbitApplicationSettingsModel.ahk
+#Include RabbitKeyBindingDialog.ahk
 
 class RabbitSettingsWindow extends Gui {
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 660
+    static BEHAVIOR_HEIGHT := 660
     static COMPACT_HEIGHT := 500
+    static SWITCH_ACTION_VALUES := ["noop", "inline_ascii", "commit_text", "commit_code", "clear"]
+    static SWITCH_ACTION_LABELS := ["不切换", "临时英文", "提交文字", "提交编码", "清空输入"]
     static pages := [
         { title: "外观", description: "配置候选窗口的配色和排版。" },
         { title: "输入方案", description: "选择输入方案并设置方案选单快捷键。" },
@@ -40,6 +44,7 @@ class RabbitSettingsWindow extends Gui {
         preview_factory := RabbitAppearancePreview,
         close_prompt := 0
     ) {
+        local controls, key
         local page_names := []
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】设置", this)
         this.workflow := workflow
@@ -57,6 +62,7 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_model := 0
         this.behavior_loading := false
         this.behavior_dirty := false
+        this.bindings := []
         this.application_model := 0
         this.application_rules := Map()
         this.application_changes := Map()
@@ -267,21 +273,103 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
         this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
 
-        this.behavior_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入与行为")
-        this.show_tips := this.AddCheckbox("x254 y174 w230 h24 Hidden", "显示输入状态提示")
+        this.behavior_tabs := this.AddTab3("x230 y136 w570 h450 Hidden", ["常规", "快捷键"])
+        this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
+        this.behavior_group := this.behavior_tabs
+
+        this.behavior_tabs.UseTab(1)
+        this.behavior_rabbit_group := this.AddGroupBox("x246 y170 w538 h140 Hidden", "玉兔毫行为")
+        this.show_tips := this.AddCheckbox("x260 y196 w190 h24 Hidden", "显示输入状态提示")
         this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.show_tips_time_label := this.AddText("x526 y176 w120 h22 Hidden", "显示时长（毫秒）：")
-        this.show_tips_time := this.AddEdit("x650 y172 w100 r1 Number -Multi Hidden")
+        this.show_tips_time_label := this.AddText("x478 y198 w130 h22 Hidden", "显示时长（毫秒）：")
+        this.show_tips_time := this.AddEdit("x612 y194 w80 r1 Number -Multi Hidden")
         this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.global_ascii := this.AddCheckbox("x254 y214 w496 h24 Hidden", "在所有程序之间共享中西文状态")
+        this.global_ascii := this.AddCheckbox("x260 y228 w490 h24 Hidden", "在所有程序之间共享中西文状态")
         this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.fix_candidate_box := this.AddCheckbox("x254 y254 w496 h24 Hidden", "组字时保持候选窗位置不变")
+        this.fix_candidate_box := this.AddCheckbox("x260 y258 w238 h24 Hidden", "组字时保持候选窗位置不变")
         this.fix_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.use_legacy_candidate_box := this.AddCheckbox("x254 y294 w496 h24 Hidden", "使用旧版候选窗")
+        this.use_legacy_candidate_box := this.AddCheckbox("x510 y258 w238 h24 Hidden", "使用旧版候选窗")
         this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.bypass_password_fields := this.AddCheckbox("x254 y334 w496 h24 Hidden", "在密码输入框中绕过 Rime")
+        this.bypass_password_fields := this.AddCheckbox("x260 y284 w490 h24 Hidden", "在密码输入框中绕过 Rime")
         this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.behavior_status := this.AddText("x254 y382 w496 h28 Hidden", "")
+
+        this.ascii_switch_group := this.AddGroupBox("x246 y316 w538 h142 Hidden", "中西文切换键")
+        this.ascii_switch_controls := Map()
+        this.AddAsciiSwitchControl("Shift_L", "左 Shift：", 260, 342)
+        this.AddAsciiSwitchControl("Shift_R", "右 Shift：", 432, 342)
+        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 342)
+        this.AddAsciiSwitchControl("Control_L", "左 Ctrl：", 260, 382)
+        this.AddAsciiSwitchControl("Control_R", "右 Ctrl：", 432, 382)
+        this.AddAsciiSwitchControl("Eisu_toggle", "英数键：", 604, 382)
+
+        this.menu_group := this.AddGroupBox("x246 y464 w538 h104 Hidden", "候选与翻页")
+        this.menu_page_size_label := this.AddText("x260 y490 w88 h22 Hidden", "每页候选数：")
+        this.menu_page_size := this.AddEdit("x350 y486 w68 r1 Number -Multi Hidden")
+        this.SetEditCue(this.menu_page_size, "5")
+        this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.menu_labels_label := this.AddText("x438 y490 w90 h22 Hidden", "候选序号：")
+        this.menu_labels := this.AddEdit("x530 y486 w236 r1 -Multi Hidden")
+        this.SetEditCue(this.menu_labels, "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
+        this.menu_labels.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.menu_help := this.AddText(
+            "x260 y520 w506 h36 cGray Hidden",
+            "此处修改全局 default.custom.yaml；具体输入方案仍可覆盖候选设置。候选序号请用逗号分隔。"
+        )
+
+        this.behavior_tabs.UseTab(2)
+        this.binding_list := this.AddListView(
+            "x250 y174 w530 h294 -Multi NoSort Hidden",
+            ["接收按键", "生效条件", "动作"]
+        )
+        this.binding_list.OnEvent("DoubleClick", (ctrl, row) => this.EditBinding(row))
+        this.binding_add := this.AddButton("x250 y478 w86 h32 Hidden", "添加")
+        this.binding_add.OnEvent("Click", (*) => this.AddBinding())
+        this.binding_edit := this.AddButton("x344 y478 w86 h32 Hidden", "编辑")
+        this.binding_edit.OnEvent("Click", (*) => this.EditBinding())
+        this.binding_delete := this.AddButton("x438 y478 w86 h32 Hidden", "删除")
+        this.binding_delete.OnEvent("Click", (*) => this.DeleteBinding())
+        this.binding_up := this.AddButton("x532 y478 w86 h32 Hidden", "上移")
+        this.binding_up.OnEvent("Click", (*) => this.MoveBinding(-1))
+        this.binding_down := this.AddButton("x626 y478 w86 h32 Hidden", "下移")
+        this.binding_down.OnEvent("Click", (*) => this.MoveBinding(1))
+        this.binding_help := this.AddText(
+            "x250 y520 w530 h48 cGray Hidden",
+            "这里显示当前生效的完整列表。修改后，default.custom.yaml 将完整接管此列表；" .
+                "要恢复默认值，请手动删除对应的 custom 配置。"
+        )
+        this.behavior_tabs.UseTab()
+
+        this.behavior_common_controls := [
+            this.behavior_rabbit_group,
+            this.show_tips,
+            this.show_tips_time_label,
+            this.show_tips_time,
+            this.global_ascii,
+            this.fix_candidate_box,
+            this.use_legacy_candidate_box,
+            this.bypass_password_fields,
+            this.ascii_switch_group,
+            this.menu_group,
+            this.menu_page_size_label,
+            this.menu_page_size,
+            this.menu_labels_label,
+            this.menu_labels,
+            this.menu_help,
+        ]
+        for key, controls in this.ascii_switch_controls {
+            this.behavior_common_controls.Push(controls.label)
+            this.behavior_common_controls.Push(controls.dropdown)
+        }
+        this.behavior_binding_controls := [
+            this.binding_list,
+            this.binding_add,
+            this.binding_edit,
+            this.binding_delete,
+            this.binding_up,
+            this.binding_down,
+            this.binding_help,
+        ]
+        this.behavior_status := this.AddText("x230 y588 w570 h24 Hidden", "")
 
         this.application_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "应用适配")
         this.application_list := this.AddListView(
@@ -372,6 +460,32 @@ class RabbitSettingsWindow extends Gui {
         this.SelectPage(1)
     }
 
+    AddAsciiSwitchControl(key, label, x, y) {
+        local label_ctrl := this.AddText(Format("x{} y{} w68 h22 Hidden", x, y), label)
+        local dropdown := this.AddDropDownList(
+            Format("x{} y{} w96 Choose1 Hidden", x + 68, y - 4),
+            RabbitSettingsWindow.SWITCH_ACTION_LABELS
+        )
+        dropdown.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.ascii_switch_controls[key] := { label: label_ctrl, dropdown: dropdown }
+    }
+
+    SetEditCue(ctrl, text) {
+        static EM_SETCUEBANNER := 0x1501
+        DllCall(
+            "User32\SendMessageW",
+            "Ptr",
+            ctrl.Hwnd,
+            "UInt",
+            EM_SETCUEBANNER,
+            "Ptr",
+            true,
+            "WStr",
+            text,
+            "Ptr"
+        )
+    }
+
     SelectPage(index) {
         local page
         if index < 1 || index > RabbitSettingsWindow.pages.Length {
@@ -415,9 +529,10 @@ class RabbitSettingsWindow extends Gui {
         if !index {
             index := this.selected_page
         }
-        return index = 1
-            ? RabbitSettingsWindow.APPEARANCE_HEIGHT
-            : RabbitSettingsWindow.COMPACT_HEIGHT
+        if index = 1 {
+            return RabbitSettingsWindow.APPEARANCE_HEIGHT
+        }
+        return index = 3 ? RabbitSettingsWindow.BEHAVIOR_HEIGHT : RabbitSettingsWindow.COMPACT_HEIGHT
     }
 
     ResizeForPage(index := 0) {
@@ -493,15 +608,24 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SetBehaviorVisible(visible) {
-        this.behavior_group.Visible := visible
-        this.show_tips.Visible := visible
-        this.show_tips_time_label.Visible := visible
-        this.show_tips_time.Visible := visible
-        this.global_ascii.Visible := visible
-        this.fix_candidate_box.Visible := visible
-        this.use_legacy_candidate_box.Visible := visible
-        this.bypass_password_fields.Visible := visible
+        this.behavior_tabs.Visible := visible
+        this.SetBehaviorTabControlsVisible(visible)
         this.behavior_status.Visible := visible
+    }
+
+    SetBehaviorTabControlsVisible(visible) {
+        local common_visible := visible && this.behavior_tabs.Value = 1
+        local bindings_visible := visible && this.behavior_tabs.Value = 2
+        for ctrl in this.behavior_common_controls {
+            ctrl.Visible := common_visible
+        }
+        for ctrl in this.behavior_binding_controls {
+            ctrl.Visible := bindings_visible
+        }
+    }
+
+    OnBehaviorTabChanged() {
+        this.SetBehaviorTabControlsVisible(this.selected_page = 3)
     }
 
     SetApplicationVisible(visible) {
@@ -1112,6 +1236,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     PopulateBehaviorSettings() {
+        local controls, key
         this.behavior_loading := true
         try {
             this.show_tips.Value := this.behavior_model.show_tips
@@ -1120,6 +1245,16 @@ class RabbitSettingsWindow extends Gui {
             this.fix_candidate_box.Value := this.behavior_model.fix_candidate_box
             this.use_legacy_candidate_box.Value := this.behavior_model.use_legacy_candidate_box
             this.bypass_password_fields.Value := this.behavior_model.bypass_password_fields
+            for key, controls in this.ascii_switch_controls {
+                controls.dropdown.Choose(this.SwitchActionIndex(this.behavior_model.switch_key[key]))
+            }
+            this.menu_page_size.Value := this.behavior_model.page_size
+            this.menu_labels.Value := RabbitBehaviorSettingsModel.Join(
+                this.behavior_model.alternative_select_labels,
+                ", "
+            )
+            this.bindings := this.behavior_model.GetBindings()
+            this.RefreshBindingList()
             this.show_tips_time.Enabled := !!this.show_tips.Value
             this.behavior_dirty := false
             this.behavior_status.Value := ""
@@ -1139,9 +1274,27 @@ class RabbitSettingsWindow extends Gui {
     }
 
     GetBehaviorValues() {
+        local controls, key, label
+        local labels := []
+        local page_size := Trim(this.menu_page_size.Value)
         local show_tips_time := Trim(this.show_tips_time.Value)
         if !RegExMatch(show_tips_time, "^\d+$") || Number(show_tips_time) > 2147483647 {
             throw ValueError("状态提示显示时长必须是非负整数。")
+        }
+        if !page_size {
+            page_size := "5"
+        }
+        if !RegExMatch(page_size, "^\d+$") || Number(page_size) < 1 || Number(page_size) > 10 {
+            throw ValueError("每页候选数必须是 1 到 10 之间的整数。")
+        }
+        Loop Parse this.menu_labels.Value, "," {
+            if (label := Trim(A_LoopField)) {
+                labels.Push(label)
+            }
+        }
+        local switch_key := Map()
+        for key, controls in this.ascii_switch_controls {
+            switch_key[key] := RabbitSettingsWindow.SWITCH_ACTION_VALUES[controls.dropdown.Value]
         }
         return {
             show_tips: !!this.show_tips.Value,
@@ -1150,6 +1303,10 @@ class RabbitSettingsWindow extends Gui {
             fix_candidate_box: !!this.fix_candidate_box.Value,
             use_legacy_candidate_box: !!this.use_legacy_candidate_box.Value,
             bypass_password_fields: !!this.bypass_password_fields.Value,
+            switch_key: switch_key,
+            page_size: Number(page_size),
+            alternative_select_labels: labels,
+            bindings: RabbitBehaviorSettingsModel.CloneValue(this.bindings),
         }
     }
 
@@ -1664,6 +1821,108 @@ class RabbitSettingsWindow extends Gui {
         } finally {
             this.Opt("-Disabled")
         }
+    }
+
+    SwitchActionIndex(action) {
+        local index, value
+        for index, value in RabbitSettingsWindow.SWITCH_ACTION_VALUES {
+            if value = action {
+                return index
+            }
+        }
+        return 1
+    }
+
+    RefreshBindingList(selected_row := 0) {
+        local action_key, action_value, binding, row
+        this.binding_list.Delete()
+        for binding in this.bindings {
+            action_key := RabbitKeyBindingDialog.FindAction(binding, &action_value)
+            row := this.binding_list.Add(
+                "",
+                binding.Has("accept") ? this.BindingValueText(binding["accept"]) : "",
+                binding.Has("when") ? this.BindingValueText(binding["when"]) : "",
+                action_key ? action_key . ": " . this.BindingValueText(action_value) : ""
+            )
+        }
+        this.binding_list.ModifyCol(1, 150)
+        this.binding_list.ModifyCol(2, 100)
+        this.binding_list.ModifyCol(3, 252)
+        if selected_row && selected_row <= this.bindings.Length {
+            this.binding_list.Modify(selected_row, "Select Focus Vis")
+        }
+    }
+
+    BindingValueText(value) {
+        if value is Map || value is Array {
+            return "…"
+        }
+        return String(value)
+    }
+
+    AddBinding() {
+        local binding := RabbitKeyBindingDialog(this).ShowModal()
+        if !binding {
+            return false
+        }
+        this.bindings.Push(binding)
+        this.RefreshBindingList(this.bindings.Length)
+        this.MarkBindingsDirty()
+        return true
+    }
+
+    EditBinding(row := 0) {
+        local binding
+        if !row {
+            row := this.binding_list.GetNext(0)
+        }
+        if row < 1 || row > this.bindings.Length {
+            this.behavior_status.Value := "请先选择一条快捷键规则。"
+            return false
+        }
+        binding := RabbitKeyBindingDialog(this, this.bindings[row]).ShowModal()
+        if !binding {
+            return false
+        }
+        this.bindings[row] := binding
+        this.RefreshBindingList(row)
+        this.MarkBindingsDirty()
+        return true
+    }
+
+    DeleteBinding() {
+        local row := this.binding_list.GetNext(0)
+        if row < 1 || row > this.bindings.Length {
+            this.behavior_status.Value := "请先选择一条快捷键规则。"
+            return false
+        }
+        this.bindings.RemoveAt(row)
+        this.RefreshBindingList(Min(row, this.bindings.Length))
+        this.MarkBindingsDirty()
+        return true
+    }
+
+    MoveBinding(offset) {
+        local binding, target
+        local row := this.binding_list.GetNext(0)
+        if row < 1 || row > this.bindings.Length {
+            this.behavior_status.Value := "请先选择一条快捷键规则。"
+            return false
+        }
+        target := row + offset
+        if target < 1 || target > this.bindings.Length {
+            return false
+        }
+        binding := this.bindings.RemoveAt(row)
+        this.bindings.InsertAt(target, binding)
+        this.RefreshBindingList(target)
+        this.MarkBindingsDirty()
+        return true
+    }
+
+    MarkBindingsDirty() {
+        this.behavior_status.Value := ""
+        this.OnBehaviorChanged()
     }
 
     Show(options := "") {

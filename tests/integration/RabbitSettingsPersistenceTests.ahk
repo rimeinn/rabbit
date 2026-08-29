@@ -97,14 +97,12 @@ TestSharedRabbitSettingsPersistence() {
             "floating_preedit_opacity", 0.65
         ))
         AssertTrue(style.Save(), "The integration test could not save UI style settings.")
-        AssertTrue(behavior.Save({
-            show_tips: !behavior.show_tips,
-            show_tips_time: behavior.show_tips_time,
-            global_ascii: behavior.global_ascii,
-            fix_candidate_box: behavior.fix_candidate_box,
-            use_legacy_candidate_box: behavior.use_legacy_candidate_box,
-            bypass_password_fields: behavior.bypass_password_fields,
-        }), "The integration test could not save behavior settings.")
+        local behavior_values := behavior.GetCurrentValues()
+        behavior_values.show_tips := !behavior.show_tips
+        AssertTrue(
+            behavior.Save(behavior_values),
+            "The integration test could not save behavior settings."
+        )
         AssertTrue(
             application.Save(Map(
                 "rabbit-settings-test.exe",

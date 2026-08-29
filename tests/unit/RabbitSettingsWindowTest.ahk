@@ -28,6 +28,8 @@ RunTest("settings window exposes appearance controls", TestSettingsWindowExposes
 RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
+RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
+RunTest("key binding dialog preserves unknown fields", TestKeyBindingDialogPreservesUnknownFields.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
 RunTest("settings window embeds dictionary management", TestSettingsWindowEmbedsDictionaryManagement.Bind())
 RunTest("settings window uses a global apply action", TestSettingsWindowUsesGlobalApplyAction.Bind())
@@ -79,6 +81,11 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(434, apply_y, "The compact layout misplaced the global apply button.")
         AssertEqual(438, divider_height, "The compact layout used the wrong sidebar divider height.")
         AssertEqual(452, footer_y, "The compact layout misplaced the footer status.")
+
+        window.SelectPage(3)
+        AssertEqual(660, window.GetPageWindowHeight(), "The behavior page used the wrong window height.")
+        AssertTrue(window.behavior_tabs.Visible, "The behavior page did not show its tabs.")
+        AssertEqual(1, window.behavior_tabs.Value, "The behavior page did not select the general tab.")
 
         window.SelectPage(1)
         AssertEqual(660, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
@@ -597,6 +604,21 @@ class RabbitSettingsBehaviorModelProbe {
         this.fix_candidate_box := false
         this.use_legacy_candidate_box := false
         this.bypass_password_fields := true
+        this.switch_key := Map(
+            "Shift_L", "inline_ascii",
+            "Shift_R", "commit_text",
+            "Control_L", "noop",
+            "Control_R", "noop",
+            "Caps_Lock", "clear",
+            "Eisu_toggle", "clear"
+        )
+        this.page_size := 5
+        this.alternative_select_labels := []
+        this.bindings := [Map("accept", "Control+p", "send", "Up", "when", "composing")]
+    }
+
+    GetBindings() {
+        return RabbitBehaviorSettingsModel.CloneValue(this.bindings)
     }
 
     Save(values) {
@@ -642,6 +664,81 @@ class RabbitSettingsAppearanceModelProbe {
 
     Dispose() {
         this.calls.Push("dispose_style")
+    }
+}
+
+TestSettingsWindowDefaultBehaviorControls() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        AssertEqual(5, window.menu_page_size.Value, "The behavior page showed the wrong page size.")
+        AssertEqual(1, window.binding_list.GetCount(), "The behavior page showed the wrong binding count.")
+        AssertEqual("5", RabbitSettingsEditCue(window.menu_page_size), "The page-size placeholder was wrong.")
+        AssertEqual(
+            "1, 2, 3, 4, 5, 6, 7, 8, 9, 10",
+            RabbitSettingsEditCue(window.menu_labels),
+            "The candidate-label placeholder was wrong."
+        )
+        window.behavior_tabs.Choose(2)
+        window.OnBehaviorTabChanged()
+        AssertTrue(window.binding_list.Visible, "The shortcut tab did not show the binding list.")
+        AssertTrue(!window.menu_page_size.Visible, "The shortcut tab left general controls visible.")
+        window.behavior_tabs.Choose(1)
+        window.OnBehaviorTabChanged()
+        window.menu_page_size.Value := 7
+        window.menu_labels.Value := "①, ②"
+        local values := window.GetBehaviorValues()
+        AssertEqual(7, values.page_size, "The behavior page returned the wrong page size.")
+        AssertEqual(
+            2,
+            values.alternative_select_labels.Length,
+            "The behavior page parsed candidate labels incorrectly."
+        )
+        AssertEqual("inline_ascii", values.switch_key["Shift_L"], "The behavior page returned the wrong switch action.")
+        window.menu_page_size.Value := ""
+        window.menu_labels.Value := ""
+        values := window.GetBehaviorValues()
+        AssertEqual(5, values.page_size, "An empty page size did not use its placeholder value.")
+        AssertEqual(0, values.alternative_select_labels.Length, "An empty label field created custom labels.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+RabbitSettingsEditCue(ctrl) {
+    static EM_GETCUEBANNER := 0x1502
+    local buf := Buffer(256, 0)
+    DllCall(
+        "User32\SendMessageW",
+        "Ptr",
+        ctrl.Hwnd,
+        "UInt",
+        EM_GETCUEBANNER,
+        "Ptr",
+        buf.Ptr,
+        "Ptr",
+        buf.Size / 2,
+        "Ptr"
+    )
+    return StrGet(buf, "UTF-16")
+}
+
+TestKeyBindingDialogPreservesUnknownFields() {
+    local owner := Gui()
+    local dialog := RabbitKeyBindingDialog(
+        owner,
+        Map("accept", "Control+p", "send", "Up", "when", "composing", "custom_field", "kept")
+    )
+    try {
+        AssertEqual("send", dialog.action_key.Text, "The binding dialog selected the wrong action field.")
+        dialog.action_value.Value := "Down"
+        AssertTrue(dialog.SaveBinding(), "The binding dialog rejected a valid rule.")
+        AssertEqual("Down", dialog.result["send"], "The binding dialog did not update the action value.")
+        AssertEqual("kept", dialog.result["custom_field"], "The binding dialog dropped an unknown field.")
+    } finally {
+        try dialog.Destroy()
+        owner.Destroy()
     }
 }
 
