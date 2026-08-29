@@ -20,9 +20,12 @@
 #Include ..\..\Lib\RabbitSettingsWindow.ahk
 
 RunTest("settings window navigation", TestSettingsWindowNavigation.Bind())
+RunTest("settings window uses page-specific heights", TestSettingsWindowUsesPageSpecificHeights.Bind())
 RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalidPage.Bind())
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
+RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
+RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
@@ -41,6 +44,44 @@ TestSettingsWindowNavigation() {
         AssertEqual("应用适配", window.page_title.Value, "The settings window showed the wrong selected page.")
         AssertTrue(window.SelectPage(7), "The settings window rejected the about page.")
         AssertTrue(window.about_group.Visible, "The settings window did not show the about page.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowUsesPageSpecificHeights() {
+    local apply_y, divider_height, footer_y, navigation_height, navigation_y
+    local window := RabbitSettingsWindow(0, true)
+    try {
+        AssertEqual(660, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
+        window.apply_button.GetPos(, &apply_y)
+        window.navigation.GetPos(, &navigation_y, , &navigation_height)
+        window.sidebar_divider.GetPos(, , , &divider_height)
+        window.footer_status.GetPos(, &footer_y)
+        AssertEqual(490, navigation_height, "The tall layout used the wrong navigation height.")
+        AssertEqual(16, apply_y - navigation_y - navigation_height, "The tall navigation used the wrong bottom gap.")
+        AssertEqual(594, apply_y, "The tall layout misplaced the global apply button.")
+        AssertEqual(598, divider_height, "The tall layout used the wrong sidebar divider height.")
+        AssertEqual(612, footer_y, "The tall layout misplaced the footer status.")
+
+        window.SelectPage(2)
+        AssertEqual(500, window.GetPageWindowHeight(), "A compact page used the wrong window height.")
+        window.apply_button.GetPos(, &apply_y)
+        window.navigation.GetPos(, &navigation_y, , &navigation_height)
+        window.sidebar_divider.GetPos(, , , &divider_height)
+        window.footer_status.GetPos(, &footer_y)
+        AssertEqual(330, navigation_height, "The compact layout used the wrong navigation height.")
+        AssertEqual(
+            16,
+            apply_y - navigation_y - navigation_height,
+            "The compact navigation used the wrong bottom gap."
+        )
+        AssertEqual(434, apply_y, "The compact layout misplaced the global apply button.")
+        AssertEqual(438, divider_height, "The compact layout used the wrong sidebar divider height.")
+        AssertEqual(452, footer_y, "The compact layout misplaced the footer status.")
+
+        window.SelectPage(1)
+        AssertEqual(660, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
     } finally {
         window.Dispose()
     }
@@ -92,6 +133,81 @@ TestSettingsWindowSavesAppearanceSettings() {
         JoinSettingsWorkflowCalls(calls),
         "The appearance page did not save, deploy, and dispose in order."
     )
+}
+
+TestSettingsWindowExposesAppearanceControls() {
+    local calls := []
+    local color_details_y, color_list_height, height_label_width, opacity_label_width
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
+    try {
+        AssertEqual(1, window.appearance_tabs.Value, "The appearance page did not start on the color tab.")
+        AssertTrue(
+            !HasProp(window, "appearance_preview_img"),
+            "The appearance page retained its embedded bitmap preview."
+        )
+        window.appearance_list.GetPos(, , , &color_list_height)
+        window.appearance_details.GetPos(, &color_details_y)
+        AssertTrue(color_list_height >= 260, "The color scheme list did not fill the color tab.")
+        AssertEqual(528, color_details_y, "The color scheme details did not follow the enlarged list.")
+        window.appearance_tabs.Choose(2)
+        window.OnAppearanceTabChanged()
+        AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")
+        AssertTrue(!window.appearance_list.Visible, "The typography tab left color controls visible.")
+        window.appearance_floating_opacity_label.GetPos(, , &opacity_label_width)
+        window.appearance_floating_height_label.GetPos(, , &height_label_width)
+        AssertTrue(opacity_label_width >= 72, "The floating opacity label remained too narrow.")
+        AssertTrue(height_label_width >= 72, "The floating height label remained too narrow.")
+
+        window.appearance_layout_type.Choose(2)
+        window.OnAppearanceControlsChanged()
+        AssertTrue(window.appearance_align_type.Enabled, "Flow layout did not enable alignment.")
+        AssertTrue(window.appearance_flow_rows.Enabled, "Flow layout did not enable expanded pages.")
+        AssertTrue(
+            !window.appearance_vertical_direction.Enabled,
+            "Flow layout enabled the vertical text direction setting."
+        )
+
+        window.appearance_floating_preedit.Value := true
+        window.OnAppearanceControlsChanged()
+        AssertTrue(
+            window.appearance_floating_opacity.Enabled,
+            "Floating preedit did not enable its opacity setting."
+        )
+        AssertTrue(
+            window.appearance_settings.last_values["floating_preedit"],
+            "The appearance page did not stage floating preedit."
+        )
+        AssertEqual(
+            "flow",
+            window.appearance_settings.last_values["layout_type"],
+            "The appearance page staged the wrong layout type."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowContainsPreviewFailures() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsAppearanceWorkflowProbe(calls),
+        false,
+        RabbitSettingsFailingAppearancePreview
+    )
+    try {
+        AssertTrue(
+            InStr(window.appearance_status.Value, "无法显示预览：") = 1,
+            "The settings window did not report the initial preview failure."
+        )
+        window.appearance_target.Choose(2)
+        window.OnAppearanceTargetChange()
+        AssertTrue(
+            InStr(window.appearance_status.Value, "无法显示预览：") = 1,
+            "The settings window let an event-driven preview failure escape."
+        )
+    } finally {
+        window.Dispose()
+    }
 }
 
 TestSettingsWindowSavesSwitcherSettings() {
@@ -224,7 +340,7 @@ TestSettingsWindowUsesGlobalApplyAction() {
 }
 
 TestSettingsWindowPreservesCanceledClose() {
-    local window := RabbitSettingsWindow(0, true, CandidatePreview, (*) => "Cancel")
+    local window := RabbitSettingsWindow(0, true, RabbitAppearancePreview, (*) => "Cancel")
     try {
         window.appearance_dirty := true
         AssertTrue(window.OnClose(), "The settings window did not handle a canceled close.")
@@ -243,7 +359,7 @@ TestSettingsWindowSavesAllSettingsOnClose() {
     local window := RabbitSettingsWindow(
         workflow,
         true,
-        CandidatePreview,
+        RabbitAppearancePreview,
         RabbitSettingsClosePrompt.Bind(calls, "Yes")
     )
     try {
@@ -471,6 +587,7 @@ class RabbitSettingsBehaviorModelProbe {
 class RabbitSettingsAppearanceModelProbe {
     __New(calls) {
         this.calls := calls
+        this.last_values := Map()
     }
 
     GetActiveColorScheme() {
@@ -479,14 +596,18 @@ class RabbitSettingsAppearanceModelProbe {
 
     GetPresetColorSchemes() {
         return [
-            { color_scheme_id: "theme_a", name: "主题 A", author: "甲", style: 0 },
-            { color_scheme_id: "theme_b", name: "主题 B", author: "乙", style: 0 },
+            { color_scheme_id: "theme_a", name: "主题 A", author: "甲", style: RabbitUIStyleSnapshot() },
+            { color_scheme_id: "theme_b", name: "主题 B", author: "乙", style: RabbitUIStyleSnapshot() },
         ]
     }
 
     SelectColorScheme(color_scheme_id) {
         this.calls.Push("select:" . color_scheme_id)
         return true
+    }
+
+    SetStyleValues(values) {
+        this.last_values := values
     }
 
     Save() {
@@ -496,6 +617,21 @@ class RabbitSettingsAppearanceModelProbe {
 
     Dispose() {
         this.calls.Push("dispose_style")
+    }
+}
+
+class RabbitSettingsFailingAppearancePreview {
+    __New(ctrl) {
+    }
+
+    Render(style) {
+        throw Error("preview probe failure")
+    }
+
+    Hide() {
+    }
+
+    Dispose() {
     }
 }
 

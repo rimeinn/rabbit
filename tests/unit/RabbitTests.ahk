@@ -21,6 +21,7 @@
 #Include RabbitAppContextTest.ahk
 #Include RabbitApplicationTest.ahk
 #Include RabbitApplicationSettingsModelTest.ahk
+#Include RabbitAppearancePreviewTest.ahk
 #Include RabbitBehaviorSettingsModelTest.ahk
 #Include RabbitCandidatePresentationTest.ahk
 #Include RabbitCandidateViewportTest.ahk
@@ -42,5 +43,6 @@
 #Include RabbitTrayClickTest.ahk
 #Include RabbitTrayStatusTipTest.ahk
 #Include RabbitUIStyleSnapshotTest.ahk
+#Include RabbitUIStyleSettingsTest.ahk
 
 ExitApp()

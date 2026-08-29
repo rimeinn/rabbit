@@ -83,7 +83,7 @@ class RabbitDeployerApplication {
 
         local window := this.CreateSettingsWindow()
         try {
-            window.Show("w820 h500 Center")
+            window.Show("Center")
             window.WaitClose()
         } finally {
             window.Dispose()

@@ -89,6 +89,13 @@ TestSharedRabbitSettingsPersistence() {
             style.SelectColorScheme(style.GetActiveColorScheme()),
             "The integration test could not stage a color scheme."
         )
+        local current_style := style.GetCurrentStyle()
+        style.SetStyleValues(Map(
+            "font_point", current_style.font_point + 1,
+            "margin_x", current_style.margin_x + 1,
+            "floating_preedit", !current_style.floating_preedit,
+            "floating_preedit_opacity", 0.65
+        ))
         AssertTrue(style.Save(), "The integration test could not save UI style settings.")
         AssertTrue(behavior.Save({
             show_tips: !behavior.show_tips,
@@ -108,6 +115,9 @@ TestSharedRabbitSettingsPersistence() {
 
         local saved := FileRead(test_dir . "\rabbit.custom.yaml", "UTF-8")
         AssertTrue(InStr(saved, "style/color_scheme"), "A later save removed the UI style setting.")
+        AssertTrue(InStr(saved, "style/font_point"), "The saved config omitted the candidate font size.")
+        AssertTrue(InStr(saved, "style/layout/margin_x"), "The saved config omitted the horizontal margin.")
+        AssertTrue(InStr(saved, "style/floating_preedit"), "The saved config omitted floating preedit.")
         AssertTrue(InStr(saved, "show_tips"), "A later save removed the behavior setting.")
         AssertTrue(InStr(saved, "rabbit-settings-test.exe"), "The application setting was not saved.")
     } finally {

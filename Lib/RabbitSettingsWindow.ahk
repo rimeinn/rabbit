@@ -16,13 +16,16 @@
  *
  */
 
-#Include RabbitCandidatePreview.ahk
+#Include RabbitAppearancePreview.ahk
 #Include RabbitCommon.ahk
 #Include RabbitApplicationSettingsModel.ahk
 
 class RabbitSettingsWindow extends Gui {
+    static WINDOW_WIDTH := 820
+    static APPEARANCE_HEIGHT := 660
+    static COMPACT_HEIGHT := 500
     static pages := [
-        { title: "外观", description: "选择玉兔毫候选窗使用的配色。" },
+        { title: "外观", description: "配置候选窗口的配色和排版。" },
         { title: "输入方案", description: "选择输入方案并设置方案选单快捷键。" },
         { title: "输入与行为", description: "设置玉兔毫的输入、提示和候选行为。" },
         { title: "应用适配", description: "按应用程序设置默认输入状态。" },
@@ -34,7 +37,7 @@ class RabbitSettingsWindow extends Gui {
     __New(
         workflow := 0,
         old_windows := RabbitIsOldWindows(),
-        preview_factory := CandidatePreview,
+        preview_factory := RabbitAppearancePreview,
         close_prompt := 0
     ) {
         local page_names := []
@@ -48,6 +51,9 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_preview := 0
         this.appearance_loading := false
         this.appearance_dirty := false
+        this.appearance_style := RabbitUIStyleSnapshot()
+        this.appearance_light_scheme := ""
+        this.appearance_dark_scheme := ""
         this.behavior_model := 0
         this.behavior_loading := false
         this.behavior_dirty := false
@@ -63,6 +69,7 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_dirty := false
         this.disposed := false
         this.selected_page := 0
+        this.window_shown := false
 
         this.SetFont("s10", "Microsoft YaHei UI")
         this.MarginX := 20
@@ -76,29 +83,167 @@ class RabbitSettingsWindow extends Gui {
         for page in RabbitSettingsWindow.pages {
             page_names.Push(page.title)
         }
-        this.navigation := this.AddListBox("x20 y88 w170 h330 -Multi", page_names)
+        this.navigation := this.AddListBox("x20 y88 w170 h330 -Multi +0x100", page_names)
         this.navigation.OnEvent("Change", (*) => this.SelectPage(this.navigation.Value))
-        this.apply_button := this.AddButton("x20 y434 w170 h36 Disabled", "应用并重新部署")
+        this.apply_button := this.AddButton("x20 y594 w170 h36 Disabled", "应用并重新部署")
         this.apply_button.OnEvent("Click", (*) => this.ApplyAllPendingSettings())
 
-        this.AddText("x205 y20 w1 h458 +0x10")
+        this.sidebar_divider := this.AddText("x205 y20 w1 h598 +0x10")
         this.SetFont("s18 w600")
         this.page_title := this.AddText("x230 y28 w570 h38", "")
         this.SetFont("s10 w400")
         this.page_description := this.AddText("x230 y72 w570 h28 cGray", "")
         this.AddText("x230 y112 w570 h1 +0x10")
 
-        this.appearance_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "候选窗配色")
-        this.appearance_list := this.AddListBox("x254 y174 w250 h174 -Multi Hidden")
-        this.appearance_list.OnEvent("Change", (*) => this.OnAppearanceSelectionChange())
-        this.appearance_details := this.AddText("x254 y358 w250 h44 Hidden", "")
-        this.appearance_preview_group := this.AddGroupBox("x526 y174 w248 h178 Hidden", "预览")
-        this.appearance_preview_img := this.AddPicture("x560 y202 w180 h126 0xE BackgroundWhite Hidden")
-        this.appearance_preview_unavailable := this.AddText(
-            "x546 y210 w208 h108 Center +0x200 Hidden",
-            "旧版 Windows 暂不支持预览"
+        this.appearance_tabs := this.AddTab3(
+            "x230 y136 w480 h450 Hidden",
+            ["配色", "排版"]
         )
-        this.appearance_status := this.AddText("x526 y370 w248 h32 Hidden", "")
+        this.appearance_tabs.OnEvent("Change", (*) => this.OnAppearanceTabChanged())
+        this.appearance_tabs.UseTab(1)
+        this.appearance_target_label := this.AddText("x250 y178 w80 h22 Hidden", "设置对象：")
+        this.appearance_target := this.AddDropDownList(
+            "x334 y174 w336 Choose1 Hidden",
+            ["浅色模式", "深色模式"]
+        )
+        this.appearance_target.OnEvent("Change", (*) => this.OnAppearanceTargetChange())
+        this.appearance_list_label := this.AddText("x250 y216 w120 h22 Hidden", "配色方案：")
+        this.appearance_list := this.AddListBox("x250 y240 w420 h278 -Multi Hidden")
+        this.appearance_list.OnEvent("Change", (*) => this.OnAppearanceSelectionChange())
+        this.appearance_details := this.AddText("x250 y528 w420 h36 Hidden", "")
+
+        this.appearance_tabs.UseTab(2)
+        this.appearance_font_group := this.AddGroupBox("x246 y170 w448 h180 Hidden", "字体")
+        this.appearance_font_label := this.AddText("x260 y196 w72 h22 Hidden", "候选文字：")
+        this.appearance_font := this.AddComboBox("x334 y192 w230 Hidden", [])
+        this.appearance_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_font_point_label := this.AddText("x574 y196 w42 h22 Hidden", "字号：")
+        this.appearance_font_point := this.AddEdit("x618 y192 w58 r1 Number -Multi Hidden")
+        this.appearance_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_preedit_font_label := this.AddText("x260 y226 w72 h22 Hidden", "预编辑：")
+        this.appearance_preedit_font := this.AddComboBox("x334 y222 w342 Hidden", [])
+        this.appearance_preedit_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_label_font_label := this.AddText("x260 y256 w72 h22 Hidden", "候选序号：")
+        this.appearance_label_font := this.AddComboBox("x334 y252 w230 Hidden", [])
+        this.appearance_label_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_label_font_point := this.AddEdit("x618 y252 w58 r1 Number -Multi Hidden")
+        this.appearance_label_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_comment_font_label := this.AddText("x260 y286 w72 h22 Hidden", "候选注释：")
+        this.appearance_comment_font := this.AddComboBox("x334 y282 w230 Hidden", [])
+        this.appearance_comment_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_comment_font_point := this.AddEdit("x618 y282 w58 r1 Number -Multi Hidden")
+        this.appearance_comment_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_label_format_label := this.AddText("x260 y316 w72 h22 Hidden", "序号格式：")
+        this.appearance_label_format := this.AddEdit("x334 y312 w342 r1 -Multi Hidden")
+        this.appearance_label_format.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+
+        this.appearance_layout_group := this.AddGroupBox("x246 y356 w448 h212 Hidden", "布局")
+        this.appearance_layout_type_label := this.AddText("x260 y382 w72 h22 Hidden", "候选排列：")
+        this.appearance_layout_type := this.AddDropDownList(
+            "x334 y378 w120 Choose1 Hidden",
+            ["纵向堆叠", "横向流式", "竖排文字"]
+        )
+        this.appearance_layout_type.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_align_type_label := this.AddText("x470 y382 w72 h22 Hidden", "对齐方式：")
+        this.appearance_align_type := this.AddDropDownList(
+            "x544 y378 w132 Choose1 Hidden",
+            ["顶部", "居中", "底部"]
+        )
+        this.appearance_align_type.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_margin_x_label := this.AddText("x260 y414 w72 h22 Hidden", "水平边距：")
+        this.appearance_margin_x := this.AddEdit("x334 y410 w72 r1 Number -Multi Hidden")
+        this.appearance_margin_x.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_margin_y_label := this.AddText("x430 y414 w72 h22 Hidden", "垂直边距：")
+        this.appearance_margin_y := this.AddEdit("x504 y410 w72 r1 Number -Multi Hidden")
+        this.appearance_margin_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_border_width_label := this.AddText("x260 y446 w72 h22 Hidden", "边框宽度：")
+        this.appearance_border_width := this.AddEdit("x334 y442 w72 r1 Number -Multi Hidden")
+        this.appearance_border_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_corner_radius_label := this.AddText("x430 y446 w72 h22 Hidden", "窗口圆角：")
+        this.appearance_corner_radius := this.AddEdit("x504 y442 w72 r1 Number -Multi Hidden")
+        this.appearance_corner_radius.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_round_corner_label := this.AddText("x260 y478 w72 h22 Hidden", "选中圆角：")
+        this.appearance_round_corner := this.AddEdit("x334 y474 w54 r1 Number -Multi Hidden")
+        this.appearance_round_corner.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_min_width_label := this.AddText("x400 y478 w72 h22 Hidden", "最小宽度：")
+        this.appearance_min_width := this.AddEdit("x474 y474 w60 r1 Number -Multi Hidden")
+        this.appearance_min_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_min_height_label := this.AddText("x542 y478 w72 h22 Hidden", "最小高度：")
+        this.appearance_min_height := this.AddEdit("x616 y474 w60 r1 Number -Multi Hidden")
+        this.appearance_min_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_flow_rows_label := this.AddText("x260 y510 w72 h22 Hidden", "展开页数：")
+        this.appearance_flow_rows := this.AddEdit("x334 y506 w72 r1 Number -Multi Hidden")
+        this.appearance_flow_rows.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_vertical_direction := this.AddCheckbox(
+            "x430 y508 w246 h24 Hidden",
+            "竖排候选从左向右排列"
+        )
+        this.appearance_vertical_direction.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_floating_preedit := this.AddCheckbox(
+            "x260 y538 w190 h24 Hidden",
+            "显示浮动预编辑框"
+        )
+        this.appearance_floating_preedit.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_floating_opacity_label := this.AddText("x456 y540 w72 h22 Hidden", "不透明度：")
+        this.appearance_floating_opacity := this.AddEdit("x530 y536 w44 r1 Number -Multi Hidden")
+        this.appearance_floating_opacity.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_floating_height_label := this.AddText("x580 y540 w72 h22 Hidden", "最小高度：")
+        this.appearance_floating_height := this.AddEdit("x654 y536 w40 r1 Number -Multi Hidden")
+        this.appearance_floating_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_tabs.UseTab()
+
+        this.appearance_color_controls := [
+            this.appearance_target_label,
+            this.appearance_target,
+            this.appearance_list_label,
+            this.appearance_list,
+            this.appearance_details,
+        ]
+        this.appearance_typesetting_controls := [
+            this.appearance_font_group,
+            this.appearance_font_label,
+            this.appearance_font,
+            this.appearance_font_point_label,
+            this.appearance_font_point,
+            this.appearance_preedit_font_label,
+            this.appearance_preedit_font,
+            this.appearance_label_font_label,
+            this.appearance_label_font,
+            this.appearance_label_font_point,
+            this.appearance_comment_font_label,
+            this.appearance_comment_font,
+            this.appearance_comment_font_point,
+            this.appearance_label_format_label,
+            this.appearance_label_format,
+            this.appearance_layout_group,
+            this.appearance_layout_type_label,
+            this.appearance_layout_type,
+            this.appearance_align_type_label,
+            this.appearance_align_type,
+            this.appearance_margin_x_label,
+            this.appearance_margin_x,
+            this.appearance_margin_y_label,
+            this.appearance_margin_y,
+            this.appearance_border_width_label,
+            this.appearance_border_width,
+            this.appearance_corner_radius_label,
+            this.appearance_corner_radius,
+            this.appearance_round_corner_label,
+            this.appearance_round_corner,
+            this.appearance_min_width_label,
+            this.appearance_min_width,
+            this.appearance_min_height_label,
+            this.appearance_min_height,
+            this.appearance_flow_rows_label,
+            this.appearance_flow_rows,
+            this.appearance_vertical_direction,
+            this.appearance_floating_preedit,
+            this.appearance_floating_opacity_label,
+            this.appearance_floating_opacity,
+            this.appearance_floating_height_label,
+            this.appearance_floating_height,
+        ]
+        this.appearance_status := this.AddText("x230 y588 w570 h20 Hidden", "")
 
         this.placeholder := this.AddGroupBox("x230 y136 w570 h290", "页面内容")
         this.placeholder_text := this.AddText(
@@ -218,7 +363,7 @@ class RabbitSettingsWindow extends Gui {
         this.operation_status := this.AddText("x254 y302 w520 h28 Hidden", "")
 
         this.footer_status := this.AddText(
-            "x230 y452 w570 h22 cGray",
+            "x230 y612 w570 h22 cGray",
             "设置内容将在确认后统一保存和部署。"
         )
         this.OnEvent("Close", this.OnClose.Bind(this))
@@ -249,8 +394,10 @@ class RabbitSettingsWindow extends Gui {
         this.SetDictionaryVisible(index = 5)
         this.SetMaintenanceVisible(index = 6)
         this.SetAboutVisible(index = 7)
+        this.ResizeForPage(index)
         if index = 1 {
             this.EnsureAppearanceSettings()
+            this.PreviewAppearance()
         } else if index = 2 {
             this.EnsureSwitcherSettings()
         } else if index = 3 {
@@ -264,19 +411,76 @@ class RabbitSettingsWindow extends Gui {
         return true
     }
 
+    GetPageWindowHeight(index := 0) {
+        if !index {
+            index := this.selected_page
+        }
+        return index = 1
+            ? RabbitSettingsWindow.APPEARANCE_HEIGHT
+            : RabbitSettingsWindow.COMPACT_HEIGHT
+    }
+
+    ResizeForPage(index := 0) {
+        local height := this.GetPageWindowHeight(index)
+        this.LayoutSharedControls(height)
+        if !this.window_shown {
+            return
+        }
+        super.Show(Format(
+            "NA w{} h{}",
+            RabbitSettingsWindow.WINDOW_WIDTH,
+            height
+        ))
+        this.ClampWindowToWorkArea()
+    }
+
+    LayoutSharedControls(height) {
+        this.navigation.Move(, , , height - 170)
+        this.apply_button.Move(, height - 66)
+        this.sidebar_divider.Move(, , , height - 62)
+        this.footer_status.Move(, height - 48)
+    }
+
+    ClampWindowToWorkArea() {
+        local height, info, width, x, y
+        WinGetPos(&x, &y, &width, &height, "ahk_id " . this.Hwnd)
+        info := RabbitPopupPlacement.GetWorkAreaAt(x + width / 2, y + height / 2)
+        if !info {
+            return
+        }
+        local clamped_y := Min(Max(y, info.work.top), Max(info.work.top, info.work.bottom - height))
+        if clamped_y != y {
+            WinMove(x, clamped_y, , , "ahk_id " . this.Hwnd)
+        }
+    }
+
     SetPlaceholderVisible(visible) {
         this.placeholder.Visible := visible
         this.placeholder_text.Visible := visible
     }
 
     SetAppearanceVisible(visible) {
-        this.appearance_group.Visible := visible
-        this.appearance_list.Visible := visible
-        this.appearance_details.Visible := visible
-        this.appearance_preview_group.Visible := visible
-        this.appearance_preview_img.Visible := visible && !this.old_windows
-        this.appearance_preview_unavailable.Visible := visible && this.old_windows
+        this.appearance_tabs.Visible := visible
+        this.SetAppearanceTabControlsVisible(visible)
         this.appearance_status.Visible := visible
+        if !visible && this.appearance_preview && HasMethod(this.appearance_preview, "Hide") {
+            this.appearance_preview.Hide()
+        }
+    }
+
+    SetAppearanceTabControlsVisible(visible) {
+        local color_visible := visible && this.appearance_tabs.Value = 1
+        local typesetting_visible := visible && this.appearance_tabs.Value = 2
+        for ctrl in this.appearance_color_controls {
+            ctrl.Visible := color_visible
+        }
+        for ctrl in this.appearance_typesetting_controls {
+            ctrl.Visible := typesetting_visible
+        }
+    }
+
+    OnAppearanceTabChanged() {
+        this.SetAppearanceTabControlsVisible(this.selected_page = 1)
     }
 
     SetSwitcherVisible(visible) {
@@ -368,9 +572,11 @@ class RabbitSettingsWindow extends Gui {
         try {
             this.appearance_settings := this.workflow.CreateUIStyleSettings()
             this.PopulateAppearanceSettings()
-            try {
+            if this.old_windows {
+                this.appearance_status.Value := "旧版 Windows 暂不支持预览。"
+            } else try {
                 this.CreateAppearancePreview()
-                this.PreviewAppearance(this.appearance_list.Value)
+                this.PreviewAppearance()
             } catch as err {
                 this.appearance_status.Value := "无法显示预览：" . err.Message
             }
@@ -387,34 +593,151 @@ class RabbitSettingsWindow extends Gui {
             return
         }
         factory := this.preview_factory
-        this.appearance_preview := factory(this.appearance_preview_img)
+        this.appearance_preview := factory(this)
     }
 
     PopulateAppearanceSettings() {
-        local active, active_index, i, info, names := []
+        local style
         this.appearance_loading := true
         try {
-            active := this.appearance_settings.GetActiveColorScheme()
-            active_index := 0
+            this.appearance_light_scheme := this.appearance_settings.GetActiveColorScheme()
+            this.appearance_dark_scheme := HasMethod(this.appearance_settings, "GetActiveColorSchemeDark")
+                ? this.appearance_settings.GetActiveColorSchemeDark()
+                : ""
+            style := HasMethod(this.appearance_settings, "GetCurrentStyle")
+                ? this.appearance_settings.GetCurrentStyle()
+                : RabbitUIStyleSnapshot()
+            this.appearance_style := style
             this.appearance_presets := this.appearance_settings.GetPresetColorSchemes()
-            for i, info in this.appearance_presets {
-                names.Push(info.name)
-                if info.color_scheme_id = active {
-                    active_index := i
-                }
-            }
-            this.appearance_list.Delete()
-            this.appearance_list.Add(names)
-            if active_index > 0 {
-                this.appearance_list.Choose(active_index)
-                this.ShowAppearanceDetails(active_index)
-                this.PreviewAppearance(active_index)
-            }
+            this.PopulateAppearanceColorList()
+            this.PopulateAppearanceStyle(style)
             this.appearance_dirty := false
-            this.appearance_status.Value := names.Length ? "" : "没有找到可用的配色。"
+            this.appearance_status.Value := this.appearance_presets.Length
+                ? ""
+                : "没有找到可用的配色。"
         } finally {
             this.appearance_loading := false
         }
+        this.UpdateAppearanceConditionalControls()
+        this.PreviewAppearance()
+    }
+
+    PopulateAppearanceColorList() {
+        local active_index := 0
+        local names := []
+        local selected_id := this.appearance_target.Value = 2
+            ? this.appearance_dark_scheme
+            : this.appearance_light_scheme
+        for i, info in this.appearance_presets {
+            names.Push(info.name)
+            if info.color_scheme_id = selected_id {
+                active_index := i
+            }
+        }
+        this.appearance_list.Delete()
+        this.appearance_list.Add(names)
+        if active_index > 0 {
+            this.appearance_list.Choose(active_index)
+            this.ShowAppearanceDetails(active_index)
+        } else {
+            this.appearance_list.Choose(0)
+            this.appearance_details.Value := this.appearance_target.Value = 2
+                ? "深色模式当前跟随浅色配色。"
+                : ""
+        }
+    }
+
+    PopulateAppearanceStyle(style) {
+        this.SetAppearanceFontValue(this.appearance_font, style.font_face)
+        this.SetAppearanceFontValue(this.appearance_preedit_font, style.preedit_font_face)
+        this.SetAppearanceFontValue(this.appearance_label_font, style.label_font_face)
+        this.SetAppearanceFontValue(this.appearance_comment_font, style.comment_font_face)
+        this.appearance_font_point.Value := style.font_point
+        this.appearance_label_font_point.Value := style.label_font_point
+        this.appearance_comment_font_point.Value := style.comment_font_point
+        this.appearance_label_format.Value := style.label_format
+        this.appearance_layout_type.Choose(
+            style.layout_type = "flow" ? 2 : style.layout_type = "vertical_text" ? 3 : 1)
+        this.appearance_align_type.Choose(
+            style.align_type = "center" ? 2 : style.align_type = "bottom" ? 3 : 1)
+        this.appearance_margin_x.Value := style.margin_x
+        this.appearance_margin_y.Value := style.margin_y
+        this.appearance_border_width.Value := style.border_width
+        this.appearance_corner_radius.Value := style.corner_radius
+        this.appearance_round_corner.Value := style.round_corner
+        this.appearance_min_width.Value := style.min_width
+        this.appearance_min_height.Value := style.min_height
+        this.appearance_flow_rows.Value := style.flow_rows
+        this.appearance_vertical_direction.Value := style.vertical_text_left_to_right
+        this.appearance_floating_preedit.Value := style.floating_preedit
+        this.appearance_floating_opacity.Value := Round(style.floating_preedit_opacity * 100)
+        this.appearance_floating_height.Value := style.floating_preedit_min_height
+    }
+
+    SetAppearanceFontValue(ctrl, value) {
+        local fonts := RabbitSettingsWindow.GetInstalledFontFaces()
+        local selected := 0
+        for index, font_face in fonts {
+            if font_face = value {
+                selected := index
+                break
+            }
+        }
+        if !selected {
+            fonts.InsertAt(1, value)
+            selected := 1
+        }
+        ctrl.Delete()
+        ctrl.Add(fonts)
+        ctrl.Choose(selected)
+    }
+
+    static GetInstalledFontFaces() {
+        static cached := 0
+        local names := Map()
+        local result := []
+        local text := ""
+        if cached {
+            return cached.Clone()
+        }
+        try {
+            Loop Reg, "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts", "V" {
+                local name := RegExReplace(A_LoopRegName, "\s+\([^)]*\)$")
+                for face in StrSplit(name, " & ") {
+                    face := Trim(face)
+                    if face {
+                        names[face] := true
+                    }
+                }
+            }
+        }
+        for name in names {
+            text .= name . "`n"
+        }
+        text := Sort(text, "D`n")
+        for name in StrSplit(RTrim(text, "`n"), "`n") {
+            if name {
+                result.Push(name)
+            }
+        }
+        if !result.Length {
+            result.Push("Microsoft YaHei UI")
+        }
+        cached := result
+        return cached.Clone()
+    }
+
+    OnAppearanceTargetChange() {
+        if this.appearance_loading {
+            return
+        }
+        this.appearance_loading := true
+        try {
+            this.PopulateAppearanceColorList()
+        } finally {
+            this.appearance_loading := false
+        }
+        this.PreviewAppearance()
     }
 
     OnAppearanceSelectionChange() {
@@ -422,12 +745,19 @@ class RabbitSettingsWindow extends Gui {
         if this.appearance_loading || index < 1 || index > this.appearance_presets.Length {
             return
         }
-        this.appearance_settings.SelectColorScheme(this.appearance_presets[index].color_scheme_id)
+        local scheme_id := this.appearance_presets[index].color_scheme_id
+        if this.appearance_target.Value = 2 {
+            if HasMethod(this.appearance_settings, "SelectDarkColorScheme") {
+                this.appearance_settings.SelectDarkColorScheme(scheme_id)
+            }
+            this.appearance_dark_scheme := scheme_id
+        } else {
+            this.appearance_settings.SelectColorScheme(scheme_id)
+            this.appearance_light_scheme := scheme_id
+        }
         this.ShowAppearanceDetails(index)
-        this.PreviewAppearance(index)
-        this.appearance_dirty := true
-        this.footer_status.Value := "外观设置尚未保存。"
-        this.UpdateApplyButton()
+        this.MarkAppearanceDirty()
+        this.PreviewAppearance()
     }
 
     ShowAppearanceDetails(index) {
@@ -439,24 +769,156 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_details.Value := info.author ? "作者：" . info.author : ""
     }
 
-    PreviewAppearance(index) {
-        local box_height, box_width, box_x, box_y, info
-        if !this.appearance_preview || index < 1 || index > this.appearance_presets.Length {
+    OnAppearanceControlsChanged() {
+        if this.appearance_loading {
             return
         }
-        info := this.appearance_presets[index]
-        this.appearance_preview.Build(info.style, &box_width, &box_height)
-        box_width /= this.appearance_preview.dpiScale
-        box_height /= this.appearance_preview.dpiScale
-        box_x := 526 + Round((248 - box_width) / 2)
-        box_y := 196 + Round((144 - box_height) / 2)
-        this.appearance_preview_img.Move(box_x, box_y, box_width, box_height)
-        this.appearance_preview.Render(["输入法", "输入", "数", "书", "输"], 1)
+        this.UpdateAppearanceConditionalControls()
+        try {
+            local values := this.GetAppearanceValues()
+            if this.appearance_settings && HasMethod(this.appearance_settings, "SetStyleValues") {
+                this.appearance_settings.SetStyleValues(values)
+            }
+            this.appearance_status.Value := ""
+            this.MarkAppearanceDirty()
+            this.PreviewAppearance(values)
+        } catch as err {
+            this.appearance_status.Value := err.Message
+        }
+    }
+
+    UpdateAppearanceConditionalControls() {
+        local flow := this.appearance_layout_type.Value = 2
+        local vertical := this.appearance_layout_type.Value = 3
+        local floating := !!this.appearance_floating_preedit.Value
+        this.appearance_align_type.Enabled := flow
+        this.appearance_flow_rows.Enabled := flow
+        this.appearance_vertical_direction.Enabled := vertical
+        this.appearance_floating_opacity.Enabled := floating
+        this.appearance_floating_height.Enabled := floating
+    }
+
+    MarkAppearanceDirty() {
+        this.appearance_dirty := true
+        this.footer_status.Value := "外观设置尚未保存。"
+        this.UpdateApplyButton()
+    }
+
+    GetAppearanceValues() {
+        local font_face := Trim(this.appearance_font.Text)
+        local preedit_font_face := Trim(this.appearance_preedit_font.Text)
+        local label_font_face := Trim(this.appearance_label_font.Text)
+        local comment_font_face := Trim(this.appearance_comment_font.Text)
+        local label_format := this.appearance_label_format.Value
+        if !font_face || !preedit_font_face || !label_font_face || !comment_font_face {
+            throw Error("字体名称不能为空。")
+        }
+        if !label_format {
+            throw Error("候选序号格式不能为空。")
+        }
+        try {
+            Format(label_format, "1")
+        } catch {
+            throw Error("候选序号格式无效。")
+        }
+        return Map(
+            "font_face", font_face,
+            "preedit_font_face", preedit_font_face,
+            "label_font_face", label_font_face,
+            "comment_font_face", comment_font_face,
+            "font_point", this.ReadAppearanceNumber(this.appearance_font_point, "候选字号", 6, 72),
+            "label_font_point", this.ReadAppearanceNumber(
+                this.appearance_label_font_point, "候选序号字号", 6, 72),
+            "comment_font_point", this.ReadAppearanceNumber(
+                this.appearance_comment_font_point, "候选注释字号", 6, 72),
+            "label_format", label_format,
+            "layout_type", ["stacked", "flow", "vertical_text"][this.appearance_layout_type.Value],
+            "align_type", ["top", "center", "bottom"][this.appearance_align_type.Value],
+            "margin_x", this.ReadAppearanceNumber(this.appearance_margin_x, "水平边距", 0, 500),
+            "margin_y", this.ReadAppearanceNumber(this.appearance_margin_y, "垂直边距", 0, 500),
+            "border_width", this.ReadAppearanceNumber(
+                this.appearance_border_width, "边框宽度", 0, 500),
+            "corner_radius", this.ReadAppearanceNumber(
+                this.appearance_corner_radius, "窗口圆角", 0, 500),
+            "round_corner", this.ReadAppearanceNumber(
+                this.appearance_round_corner, "选中项圆角", 0, 500),
+            "min_width", this.ReadAppearanceNumber(this.appearance_min_width, "最小宽度", 0, 2000),
+            "min_height", this.ReadAppearanceNumber(this.appearance_min_height, "最小高度", 0, 2000),
+            "flow_rows", this.ReadAppearanceNumber(this.appearance_flow_rows, "展开页数", 1, 9),
+            "vertical_text_left_to_right", !!this.appearance_vertical_direction.Value,
+            "floating_preedit", !!this.appearance_floating_preedit.Value,
+            "floating_preedit_opacity", this.ReadAppearanceNumber(
+                this.appearance_floating_opacity, "浮动预编辑不透明度", 0, 100) / 100,
+            "floating_preedit_min_height", this.ReadAppearanceNumber(
+                this.appearance_floating_height, "浮动预编辑最小高度", 0, 500)
+        )
+    }
+
+    ReadAppearanceNumber(ctrl, name, minimum, maximum) {
+        local text := Trim(ctrl.Value)
+        if !text || !IsNumber(text) {
+            throw Error(name . "必须是数字。")
+        }
+        local value := Number(text)
+        if value != Integer(value) {
+            throw Error(name . "必须是整数。")
+        }
+        if value < minimum || value > maximum {
+            throw Error(Format("{}必须在 {} 到 {} 之间。", name, minimum, maximum))
+        }
+        return Integer(value)
+    }
+
+    FindAppearancePreset(color_scheme_id) {
+        for index, info in this.appearance_presets {
+            if info.color_scheme_id = color_scheme_id {
+                return index
+            }
+        }
+        return 0
+    }
+
+    PreviewAppearance(values := 0) {
+        local index, info, selected_id, style
+        if !this.appearance_preview || !this.appearance_presets.Length {
+            return false
+        }
+        try {
+            selected_id := this.appearance_target.Value = 2 && this.appearance_dark_scheme
+                ? this.appearance_dark_scheme
+                : this.appearance_light_scheme
+            index := this.FindAppearancePreset(selected_id)
+            if !index {
+                index := 1
+            }
+            info := this.appearance_presets[index]
+            if !values {
+                try values := this.GetAppearanceValues()
+            }
+            style := values ? info.style.With(values) : info.style
+            this.appearance_preview.Render(style)
+            if InStr(this.appearance_status.Value, "无法显示预览：") = 1 {
+                this.appearance_status.Value := ""
+            }
+            return true
+        } catch as err {
+            this.appearance_status.Value := "无法显示预览：" . err.Message
+            return false
+        }
     }
 
     ApplyAppearanceSettings() {
-        local deploy_result
+        local deploy_result, values
         if !this.appearance_settings || !this.appearance_dirty {
+            return false
+        }
+        try {
+            values := this.GetAppearanceValues()
+            if HasMethod(this.appearance_settings, "SetStyleValues") {
+                this.appearance_settings.SetStyleValues(values)
+            }
+        } catch as err {
+            this.appearance_status.Value := err.Message
             return false
         }
         this.Opt("+Disabled")
@@ -516,6 +978,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     ApplyAllPendingSettings() {
+        local appearance_values := 0
         local behavior_values := 0
         local deploy_result, schema_ids := 0
         if !this.HasUnsavedSettings() {
@@ -527,6 +990,15 @@ class RabbitSettingsWindow extends Gui {
             if schema_ids.Length = 0 {
                 this.SelectPage(2)
                 this.switcher_status.Value := "至少要选用一项输入方案。"
+                return false
+            }
+        }
+        if this.appearance_dirty {
+            try {
+                appearance_values := this.GetAppearanceValues()
+            } catch as err {
+                this.SelectPage(1)
+                this.appearance_status.Value := err.Message
                 return false
             }
         }
@@ -544,6 +1016,9 @@ class RabbitSettingsWindow extends Gui {
         this.footer_status.Value := "正在保存所有更改…"
         try {
             if this.appearance_dirty {
+                if this.appearance_settings && HasMethod(this.appearance_settings, "SetStyleValues") {
+                    this.appearance_settings.SetStyleValues(appearance_values)
+                }
                 if !this.appearance_settings || !this.appearance_settings.Save() {
                     this.SelectPage(1)
                     this.appearance_status.Value := "未能保存外观设置。"
@@ -1183,6 +1658,21 @@ class RabbitSettingsWindow extends Gui {
             return false
         } finally {
             this.Opt("-Disabled")
+        }
+    }
+
+    Show(options := "") {
+        local height := this.GetPageWindowHeight()
+        this.LayoutSharedControls(height)
+        super.Show(Trim(options . Format(
+            " w{} h{}",
+            RabbitSettingsWindow.WINDOW_WIDTH,
+            height
+        )))
+        this.window_shown := true
+        this.ClampWindowToWorkArea()
+        if this.selected_page = 1 {
+            this.PreviewAppearance()
         }
     }
 

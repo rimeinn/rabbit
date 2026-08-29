@@ -40,8 +40,14 @@ RunSettingsWindowPreview() {
 
     try {
         window := RabbitSettingsWindow(RabbitDeployerWorkflow(rime))
-        window.Show("w820 h500 Center")
+        window.Show("Center")
         if A_Args.Length > 0 && A_Args[1] = "ci" {
+            window.appearance_tabs.Choose(2)
+            window.OnAppearanceTabChanged()
+            window.appearance_layout_type.Choose(2)
+            window.OnAppearanceControlsChanged()
+            window.appearance_floating_preedit.Value := true
+            window.OnAppearanceControlsChanged()
             window.SelectPage(2)
             window.SelectPage(3)
             SetTimer(window.OnClose.Bind(window), -100)
