@@ -44,6 +44,10 @@ RunTest("Taskbar button is a non-text target", TestTaskbarButtonIsNo.Bind())
 RunTest("Chrome address bar is a text target", TestChromeAddressBarIsYes.Bind())
 RunTest("Chrome native menu is a non-text target", TestChromeNativeMenuIsNo.Bind())
 RunTest("Chrome page edit control is a text target", TestChromePageEditIsYes.Bind())
+RunTest("Chrome generic contenteditable is a text target", TestChromeGenericContenteditableIsYes.Bind())
+RunTest("Chrome generic page area is a non-text target", TestChromeGenericPageAreaIsNo.Bind())
+RunTest("Chrome editable document is a text target", TestChromeEditableDocumentIsYes.Bind())
+RunTest("Chrome read-only document is a non-text target", TestChromeReadOnlyDocumentIsNo.Bind())
 RunTest("Chrome search combo box is a text target", TestChromeSearchComboboxIsYes.Bind())
 RunTest("Chrome dropdown picker list item is a text target", TestChromeDropdownListItemIsYes.Bind())
 RunTest("Chrome context menu item is a non-text target", TestChromeContextMenuItemIsNo.Bind())
@@ -368,6 +372,61 @@ TestChromePageEditIsYes() {
     )
 }
 
+TestChromeGenericContenteditableIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "msedge.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [50026], ; UIA_GROUP_CONTROL_TYPE_ID
+            RabbitInputTarget.YES
+        )),
+        "A Chrome generic contenteditable control was classified as a non-text target."
+    )
+}
+
+TestChromeGenericPageAreaIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "msedge.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [50026] ; UIA_GROUP_CONTROL_TYPE_ID
+        )),
+        "A Chrome generic page area was classified as a text target."
+    )
+}
+
+TestChromeEditableDocumentIsYes() {
+    AssertEqual(
+        RabbitInputTarget.YES,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_DOCUMENT_CONTROL_TYPE_ID],
+            RabbitInputTarget.YES
+        )),
+        "An editable Chrome document was classified as a non-text target."
+    )
+}
+
+TestChromeReadOnlyDocumentIsNo() {
+    AssertEqual(
+        RabbitInputTarget.NO,
+        RabbitInputTarget.ClassifyDescriptor(CreateTargetDescriptor(
+            "chrome.exe",
+            ["chrome_renderwidgethosthwnd", "chrome_widgetwin_1"],
+            [],
+            [RabbitInputTarget.UIA_DOCUMENT_CONTROL_TYPE_ID],
+            RabbitInputTarget.NO
+        )),
+        "A read-only Chrome document was classified as a text target."
+    )
+}
+
 TestChromeSearchComboboxIsYes() {
     AssertEqual(
         RabbitInputTarget.YES,
@@ -455,11 +514,18 @@ TestUnknownTarget() {
     )
 }
 
-CreateTargetDescriptor(process_name, focus_classes, active_classes := [], uia_control_types := []) {
+CreateTargetDescriptor(
+    process_name,
+    focus_classes,
+    active_classes := [],
+    uia_control_types := [],
+    uia_text_editability := RabbitInputTarget.UNKNOWN
+) {
     return {
         process_name: process_name,
         focus_classes: focus_classes,
         active_classes: active_classes,
-        uia_control_types: uia_control_types
+        uia_control_types: uia_control_types,
+        uia_text_editability: uia_text_editability
     }
 }

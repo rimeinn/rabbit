@@ -35,19 +35,24 @@ class RabbitInputTarget {
     static UIA_DATA_GRID_CONTROL_TYPE_ID := 50028
     static UIA_DATA_ITEM_CONTROL_TYPE_ID := 50029
     static UIA_DOCUMENT_CONTROL_TYPE_ID := 50030
-    static UIA_IS_READONLY_PROPERTY_ID := 30048
+    static UIA_TEXT_PATTERN_ID := 10014
+    static UIA_IS_READONLY_ATTRIBUTE_ID := 40015
+    static UIA_VALUE_IS_READONLY_PROPERTY_ID := 30046
     static VT_BOOL := 11
 
     static native_list_view_detector := RabbitNativeListViewDetector()
 
     static Classify(foreground_hwnd) {
-        local result
+        local result, is_browser
         if !(descriptor := this.Describe(foreground_hwnd)) {
             this.native_list_view_detector.Reset()
             return this.UNKNOWN
         }
-        if this.IsWpfWindow(descriptor) || this.IsBrowserWindow(descriptor) {
-            descriptor.uia_control_types := this.GetFocusedUIAutomationControlTypes(descriptor.process_id)
+        is_browser := this.IsBrowserWindow(descriptor)
+        if this.IsWpfWindow(descriptor) || is_browser {
+            local uia_details := this.GetFocusedUIAutomationDetails(descriptor.process_id, is_browser)
+            descriptor.uia_control_types := uia_details.control_types
+            descriptor.uia_text_editability := uia_details.text_editability
         }
         result := this.ClassifyDescriptor(descriptor)
         if result != this.UNKNOWN {
@@ -232,26 +237,37 @@ class RabbitInputTarget {
         return descriptor.HasOwnProp("uia_control_types") ? descriptor.uia_control_types : []
     }
 
-    static GetFocusedUIAutomationControlTypes(expected_process_id) {
-        local control_types := []
+    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability := false) {
+        local details := {
+            control_types: [],
+            text_editability: this.UNKNOWN
+        }
         local uia := this.GetUIAutomation()
         local focused_element, walker, current_element, parent_element
         local process_id, control_type
         if !uia {
-            return control_types
+            return details
         }
 
         try {
             focused_element := ComValue(13, 0)
             ComCall(8, uia, "Ptr*", focused_element)
             if !focused_element.Ptr {
-                return control_types
+                return details
+            }
+            process_id := 0
+            ComCall(20, focused_element, "Int*", &process_id)
+            if process_id != expected_process_id {
+                return details
+            }
+            if inspect_text_editability {
+                details.text_editability := this.GetUIAutomationTextEditability(focused_element)
             }
 
             walker := ComValue(13, 0)
             ComCall(14, uia, "Ptr*", walker)
             if !walker.Ptr {
-                return control_types
+                return details
             }
 
             current_element := focused_element
@@ -259,12 +275,12 @@ class RabbitInputTarget {
                 process_id := 0
                 ComCall(20, current_element, "Int*", &process_id)
                 if process_id != expected_process_id {
-                    return control_types.Length ? control_types : []
+                    return details
                 }
 
                 control_type := 0
                 ComCall(21, current_element, "Int*", &control_type)
-                control_types.Push(control_type)
+                details.control_types.Push(control_type)
                 if this.IsUIAutomationTextControlType(control_type)
                     || this.IsUIAutomationSelectionControlType(control_type) {
                     break
@@ -278,9 +294,60 @@ class RabbitInputTarget {
                 current_element := parent_element
             }
         } catch {
-            return []
+            details.control_types := []
+            details.text_editability := this.UNKNOWN
+            return details
         }
-        return control_types
+        return details
+    }
+
+    static GetUIAutomationTextEditability(element) {
+        local text_pattern := ComValue(13, 0)
+        local document_range := ComValue(13, 0)
+        local property_value := Buffer(24, 0)
+        try {
+            ComCall(
+                14,
+                element,
+                "Int",
+                this.UIA_TEXT_PATTERN_ID,
+                "Ptr",
+                this.GetIUIAutomationTextPatternIID(),
+                "Ptr*",
+                text_pattern
+            )
+            if !text_pattern.Ptr {
+                return this.UNKNOWN
+            }
+            ComCall(7, text_pattern, "Ptr*", document_range)
+            if !document_range.Ptr {
+                return this.UNKNOWN
+            }
+            ComCall(9, document_range, "Int", this.UIA_IS_READONLY_ATTRIBUTE_ID, "Ptr", property_value)
+            if NumGet(property_value, 0, "UShort") != this.VT_BOOL {
+                return this.UNKNOWN
+            }
+            return NumGet(property_value, 8, "Short") = 0 ? this.YES : this.NO
+        } catch {
+            return this.UNKNOWN
+        } finally {
+            DllCall("OleAut32\VariantClear", "Ptr", property_value)
+        }
+    }
+
+    static GetIUIAutomationTextPatternIID() {
+        static iid := 0
+        if !iid {
+            iid := Buffer(16, 0)
+            DllCall(
+                "Ole32\CLSIDFromString",
+                "WStr",
+                "{32EBA289-3583-42C9-9C59-3B6D9A1E9B6A}",
+                "Ptr",
+                iid
+            )
+        }
+        return iid
     }
 
     static GetUIAutomation() {
@@ -375,6 +442,12 @@ class RabbitInputTarget {
             ; UIA is unavailable or reports no focused element; keep the
             ; previous behavior so a real input field is never missed.
             result := this.UNKNOWN
+        } else if descriptor.HasOwnProp("uia_text_editability")
+            && descriptor.uia_text_editability = this.YES {
+            ; Chromium can expose a contenteditable element as a generic UIA
+            ; control instead of Edit or Document. The TextPattern range's
+            ; IsReadOnly attribute distinguishes it from ordinary page text.
+            result := this.YES
         } else {
             ; The first entry is the focused element itself.
             control_type := control_types[1]
@@ -393,7 +466,12 @@ class RabbitInputTarget {
                 ; does not regress plain page lists.
                 result := this.YES
             } else if control_type = this.UIA_DOCUMENT_CONTROL_TYPE_ID {
-                result := this.IsFocusedDocumentEditable(descriptor.process_id)
+                if descriptor.HasOwnProp("uia_text_editability")
+                    && descriptor.uia_text_editability != this.UNKNOWN {
+                    result := descriptor.uia_text_editability
+                } else {
+                    result := this.IsFocusedDocumentEditable(descriptor.process_id)
+                }
             } else {
                 ; Menu items, buttons, panes and other non-text elements pass keys
                 ; through to the browser.
@@ -440,7 +518,7 @@ class RabbitInputTarget {
                 10,
                 focused_element,
                 "Int",
-                this.UIA_IS_READONLY_PROPERTY_ID,
+                this.UIA_VALUE_IS_READONLY_PROPERTY_ID,
                 "Ptr",
                 property_value
             )
