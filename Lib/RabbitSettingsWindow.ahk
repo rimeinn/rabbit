@@ -1025,7 +1025,7 @@ class RabbitSettingsWindow extends Gui {
                 try values := this.GetAppearanceValues()
             }
             style := values ? info.style.With(values) : info.style
-            this.appearance_preview.Render(style)
+            this.appearance_preview.Render(style, this.GetAppearancePreviewLabels())
             if InStr(this.appearance_status.Value, "无法显示预览：") = 1 {
                 this.appearance_status.Value := ""
             }
@@ -1034,6 +1034,25 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_status.Value := "无法显示预览：" . err.Message
             return false
         }
+    }
+
+    GetAppearancePreviewLabels() {
+        local label
+        local labels := []
+        if !this.behavior_model {
+            if !this.workflow || !HasMethod(this.workflow, "CreateBehaviorSettingsModel") {
+                return labels
+            }
+            if !this.EnsureBehaviorSettings() {
+                return labels
+            }
+        }
+        Loop Parse this.menu_labels.Value, "," {
+            if (label := Trim(A_LoopField)) {
+                labels.Push(label)
+            }
+        }
+        return labels
     }
 
     ApplyAppearanceSettings() {

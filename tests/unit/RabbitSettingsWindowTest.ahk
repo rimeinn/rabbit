@@ -26,6 +26,7 @@ RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActi
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
 RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
+RunTest("settings window previews pending candidate labels", TestSettingsWindowPreviewsPendingLabels.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
@@ -236,6 +237,31 @@ TestSettingsWindowContainsPreviewFailures() {
         AssertTrue(
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
             "The settings window let an event-driven preview failure escape."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowPreviewsPendingLabels() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsCombinedWorkflowProbe(calls),
+        false,
+        RabbitSettingsCapturingAppearancePreview
+    )
+    try {
+        window.menu_labels.Value := "壹, 贰, 叁, 肆, 伍"
+        AssertTrue(window.PreviewAppearance(), "The appearance page failed to refresh its preview.")
+        AssertEqual(
+            "壹",
+            RabbitSettingsCapturingAppearancePreview.last_labels[1],
+            "The appearance preview ignored a pending candidate label."
+        )
+        AssertEqual(
+            "伍",
+            RabbitSettingsCapturingAppearancePreview.last_labels[5],
+            "The appearance preview used the wrong pending candidate label."
         )
     } finally {
         window.Dispose()
@@ -746,8 +772,29 @@ class RabbitSettingsFailingAppearancePreview {
     __New(ctrl) {
     }
 
-    Render(style) {
+    Render(style, select_labels := 0) {
         throw Error("preview probe failure")
+    }
+
+    Hide() {
+    }
+
+    Dispose() {
+    }
+}
+
+class RabbitSettingsCapturingAppearancePreview {
+    static last_labels := []
+
+    __New(ctrl) {
+        RabbitSettingsCapturingAppearancePreview.last_labels := []
+    }
+
+    Render(style, select_labels := 0) {
+        RabbitSettingsCapturingAppearancePreview.last_labels := select_labels is Array
+            ? select_labels.Clone()
+            : []
+        return true
     }
 
     Hide() {

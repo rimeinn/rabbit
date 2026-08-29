@@ -21,6 +21,7 @@
 RunTest("appearance preview uses the production candidate renderer", TestAppearancePreviewUsesCandidateRenderer.Bind())
 RunTest("appearance preview builds standard placeholders", TestAppearancePreviewBuildsStandardPlaceholders.Bind())
 RunTest("appearance preview builds expanded flow placeholders", TestAppearancePreviewBuildsFlowPlaceholders.Bind())
+RunTest("appearance preview uses configured candidate labels", TestAppearancePreviewUsesConfiguredLabels.Bind())
 RunTest("appearance preview aligns beside the client area", TestAppearancePreviewAlignsBesideClientArea.Bind())
 
 TestAppearancePreviewUsesCandidateRenderer() {
@@ -81,6 +82,19 @@ TestAppearancePreviewBuildsFlowPlaceholders() {
         AssertEqual(index = 6, candidate.highlighted, "The flow preview highlighted the wrong candidate.")
         AssertEqual(current, !!candidate.label, "A flow candidate used the wrong label visibility.")
     }
+}
+
+TestAppearancePreviewUsesConfiguredLabels() {
+    local labels := ["①", "②", "③", "④", "⑤"]
+    local style := RabbitUIStyleSnapshot()
+    local standard := RabbitAppearancePreview.CreatePresentation(style, labels)
+    AssertEqual("①. ", standard.candidates[1].label, "The standard preview ignored custom labels.")
+    AssertEqual("⑤. ", standard.candidates[5].label, "The standard preview used the wrong custom label.")
+
+    style := RabbitUIStyleSnapshot({ layout_type: "flow" })
+    local flow := RabbitAppearancePreview.CreatePresentation(style, labels)
+    AssertEqual("①. ", flow.candidates[6].label, "The flow preview ignored custom labels.")
+    AssertEqual("⑤. ", flow.candidates[10].label, "The flow preview used the wrong custom label.")
 }
 
 TestAppearancePreviewAlignsBesideClientArea() {

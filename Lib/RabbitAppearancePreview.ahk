@@ -27,6 +27,7 @@ class RabbitAppearancePreview {
         this.candidate_box := 0
         this.caret_gui := 0
         this.style := 0
+        this.select_labels := []
         this.enabled := false
         this.visible := false
         this.disposed := false
@@ -53,9 +54,10 @@ class RabbitAppearancePreview {
         this.owner := 0
     }
 
-    Render(style) {
+    Render(style, select_labels := 0) {
         this.AssertNotDisposed()
         this.style := style
+        this.select_labels := select_labels is Array ? select_labels.Clone() : []
         this.enabled := true
         if !this.IsOwnerReady() {
             return false
@@ -109,7 +111,7 @@ class RabbitAppearancePreview {
     ShowPreview(bounds := 0) {
         local box_height, box_width, candidate_position, caret_height, caret_width
         local client_top, content_bottom, group_height, group_width, max_width, monitor_info, position
-        local presentation := RabbitAppearancePreview.CreatePresentation(this.style)
+        local presentation := RabbitAppearancePreview.CreatePresentation(this.style, this.select_labels)
         if !bounds {
             bounds := this.GetOwnerBounds()
         }
@@ -247,10 +249,10 @@ class RabbitAppearancePreview {
         }
     }
 
-    static CreatePresentation(style) {
+    static CreatePresentation(style, select_labels := 0) {
         return style.layout_type = "flow"
-            ? this.CreateFlowPresentation(style.label_format)
-            : this.CreateStandardPresentation(style.label_format)
+            ? this.CreateFlowPresentation(style.label_format, select_labels)
+            : this.CreateStandardPresentation(style.label_format, select_labels)
     }
 
     static AlignBesidePositionToClient(position, client_top, width, height, monitor_info) {
@@ -270,13 +272,13 @@ class RabbitAppearancePreview {
         return aligned
     }
 
-    static CreateStandardPresentation(label_format) {
+    static CreateStandardPresentation(label_format, select_labels := 0) {
         local texts := ["输入", "书", "数", "树", "输"]
         local comments := ["shū rù", "shū", "shǔ", "shù", "shū"]
         local candidates := []
         for index, text in texts {
             candidates.Push({
-                label: this.FormatLabel(label_format, index),
+                label: this.FormatLabel(label_format, this.GetLabel(select_labels, index)),
                 text: text,
                 comment: comments[index],
                 highlighted: index = 1,
@@ -289,7 +291,7 @@ class RabbitAppearancePreview {
         }
     }
 
-    static CreateFlowPresentation(label_format) {
+    static CreateFlowPresentation(label_format, select_labels := 0) {
         local pages := [
             ["输入法", "输入", "书", "数", "树"],
             ["输", "属", "熟", "术", "舒"],
@@ -302,7 +304,9 @@ class RabbitAppearancePreview {
             for index, text in page {
                 local current := page_index = 2
                 candidates.Push({
-                    label: current ? this.FormatLabel(label_format, index) : "",
+                    label: current
+                        ? this.FormatLabel(label_format, this.GetLabel(select_labels, index))
+                        : "",
                     text: text,
                     comment: "",
                     highlighted: current && index = 1,
@@ -331,11 +335,18 @@ class RabbitAppearancePreview {
         }
     }
 
-    static FormatLabel(label_format, index) {
+    static GetLabel(select_labels, index) {
+        if select_labels is Array && index <= select_labels.Length && select_labels[index] != "" {
+            return select_labels[index]
+        }
+        return String(index)
+    }
+
+    static FormatLabel(label_format, label) {
         try {
-            return Format(label_format, index . "")
+            return Format(label_format, label)
         } catch {
-            return index . ". "
+            return label . ". "
         }
     }
 }
