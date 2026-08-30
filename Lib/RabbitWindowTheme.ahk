@@ -38,8 +38,12 @@ class RabbitWindowThemeController {
         this.dark_mode_reader := dark_mode_reader
         this.native := native_api
         this.roles := Map()
+        this.combo_list_hwnds := Map()
         this.dark_mode := false
         this.registered := false
+        this.list_brush := 0
+        this.command_callback := this.OnCommand.Bind(this)
+        this.list_color_callback := this.OnCtlColorListBox.Bind(this)
     }
 
     RegisterMuted(controls*) {
@@ -65,17 +69,51 @@ class RabbitWindowThemeController {
             return
         }
         ; Keep one theme for the window lifetime; reopening follows a later system theme change.
+        OnMessage(WM_COMMAND, this.command_callback)
+        OnMessage(WM_CTLCOLORLISTBOX, this.list_color_callback)
         this.registered := true
         this.Apply()
     }
 
     Dispose() {
+        if this.registered {
+            OnMessage(WM_COMMAND, this.command_callback, 0)
+            OnMessage(WM_CTLCOLORLISTBOX, this.list_color_callback, 0)
+        }
+        if this.list_brush {
+            this.native.DeleteObject(this.list_brush)
+            this.list_brush := 0
+        }
+        this.combo_list_hwnds.Clear()
         this.registered := false
+    }
+
+    OnCommand(w_param, l_param, msg, hwnd) {
+        static CBN_DROPDOWN := 7
+        local list_hwnd
+        if hwnd != this.window.Hwnd || ((w_param >> 16) & 0xFFFF) != CBN_DROPDOWN {
+            return
+        }
+        if (list_hwnd := this.native.ApplyComboBoxList(l_param, this.dark_mode)) {
+            this.combo_list_hwnds[list_hwnd] := true
+        }
+    }
+
+    OnCtlColorListBox(w_param, l_param, msg, hwnd) {
+        if hwnd != this.window.Hwnd || !this.dark_mode || !this.list_brush
+            || !this.combo_list_hwnds.Has(l_param) {
+            return
+        }
+        this.native.SetListBoxColors(w_param, 0x00F0F0F0, 0x002B2B2B)
+        return this.list_brush
     }
 
     Apply() {
         local control, hwnd
         this.dark_mode := !!this.dark_mode_reader.Call()
+        if this.dark_mode && !this.list_brush {
+            this.list_brush := this.native.CreateSolidBrush(0x002B2B2B)
+        }
         this.native.SetPreferredAppMode(this.dark_mode)
         this.native.ApplyWindow(this.window.Hwnd, this.dark_mode)
         ; Reassigning a light Gui background after creation breaks transparent Text backgrounds in AutoHotkey.
@@ -229,10 +267,50 @@ class RabbitWindowThemeNative {
                 ? "DarkMode_CFD"
                 : "DarkMode_Explorer"
             DllCall("UxTheme\SetWindowTheme", "Ptr", hwnd, "WStr", theme, "Ptr", 0)
+            if control_type = "ComboBox" || control_type = "DDL" {
+                this.ApplyComboBoxList(hwnd, true)
+            }
         } else {
             DllCall("UxTheme\SetWindowTheme", "Ptr", hwnd, "Ptr", 0, "Ptr", 0)
         }
         DllCall("User32\SendMessageW", "Ptr", hwnd, "UInt", WM_THEMECHANGED, "Ptr", 0, "Ptr", 0)
+    }
+
+    static ApplyComboBoxList(combo_hwnd, dark_mode) {
+        local list_hwnd := this.GetComboBoxListHwnd(combo_hwnd)
+        if !list_hwnd {
+            return 0
+        }
+        this.AllowDarkModeForWindow(list_hwnd, dark_mode)
+        if dark_mode {
+            DllCall("UxTheme\SetWindowTheme", "Ptr", list_hwnd, "WStr", "DarkMode_Explorer", "Ptr", 0)
+        } else {
+            DllCall("UxTheme\SetWindowTheme", "Ptr", list_hwnd, "Ptr", 0, "Ptr", 0)
+        }
+        DllCall("User32\SendMessageW", "Ptr", list_hwnd, "UInt", WM_THEMECHANGED, "Ptr", 0, "Ptr", 0)
+        return list_hwnd
+    }
+
+    static GetComboBoxListHwnd(combo_hwnd) {
+        local info := Buffer(40 + A_PtrSize * 3, 0)
+        NumPut("UInt", info.Size, info)
+        if !DllCall("User32\GetComboBoxInfo", "Ptr", combo_hwnd, "Ptr", info, "Int") {
+            return 0
+        }
+        return NumGet(info, 40 + A_PtrSize * 2, "Ptr")
+    }
+
+    static CreateSolidBrush(color) {
+        return DllCall("Gdi32\CreateSolidBrush", "UInt", color, "Ptr")
+    }
+
+    static DeleteObject(handle) {
+        return DllCall("Gdi32\DeleteObject", "Ptr", handle, "Int")
+    }
+
+    static SetListBoxColors(hdc, text_color, background_color) {
+        DllCall("Gdi32\SetTextColor", "Ptr", hdc, "UInt", text_color, "UInt")
+        DllCall("Gdi32\SetBkColor", "Ptr", hdc, "UInt", background_color, "UInt")
     }
 
     static AllowDarkModeForWindow(hwnd, dark_mode) {

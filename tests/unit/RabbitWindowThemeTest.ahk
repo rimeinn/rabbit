@@ -20,6 +20,8 @@
 
 RunTest("window theme applies system appearance", TestWindowThemeAppliesSystemAppearance.Bind())
 RunTest("light window keeps native control rendering", TestLightWindowKeepsNativeControlRendering.Bind())
+RunTest("combo box exposes its drop-down list", TestComboBoxExposesDropDownList.Bind())
+RunTest("dark combo box paints only its popup list", TestDarkComboBoxPaintsOnlyItsPopupList.Bind())
 RunTest("window theme preserves semantic text roles", TestWindowThemePreservesSemanticTextRoles.Bind())
 
 TestWindowThemeAppliesSystemAppearance() {
@@ -57,6 +59,7 @@ TestLightWindowKeepsNativeControlRendering() {
     try {
         controller.Register()
         AssertTrue(!controller.dark_mode, "The theme controller ignored the initial light mode.")
+        AssertEqual(0, controller.list_brush, "The light theme allocated a dark ComboBox brush.")
         AssertEqual(1, native.window_modes.Length, "The light theme did not update the window.")
         AssertEqual(0, native.control_modes.Length, "The light theme replaced native control rendering.")
         AssertEqual(
@@ -68,6 +71,52 @@ TestLightWindowKeepsNativeControlRendering() {
         controller.Dispose()
         window.Destroy()
     }
+}
+
+TestComboBoxExposesDropDownList() {
+    local window := Gui()
+    local dropdown := window.AddDropDownList(, ["First", "Second"])
+    try {
+        window.Show("Hide")
+        local list_hwnd := RabbitWindowThemeNative.GetComboBoxListHwnd(dropdown.Hwnd)
+        AssertTrue(list_hwnd, "GetComboBoxInfo did not return the drop-down list window.")
+        AssertTrue(
+            DllCall("User32\IsWindow", "Ptr", list_hwnd, "Int"),
+            "The reported drop-down list handle is not a window."
+        )
+    } finally {
+        window.Destroy()
+    }
+}
+
+TestDarkComboBoxPaintsOnlyItsPopupList() {
+    local window := Gui()
+    local dropdown := window.AddDropDownList(, ["First", "Second"])
+    local native := RabbitWindowThemeNativeProbe()
+    local controller := RabbitWindowThemeController(window, RabbitWindowThemeModeProbe(true), native)
+    try {
+        controller.Register()
+        controller.OnCommand(7 << 16, dropdown.Hwnd, WM_COMMAND, window.Hwnd)
+        AssertTrue(
+            controller.combo_list_hwnds.Has(native.combo_list_hwnd),
+            "The ComboBox popup was not registered for dark painting."
+        )
+        AssertEqual(
+            native.brush,
+            controller.OnCtlColorListBox(123, native.combo_list_hwnd, WM_CTLCOLORLISTBOX, window.Hwnd),
+            "The dark ComboBox popup did not return its background brush."
+        )
+        AssertEqual(1, native.list_color_calls.Length, "The dark ComboBox popup colors were not applied.")
+        AssertEqual(
+            "",
+            controller.OnCtlColorListBox(123, native.combo_list_hwnd + 1, WM_CTLCOLORLISTBOX, window.Hwnd),
+            "The ComboBox color handler affected an unrelated list."
+        )
+    } finally {
+        controller.Dispose()
+        window.Destroy()
+    }
+    AssertEqual(native.brush, native.deleted_handle, "The ComboBox background brush was not released.")
 }
 
 TestWindowThemePreservesSemanticTextRoles() {
@@ -124,6 +173,10 @@ class RabbitWindowThemeNativeProbe {
         this.app_modes := []
         this.window_modes := []
         this.control_modes := []
+        this.list_color_calls := []
+        this.combo_list_hwnd := 4321
+        this.brush := 8765
+        this.deleted_handle := 0
         this.redraw_count := 0
     }
 
@@ -137,6 +190,22 @@ class RabbitWindowThemeNativeProbe {
 
     ApplyControl(hwnd, control_type, dark_mode) {
         this.control_modes.Push({ type: control_type, dark_mode: dark_mode })
+    }
+
+    ApplyComboBoxList(hwnd, dark_mode) {
+        return this.combo_list_hwnd
+    }
+
+    CreateSolidBrush(color) {
+        return this.brush
+    }
+
+    DeleteObject(handle) {
+        this.deleted_handle := handle
+    }
+
+    SetListBoxColors(hdc, text_color, background_color) {
+        this.list_color_calls.Push({ hdc: hdc, text_color: text_color, background_color: background_color })
     }
 
     Redraw(hwnd) {
