@@ -74,14 +74,14 @@ class RabbitWindowThemeController {
     }
 
     Apply() {
-        local background, control, hwnd
+        local control, hwnd
         this.dark_mode := !!this.dark_mode_reader.Call()
         this.native.SetPreferredAppMode(this.dark_mode)
         this.native.ApplyWindow(this.window.Hwnd, this.dark_mode)
-        background := this.dark_mode
-            ? RabbitWindowThemeController.DARK_BACKGROUND
-            : this.native.GetLightBackground()
-        this.window.BackColor := background
+        ; Reassigning a light Gui background after creation breaks transparent Text backgrounds in AutoHotkey.
+        if this.dark_mode {
+            this.window.BackColor := RabbitWindowThemeController.DARK_BACKGROUND
+        }
         for hwnd, control in this.window {
             this.ApplyControl(control, this.dark_mode)
         }
@@ -240,16 +240,6 @@ class RabbitWindowThemeNative {
         if (proc := this.GetUxThemeProc(133)) {
             DllCall(proc, "Ptr", hwnd, "Int", dark_mode, "Int")
         }
-    }
-
-    static GetLightBackground() {
-        local color := DllCall("User32\GetSysColor", "Int", 15, "UInt")
-        return Format(
-            "{:02X}{:02X}{:02X}",
-            color & 0xFF,
-            (color >> 8) & 0xFF,
-            (color >> 16) & 0xFF
-        )
     }
 
     static Redraw(hwnd) {

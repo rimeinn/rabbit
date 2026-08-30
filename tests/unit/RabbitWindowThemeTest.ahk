@@ -49,6 +49,7 @@ TestWindowThemeAppliesSystemAppearance() {
 
 TestLightWindowKeepsNativeControlRendering() {
     local window := Gui()
+    local initial_background := window.BackColor
     local native := RabbitWindowThemeNativeProbe()
     local controller := RabbitWindowThemeController(window, RabbitWindowThemeModeProbe(false), native)
     window.AddText(, "Text")
@@ -58,6 +59,11 @@ TestLightWindowKeepsNativeControlRendering() {
         AssertTrue(!controller.dark_mode, "The theme controller ignored the initial light mode.")
         AssertEqual(1, native.window_modes.Length, "The light theme did not update the window.")
         AssertEqual(0, native.control_modes.Length, "The light theme replaced native control rendering.")
+        AssertEqual(
+            initial_background,
+            window.BackColor,
+            "The light theme replaced the native window background."
+        )
     } finally {
         controller.Dispose()
         window.Destroy()
@@ -131,10 +137,6 @@ class RabbitWindowThemeNativeProbe {
 
     ApplyControl(hwnd, control_type, dark_mode) {
         this.control_modes.Push({ type: control_type, dark_mode: dark_mode })
-    }
-
-    GetLightBackground() {
-        return "F0F0F0"
     }
 
     Redraw(hwnd) {
