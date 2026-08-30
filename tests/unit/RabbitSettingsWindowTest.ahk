@@ -36,10 +36,15 @@ RunTest("settings window embeds dictionary management", TestSettingsWindowEmbeds
 RunTest("settings window uses a global apply action", TestSettingsWindowUsesGlobalApplyAction.Bind())
 RunTest("settings window preserves canceled close", TestSettingsWindowPreservesCanceledClose.Bind())
 RunTest("settings window saves all settings on close", TestSettingsWindowSavesAllSettingsOnClose.Bind())
+RunTest("settings window completes first install in place", TestSettingsWindowCompletesFirstInstallInPlace.Bind())
+RunTest("settings window keeps failed first install locked", TestSettingsWindowKeepsFailedFirstInstallLocked.Bind())
 
 TestSettingsWindowNavigation() {
     local window := RabbitSettingsWindow()
     try {
+        AssertEqual(1, RabbitSettingsWindow.PageIndex(), "The default page ID did not resolve to the first page.")
+        AssertEqual(2, RabbitSettingsWindow.PageIndex("input-schemes"), "A stable page ID resolved incorrectly.")
+        AssertEqual(0, RabbitSettingsWindow.PageIndex("missing"), "An unknown page ID resolved to a page.")
         AssertEqual(1, window.selected_page, "The settings window did not select its first page.")
         AssertEqual("外观", window.page_title.Value, "The settings window showed the wrong first page.")
         AssertTrue(window.SelectPage(4), "The settings window rejected a valid page.")
@@ -444,6 +449,60 @@ TestSettingsWindowSavesAllSettingsOnClose() {
     )
 }
 
+TestSettingsWindowCompletesFirstInstallInPlace() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsInstallWorkflowProbe(calls),
+        true,
+        RabbitAppearancePreview,
+        0,
+        "input-schemes",
+        true
+    )
+    try {
+        AssertEqual(2, window.selected_page, "Install mode did not open the input-schemes page directly.")
+        AssertEqual("create_model", JoinSettingsWorkflowCalls(calls), "Install mode eagerly loaded another page.")
+        AssertTrue(!window.navigation.Enabled, "Install mode left other settings pages enabled.")
+        AssertTrue(window.apply_button.Enabled, "Install mode disabled its mandatory deployment action.")
+        AssertEqual("完成安装并部署", window.apply_button.Text, "Install mode used the regular apply label.")
+        AssertTrue(!window.SelectPage(1), "Install mode allowed navigation before deployment.")
+
+        AssertTrue(window.ApplyAllPendingSettings(), "Install mode failed to deploy without pending edits.")
+        AssertTrue(!window.installing, "A successful deployment left the window in install mode.")
+        AssertTrue(window.navigation.Enabled, "A successful deployment did not unlock settings navigation.")
+        AssertEqual("应用并重新部署", window.apply_button.Text, "The unlocked window kept the install action label.")
+        AssertTrue(window.SelectPage(7), "The unlocked window could not open another settings page.")
+        AssertEqual(
+            "create_model,save:schema_a:Control+grave,dispose_model,deploy,create_model",
+            JoinSettingsWorkflowCalls(calls),
+            "Install mode did not dispose, deploy, and recreate its model in order."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowKeepsFailedFirstInstallLocked() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsInstallWorkflowProbe(calls, 1),
+        true,
+        RabbitAppearancePreview,
+        0,
+        "input-schemes",
+        true
+    )
+    try {
+        AssertTrue(!window.CompleteInstallation(), "Install mode reported a failed deployment as successful.")
+        AssertTrue(window.installing, "A failed deployment unlocked the settings window.")
+        AssertTrue(!window.navigation.Enabled, "A failed deployment enabled settings navigation.")
+        AssertTrue(window.OnClose(), "Install mode did not handle an early close request.")
+        AssertTrue(!window.disposed, "Install mode closed before its mandatory deployment completed.")
+    } finally {
+        window.Dispose()
+    }
+}
+
 RabbitSettingsClosePrompt(calls, decision) {
     calls.Push("prompt")
     return decision
@@ -570,6 +629,23 @@ class RabbitSettingsCombinedWorkflowProbe {
     UpdateWorkspace(report_errors := false) {
         this.calls.Push("deploy")
         return 0
+    }
+}
+
+class RabbitSettingsInstallWorkflowProbe {
+    __New(calls, deploy_result := 0) {
+        this.calls := calls
+        this.deploy_result := deploy_result
+    }
+
+    CreateSwitcherSettingsModel() {
+        this.calls.Push("create_model")
+        return RabbitSettingsSwitcherModelProbe(this.calls)
+    }
+
+    UpdateWorkspace(report_errors := false) {
+        this.calls.Push("deploy")
+        return this.deploy_result
     }
 }
 

@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitCommandLine.ahk
 #Include RabbitDeployerContext.ahk
 #Include RabbitDeployerWorkflow.ahk
 #Include RabbitSettingsWindow.ahk
@@ -31,57 +32,79 @@ class RabbitDeployerApplication {
     }
 
     Run(args) {
-        this.context.command := args.Length > 0 ? args[1] : ""
-        this.context.keyboard_layout := args.Length >= 2 ? Number(args[2]) : 0
+        local options := this.ParseOptions(args)
+        this.context.command := options.command
+        this.context.keyboard_layout := options.keyboard_layout
 
         TrayTip()
         TrayTip("维护中", RABBIT_IME_NAME)
         RabbitSetupMaintenanceTray()
 
         OnExit(this.exit_callback)
-        this.workflow := RabbitDeployerWorkflow(this.context.rime)
         this.context.Initialize()
+        this.workflow := RabbitDeployerWorkflow(this.context.rime)
 
-        switch this.context.command {
+        switch options.command {
             case "deploy":
                 this.context.result := this.workflow.UpdateWorkspace()
                 this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
-            case "dict":
-                this.context.result := this.workflow.DictManagement()
-                this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
             case "sync":
                 this.context.result := this.workflow.SyncUserData()
                 this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
-            case "settings", "configure":
-                this.context.result := this.ShowSettings()
+            case "settings":
+                this.context.result := this.ShowSettings(options.target, options.installing)
                 this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
-            default:
-                this.context.result := this.workflow.Run(this.context.command = "install")
-                this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
+            case "legacy-settings":
+                if options.target = "dictionary" {
+                    this.context.result := this.workflow.DictManagement()
+                    this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
+                } else {
+                    this.context.result := this.workflow.Run(options.installing)
+                    this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
+                }
         }
 
-        if args.Length > 1 {
+        if options.return_to_rabbit {
             this.Shutdown()
-            this.RestartRabbit()
-            ExitApp()
+            this.RestartRabbit(this.context.maintenance_mode)
+            this.ExitApplication()
         }
         return this.context.result
     }
 
-    CreateSettingsWindow() {
-        return RabbitSettingsWindow(this.workflow)
+    ParseOptions(args) {
+        local options := RabbitDeployerOptions.Parse(args)
+        if options.command = "settings" && options.target
+            && !RabbitSettingsWindow.PageIndex(options.target) {
+            throw ValueError("未知的设置页面：" . options.target)
+        }
+        return options
+    }
+
+    CreateSettingsWindow(page_id := "", installing := false) {
+        return RabbitSettingsWindow(
+            this.workflow,
+            false,
+            RabbitAppearancePreview,
+            0,
+            page_id,
+            installing
+        )
     }
 
     UseLegacySettings() {
         return RabbitIsOldWindows()
     }
 
-    ShowSettings() {
+    ShowSettings(page_id := "", installing := false) {
         if this.UseLegacySettings() {
-            return this.workflow.Run(false)
+            if page_id = "dictionary" {
+                return this.workflow.DictManagement()
+            }
+            return this.workflow.Run(installing)
         }
 
-        local window := this.CreateSettingsWindow()
+        local window := this.CreateSettingsWindow(page_id, installing)
         try {
             window.Show("Center")
             window.WaitClose()
@@ -91,25 +114,24 @@ class RabbitDeployerApplication {
         return 0
     }
 
-    RestartRabbit() {
+    RestartRabbit(maintenance_mode) {
+        local command_line := []
         if A_IsCompiled {
-            Run(Format(
-                "`"{}\Rabbit.exe`" {} {} {}",
-                A_ScriptDir,
-                this.context.maintenance_mode,
-                this.context.result,
-                this.context.keyboard_layout
-            ))
+            command_line.Push(A_ScriptDir . "\Rabbit.exe")
         } else {
-            Run(Format(
-                "{} `"{}\Rabbit.ahk`" {} {} {}",
-                A_AhkPath,
-                A_ScriptDir,
-                this.context.maintenance_mode,
-                this.context.result,
-                this.context.keyboard_layout
-            ))
+            command_line.Push(A_AhkPath, A_ScriptDir . "\Rabbit.ahk")
         }
+        command_line.Push(
+            "--maintenance",
+            RabbitMaintenanceModeName(maintenance_mode),
+            "--keyboard-layout",
+            RabbitFormatKeyboardLayout(this.context.keyboard_layout)
+        )
+        Run(RabbitBuildCommandLine(command_line))
+    }
+
+    ExitApplication() {
+        ExitApp()
     }
 
     OnExit(reason, code) {

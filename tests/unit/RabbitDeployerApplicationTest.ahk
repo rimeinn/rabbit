@@ -21,16 +21,44 @@
 
 RunTest("settings window ownership", TestSettingsWindowOwnership.Bind())
 RunTest("old Windows uses legacy deployer", TestOldWindowsUsesLegacyDeployer.Bind())
+RunTest("deployer validates settings page IDs", TestDeployerValidatesSettingsPageIds.Bind())
+RunTest("old Windows redirects dictionary settings", TestOldWindowsRedirectsDictionarySettings.Bind())
 
 TestSettingsWindowOwnership() {
     local calls := []
     local application := RabbitDeployerApplicationProbe(calls)
 
-    AssertEqual(0, application.ShowSettings(), "The settings window returned a failure result.")
+    AssertEqual(0, application.ShowSettings("input-schemes", true), "The settings window returned a failure result.")
     AssertEqual(
-        "create,show,wait,dispose",
+        "create:input-schemes:1,show,wait,dispose",
         JoinSettingsWindowCalls(calls),
         "The deployer application did not own the settings window for its complete lifetime."
+    )
+}
+
+TestDeployerValidatesSettingsPageIds() {
+    local application := RabbitDeployerApplicationProbe([])
+    local options := application.ParseOptions([])
+    AssertEqual("settings", options.command, "No arguments did not select unified settings.")
+    AssertEqual("", options.target, "No arguments were mapped to a named page.")
+
+    options := application.ParseOptions(["settings", "about"])
+    AssertEqual("about", options.target, "A stable settings page ID was rejected.")
+    AssertThrows(
+        application.ParseOptions.Bind(application, ["settings", "missing-page"]),
+        "The deployer accepted an unknown settings page."
+    )
+}
+
+TestOldWindowsRedirectsDictionarySettings() {
+    local calls := []
+    local application := RabbitLegacyDeployerApplicationProbe(calls)
+
+    AssertEqual(8, application.ShowSettings("dictionary"), "The legacy dictionary result was not returned.")
+    AssertEqual(
+        "dictionary",
+        JoinSettingsWindowCalls(calls),
+        "Old Windows did not redirect unified dictionary settings to the legacy dialog."
     )
 }
 
@@ -60,8 +88,8 @@ class RabbitDeployerApplicationProbe extends RabbitDeployerApplication {
         super.__New(0)
     }
 
-    CreateSettingsWindow() {
-        this.calls.Push("create")
+    CreateSettingsWindow(page_id := "", installing := false) {
+        this.calls.Push("create:" . page_id . ":" . installing)
         return RabbitSettingsWindowProbe(this.calls)
     }
 
@@ -95,6 +123,11 @@ class RabbitLegacySettingsWorkflowProbe {
     Run(installing) {
         this.calls.Push("legacy:" . installing)
         return 7
+    }
+
+    DictManagement() {
+        this.calls.Push("dictionary")
+        return 8
     }
 }
 

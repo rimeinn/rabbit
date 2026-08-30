@@ -50,7 +50,7 @@ RunSettingsWindowPreview() {
             window.OnAppearanceControlsChanged()
             window.SelectPage(2)
             window.SelectPage(3)
-            SetTimer(window.OnClose.Bind(window), -100)
+            SetTimer(window.Dispose.Bind(window), -100)
         }
         window.WaitClose()
     } finally {

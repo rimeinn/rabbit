@@ -19,6 +19,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitAppContext.ahk
 #Include RabbitCandidateBoxFactory.ahk
+#Include RabbitCommandLine.ahk
 #Include RabbitConfig.ahk
 #Include RabbitInput.ahk
 #Include RabbitRuntimeState.ahk
@@ -39,8 +40,9 @@ class RabbitApplication {
     }
 
     Run(args) {
-        local fail_count, status
-        this.context.keyboard_layout := this.ResolveKeyboardLayout(args)
+        local fail_count, options, status
+        options := RabbitApplicationOptions.Parse(args)
+        this.context.keyboard_layout := this.ResolveKeyboardLayout(options.keyboard_layout)
         this.SetDefaultKeyboard()
         OnExit(this.exit_callback)
         this.exit_registered := true
@@ -69,7 +71,7 @@ class RabbitApplication {
         this.context.rime.initialize(this.context.traits)
         this.context.rime_initialized := true
 
-        local maintenance := args.Length == 0 ? RABBIT_PARTIAL_MAINTENANCE : args[1]
+        local maintenance := options.maintenance
         RabbitDebug(
             Format(
                 "startup: keyboard_layout=0x{:04x} maintenance={} first_run={}",
@@ -82,7 +84,7 @@ class RabbitApplication {
         if maintenance != RABBIT_NO_MAINTENANCE {
             RabbitUpdateMaintenanceTrayIcon()
             if first_run {
-                this.RunDeployer("install", this.context.keyboard_layout)
+                this.RunFirstInstallation()
             } else if this.context.rime.start_maintenance(
                 maintenance == RABBIT_FULL_MAINTENANCE) {
                 this.context.rime.join_maintenance_thread()
@@ -187,12 +189,27 @@ class RabbitApplication {
         ExitApp(code)
     }
 
-    ResolveKeyboardLayout(args) {
-        local layout
-        if args.Length >= 3 {
-            layout := Number(args[3])
+    UseLegacySettings() {
+        return RabbitIsOldWindows()
+    }
+
+    RunFirstInstallation() {
+        local args := []
+        local command := this.UseLegacySettings() ? "legacy-settings" : "settings"
+        if !this.UseLegacySettings() {
+            args.Push("input-schemes")
         }
-        if !IsSet(layout) || layout == 0 {
+        args.Push(
+            "--install",
+            "--return-to-rabbit",
+            "--keyboard-layout",
+            RabbitFormatKeyboardLayout(this.context.keyboard_layout)
+        )
+        this.RunDeployer(command, args*)
+    }
+
+    ResolveKeyboardLayout(layout := 0) {
+        if layout == 0 {
             layout := DllCall("GetKeyboardLayout", "UInt", 0)
         }
         return layout

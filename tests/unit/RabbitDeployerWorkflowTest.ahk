@@ -22,6 +22,7 @@
 RunTest("deploy workflow ownership", TestDeployWorkflowOwnership.Bind())
 RunTest("sync workflow ownership", TestSyncWorkflowOwnership.Bind())
 RunTest("deploy workflow failure cleanup", TestDeployWorkflowFailureCleanup.Bind())
+RunTest("deploy workflow checks librime results", TestDeployWorkflowChecksLibrimeResults.Bind())
 
 TestDeployWorkflowOwnership() {
     local calls := []
@@ -71,6 +72,21 @@ TestDeployWorkflowFailureCleanup() {
     )
 }
 
+TestDeployWorkflowChecksLibrimeResults() {
+    local calls := []
+    local workflow := RabbitDeployerWorkflowProbe(
+        RabbitDeployerWorkflowRimeProbe(calls, false, true, false),
+        calls
+    )
+
+    AssertEqual(1, workflow.UpdateWorkspace(), "The deploy workflow ignored a failed config deployment.")
+    AssertEqual(
+        "mutex_create,deploy,deploy_config,mutex_close",
+        JoinWorkflowCalls(calls),
+        "A reported config deployment failure skipped mutex cleanup."
+    )
+}
+
 JoinWorkflowCalls(calls) {
     local result := ""
     for call in calls {
@@ -115,9 +131,11 @@ class RabbitDeployerWorkflowMutexProbe {
 }
 
 class RabbitDeployerWorkflowRimeProbe {
-    __New(calls, fail_deploy := false) {
+    __New(calls, fail_deploy := false, deploy_result := true, config_result := true) {
         this.calls := calls
         this.fail_deploy := fail_deploy
+        this.deploy_result := deploy_result
+        this.config_result := config_result
     }
 
     deploy() {
@@ -125,10 +143,12 @@ class RabbitDeployerWorkflowRimeProbe {
         if this.fail_deploy {
             throw Error("Injected deployment failure.")
         }
+        return this.deploy_result
     }
 
     deploy_config_file(filename, version_key) {
         this.calls.Push("deploy_config")
+        return this.config_result
     }
 
     sync_user_data() {

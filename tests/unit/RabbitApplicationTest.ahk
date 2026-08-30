@@ -21,6 +21,9 @@
 
 RunTest("deployer launch after application shutdown", TestDeployerLaunchAfterShutdown.Bind())
 RunTest("tray delegates deployer launch", TestTrayDelegatesDeployerLaunch.Bind())
+RunTest("tray routes unified settings", TestTrayRoutesUnifiedSettings.Bind())
+RunTest("tray routes legacy settings", TestTrayRoutesLegacySettings.Bind())
+RunTest("first install uses platform settings", TestFirstInstallUsesPlatformSettings.Bind())
 
 TestDeployerLaunchAfterShutdown() {
     local calls := []
@@ -36,12 +39,18 @@ TestDeployerLaunchAfterShutdown() {
     application.context.runtime_state := RabbitApplicationDisposeProbe(calls, "runtime")
     application.context.appearance := RabbitApplicationDisposeProbe(calls, "appearance")
 
-    application.RunDeployer("dict", 1033)
+    application.RunDeployer(
+        "legacy-settings",
+        "dictionary",
+        "--return-to-rabbit",
+        "--keyboard-layout",
+        "0x0409"
+    )
     application.OnExit("Exit", 1)
 
     AssertEqual(
         "input,runtime,appearance,candidate,destroy:42,finalize,close,"
-            . "launch:dict:1033,exit:1",
+            . "launch:legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409,exit:1",
         JoinApplicationCalls(calls),
         "The deployer started before the main application released Rime."
     )
@@ -49,16 +58,84 @@ TestDeployerLaunchAfterShutdown() {
 
 TestTrayDelegatesDeployerLaunch() {
     local calls := []
-    local callback := (command, layout) => calls.Push(command . ":" . layout)
+    local callback := (args*) => calls.Push(JoinApplicationArguments(args))
     local tray := RabbitTrayController(0, 0, 0, 0, 0, 1033, callback)
 
     tray.StartDeployer("deploy")
 
     AssertEqual(
-        "deploy:1033",
+        "deploy:--return-to-rabbit:--keyboard-layout:0x0409",
         JoinApplicationCalls(calls),
         "The tray did not delegate deployment through the application owner."
     )
+}
+
+TestTrayRoutesUnifiedSettings() {
+    local calls := []
+    local tray := RabbitModernTrayProbe(0, 0, 0, 0, 0, 1033, (args*) => calls.Push(
+        JoinApplicationArguments(args)
+    ))
+
+    tray.StartSettings()
+    tray.StartSettings("dictionary")
+    tray.StartSettings("maintenance")
+
+    AssertEqual(
+        "settings:--return-to-rabbit:--keyboard-layout:0x0409," .
+            "settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409," .
+            "settings:maintenance:--return-to-rabbit:--keyboard-layout:0x0409",
+        JoinApplicationCalls(calls),
+        "The modern tray did not route settings pages through the unified window."
+    )
+}
+
+TestTrayRoutesLegacySettings() {
+    local calls := []
+    local tray := RabbitLegacyTrayProbe(0, 0, 0, 0, 0, 1033, (args*) => calls.Push(
+        JoinApplicationArguments(args)
+    ))
+
+    tray.StartSettings()
+    tray.StartSettings("dictionary")
+    tray.StartSettings("maintenance")
+
+    AssertEqual(
+        "legacy-settings:--return-to-rabbit:--keyboard-layout:0x0409," .
+            "legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409," .
+            "sync:--return-to-rabbit:--keyboard-layout:0x0409",
+        JoinApplicationCalls(calls),
+        "The old-Windows tray did not use legacy settings and direct synchronization."
+    )
+}
+
+TestFirstInstallUsesPlatformSettings() {
+    local modern_calls := []
+    local modern := RabbitApplicationInstallProbe(modern_calls, false)
+    modern.context.keyboard_layout := 1033
+    modern.RunFirstInstallation()
+    AssertEqual(
+        "settings:input-schemes:--install:--return-to-rabbit:--keyboard-layout:0x0409",
+        JoinApplicationCalls(modern_calls),
+        "Modern first install did not open the unified input-schemes page."
+    )
+
+    local legacy_calls := []
+    local legacy := RabbitApplicationInstallProbe(legacy_calls, true)
+    legacy.context.keyboard_layout := 1033
+    legacy.RunFirstInstallation()
+    AssertEqual(
+        "legacy-settings:--install:--return-to-rabbit:--keyboard-layout:0x0409",
+        JoinApplicationCalls(legacy_calls),
+        "Old-Windows first install did not open the legacy settings flow."
+    )
+}
+
+JoinApplicationArguments(args) {
+    local argument, result := ""
+    for argument in args {
+        result .= (result ? ":" : "") . argument
+    }
+    return result
 }
 
 JoinApplicationCalls(calls) {
@@ -76,11 +153,47 @@ class RabbitApplicationDeployerProbe extends RabbitApplication {
     }
 
     LaunchDeployer(command, args*) {
-        this.calls.Push("launch:" . command . ":" . args[1])
+        local all_args := [command]
+        for argument in args {
+            all_args.Push(argument)
+        }
+        this.calls.Push("launch:" . JoinApplicationArguments(all_args))
     }
 
     ExitApplication(code) {
         this.calls.Push("exit:" . code)
+    }
+}
+
+class RabbitApplicationInstallProbe extends RabbitApplication {
+    __New(calls, legacy) {
+        super.__New(0)
+        this.calls := calls
+        this.legacy := legacy
+    }
+
+    UseLegacySettings() {
+        return this.legacy
+    }
+
+    RunDeployer(command, args*) {
+        local all_args := [command]
+        for argument in args {
+            all_args.Push(argument)
+        }
+        this.calls.Push(JoinApplicationArguments(all_args))
+    }
+}
+
+class RabbitModernTrayProbe extends RabbitTrayController {
+    UseLegacySettings() {
+        return false
+    }
+}
+
+class RabbitLegacyTrayProbe extends RabbitTrayController {
+    UseLegacySettings() {
+        return true
     }
 }
 

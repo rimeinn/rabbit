@@ -202,8 +202,12 @@ class RabbitDeployerWorkflow {
                 return 1
             }
 
-            this.rime.deploy()
-            this.rime.deploy_config_file("rabbit.yaml", "config_version")
+            if !this.rime.deploy() {
+                return 1
+            }
+            if !this.rime.deploy_config_file("rabbit.yaml", "config_version") {
+                return 1
+            }
             return 0
         } finally {
             mutex.Close()

@@ -29,28 +29,38 @@ class RabbitSettingsWindow extends Gui {
     static SWITCH_ACTION_VALUES := ["noop", "inline_ascii", "commit_text", "commit_code", "clear"]
     static SWITCH_ACTION_LABELS := ["不切换", "临时英文", "提交文字", "提交编码", "清空输入"]
     static pages := [
-        { title: "外观", description: "配置候选窗口的配色和排版。" },
-        { title: "输入方案", description: "选择输入方案并设置方案选单快捷键。" },
-        { title: "输入与行为", description: "设置玉兔毫的输入、提示和候选行为。" },
-        { title: "应用适配", description: "按应用程序设置默认输入状态。" },
-        { title: "用户词典", description: "备份、恢复、导入和导出用户词典。" },
-        { title: "维护与同步", description: "重新部署、同步用户资料并查看诊断信息。" },
-        { title: "关于", description: "查看版本、许可证和项目链接。" },
+        { id: "appearance", title: "外观", description: "配置候选窗口的配色和排版。" },
+        { id: "input-schemes", title: "输入方案", description: "选择输入方案并设置方案选单快捷键。" },
+        { id: "behavior", title: "输入与行为", description: "设置玉兔毫的输入、提示和候选行为。" },
+        { id: "applications", title: "应用适配", description: "按应用程序设置默认输入状态。" },
+        { id: "dictionary", title: "用户词典", description: "备份、恢复、导入和导出用户词典。" },
+        { id: "maintenance", title: "维护与同步", description: "重新部署、同步用户资料并查看诊断信息。" },
+        { id: "about", title: "关于", description: "查看版本、许可证和项目链接。" },
     ]
 
     __New(
         workflow := 0,
         old_windows := RabbitIsOldWindows(),
         preview_factory := RabbitAppearancePreview,
-        close_prompt := 0
+        close_prompt := 0,
+        initial_page_id := "",
+        installing := false
     ) {
-        local controls, key
+        local controls, initial_page, key
         local page_names := []
+        initial_page := RabbitSettingsWindow.PageIndex(initial_page_id)
+        if !initial_page {
+            throw ValueError("未知的设置页面：" . initial_page_id)
+        }
+        if installing && RabbitSettingsWindow.pages[initial_page].id != "input-schemes" {
+            throw ValueError("首次安装必须打开输入方案页面。")
+        }
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】设置", this)
         this.workflow := workflow
         this.old_windows := old_windows
         this.preview_factory := preview_factory
         this.close_prompt := close_prompt
+        this.installing := installing
         this.appearance_settings := 0
         this.appearance_presets := []
         this.appearance_preview := 0
@@ -476,7 +486,25 @@ class RabbitSettingsWindow extends Gui {
         this.OnEvent("Close", this.OnClose.Bind(this))
         this.OnEvent("Escape", this.OnClose.Bind(this))
 
-        this.SelectPage(1)
+        this.SelectPage(initial_page)
+        this.navigation.Enabled := !installing
+        if installing {
+            this.footer_status.Value := "请选择输入方案，然后完成首次部署。"
+        }
+        this.UpdateApplyButton()
+    }
+
+    static PageIndex(page_id := "") {
+        local index, page
+        if !page_id {
+            return 1
+        }
+        for index, page in RabbitSettingsWindow.pages {
+            if page.id = page_id {
+                return index
+            }
+        }
+        return 0
     }
 
     AddAsciiSwitchControl(key, label, x, y) {
@@ -508,6 +536,12 @@ class RabbitSettingsWindow extends Gui {
     SelectPage(index) {
         local page
         if index < 1 || index > RabbitSettingsWindow.pages.Length {
+            return false
+        }
+        if this.installing && RabbitSettingsWindow.pages[index].id != "input-schemes" {
+            if this.selected_page && this.navigation.Value != this.selected_page {
+                this.navigation.Choose(this.selected_page)
+            }
             return false
         }
         this.selected_page := index
@@ -1148,6 +1182,9 @@ class RabbitSettingsWindow extends Gui {
         local appearance_values := 0
         local behavior_values := 0
         local deploy_result, schema_ids := 0
+        if this.installing {
+            return this.CompleteInstallation()
+        }
         if !this.HasUnsavedSettings() {
             return true
         }
@@ -1251,7 +1288,60 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    CompleteInstallation() {
+        local deploy_result, reloaded, schema_ids
+        if !this.installing || !this.EnsureSwitcherSettings() {
+            return false
+        }
+        schema_ids := this.SelectedSchemaIds()
+        if schema_ids.Length = 0 {
+            this.switcher_status.Value := "至少要选用一项输入方案。"
+            return false
+        }
+
+        this.Opt("+Disabled")
+        this.footer_status.Value := "正在保存输入方案并完成首次部署…"
+        try {
+            if !this.switcher_model.Save(schema_ids, Trim(this.switcher_hotkeys.Value)) {
+                this.switcher_status.Value := "未能保存输入方案设置。"
+                return false
+            }
+            this.DisposeSwitcherSettings()
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.EnsureSwitcherSettings()
+                this.footer_status.Value := "首次部署失败，请重试。"
+                return false
+            }
+
+            this.installing := false
+            this.navigation.Enabled := true
+            reloaded := this.EnsureSwitcherSettings()
+            this.switcher_dirty := false
+            if reloaded {
+                this.switcher_status.Value := "输入方案设置已保存。"
+                this.footer_status.Value := "首次部署完成，其他设置页面已解锁。"
+            } else {
+                this.footer_status.Value := "首次部署完成，但无法重新读取输入方案；其他页面已解锁。"
+            }
+            this.UpdateApplyButton()
+            return true
+        } catch as err {
+            this.EnsureSwitcherSettings()
+            this.footer_status.Value := "首次部署失败：" . err.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
+    }
+
     UpdateApplyButton() {
+        if this.installing {
+            this.apply_button.Text := "完成安装并部署"
+            this.apply_button.Enabled := true
+            return
+        }
+        this.apply_button.Text := "应用并重新部署"
         this.apply_button.Enabled := this.HasUnsavedSettings()
     }
 
@@ -1596,6 +1686,14 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    DisposeSwitcherSettings() {
+        if this.switcher_model {
+            this.switcher_model.Dispose()
+            this.switcher_model := 0
+        }
+        this.switcher_items := Map()
+    }
+
     PopulateSwitcherSettings() {
         local row
         this.switcher_loading := true
@@ -1859,6 +1957,9 @@ class RabbitSettingsWindow extends Gui {
     }
 
     RunDeploy() {
+        if this.installing {
+            return this.CompleteInstallation()
+        }
         return this.RunMaintenanceAction(
             (*) => this.workflow.UpdateWorkspace(true),
             "部署完成。",
@@ -2020,6 +2121,10 @@ class RabbitSettingsWindow extends Gui {
         if this.disposed {
             return true
         }
+        if this.installing {
+            this.footer_status.Value := "首次安装尚未完成，请先点击“完成安装并部署”。"
+            return true
+        }
         if this.HasUnsavedSettings() {
             decision := this.PromptUnsavedSettings()
             if decision = "Cancel" {
@@ -2051,10 +2156,7 @@ class RabbitSettingsWindow extends Gui {
                 }
             } finally {
                 try {
-                    if this.switcher_model {
-                        this.switcher_model.Dispose()
-                        this.switcher_model := 0
-                    }
+                    this.DisposeSwitcherSettings()
                 } finally {
                     try {
                         if this.behavior_model {

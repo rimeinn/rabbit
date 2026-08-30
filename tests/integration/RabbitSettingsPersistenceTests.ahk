@@ -77,6 +77,7 @@ TestSharedRabbitSettingsPersistence() {
     local style := 0
     local test_dir := RabbitSettingsPersistenceTestDirectory("rabbit")
     try {
+        FileAppend("patch: {}`n", test_dir . "\default.custom.yaml", "UTF-8")
         FileAppend("patch: {}`n", test_dir . "\rabbit.custom.yaml", "UTF-8")
         rime := RabbitSettingsPersistenceRime(test_dir)
         levers := RimeLeversApi(rime)

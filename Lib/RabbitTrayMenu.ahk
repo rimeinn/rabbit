@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitCommandLine.ahk
 #Include RabbitConfigSnapshot.ahk
 
 A_IconTip := "玉兔毫（维护中）"
@@ -36,16 +37,20 @@ RabbitUpdateMaintenanceTrayIcon() {
 }
 
 RabbitLaunchDeployer(command, args*) {
-    local arguments := ""
-    for argument in args {
-        arguments .= " " . argument
-    }
-    arguments := LTrim(arguments, " ")
+    local argument
+    local command_line := []
     if A_IsCompiled {
-        Run(Format("`"{}\RabbitDeployer.exe`" {} {}", A_ScriptDir, command, arguments))
+        command_line.Push(A_ScriptDir . "\RabbitDeployer.exe")
     } else {
-        Run(Format("{} `"{}\RabbitDeployer.ahk`" {} {}", A_AhkPath, A_ScriptDir, command, arguments))
+        command_line.Push(A_AhkPath, A_ScriptDir . "\RabbitDeployer.ahk")
     }
+    if command {
+        command_line.Push(command)
+    }
+    for argument in args {
+        command_line.Push(argument)
+    }
+    Run(RabbitBuildCommandLine(command_line))
 }
 
 class RabbitTrayController {
@@ -84,15 +89,15 @@ class RabbitTrayController {
         A_TrayMenu.Delete()
         A_TrayMenu.Add(
             "输入法设定",
-            (*) => this.StartDeployer("configure")
+            (*) => this.StartSettings()
         )
         A_TrayMenu.Add(
             "用户词典管理",
-            (*) => this.StartDeployer("dict")
+            (*) => this.StartSettings("dictionary")
         )
         A_TrayMenu.Add(
             "用户资料同步",
-            (*) => this.StartDeployer("sync")
+            (*) => this.StartSettings("maintenance")
         )
         A_TrayMenu.Add()
         A_TrayMenu.Add("用户文件夹", (*) => Run(RabbitUserDataPath()))
@@ -160,8 +165,33 @@ class RabbitTrayController {
         A_TrayMenu.Add("退出玉兔毫", (*) => ExitApp())
     }
 
-    StartDeployer(command) {
-        this.deployer_callback.Call(command, this.keyboard_layout)
+    UseLegacySettings() {
+        return RabbitIsOldWindows()
+    }
+
+    StartSettings(page_id := "") {
+        if this.UseLegacySettings() {
+            if page_id = "dictionary" {
+                return this.StartDeployer("legacy-settings", "dictionary")
+            }
+            if page_id = "maintenance" {
+                return this.StartDeployer("sync")
+            }
+            return this.StartDeployer("legacy-settings")
+        }
+        if page_id {
+            return this.StartDeployer("settings", page_id)
+        }
+        return this.StartDeployer("settings")
+    }
+
+    StartDeployer(command, args*) {
+        args.Push(
+            "--return-to-rabbit",
+            "--keyboard-layout",
+            RabbitFormatKeyboardLayout(this.keyboard_layout)
+        )
+        this.deployer_callback.Call(command, args*)
     }
 
     ToggleSuspend() {
