@@ -856,7 +856,7 @@ TestKeyBindingDialogPreservesUnknownFields() {
         AssertEqual("Down", dialog.result["send"], "The binding dialog did not update the action value.")
         AssertEqual("kept", dialog.result["custom_field"], "The binding dialog dropped an unknown field.")
     } finally {
-        try dialog.Destroy()
+        try dialog.Dispose()
         owner.Destroy()
     }
 }

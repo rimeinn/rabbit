@@ -20,6 +20,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
+#Include RabbitWindowTheme.ahk
 
 class RabbitSettingsWindow extends Gui {
     static WINDOW_WIDTH := 820
@@ -44,9 +45,11 @@ class RabbitSettingsWindow extends Gui {
         preview_factory := RabbitAppearancePreview,
         close_prompt := 0,
         initial_page_id := "",
-        installing := false
+        installing := false,
+        theme_factory := RabbitWindowThemeController
     ) {
-        local controls, initial_page, key
+        local controls, initial_dark_mode := false, initial_page, key, factory
+        local surface_options := ""
         local page_names := []
         initial_page := RabbitSettingsWindow.PageIndex(initial_page_id)
         if !initial_page {
@@ -54,6 +57,9 @@ class RabbitSettingsWindow extends Gui {
         }
         if installing && RabbitSettingsWindow.pages[initial_page].id != "input-schemes" {
             throw ValueError("首次安装必须打开输入方案页面。")
+        }
+        if HasMethod(theme_factory, "Prepare") {
+            initial_dark_mode := !!theme_factory.Prepare()
         }
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】设置", this)
         this.workflow := workflow
@@ -86,15 +92,23 @@ class RabbitSettingsWindow extends Gui {
         this.disposed := false
         this.selected_page := 0
         this.window_shown := false
+        this.initial_dark_mode := initial_dark_mode
 
-        this.SetFont("s10", "Microsoft YaHei UI")
+        if initial_dark_mode {
+            this.BackColor := RabbitWindowThemeController.DARK_BACKGROUND
+        }
+        this.SetFont(
+            "s10" . (initial_dark_mode ? " c" . RabbitWindowThemeController.DARK_TEXT : ""),
+            "Microsoft YaHei UI"
+        )
+        surface_options := initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
         this.MarginX := 20
         this.MarginY := 20
 
         this.SetFont("s16 w600")
         this.AddText("x20 y20 w170 h32 Center", "玉兔毫")
         this.SetFont("s9 w400")
-        this.AddText("x20 y52 w170 h22 Center cGray", "控制面板")
+        this.sidebar_subtitle := this.AddText("x20 y52 w170 h22 Center cGray", "控制面板")
 
         for page in RabbitSettingsWindow.pages {
             page_names.Push(page.title)
@@ -109,10 +123,11 @@ class RabbitSettingsWindow extends Gui {
         this.page_title := this.AddText("x230 y28 w570 h38", "")
         this.SetFont("s10 w400")
         this.page_description := this.AddText("x230 y72 w570 h28 cGray", "")
-        this.AddText("x230 y112 w570 h1 +0x10")
+        this.header_divider := this.AddText("x230 y112 w570 h1 +0x10")
 
         this.appearance_tabs := this.AddTab3(
-            "x230 y136 w570 h450 Hidden",
+            "x230 y136 w570 h450 Hidden"
+                . (initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             ["配色", "排版"]
         )
         this.appearance_tabs.OnEvent("Change", (*) => this.OnAppearanceTabChanged())
@@ -268,8 +283,13 @@ class RabbitSettingsWindow extends Gui {
         )
 
         this.switcher_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入方案")
+        this.switcher_list_header := this.AddText(
+            "x254 y174 w250 h24 Center +0x200 Hidden" . surface_options,
+            "方案名称"
+        )
         this.switcher_list := this.AddListView(
-            "x254 y174 w250 h178 Checked NoSort -Multi Hidden",
+            (initial_dark_mode ? "x254 y198 w250 h154 -Hdr" : "x254 y174 w250 h178")
+                . " Checked NoSort -Multi Hidden",
             ["方案名称"]
         )
         this.switcher_list.OnEvent("Click", (ctrl, row) => this.ShowSwitcherDetails(row))
@@ -283,7 +303,11 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
         this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
 
-        this.behavior_tabs := this.AddTab3("x230 y136 w570 h450 Hidden", ["常规", "按键绑定"])
+        this.behavior_tabs := this.AddTab3(
+            "x230 y136 w570 h450 Hidden"
+                . (initial_dark_mode ? " cF0F0F0 Background202020" : ""),
+            ["常规", "按键绑定"]
+        )
         this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
         this.behavior_group := this.behavior_tabs
 
@@ -341,8 +365,21 @@ class RabbitSettingsWindow extends Gui {
 
         this.behavior_tabs.UseTab(2)
         this.binding_list := this.AddListView(
-            "x250 y174 w530 h294 -Multi NoSort Hidden",
+            (initial_dark_mode ? "x250 y198 w530 h270 -Hdr" : "x250 y174 w530 h294")
+                . " -Multi NoSort Hidden",
             ["接收按键", "生效条件", "动作"]
+        )
+        this.binding_accept_header := this.AddText(
+            "x250 y174 w150 h24 +0x200 Hidden" . surface_options,
+            "  接收按键"
+        )
+        this.binding_when_header := this.AddText(
+            "x400 y174 w100 h24 +0x200 Hidden" . surface_options,
+            "  生效条件"
+        )
+        this.binding_action_header := this.AddText(
+            "x500 y174 w280 h24 +0x200 Hidden" . surface_options,
+            "  动作"
         )
         this.binding_list.OnEvent("DoubleClick", (ctrl, row) => this.EditBinding(row))
         this.binding_add := this.AddButton("x250 y478 w86 h32 Hidden", "添加")
@@ -398,11 +435,28 @@ class RabbitSettingsWindow extends Gui {
             this.binding_down,
             this.binding_help,
         ]
+        if initial_dark_mode {
+            this.behavior_binding_controls.InsertAt(
+                1,
+                this.binding_accept_header,
+                this.binding_when_header,
+                this.binding_action_header
+            )
+        }
         this.behavior_status := this.AddText("x230 y588 w570 h24 Hidden", "")
 
         this.application_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "应用适配")
+        this.application_process_header := this.AddText(
+            "x254 y174 w210 h24 +0x200 Hidden" . surface_options,
+            "  应用程序"
+        )
+        this.application_mode_header := this.AddText(
+            "x464 y174 w110 h24 +0x200 Hidden" . surface_options,
+            "  默认状态"
+        )
         this.application_list := this.AddListView(
-            "x254 y174 w320 h174 -Multi NoSort Hidden",
+            (initial_dark_mode ? "x254 y198 w320 h150 -Hdr" : "x254 y174 w320 h174")
+                . " -Multi NoSort Hidden",
             ["应用程序", "默认状态"]
         )
         this.application_list.OnEvent(
@@ -492,6 +546,25 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := "请选择输入方案，然后完成首次部署。"
         }
         this.UpdateApplyButton()
+        factory := theme_factory
+        this.window_theme := factory(this)
+        this.window_theme.RegisterMuted(
+            this.sidebar_subtitle,
+            this.page_description,
+            this.menu_help,
+            this.binding_help,
+            this.about_copyright,
+            this.footer_status
+        )
+        this.window_theme.RegisterSurface(
+            this.switcher_list_header,
+            this.binding_accept_header,
+            this.binding_when_header,
+            this.binding_action_header,
+            this.application_process_header,
+            this.application_mode_header
+        )
+        this.window_theme.Register()
     }
 
     static PageIndex(page_id := "") {
@@ -653,6 +726,7 @@ class RabbitSettingsWindow extends Gui {
 
     SetSwitcherVisible(visible) {
         this.switcher_group.Visible := visible
+        this.switcher_list_header.Visible := visible && this.initial_dark_mode
         this.switcher_list.Visible := visible
         this.switcher_details.Visible := visible
         this.switcher_hotkeys_label.Visible := visible
@@ -683,6 +757,8 @@ class RabbitSettingsWindow extends Gui {
 
     SetApplicationVisible(visible) {
         this.application_group.Visible := visible
+        this.application_process_header.Visible := visible && this.initial_dark_mode
+        this.application_mode_header.Visible := visible && this.initial_dark_mode
         this.application_list.Visible := visible
         this.application_process_label.Visible := visible
         this.application_process.Visible := visible
@@ -2032,7 +2108,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     AddBinding() {
-        local binding := RabbitKeyBindingDialog(this).ShowModal()
+        local binding := RabbitKeyBindingDialog(this, 0, this.window_theme.dark_mode_reader).ShowModal()
         if !binding {
             return false
         }
@@ -2051,7 +2127,11 @@ class RabbitSettingsWindow extends Gui {
             this.behavior_status.Value := "请先选择一条快捷键规则。"
             return false
         }
-        binding := RabbitKeyBindingDialog(this, this.bindings[row]).ShowModal()
+        binding := RabbitKeyBindingDialog(
+            this,
+            this.bindings[row],
+            this.window_theme.dark_mode_reader
+        ).ShowModal()
         if !binding {
             return false
         }
@@ -2144,39 +2224,46 @@ class RabbitSettingsWindow extends Gui {
         }
         this.disposed := true
         try {
-            if this.appearance_preview {
-                this.appearance_preview.Dispose()
-                this.appearance_preview := 0
+            if this.window_theme {
+                this.window_theme.Dispose()
+                this.window_theme := 0
             }
         } finally {
             try {
-                if this.appearance_settings {
-                    this.appearance_settings.Dispose()
-                    this.appearance_settings := 0
+                if this.appearance_preview {
+                    this.appearance_preview.Dispose()
+                    this.appearance_preview := 0
                 }
             } finally {
                 try {
-                    this.DisposeSwitcherSettings()
+                    if this.appearance_settings {
+                        this.appearance_settings.Dispose()
+                        this.appearance_settings := 0
+                    }
                 } finally {
                     try {
-                        if this.behavior_model {
-                            this.behavior_model.Dispose()
-                            this.behavior_model := 0
-                        }
+                        this.DisposeSwitcherSettings()
                     } finally {
                         try {
-                            if this.application_model {
-                                this.application_model.Dispose()
-                                this.application_model := 0
+                            if this.behavior_model {
+                                this.behavior_model.Dispose()
+                                this.behavior_model := 0
                             }
                         } finally {
                             try {
-                                if this.dictionary_model {
-                                    this.dictionary_model.Dispose()
-                                    this.dictionary_model := 0
+                                if this.application_model {
+                                    this.application_model.Dispose()
+                                    this.application_model := 0
                                 }
                             } finally {
-                                try this.Destroy()
+                                try {
+                                    if this.dictionary_model {
+                                        this.dictionary_model.Dispose()
+                                        this.dictionary_model := 0
+                                    }
+                                } finally {
+                                    try this.Destroy()
+                                }
                             }
                         }
                     }

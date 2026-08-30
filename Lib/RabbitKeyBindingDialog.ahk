@@ -17,12 +17,21 @@
  */
 
 #Include RabbitBehaviorSettingsModel.ahk
+#Include RabbitWindowTheme.ahk
 
 class RabbitKeyBindingDialog extends Gui {
     static STANDARD_ACTIONS := ["send", "toggle", "select", "send_sequence"]
 
-    __New(owner, binding := 0) {
-        local action_key, action_value
+    __New(
+        owner,
+        binding := 0,
+        dark_mode_reader := RabbitIsUserDarkMode,
+        theme_factory := RabbitWindowThemeController
+    ) {
+        local action_key, action_value, factory, initial_dark_mode := false
+        if HasMethod(theme_factory, "Prepare") {
+            initial_dark_mode := !!theme_factory.Prepare()
+        }
         super.__New(
             "+Owner" . owner.Hwnd . " -MinimizeBox -MaximizeBox",
             binding ? "编辑快捷键规则" : "添加快捷键规则",
@@ -37,9 +46,16 @@ class RabbitKeyBindingDialog extends Gui {
             action_value := ""
         }
         this.result := 0
+        this.disposed := false
         this.MarginX := 20
         this.MarginY := 18
-        this.SetFont("s10", "Microsoft YaHei UI")
+        if initial_dark_mode {
+            this.BackColor := RabbitWindowThemeController.DARK_BACKGROUND
+        }
+        this.SetFont(
+            "s10" . (initial_dark_mode ? " c" . RabbitWindowThemeController.DARK_TEXT : ""),
+            "Microsoft YaHei UI"
+        )
 
         this.AddText("x20 y22 w86 h22", "接收按键：")
         this.accept := this.AddEdit("x110 y18 w330 r1 -Multi", this.binding.Has("accept") ? this.binding["accept"] : "")
@@ -59,8 +75,14 @@ class RabbitKeyBindingDialog extends Gui {
         this.save_button := this.AddButton("x272 y172 w80 h32 Default", "确定")
         this.save_button.OnEvent("Click", (*) => this.SaveBinding())
         this.cancel_button := this.AddButton("x360 y172 w80 h32", "取消")
-        this.cancel_button.OnEvent("Click", (*) => this.Destroy())
-        this.OnEvent("Escape", (*) => this.Destroy())
+        this.cancel_button.OnEvent("Click", (*) => this.Dispose())
+        this.OnEvent("Close", (*) => this.Dispose())
+        this.OnEvent("Escape", (*) => this.Dispose())
+
+        factory := theme_factory
+        this.window_theme := factory(this, dark_mode_reader)
+        this.window_theme.RegisterError(this.status)
+        this.window_theme.Register()
     }
 
     ShowModal() {
@@ -98,8 +120,23 @@ class RabbitKeyBindingDialog extends Gui {
         }
         this.binding[action_key] := action_value
         this.result := this.binding
-        this.Destroy()
+        this.Dispose()
         return true
+    }
+
+    Dispose() {
+        if this.disposed {
+            return
+        }
+        this.disposed := true
+        try {
+            if this.window_theme {
+                this.window_theme.Dispose()
+                this.window_theme := 0
+            }
+        } finally {
+            try this.Destroy()
+        }
     }
 
     static FindAction(binding, &value) {
