@@ -26,7 +26,6 @@
 #Include RabbitCandidatePresentationTest.ahk
 #Include RabbitCandidateViewportTest.ahk
 #Include RabbitColorSchemeTest.ahk
-#Include RabbitColorSchemeDialogTest.ahk
 #Include RabbitCommandLineTest.ahk
 #Include RabbitConfigSnapshotTest.ahk
 #Include RabbitDeployerApplicationTest.ahk

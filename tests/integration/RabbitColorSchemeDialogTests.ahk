@@ -15,6 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#Requires AutoHotkey v2.0
+#SingleInstance Off
+
 #Include ..\support\TestCommon.ahk
 #Include ..\..\Lib\RabbitColorSchemeDialog.ahk
 
@@ -22,6 +25,7 @@ RunTest("color scheme dialog edits through ARGB", TestColorSchemeDialogEditsArgb
 RunTest("color scheme dialog copies to standard ARGB", TestColorSchemeDialogCopiesArgb.Bind())
 RunTest("color scheme dialog attaches the real preview owner", TestColorSchemeDialogAttachesPreview.Bind())
 RunTest("color scheme dialog prepares dark mode", TestColorSchemeDialogPreparesDarkMode.Bind())
+ExitApp()
 
 TestColorSchemeDialogEditsArgb() {
     local owner := Gui()
