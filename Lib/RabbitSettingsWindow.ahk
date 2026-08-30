@@ -273,47 +273,60 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
         this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
 
-        this.behavior_tabs := this.AddTab3("x230 y136 w570 h450 Hidden", ["常规", "快捷键"])
+        this.behavior_tabs := this.AddTab3("x230 y136 w570 h450 Hidden", ["常规", "按键绑定"])
         this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
         this.behavior_group := this.behavior_tabs
 
         this.behavior_tabs.UseTab(1)
-        this.behavior_rabbit_group := this.AddGroupBox("x246 y170 w538 h140 Hidden", "玉兔毫行为")
+        this.behavior_rabbit_group := this.AddGroupBox("x246 y170 w538 h190 Hidden", "玉兔毫行为")
         this.show_tips := this.AddCheckbox("x260 y196 w190 h24 Hidden", "显示输入状态提示")
         this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
         this.show_tips_time_label := this.AddText("x478 y198 w130 h22 Hidden", "显示时长（毫秒）：")
         this.show_tips_time := this.AddEdit("x612 y194 w80 r1 Number -Multi Hidden")
         this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.global_ascii := this.AddCheckbox("x260 y228 w490 h24 Hidden", "在所有程序之间共享中西文状态")
+        this.suspend_hotkey_label := this.AddText("x260 y228 w132 h22 Hidden", "暂停/恢复快捷键：")
+        this.suspend_hotkey := this.AddEdit("x394 y224 w372 r1 -Multi Hidden")
+        this.SetEditCue(this.suspend_hotkey, "例如：Control+Shift+F12")
+        this.suspend_hotkey.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.clipboard_mode_label := this.AddText("x260 y260 w96 h22 Hidden", "剪贴板上屏：")
+        this.clipboard_mode := this.AddDropDownList(
+            "x358 y256 w164 Choose3 Hidden",
+            ["从不使用", "始终使用", "达到指定长度时"]
+        )
+        this.clipboard_mode.OnEvent("Change", (*) => this.OnClipboardModeChanged())
+        this.clipboard_length_label := this.AddText("x536 y260 w110 h22 Hidden", "指定长度（字）：")
+        this.clipboard_length := this.AddEdit("x648 y256 w118 r1 Number -Multi Hidden")
+        this.clipboard_length.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.global_ascii := this.AddCheckbox("x260 y286 w490 h24 Hidden", "在所有程序之间共享中西文状态")
         this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.fix_candidate_box := this.AddCheckbox("x260 y258 w238 h24 Hidden", "组字时保持候选窗位置不变")
+        this.fix_candidate_box := this.AddCheckbox("x260 y312 w238 h24 Hidden", "组字时保持候选窗位置不变")
         this.fix_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.use_legacy_candidate_box := this.AddCheckbox("x510 y258 w238 h24 Hidden", "使用旧版候选窗")
+        this.use_legacy_candidate_box := this.AddCheckbox("x510 y312 w238 h24 Hidden", "使用旧版候选窗")
         this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.bypass_password_fields := this.AddCheckbox("x260 y284 w490 h24 Hidden", "在密码输入框中绕过 Rime")
+        this.bypass_password_fields := this.AddCheckbox("x260 y336 w490 h24 Hidden", "在密码输入框中绕过 Rime")
         this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
 
-        this.ascii_switch_group := this.AddGroupBox("x246 y316 w538 h142 Hidden", "中西文切换键")
+        this.ascii_switch_group := this.AddGroupBox("x246 y366 w538 h110 Hidden", "中西文切换键")
         this.ascii_switch_controls := Map()
-        this.AddAsciiSwitchControl("Shift_L", "左 Shift：", 260, 342)
-        this.AddAsciiSwitchControl("Shift_R", "右 Shift：", 432, 342)
-        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 342)
-        this.AddAsciiSwitchControl("Control_L", "左 Ctrl：", 260, 382)
-        this.AddAsciiSwitchControl("Control_R", "右 Ctrl：", 432, 382)
-        this.AddAsciiSwitchControl("Eisu_toggle", "英数键：", 604, 382)
+        this.AddAsciiSwitchControl("Shift_L", "左 Shift：", 260, 392)
+        this.AddAsciiSwitchControl("Shift_R", "右 Shift：", 432, 392)
+        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 392)
+        this.AddAsciiSwitchControl("Control_L", "左 Ctrl：", 260, 432)
+        this.AddAsciiSwitchControl("Control_R", "右 Ctrl：", 432, 432)
+        this.AddAsciiSwitchControl("Eisu_toggle", "英数键：", 604, 432)
 
-        this.menu_group := this.AddGroupBox("x246 y464 w538 h104 Hidden", "候选与翻页")
-        this.menu_page_size_label := this.AddText("x260 y490 w88 h22 Hidden", "每页候选数：")
-        this.menu_page_size := this.AddEdit("x350 y486 w68 r1 Number -Multi Hidden")
+        this.menu_group := this.AddGroupBox("x246 y482 w538 h86 Hidden", "候选与翻页")
+        this.menu_page_size_label := this.AddText("x260 y508 w88 h22 Hidden", "每页候选数：")
+        this.menu_page_size := this.AddEdit("x350 y504 w68 r1 Number -Multi Hidden")
         this.SetEditCue(this.menu_page_size, "5")
         this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.menu_labels_label := this.AddText("x438 y490 w90 h22 Hidden", "候选序号：")
-        this.menu_labels := this.AddEdit("x530 y486 w236 r1 -Multi Hidden")
+        this.menu_labels_label := this.AddText("x438 y508 w90 h22 Hidden", "候选序号：")
+        this.menu_labels := this.AddEdit("x530 y504 w236 r1 -Multi Hidden")
         this.SetEditCue(this.menu_labels, "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
         this.menu_labels.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.menu_help := this.AddText(
-            "x260 y520 w506 h36 cGray Hidden",
-            "此处修改全局 default.custom.yaml；具体输入方案仍可覆盖候选设置。候选序号请用逗号分隔。"
+            "x260 y538 w506 h22 cGray Hidden",
+            "候选序号请用逗号分隔；具体输入方案仍可覆盖候选设置。"
         )
 
         this.behavior_tabs.UseTab(2)
@@ -344,6 +357,12 @@ class RabbitSettingsWindow extends Gui {
             this.show_tips,
             this.show_tips_time_label,
             this.show_tips_time,
+            this.suspend_hotkey_label,
+            this.suspend_hotkey,
+            this.clipboard_mode_label,
+            this.clipboard_mode,
+            this.clipboard_length_label,
+            this.clipboard_length,
             this.global_ascii,
             this.fix_candidate_box,
             this.use_legacy_candidate_box,
@@ -1260,6 +1279,15 @@ class RabbitSettingsWindow extends Gui {
         try {
             this.show_tips.Value := this.behavior_model.show_tips
             this.show_tips_time.Value := this.behavior_model.show_tips_time
+            this.suspend_hotkey.Value := this.behavior_model.suspend_hotkey
+            this.clipboard_mode.Choose(
+                this.behavior_model.send_by_clipboard_length < 0
+                    ? 1
+                    : this.behavior_model.send_by_clipboard_length = 0 ? 2 : 3
+            )
+            this.clipboard_length.Value := this.behavior_model.send_by_clipboard_length > 0
+                ? this.behavior_model.send_by_clipboard_length
+                : 8
             this.global_ascii.Value := this.behavior_model.global_ascii
             this.fix_candidate_box.Value := this.behavior_model.fix_candidate_box
             this.use_legacy_candidate_box.Value := this.behavior_model.use_legacy_candidate_box
@@ -1275,6 +1303,7 @@ class RabbitSettingsWindow extends Gui {
             this.bindings := this.behavior_model.GetBindings()
             this.RefreshBindingList()
             this.show_tips_time.Enabled := !!this.show_tips.Value
+            this.UpdateClipboardControls()
             this.behavior_dirty := false
             this.behavior_status.Value := ""
         } finally {
@@ -1292,11 +1321,23 @@ class RabbitSettingsWindow extends Gui {
         this.UpdateApplyButton()
     }
 
+    OnClipboardModeChanged() {
+        this.UpdateClipboardControls()
+        this.OnBehaviorChanged()
+    }
+
+    UpdateClipboardControls() {
+        local use_threshold := this.clipboard_mode.Value = 3
+        this.clipboard_length_label.Enabled := use_threshold
+        this.clipboard_length.Enabled := use_threshold
+    }
+
     GetBehaviorValues() {
         local controls, key, label
         local labels := []
         local page_size := Trim(this.menu_page_size.Value)
         local show_tips_time := Trim(this.show_tips_time.Value)
+        local clipboard_length := Trim(this.clipboard_length.Value)
         if !RegExMatch(show_tips_time, "^\d+$") || Number(show_tips_time) > 2147483647 {
             throw ValueError("状态提示显示时长必须是非负整数。")
         }
@@ -1305,6 +1346,12 @@ class RabbitSettingsWindow extends Gui {
         }
         if !RegExMatch(page_size, "^\d+$") || Number(page_size) < 1 || Number(page_size) > 10 {
             throw ValueError("每页候选数必须是 1 到 10 之间的整数。")
+        }
+        if this.clipboard_mode.Value = 3
+            && (!RegExMatch(clipboard_length, "^\d+$")
+                || Number(clipboard_length) < 1
+                || Number(clipboard_length) > 2147483647) {
+            throw ValueError("剪贴板上屏的指定长度必须是正整数。")
         }
         Loop Parse this.menu_labels.Value, "," {
             if (label := Trim(A_LoopField)) {
@@ -1318,6 +1365,10 @@ class RabbitSettingsWindow extends Gui {
         return {
             show_tips: !!this.show_tips.Value,
             show_tips_time: Number(show_tips_time),
+            suspend_hotkey: Trim(this.suspend_hotkey.Value),
+            send_by_clipboard_length: this.clipboard_mode.Value = 1
+                ? -1
+                : this.clipboard_mode.Value = 2 ? 0 : Number(clipboard_length),
             global_ascii: !!this.global_ascii.Value,
             fix_candidate_box: !!this.fix_candidate_box.Value,
             use_legacy_candidate_box: !!this.use_legacy_candidate_box.Value,

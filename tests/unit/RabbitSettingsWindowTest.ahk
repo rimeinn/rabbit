@@ -626,6 +626,8 @@ class RabbitSettingsBehaviorModelProbe {
         this.calls := calls
         this.show_tips := true
         this.show_tips_time := 1200
+        this.suspend_hotkey := ""
+        this.send_by_clipboard_length := 8
         this.global_ascii := false
         this.fix_candidate_box := false
         this.use_legacy_candidate_box := false
@@ -702,18 +704,26 @@ TestSettingsWindowDefaultBehaviorControls() {
         AssertEqual(1, window.binding_list.GetCount(), "The behavior page showed the wrong binding count.")
         AssertEqual("5", RabbitSettingsEditCue(window.menu_page_size), "The page-size placeholder was wrong.")
         AssertEqual(
+            "例如：Control+Shift+F12",
+            RabbitSettingsEditCue(window.suspend_hotkey),
+            "The suspend-hotkey placeholder was wrong."
+        )
+        AssertEqual(
             "1, 2, 3, 4, 5, 6, 7, 8, 9, 10",
             RabbitSettingsEditCue(window.menu_labels),
             "The candidate-label placeholder was wrong."
         )
         window.behavior_tabs.Choose(2)
         window.OnBehaviorTabChanged()
-        AssertTrue(window.binding_list.Visible, "The shortcut tab did not show the binding list.")
-        AssertTrue(!window.menu_page_size.Visible, "The shortcut tab left general controls visible.")
+        AssertTrue(window.binding_list.Visible, "The key-binding tab did not show the binding list.")
+        AssertTrue(!window.menu_page_size.Visible, "The key-binding tab left general controls visible.")
         window.behavior_tabs.Choose(1)
         window.OnBehaviorTabChanged()
         window.menu_page_size.Value := 7
         window.menu_labels.Value := "①, ②"
+        window.suspend_hotkey.Value := "Control+Shift+F12"
+        window.clipboard_mode.Choose(2)
+        window.OnClipboardModeChanged()
         local values := window.GetBehaviorValues()
         AssertEqual(7, values.page_size, "The behavior page returned the wrong page size.")
         AssertEqual(
@@ -722,6 +732,13 @@ TestSettingsWindowDefaultBehaviorControls() {
             "The behavior page parsed candidate labels incorrectly."
         )
         AssertEqual("inline_ascii", values.switch_key["Shift_L"], "The behavior page returned the wrong switch action.")
+        AssertEqual(
+            "Control+Shift+F12",
+            values.suspend_hotkey,
+            "The behavior page returned the wrong suspend hotkey."
+        )
+        AssertEqual(0, values.send_by_clipboard_length, "The always-use clipboard mode was encoded incorrectly.")
+        AssertTrue(!window.clipboard_length.Enabled, "The always-use mode left the threshold enabled.")
         window.menu_page_size.Value := ""
         window.menu_labels.Value := ""
         values := window.GetBehaviorValues()

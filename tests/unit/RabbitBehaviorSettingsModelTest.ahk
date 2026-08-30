@@ -29,6 +29,12 @@ TestBehaviorSettingsModelLoadsDefaults() {
     try {
         AssertTrue(model.show_tips, "The behavior model loaded the wrong status-tip value.")
         AssertEqual(1500, model.show_tips_time, "The behavior model loaded the wrong status-tip duration.")
+        AssertEqual(
+            "Control+Shift+F12",
+            model.suspend_hotkey,
+            "The behavior model loaded the wrong suspend hotkey."
+        )
+        AssertEqual(12, model.send_by_clipboard_length, "The model loaded the wrong clipboard threshold.")
         AssertEqual("inline_ascii", model.switch_key["Shift_L"], "The model loaded the wrong switch action.")
         AssertEqual(6, model.page_size, "The model loaded the wrong candidate page size.")
         AssertEqual("①", model.alternative_select_labels[1], "The model loaded the wrong candidate label.")
@@ -49,9 +55,28 @@ TestBehaviorSettingsModelIsolatesConfigFiles() {
         calls.Length := 0
         local values := model.GetCurrentValues()
         values.show_tips := false
+        values.suspend_hotkey := "Alt+F12"
+        values.send_by_clipboard_length := 0
         AssertTrue(model.Save(values), "The model failed to save Rabbit-only behavior settings.")
         AssertTrue(BehaviorCallsHave(calls, "save:rabbit"), "The model did not save rabbit.custom.yaml.")
         AssertTrue(!BehaviorCallsHave(calls, "save:default"), "A Rabbit-only edit wrote default.custom.yaml.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_string:rabbit:suspend_hotkey:Alt+F12"),
+            "The suspend hotkey was not customized."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_int:rabbit:send_by_clipboard_length:0"),
+            "The clipboard strategy was not customized."
+        )
+
+        calls.Length := 0
+        values := model.GetCurrentValues()
+        values.suspend_hotkey := ""
+        AssertTrue(model.Save(values), "The model failed to disable the suspend hotkey.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:rabbit:suspend_hotkey"),
+            "An empty suspend hotkey did not clear the customization."
+        )
 
         calls.Length := 0
         values := model.GetCurrentValues()
@@ -201,6 +226,10 @@ class RabbitBehaviorRimeProbe {
             value := 1500
             return true
         }
+        if config = "rabbit" && key = "send_by_clipboard_length" {
+            value := 12
+            return true
+        }
         if config = "default" && key = "menu/page_size" {
             value := 6
             return true
@@ -214,6 +243,10 @@ class RabbitBehaviorRimeProbe {
 
     config_test_get_string(config, key, &value) {
         local name
+        if config = "rabbit" && key = "suspend_hotkey" {
+            value := "Control+Shift+F12"
+            return true
+        }
         if config != "default" {
             return false
         }

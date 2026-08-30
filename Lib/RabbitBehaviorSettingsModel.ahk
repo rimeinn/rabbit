@@ -60,6 +60,8 @@ class RabbitBehaviorSettingsModel {
 
         this.show_tips := this.GetBool(config, "show_tips", true)
         this.show_tips_time := this.GetInt(config, "show_tips_time", 1200)
+        this.suspend_hotkey := this.GetString(config, "suspend_hotkey", "")
+        this.send_by_clipboard_length := this.GetInt(config, "send_by_clipboard_length", 8)
         this.global_ascii := this.GetBool(config, "global_ascii", false)
         this.fix_candidate_box := this.GetBool(config, "fix_candidate_box", false)
         this.use_legacy_candidate_box := this.GetBool(config, "use_legacy_candidate_box", false)
@@ -80,6 +82,11 @@ class RabbitBehaviorSettingsModel {
     GetInt(config, key, fallback) {
         local value
         return this.rime.config_test_get_int(config, key, &value) ? value : fallback
+    }
+
+    GetString(config, key, fallback) {
+        local value
+        return this.rime.config_test_get_string(config, key, &value) ? value : fallback
     }
 
     LoadSwitchKeys(config) {
@@ -193,6 +200,8 @@ class RabbitBehaviorSettingsModel {
         return {
             show_tips: this.show_tips,
             show_tips_time: this.show_tips_time,
+            suspend_hotkey: this.suspend_hotkey,
+            send_by_clipboard_length: this.send_by_clipboard_length,
             global_ascii: this.global_ascii,
             fix_candidate_box: this.fix_candidate_box,
             use_legacy_candidate_box: this.use_legacy_candidate_box,
@@ -229,6 +238,8 @@ class RabbitBehaviorSettingsModel {
         local original := this.original_values
         return values.show_tips != original.show_tips
             || values.show_tips_time != original.show_tips_time
+            || values.suspend_hotkey != original.suspend_hotkey
+            || values.send_by_clipboard_length != original.send_by_clipboard_length
             || values.global_ascii != original.global_ascii
             || values.fix_candidate_box != original.fix_candidate_box
             || values.use_legacy_candidate_box != original.use_legacy_candidate_box
@@ -254,6 +265,22 @@ class RabbitBehaviorSettingsModel {
             return false
         }
         if !this.api.customize_int(this.settings, "show_tips_time", values.show_tips_time) {
+            return false
+        }
+        if values.suspend_hotkey != this.original_values.suspend_hotkey {
+            if values.suspend_hotkey {
+                if !this.api.customize_string(this.settings, "suspend_hotkey", values.suspend_hotkey) {
+                    return false
+                }
+            } else if !this.api.customize_item(this.settings, "suspend_hotkey", 0) {
+                return false
+            }
+        }
+        if !this.api.customize_int(
+            this.settings,
+            "send_by_clipboard_length",
+            values.send_by_clipboard_length
+        ) {
             return false
         }
         if !this.api.customize_bool(this.settings, "global_ascii", values.global_ascii) {
@@ -344,6 +371,8 @@ class RabbitBehaviorSettingsModel {
     SetCurrentValues(values) {
         this.show_tips := values.show_tips
         this.show_tips_time := values.show_tips_time
+        this.suspend_hotkey := values.suspend_hotkey
+        this.send_by_clipboard_length := values.send_by_clipboard_length
         this.global_ascii := values.global_ascii
         this.fix_candidate_box := values.fix_candidate_box
         this.use_legacy_candidate_box := values.use_legacy_candidate_box
