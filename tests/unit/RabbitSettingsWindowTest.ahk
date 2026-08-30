@@ -133,7 +133,7 @@ TestSettingsWindowSavesAppearanceSettings() {
     local workflow := RabbitSettingsAppearanceWorkflowProbe(calls)
     local window := RabbitSettingsWindow(workflow, true)
     try {
-        AssertEqual(2, window.appearance_presets.Length, "The appearance page showed the wrong preset count.")
+        AssertEqual(2, window.appearance_page.presets.Length, "The appearance page showed the wrong preset count.")
         AssertEqual(1, window.appearance_list.Value, "The appearance page did not select the active preset.")
         window.appearance_list.Choose(2)
         window.OnAppearanceSelectionChange()
@@ -212,12 +212,12 @@ TestSettingsWindowExposesAppearanceControls() {
             "Floating preedit did not enable its opacity setting."
         )
         AssertTrue(
-            window.appearance_settings.last_values["floating_preedit"],
+            window.appearance_page.settings.last_values["floating_preedit"],
             "The appearance page did not stage floating preedit."
         )
         AssertEqual(
             "flow",
-            window.appearance_settings.last_values["layout_type"],
+            window.appearance_page.settings.last_values["layout_type"],
             "The appearance page staged the wrong layout type."
         )
     } finally {
@@ -405,7 +405,7 @@ TestSettingsWindowUsesGlobalApplyAction() {
 TestSettingsWindowPreservesCanceledClose() {
     local window := RabbitSettingsWindow(0, true, RabbitAppearancePreview, (*) => "Cancel")
     try {
-        window.appearance_dirty := true
+        window.appearance_page.dirty := true
         AssertTrue(window.OnClose(), "The settings window did not handle a canceled close.")
         AssertTrue(!window.disposed, "The settings window closed after the user canceled.")
         window.close_prompt := (*) => "No"
@@ -429,7 +429,7 @@ TestSettingsWindowSavesAllSettingsOnClose() {
         AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
         AssertTrue(window.SelectPage(4), "The settings window rejected the application page.")
-        window.appearance_dirty := true
+        window.appearance_page.dirty := true
         window.switcher_dirty := true
         window.behavior_dirty := true
         window.application_dirty := true
