@@ -268,7 +268,7 @@ class CandidateBox {
         Loop this.num_candidates {
             local candidate := presentation.candidates[A_Index]
             this.candidateHighlights.Push(candidate.highlighted)
-            label_box := this.GetTextMetrics(candidate.label, this.labFont)
+            label_box := this.GetLabelTextMetrics(candidate.label, this.labFont)
             this.candidatesLayout.labels.Push(
                 { x: base_x, y: base_y, w: label_box.w, h: label_box.h, text: candidate.label })
 
@@ -600,7 +600,7 @@ class CandidateBox {
         Loop this.num_candidates {
             local candidate := presentation.candidates[A_Index]
             local column := Mod(A_Index - 1, page_size) + 1
-            label_widths[column] := Max(label_widths[column], this.GetTextMetrics(candidate.label, this.labFont).w)
+            label_widths[column] := Max(label_widths[column], this.GetLabelTextMetrics(candidate.label, this.labFont).w)
         }
         column_count := Min(page_size, this.num_candidates)
         row_count := Ceil(this.num_candidates / page_size)
@@ -615,7 +615,7 @@ class CandidateBox {
             local candidate := presentation.candidates[A_Index]
             local column := Mod(A_Index - 1, page_size) + 1
             local row := Ceil(A_Index / page_size)
-            local label_box := this.GetTextMetrics(candidate.label, this.labFont)
+            local label_box := this.GetLabelTextMetrics(candidate.label, this.labFont)
             local label_width := label_widths[column]
             local candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
             local comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
@@ -1092,6 +1092,15 @@ class CandidateBox {
             return { w: 0, h: 0 }
         }
         return this.d2d.GetMetrics(text, font_obj.name, font_obj.size)
+    }
+
+    GetLabelTextMetrics(text, font_obj) {
+        if !text {
+            return { w: 0, h: 0 }
+        }
+        return this.d2d.GetMetrics(text, font_obj.name, font_obj.size, 400, 0, {
+            include_trailing_whitespace: true
+        })
     }
 
     GetVerticalTextMetrics(text, font_obj) {

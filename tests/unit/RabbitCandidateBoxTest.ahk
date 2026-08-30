@@ -79,6 +79,11 @@ RunTest(
         candidate_golden
     )
 )
+RunTest("Direct2D trailing whitespace measurement", TestDirect2DTrailingWhitespaceMeasurement)
+RunTest(
+    "modern labels include trailing whitespace",
+    TestModernLabelTrailingWhitespace.Bind(candidate_style)
+)
 RunTest("modern candidate rows use candidate background colors", TestModernCandidateBackgroundColors.Bind(candidate_style))
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
@@ -165,6 +170,72 @@ ReadGoldenInteger(path, section, key) {
         throw Error(Format("Invalid candidate box golden [{}] {}: {}", section, key, value))
     }
     return Integer(value)
+}
+
+TestDirect2DTrailingWhitespaceMeasurement() {
+    local d2d := Direct2D()
+    try {
+        local without_space := d2d.GetMetrics("1.", "Segoe UI", 16)
+        local default_with_space := d2d.GetMetrics("1. ", "Segoe UI", 16)
+        local included_with_space := d2d.GetMetrics("1. ", "Segoe UI", 16, 400, 0, {
+            include_trailing_whitespace: true
+        })
+        AssertEqual(
+            without_space.w,
+            default_with_space.w,
+            "The default Direct2D measurement unexpectedly included trailing whitespace."
+        )
+        AssertTrue(
+            included_with_space.w > default_with_space.w,
+            "The opt-in Direct2D measurement excluded trailing whitespace."
+        )
+    } finally {
+        d2d := 0
+    }
+}
+
+TestModernLabelTrailingWhitespace(style) {
+    for layout_type in ["stacked", "flow"] {
+        local candidate_box := CandidateBox(style.With(Map("layout_type", layout_type)))
+        local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}  ")
+        local width, height
+        try {
+            if layout_type = "flow" {
+                presentation.flow_page_size := 5
+            }
+            candidate_box.BuildPresentation(presentation, &width, &height, 400)
+            local label := presentation.candidates[1].label
+            local default_metrics := candidate_box.d2d.GetMetrics(
+                label,
+                candidate_box.labFont.name,
+                candidate_box.labFont.size
+            )
+            local included_metrics := candidate_box.d2d.GetMetrics(
+                label,
+                candidate_box.labFont.name,
+                candidate_box.labFont.size,
+                400,
+                0,
+                {include_trailing_whitespace: true}
+            )
+            AssertTrue(
+                included_metrics.w > default_metrics.w,
+                layout_type . " label test did not contain measurable trailing whitespace."
+            )
+            AssertEqual(
+                included_metrics.w,
+                candidate_box.candidatesLayout.labels[1].w,
+                layout_type . " label layout excluded trailing whitespace."
+            )
+            AssertEqual(
+                candidate_box.candidatesLayout.labels[1].x + included_metrics.w + candidate_box.padding,
+                candidate_box.candidatesLayout.cands[1].x,
+                layout_type . " candidate did not start after the full label width."
+            )
+        } finally {
+            candidate_box.Dispose()
+        }
+    }
 }
 
 TestOldWindowsFactorySelection(style) {

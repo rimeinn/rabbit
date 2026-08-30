@@ -443,7 +443,10 @@ class Direct2D {
         ))
         try {
             local metrics := this.GetTextLayoutMetrics(pTextLayout)
-            return { w: metrics.width, h: metrics.height }
+            local width := this.GetTextFormatOption(options, "include_trailing_whitespace", false)
+                ? metrics.width_including_trailing_whitespace
+                : metrics.width
+            return { w: width, h: metrics.height }
         } finally {
             Direct2D.release(pTextLayout)
         }
