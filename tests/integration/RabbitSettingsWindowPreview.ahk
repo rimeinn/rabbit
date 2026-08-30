@@ -42,6 +42,8 @@ RunSettingsWindowPreview() {
         window := RabbitSettingsWindow(RabbitDeployerWorkflow(rime))
         window.Show("Center")
         if A_Args.Length > 0 && A_Args[1] = "ci" {
+            window.appearance_page.dialog_factory := RabbitSettingsAutoClosingColorSchemeDialog
+            window.appearance_page.EditColorScheme(1)
             window.appearance_tabs.Choose(2)
             window.OnAppearanceTabChanged()
             window.appearance_layout_type.Choose(2)
@@ -58,5 +60,12 @@ RunSettingsWindowPreview() {
             window.Dispose()
         }
         rime.finalize()
+    }
+}
+
+class RabbitSettingsAutoClosingColorSchemeDialog extends RabbitColorSchemeDialog {
+    ShowModal() {
+        SetTimer(this.Dispose.Bind(this), -200)
+        return super.ShowModal()
     }
 }

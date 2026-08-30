@@ -76,6 +76,15 @@ class RabbitAppearancePreview {
         this.HideWindows()
     }
 
+    SetOwner(owner) {
+        this.AssertNotDisposed()
+        this.owner := owner
+        this.owner_bounds_key := ""
+        if this.enabled && this.style && this.IsOwnerReady() {
+            this.ShowPreview()
+        }
+    }
+
     HideWindows() {
         if this.candidate_box {
             this.candidate_box.Hide()

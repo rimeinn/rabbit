@@ -16,6 +16,7 @@
  */
 
 #Include RabbitAppearancePreview.ahk
+#Include RabbitColorSchemeDialog.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
 class RabbitAppearanceSettingsPage {
@@ -32,7 +33,9 @@ class RabbitAppearanceSettingsPage {
         this.style := RabbitUIStyleSnapshot()
         this.light_scheme := ""
         this.dark_scheme := ""
+        this.selection_dirty := false
         this.disposed := false
+        this.dialog_factory := RabbitColorSchemeDialog
     }
 
     SetVisible(visible) {
@@ -55,6 +58,7 @@ class RabbitAppearanceSettingsPage {
         for ctrl in owner.appearance_typesetting_controls {
             ctrl.Visible := typesetting_visible
         }
+        owner.appearance_follow_light.Visible := color_visible && owner.appearance_target.Value = 2
     }
 
     OnTabChanged() {
@@ -114,6 +118,7 @@ class RabbitAppearanceSettingsPage {
             this.PopulateColorList()
             this.PopulateStyle(style)
             this.dirty := false
+            this.selection_dirty := false
             owner.appearance_status.Value := this.presets.Length
                 ? ""
                 : "没有找到可用的配色。"
@@ -124,30 +129,49 @@ class RabbitAppearanceSettingsPage {
         this.RenderPreview()
     }
 
-    PopulateColorList() {
+    PopulateColorList(selected_id := "") {
         local owner := this.owner
         local active_index := 0
-        local names := []
-        local selected_id := owner.appearance_target.Value = 2
+        local selected_index := 0
+        local active_id := owner.appearance_target.Value = 2
             ? this.dark_scheme
             : this.light_scheme
+        if !selected_id {
+            selected_id := active_id
+        }
         for i, info in this.presets {
-            names.Push(info.name)
-            if info.color_scheme_id = selected_id {
+            if info.color_scheme_id = active_id {
                 active_index := i
+            }
+            if info.color_scheme_id = selected_id {
+                selected_index := i
             }
         }
         owner.appearance_list.Delete()
-        owner.appearance_list.Add(names)
-        if active_index > 0 {
-            owner.appearance_list.Choose(active_index)
-            this.ShowDetails(active_index)
-        } else {
-            owner.appearance_list.Choose(0)
-            owner.appearance_details.Value := owner.appearance_target.Value = 2
-                ? "深色模式当前跟随浅色配色。"
-                : ""
+        for i, info in this.presets {
+            owner.appearance_list.Add(
+                "",
+                i = active_index ? "●" : "",
+                info.name,
+                info.color_scheme_id,
+                this.IsCustomScheme(info) ? "自定义" : "内置"
+            )
         }
+        owner.appearance_list.ModifyCol(1, 54)
+        owner.appearance_list.ModifyCol(2, 210)
+        owner.appearance_list.ModifyCol(3, 156)
+        owner.appearance_list.ModifyCol(4, 90)
+        if !selected_index && this.presets.Length {
+            selected_index := active_index ? active_index : 1
+        }
+        if selected_index {
+            owner.appearance_list.Modify(selected_index, "Select Focus Vis")
+            this.ShowDetails(selected_index)
+        } else if owner.appearance_target.Value = 2 && !this.dark_scheme {
+            owner.appearance_details.Value := "深色模式当前跟随浅色配色。"
+        }
+        owner.appearance_follow_light.Value := owner.appearance_target.Value = 2 && !this.dark_scheme
+        this.UpdateColorButtons()
     }
 
     PopulateStyle(style) {
@@ -241,27 +265,18 @@ class RabbitAppearanceSettingsPage {
         } finally {
             this.loading := false
         }
+        this.SetTabControlsVisible(this.owner.selected_page = 1)
         this.RenderPreview()
     }
 
     OnSelectionChange() {
         local owner := this.owner
-        local index := owner.appearance_list.Value
+        local index := this.SelectedSchemeIndex()
         if this.loading || index < 1 || index > this.presets.Length {
             return
         }
-        local scheme_id := this.presets[index].color_scheme_id
-        if owner.appearance_target.Value = 2 {
-            if HasMethod(this.settings, "SelectDarkColorScheme") {
-                this.settings.SelectDarkColorScheme(scheme_id)
-            }
-            this.dark_scheme := scheme_id
-        } else {
-            this.settings.SelectColorScheme(scheme_id)
-            this.light_scheme := scheme_id
-        }
         this.ShowDetails(index)
-        this.MarkDirty()
+        this.UpdateColorButtons()
         this.RenderPreview()
     }
 
@@ -270,7 +285,197 @@ class RabbitAppearanceSettingsPage {
             return
         }
         local info := this.presets[index]
-        this.owner.appearance_details.Value := info.author ? "作者：" . info.author : ""
+        this.owner.appearance_details.Value := "标识：" . info.color_scheme_id
+            . (info.author ? "    作者：" . info.author : "")
+            . (this.IsCustomScheme(info) ? "" : "`n内置方案只读；可以复制后修改。")
+    }
+
+    SelectedSchemeIndex() {
+        local row := this.owner.appearance_list.GetNext(0)
+        return row >= 1 && row <= this.presets.Length ? row : 0
+    }
+
+    SelectedScheme() {
+        local index := this.SelectedSchemeIndex()
+        return index ? this.presets[index] : 0
+    }
+
+    IsCustomScheme(color_scheme) {
+        return HasMethod(color_scheme, "IsCustom") && color_scheme.IsCustom()
+    }
+
+    IsManageableCustomScheme(color_scheme) {
+        if !this.IsCustomScheme(color_scheme) {
+            return false
+        }
+        try {
+            RabbitColorScheme.ValidateId(color_scheme.color_scheme_id)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    UpdateColorButtons() {
+        local owner := this.owner
+        local color_scheme := this.SelectedScheme()
+        owner.appearance_copy.Enabled := !!color_scheme
+        owner.appearance_edit.Enabled := !!color_scheme
+        owner.appearance_delete.Enabled := color_scheme && this.IsManageableCustomScheme(color_scheme)
+        owner.appearance_use.Enabled := color_scheme
+            && !(
+                owner.appearance_target.Value = 1 && color_scheme.color_scheme_id = this.light_scheme
+                || owner.appearance_target.Value = 2 && color_scheme.color_scheme_id = this.dark_scheme
+            )
+    }
+
+    UseSelectedColorScheme() {
+        local owner := this.owner
+        local color_scheme := this.SelectedScheme()
+        if !color_scheme {
+            return false
+        }
+        if owner.appearance_target.Value = 2 {
+            this.dark_scheme := color_scheme.color_scheme_id
+            owner.appearance_follow_light.Value := false
+        } else {
+            this.light_scheme := color_scheme.color_scheme_id
+        }
+        this.selection_dirty := true
+        this.PopulateColorList(color_scheme.color_scheme_id)
+        this.MarkDirty()
+        this.RenderPreview()
+        return true
+    }
+
+    OnFollowLightChange() {
+        local owner := this.owner
+        if this.loading || owner.appearance_target.Value != 2 {
+            return
+        }
+        if owner.appearance_follow_light.Value {
+            this.dark_scheme := ""
+            this.selection_dirty := true
+            this.PopulateColorList()
+            this.MarkDirty()
+            this.RenderPreview()
+        } else if !this.UseSelectedColorScheme() {
+            owner.appearance_follow_light.Value := true
+        }
+    }
+
+    AddColorScheme() {
+        local color_scheme_id := this.SuggestColorSchemeId("custom")
+        local draft := RabbitColorScheme.CreateDefault(color_scheme_id, "新配色")
+        return this.ShowColorSchemeDialog(draft, "new")
+    }
+
+    CopyColorScheme() {
+        local source := this.SelectedScheme()
+        if !source {
+            return false
+        }
+        local color_scheme_id := this.SuggestColorSchemeId(source.color_scheme_id . "_copy")
+        local draft := source.CopyAs(color_scheme_id, source.name . " 副本", source.author)
+        return this.ShowColorSchemeDialog(draft, "copy")
+    }
+
+    EditColorScheme(row := 0) {
+        local color_scheme, index
+        if row {
+            this.owner.appearance_list.Modify(row, "Select Focus Vis")
+        }
+        index := this.SelectedSchemeIndex()
+        if !index {
+            return false
+        }
+        color_scheme := this.presets[index]
+        return this.ShowColorSchemeDialog(
+            color_scheme,
+            this.IsManageableCustomScheme(color_scheme) ? "edit" : "view",
+            index
+        )
+    }
+
+    DeleteColorScheme() {
+        local color_scheme := this.SelectedScheme()
+        local index := this.SelectedSchemeIndex()
+        if !color_scheme || !this.IsManageableCustomScheme(color_scheme) {
+            return false
+        }
+        if color_scheme.color_scheme_id = this.light_scheme || color_scheme.color_scheme_id = this.dark_scheme {
+            this.owner.appearance_status.Value := "请先将浅色和深色模式切换到其他配色。"
+            return false
+        }
+        if MsgBox(
+            "确定删除配色方案“" . color_scheme.name . "”吗？",
+            "【玉兔毫】",
+            "YesNo Icon!"
+        ) != "Yes" {
+            return false
+        }
+        this.settings.DeleteColorScheme(color_scheme.color_scheme_id)
+        this.presets.RemoveAt(index)
+        this.PopulateColorList()
+        this.MarkDirty()
+        this.RenderPreview()
+        return true
+    }
+
+    ShowColorSchemeDialog(color_scheme, mode, replace_index := 0) {
+        local dialog, factory, result
+        factory := this.dialog_factory
+        dialog := factory(
+            this.owner,
+            color_scheme,
+            mode,
+            this.preview,
+            this.owner.GetAppearancePreviewLabels(),
+            mode = "new" || mode = "copy" ? this.IsColorSchemeIdAvailable.Bind(this) : 0,
+            this.owner.window_theme.dark_mode_reader
+        )
+        try {
+            result := dialog.ShowModal()
+        } finally {
+            dialog.Dispose()
+        }
+        if !result {
+            this.RenderPreview()
+            return false
+        }
+        if replace_index {
+            this.presets[replace_index] := result
+        } else {
+            this.presets.Push(result)
+        }
+        this.settings.UpsertColorScheme(result)
+        this.PopulateColorList(result.color_scheme_id)
+        this.MarkDirty()
+        this.RenderPreview()
+        return true
+    }
+
+    IsColorSchemeIdAvailable(color_scheme_id) {
+        for color_scheme in this.presets {
+            if StrLower(color_scheme.color_scheme_id) = StrLower(color_scheme_id) {
+                return false
+            }
+        }
+        return true
+    }
+
+    SuggestColorSchemeId(prefix) {
+        local candidate := StrLower(RegExReplace(prefix, "[^a-z0-9_-]", "_"))
+        local index := 2
+        if !candidate || !RegExMatch(candidate, "^[a-z0-9]") {
+            candidate := "custom"
+        }
+        local result := candidate
+        while !this.IsColorSchemeIdAvailable(result) {
+            result := candidate . "_" . index
+            index += 1
+        }
+        return result
     }
 
     OnControlsChanged() {
@@ -394,12 +599,15 @@ class RabbitAppearanceSettingsPage {
             return false
         }
         try {
-            selected_id := owner.appearance_target.Value = 2 && this.dark_scheme
-                ? this.dark_scheme
-                : this.light_scheme
-            index := this.FindPreset(selected_id)
+            index := this.SelectedSchemeIndex()
             if !index {
-                index := 1
+                selected_id := owner.appearance_target.Value = 2 && this.dark_scheme
+                    ? this.dark_scheme
+                    : this.light_scheme
+                index := this.FindPreset(selected_id)
+                if !index {
+                    index := 1
+                }
             }
             info := this.presets[index]
             if !values {
@@ -425,9 +633,7 @@ class RabbitAppearanceSettingsPage {
         }
         try {
             values := this.GetValues()
-            if HasMethod(this.settings, "SetStyleValues") {
-                this.settings.SetStyleValues(values)
-            }
+            this.PrepareSave(values)
         } catch as err {
             owner.appearance_status.Value := err.Message
             return false
@@ -445,6 +651,7 @@ class RabbitAppearanceSettingsPage {
                 return false
             }
             this.dirty := false
+            this.selection_dirty := false
             owner.appearance_status.Value := "外观设置已保存。"
             owner.footer_status.Value := "设置内容将在确认后统一保存和部署。"
             owner.UpdateApplyButton()
@@ -454,6 +661,24 @@ class RabbitAppearanceSettingsPage {
             return false
         } finally {
             owner.Opt("-Disabled")
+        }
+    }
+
+    PrepareSave(values) {
+        if HasMethod(this.settings, "SetStyleValues") {
+            this.settings.SetStyleValues(values)
+        }
+        if this.selection_dirty {
+            if HasMethod(this.settings, "StageColorSchemeSelection") {
+                this.settings.StageColorSchemeSelection(this.light_scheme, this.dark_scheme)
+            } else {
+                this.settings.SelectColorScheme(this.light_scheme)
+                if this.dark_scheme && HasMethod(this.settings, "SelectDarkColorScheme") {
+                    this.settings.SelectDarkColorScheme(this.dark_scheme)
+                } else if !this.dark_scheme && HasMethod(this.settings, "FollowLightColorScheme") {
+                    this.settings.FollowLightColorScheme()
+                }
+            }
         }
     }
 

@@ -97,7 +97,26 @@ TestSharedRabbitSettingsPersistence() {
             "floating_preedit", !current_style.floating_preedit,
             "floating_preedit_opacity", 0.65
         ))
+        local source_scheme := style.GetPresetColorSchemes()[1]
+        style.UpsertColorScheme(source_scheme.CopyAs(
+            "settings_test",
+            "Settings Test",
+            "Rabbit Integration Test"
+        ))
         AssertTrue(style.Save(), "The integration test could not save UI style settings.")
+        local color_saved := FileRead(test_dir . "\rabbit.custom.yaml", "UTF-8")
+        AssertTrue(
+            InStr(color_saved, "preset_color_schemes/settings_test"),
+            "The custom color scheme was not saved at its individual patch path."
+        )
+        AssertTrue(
+            !InStr(color_saved, '"preset_color_schemes":'),
+            "Saving one color scheme replaced the complete preset map."
+        )
+        AssertTrue(
+            style.GetCustomColorSchemeIds().Has("settings_test"),
+            "The saved path was not recognized as a custom color scheme."
+        )
         local behavior_values := behavior.GetCurrentValues()
         behavior_values.show_tips := !behavior.show_tips
         AssertTrue(
@@ -119,6 +138,18 @@ TestSharedRabbitSettingsPersistence() {
         AssertTrue(InStr(saved, "style/floating_preedit"), "The saved config omitted floating preedit.")
         AssertTrue(InStr(saved, "show_tips"), "A later save removed the behavior setting.")
         AssertTrue(InStr(saved, "rabbit-settings-test.exe"), "The application setting was not saved.")
+
+        style.DeleteColorScheme("settings_test")
+        AssertTrue(style.Save(), "The integration test could not delete a custom color scheme.")
+        saved := FileRead(test_dir . "\rabbit.custom.yaml", "UTF-8")
+        AssertTrue(
+            !InStr(saved, "preset_color_schemes/settings_test"),
+            "Deleting the custom color scheme left its patch path behind."
+        )
+        AssertTrue(
+            !style.GetCustomColorSchemeIds().Has("settings_test"),
+            "The deleted path was still recognized as a custom color scheme."
+        )
     } finally {
         if application {
             application.Dispose()

@@ -127,14 +127,47 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_tabs.UseTab(1)
         this.appearance_target_label := this.AddText("x250 y178 w80 h22 Hidden", "设置对象：")
         this.appearance_target := this.AddDropDownList(
-            "x334 y174 w446 Choose1 Hidden",
+            "x334 y174 w200 Choose1 Hidden",
             ["浅色模式", "深色模式"]
         )
         this.appearance_target.OnEvent("Change", (*) => this.OnAppearanceTargetChange())
-        this.appearance_list_label := this.AddText("x250 y216 w120 h22 Hidden", "配色方案：")
-        this.appearance_list := this.AddListBox("x250 y240 w530 h278 -Multi Hidden")
-        this.appearance_list.OnEvent("Change", (*) => this.OnAppearanceSelectionChange())
-        this.appearance_details := this.AddText("x250 y528 w530 h36 Hidden", "")
+        this.appearance_follow_light := this.AddCheckbox("x552 y174 w228 h24 Hidden", "跟随浅色模式配色")
+        this.appearance_follow_light.OnEvent("Click", (*) => this.appearance_page.OnFollowLightChange())
+        this.appearance_list := this.AddListView(
+            (initial_dark_mode ? "x250 y240 w530 h226 -Hdr" : "x250 y216 w530 h250")
+                . " -Multi NoSort Hidden",
+            ["当前", "方案名称", "方案标识", "来源"]
+        )
+        this.appearance_current_header := this.AddText(
+            "x250 y216 w54 h24 +0x200 Hidden" . surface_options,
+            " 当前"
+        )
+        this.appearance_name_header := this.AddText(
+            "x304 y216 w210 h24 +0x200 Hidden" . surface_options,
+            " 方案名称"
+        )
+        this.appearance_id_header := this.AddText(
+            "x514 y216 w156 h24 +0x200 Hidden" . surface_options,
+            " 方案标识"
+        )
+        this.appearance_source_header := this.AddText(
+            "x670 y216 w90 h24 +0x200 Hidden" . surface_options,
+            " 来源"
+        )
+        this.appearance_list.OnEvent("ItemSelect", (ctrl, row, selected) =>
+            selected ? this.OnAppearanceSelectionChange() : 0)
+        this.appearance_list.OnEvent("DoubleClick", (ctrl, row) => this.appearance_page.EditColorScheme(row))
+        this.appearance_add := this.AddButton("x250 y478 w86 h32 Hidden", "新建")
+        this.appearance_add.OnEvent("Click", (*) => this.appearance_page.AddColorScheme())
+        this.appearance_copy := this.AddButton("x344 y478 w86 h32 Hidden", "复制")
+        this.appearance_copy.OnEvent("Click", (*) => this.appearance_page.CopyColorScheme())
+        this.appearance_edit := this.AddButton("x438 y478 w86 h32 Hidden", "查看/编辑")
+        this.appearance_edit.OnEvent("Click", (*) => this.appearance_page.EditColorScheme())
+        this.appearance_delete := this.AddButton("x532 y478 w86 h32 Hidden", "删除")
+        this.appearance_delete.OnEvent("Click", (*) => this.appearance_page.DeleteColorScheme())
+        this.appearance_use := this.AddButton("x626 y478 w86 h32 Hidden", "设为当前")
+        this.appearance_use.OnEvent("Click", (*) => this.appearance_page.UseSelectedColorScheme())
+        this.appearance_details := this.AddText("x250 y520 w530 h48 Hidden", "")
 
         this.appearance_tabs.UseTab(2)
         this.appearance_font_group := this.AddGroupBox("x246 y170 w538 h180 Hidden", "字体")
@@ -219,10 +252,24 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_color_controls := [
             this.appearance_target_label,
             this.appearance_target,
-            this.appearance_list_label,
+            this.appearance_follow_light,
             this.appearance_list,
+            this.appearance_add,
+            this.appearance_copy,
+            this.appearance_edit,
+            this.appearance_delete,
+            this.appearance_use,
             this.appearance_details,
         ]
+        if initial_dark_mode {
+            this.appearance_color_controls.InsertAt(
+                1,
+                this.appearance_current_header,
+                this.appearance_name_header,
+                this.appearance_id_header,
+                this.appearance_source_header
+            )
+        }
         this.appearance_typesetting_controls := [
             this.appearance_font_group,
             this.appearance_font_label,
@@ -556,6 +603,10 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status
         )
         this.window_theme.RegisterSurface(
+            this.appearance_current_header,
+            this.appearance_name_header,
+            this.appearance_id_header,
+            this.appearance_source_header,
             this.switcher_list_header,
             this.binding_accept_header,
             this.binding_when_header,
@@ -965,8 +1016,8 @@ class RabbitSettingsWindow extends Gui {
         this.footer_status.Value := "正在保存所有更改…"
         try {
             if this.appearance_page.dirty {
-                if this.appearance_page.settings && HasMethod(this.appearance_page.settings, "SetStyleValues") {
-                    this.appearance_page.settings.SetStyleValues(appearance_values)
+                if this.appearance_page.settings {
+                    this.appearance_page.PrepareSave(appearance_values)
                 }
                 if !this.appearance_page.settings || !this.appearance_page.settings.Save() {
                     this.SelectPage(1)
@@ -1007,6 +1058,7 @@ class RabbitSettingsWindow extends Gui {
 
             if this.appearance_page.dirty {
                 this.appearance_page.dirty := false
+                this.appearance_page.selection_dirty := false
                 this.appearance_status.Value := "外观设置已保存。"
             }
             if this.switcher_dirty {

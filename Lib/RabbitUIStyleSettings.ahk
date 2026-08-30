@@ -17,6 +17,8 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitColorScheme.ahk
+#Include RabbitConfigValue.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
 class UIStyleSettings {
@@ -26,6 +28,7 @@ class UIStyleSettings {
     selected_color_scheme := ""
     selected_color_scheme_dark := ""
     color_scheme_dark_changed := false
+    color_scheme_changes := Map()
     style_values := 0
     disposed := false
 
@@ -40,7 +43,8 @@ class UIStyleSettings {
     }
 
     GetPresetColorSchemes() {
-        local config, preset, name, style
+        local config, preset, name, scheme_item, style, values
+        local custom_ids := this.GetCustomColorSchemeIds()
         local result := []
         if !(config := this.api.settings_get_config(this.settings)) {
             return result
@@ -56,18 +60,40 @@ class UIStyleSettings {
                 }
                 local author_key := preset.path . "/author"
                 local author := this.rime.config_get_cstring(config, author_key)
+                values := Map(
+                    "name", name,
+                    "author", author
+                )
+                if HasMethod(this.rime, "config_get_item") && HasMethod(this.rime, "config_begin_list") {
+                    scheme_item := this.rime.config_get_item(config, preset.path)
+                    try {
+                        if scheme_item && RabbitConfigValue.Read(this.rime, scheme_item, "/", &values) {
+                            if !values.Has("name") {
+                                values["name"] := name
+                            }
+                            if author && !values.Has("author") {
+                                values["author"] := author
+                            }
+                        }
+                    } finally {
+                        if scheme_item {
+                            this.rime.config_close(scheme_item)
+                            scheme_item := 0
+                        }
+                    }
+                }
                 style := RabbitUIStyleSnapshot.FromConfig(
                     this.rime,
                     config,
                     false,
                     StrLower(preset.key)
                 )
-                result.Push({
-                    color_scheme_id: preset.key,
-                    name: name,
-                    author: author,
-                    style: style,
-                })
+                result.Push(RabbitColorScheme(
+                    preset.key,
+                    values,
+                    custom_ids.Has(preset.key) ? "custom" : "builtin",
+                    style
+                ))
             }
         } finally {
             this.rime.config_end(preset)
@@ -85,6 +111,56 @@ class UIStyleSettings {
         }
         this.selected_color_scheme := value
         return value
+    }
+
+    GetCustomColorSchemeIds() {
+        local config := 0
+        local item := 0
+        local iter := 0
+        local nested := 0
+        local match
+        local result := Map()
+        if !this.rime || !HasMethod(this.rime, "user_config_open") {
+            return result
+        }
+        if !(config := this.rime.user_config_open("rabbit.custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    if RegExMatch(iter.key, "^preset_color_schemes/([^/]+)", &match) {
+                        result[match[1]] := true
+                    } else if iter.key = "preset_color_schemes" {
+                        item := this.rime.config_get_item(config, iter.path)
+                        if item && (nested := this.rime.config_begin_map(item, "/")) {
+                            try {
+                                while this.rime.config_next(nested) {
+                                    result[nested.key] := true
+                                }
+                            } finally {
+                                this.rime.config_end(nested)
+                            }
+                        }
+                        if item {
+                            this.rime.config_close(item)
+                            item := 0
+                        }
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            if item {
+                this.rime.config_close(item)
+            }
+            this.rime.config_close(config)
+        }
+        return result
     }
 
     GetActiveColorSchemeDark() {
@@ -116,6 +192,31 @@ class UIStyleSettings {
         this.selected_color_scheme_dark := color_scheme_id
         this.color_scheme_dark_changed := true
         return !!this.api.customize_string(this.settings, "style/color_scheme_dark", color_scheme_id)
+    }
+
+    FollowLightColorScheme() {
+        this.selected_color_scheme_dark := ""
+        this.color_scheme_dark_changed := true
+        return !!this.api.customize_item(this.settings, "style/color_scheme_dark", 0)
+    }
+
+    StageColorSchemeSelection(light_color_scheme_id, dark_color_scheme_id := "") {
+        this.selected_color_scheme := light_color_scheme_id
+        this.selected_color_scheme_dark := dark_color_scheme_id
+        this.color_scheme_dark_changed := true
+    }
+
+    UpsertColorScheme(color_scheme) {
+        if !(color_scheme is RabbitColorScheme) || !color_scheme.IsCustom() {
+            throw TypeError("只能保存自定义配色方案。")
+        }
+        RabbitColorScheme.ValidateId(color_scheme.color_scheme_id)
+        this.color_scheme_changes[color_scheme.color_scheme_id] := color_scheme
+    }
+
+    DeleteColorScheme(color_scheme_id) {
+        RabbitColorScheme.ValidateId(color_scheme_id)
+        this.color_scheme_changes[color_scheme_id] := 0
     }
 
     SetStyleValues(values) {
@@ -219,19 +320,53 @@ class UIStyleSettings {
         if !this.api.customize_string(this.settings, "style/color_scheme", this.selected_color_scheme) {
             return false
         }
-        if this.color_scheme_dark_changed
-            && !this.api.customize_string(
-                this.settings,
-                "style/color_scheme_dark",
-                this.selected_color_scheme_dark
-            ) {
-            return false
+        if this.color_scheme_dark_changed {
+            if this.selected_color_scheme_dark {
+                if !this.api.customize_string(
+                    this.settings,
+                    "style/color_scheme_dark",
+                    this.selected_color_scheme_dark
+                ) {
+                    return false
+                }
+            } else if !this.api.customize_item(this.settings, "style/color_scheme_dark", 0) {
+                return false
+            }
         }
         if !this.CustomizeStyleValues() {
             return false
         }
+        if !this.CustomizeColorSchemes() {
+            return false
+        }
         if !this.api.save_settings(this.settings) {
             return false
+        }
+        this.color_scheme_changes := Map()
+        return true
+    }
+
+    CustomizeColorSchemes() {
+        local color_scheme, config, path
+        for color_scheme_id, color_scheme in this.color_scheme_changes {
+            path := "preset_color_schemes/" . color_scheme_id
+            if !color_scheme {
+                if !this.api.customize_item(this.settings, path, 0) {
+                    return false
+                }
+                continue
+            }
+            config := this.rime.config_load_string(RabbitConfigValue.ToYaml(color_scheme.values))
+            if !config {
+                return false
+            }
+            try {
+                if !this.api.customize_item(this.settings, path, config) {
+                    return false
+                }
+            } finally {
+                this.rime.config_close(config)
+            }
         }
         return true
     }

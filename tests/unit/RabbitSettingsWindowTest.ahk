@@ -25,6 +25,9 @@ RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalid
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
+RunTest("settings window browses color schemes without changing selection", TestSettingsWindowBrowsesColorSchemes.Bind())
+RunTest("settings window stages custom color schemes", TestSettingsWindowStagesCustomColorSchemes.Bind())
+RunTest("settings window restores dark scheme following", TestSettingsWindowRestoresDarkSchemeFollowing.Bind())
 RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
 RunTest("settings window previews pending candidate labels", TestSettingsWindowPreviewsPendingLabels.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
@@ -134,9 +137,10 @@ TestSettingsWindowSavesAppearanceSettings() {
     local window := RabbitSettingsWindow(workflow, true)
     try {
         AssertEqual(2, window.appearance_page.presets.Length, "The appearance page showed the wrong preset count.")
-        AssertEqual(1, window.appearance_list.Value, "The appearance page did not select the active preset.")
-        window.appearance_list.Choose(2)
+        AssertEqual(1, window.appearance_list.GetNext(0), "The appearance page did not select the active preset.")
+        window.appearance_list.Modify(2, "Select Focus")
         window.OnAppearanceSelectionChange()
+        window.appearance_page.UseSelectedColorScheme()
         AssertTrue(window.ApplyAppearanceSettings(), "The appearance page failed to save valid settings.")
     } finally {
         window.Dispose()
@@ -164,8 +168,8 @@ TestSettingsWindowExposesAppearanceControls() {
         window.appearance_details.GetPos(, &color_details_y)
         AssertEqual(570, tabs_width, "The appearance tabs did not fill the main content width.")
         AssertTrue(color_list_width >= 500, "The color scheme list did not use the available width.")
-        AssertTrue(color_list_height >= 260, "The color scheme list did not fill the color tab.")
-        AssertEqual(528, color_details_y, "The color scheme details did not follow the enlarged list.")
+        AssertTrue(color_list_height >= 220, "The color scheme list did not fill the color tab.")
+        AssertEqual(520, color_details_y, "The color scheme details did not follow the action row.")
         window.appearance_tabs.Choose(2)
         window.OnAppearanceTabChanged()
         AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")
@@ -220,6 +224,56 @@ TestSettingsWindowExposesAppearanceControls() {
             window.appearance_page.settings.last_values["layout_type"],
             "The appearance page staged the wrong layout type."
         )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowBrowsesColorSchemes() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
+    try {
+        window.appearance_list.Modify(2, "Select Focus")
+        window.OnAppearanceSelectionChange()
+        AssertTrue(!window.appearance_page.dirty, "Browsing a scheme changed the pending settings.")
+        AssertTrue(window.appearance_page.UseSelectedColorScheme(), "The selected scheme could not be activated.")
+        AssertTrue(window.appearance_page.dirty, "Activating a scheme did not mark the page dirty.")
+        AssertEqual("theme_b", window.appearance_page.light_scheme, "The wrong light scheme was staged.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowStagesCustomColorSchemes() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
+    try {
+        window.appearance_page.dialog_factory := RabbitSettingsColorSchemeDialogProbe
+        AssertTrue(window.appearance_page.AddColorScheme(), "The appearance page rejected a new scheme.")
+        AssertEqual(3, window.appearance_page.presets.Length, "The new scheme was not added to the catalog.")
+        AssertTrue(
+            InStr(JoinSettingsWorkflowCalls(calls), "upsert:custom"),
+            "The new scheme was not staged at the settings model."
+        )
+        AssertTrue(window.appearance_page.dirty, "Adding a scheme did not mark the page dirty.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowRestoresDarkSchemeFollowing() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
+    try {
+        window.appearance_target.Choose(2)
+        window.OnAppearanceTargetChange()
+        AssertTrue(window.appearance_follow_light.Value, "Dark mode did not start by following the light scheme.")
+        window.appearance_list.Modify(2, "Select Focus")
+        AssertTrue(window.appearance_page.UseSelectedColorScheme(), "A dark scheme could not be staged.")
+        AssertEqual("theme_b", window.appearance_page.dark_scheme, "The wrong dark scheme was staged.")
+        window.appearance_follow_light.Value := true
+        window.appearance_page.OnFollowLightChange()
+        AssertEqual("", window.appearance_page.dark_scheme, "Dark mode did not return to following light mode.")
     } finally {
         window.Dispose()
     }
@@ -747,8 +801,8 @@ class RabbitSettingsAppearanceModelProbe {
 
     GetPresetColorSchemes() {
         return [
-            { color_scheme_id: "theme_a", name: "主题 A", author: "甲", style: RabbitUIStyleSnapshot() },
-            { color_scheme_id: "theme_b", name: "主题 B", author: "乙", style: RabbitUIStyleSnapshot() },
+            RabbitColorScheme("theme_a", Map("name", "主题 A", "author", "甲"), "builtin"),
+            RabbitColorScheme("theme_b", Map("name", "主题 B", "author", "乙"), "builtin"),
         ]
     }
 
@@ -761,6 +815,14 @@ class RabbitSettingsAppearanceModelProbe {
         this.last_values := values
     }
 
+    UpsertColorScheme(color_scheme) {
+        this.calls.Push("upsert:" . color_scheme.color_scheme_id)
+    }
+
+    DeleteColorScheme(color_scheme_id) {
+        this.calls.Push("delete:" . color_scheme_id)
+    }
+
     Save() {
         this.calls.Push("save_style")
         return true
@@ -768,6 +830,19 @@ class RabbitSettingsAppearanceModelProbe {
 
     Dispose() {
         this.calls.Push("dispose_style")
+    }
+}
+
+class RabbitSettingsColorSchemeDialogProbe {
+    __New(owner, color_scheme, mode, preview, labels, id_validator, dark_mode_reader) {
+        this.result := color_scheme
+    }
+
+    ShowModal() {
+        return this.result
+    }
+
+    Dispose() {
     }
 }
 

@@ -19,6 +19,8 @@
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
 
 RunTest("UI style settings save typography and layout", TestUIStyleSettingsSaveTypographyAndLayout.Bind())
+RunTest("UI style settings patch individual color schemes", TestUIStyleSettingsPatchColorSchemes.Bind())
+RunTest("UI style settings restore dark scheme following", TestUIStyleSettingsRestoreDarkFollowing.Bind())
 
 TestUIStyleSettingsSaveTypographyAndLayout() {
     local calls := []
@@ -55,6 +57,51 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
     }
     AssertEqual("save", calls[calls.Length - 1], "The settings model did not save before disposal.")
     AssertEqual("destroy", calls[calls.Length], "The settings model did not dispose after saving.")
+}
+
+TestUIStyleSettingsPatchColorSchemes() {
+    local calls := []
+    local rime := RabbitUIStyleSettingsRimeProbe(calls)
+    local settings := UIStyleSettings(rime, RabbitUIStyleSettingsLeversProbe(calls))
+    try {
+        settings.SelectColorScheme("aqua")
+        settings.UpsertColorScheme(RabbitColorScheme.CreateDefault("custom_blue", "Custom Blue"))
+        settings.DeleteColorScheme("old_custom")
+        AssertTrue(settings.Save(), "The settings model failed to save color-scheme changes.")
+    } finally {
+        settings.Dispose()
+    }
+    local joined := JoinUIStyleSettingsCalls(calls)
+    AssertTrue(
+        InStr(joined, "item:preset_color_schemes/custom_blue:73"),
+        "The custom scheme was not written at its individual path."
+    )
+    AssertTrue(
+        InStr(joined, "item:preset_color_schemes/old_custom:0"),
+        "The deleted scheme path was not removed."
+    )
+    AssertTrue(
+        !InStr(joined, "item:preset_color_schemes:73"),
+        "The settings model replaced the whole color-scheme map."
+    )
+    AssertTrue(InStr(joined, "Custom Blue"), "The scheme map was not serialized.")
+}
+
+TestUIStyleSettingsRestoreDarkFollowing() {
+    local calls := []
+    local settings := UIStyleSettings(0, RabbitUIStyleSettingsLeversProbe(calls))
+    try {
+        settings.SelectColorScheme("aqua")
+        AssertTrue(settings.FollowLightColorScheme(), "The settings model rejected dark-mode following.")
+        AssertTrue(settings.Save(), "The settings model failed to save dark-mode following.")
+    } finally {
+        settings.Dispose()
+    }
+    local joined := JoinUIStyleSettingsCalls(calls)
+    AssertTrue(
+        InStr(joined, "item:style/color_scheme_dark:0"),
+        "Dark-mode following did not remove the explicit dark scheme."
+    )
 }
 
 JoinUIStyleSettingsCalls(calls) {
@@ -107,5 +154,25 @@ class RabbitUIStyleSettingsLeversProbe {
     customize_double(settings, key, value) {
         this.calls.Push("double:" . key . ":" . value)
         return true
+    }
+
+    customize_item(settings, key, value) {
+        this.calls.Push("item:" . key . ":" . value)
+        return true
+    }
+}
+
+class RabbitUIStyleSettingsRimeProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    config_load_string(yaml) {
+        this.calls.Push("yaml:" . yaml)
+        return 73
+    }
+
+    config_close(config) {
+        this.calls.Push("close:" . config)
     }
 }
