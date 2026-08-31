@@ -158,8 +158,16 @@ class RabbitColorScheme {
 
     static TryParseConfigColor(value, color_format, &argb) {
         local digits, number
-        if IsInteger(value) {
+        if Type(value) = "Integer" {
             number := value & 0xffffffff
+            if number <= 0xffffff {
+                switch color_format {
+                    case "rgba":
+                        number := ((number << 8) | 0xff) & 0xffffffff
+                    default:
+                        number := number | 0xff000000
+                }
+            }
             argb := this.ConvertToArgb(number, color_format)
             return true
         }

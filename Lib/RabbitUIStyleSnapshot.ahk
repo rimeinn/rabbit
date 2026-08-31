@@ -334,6 +334,9 @@ class RabbitUIStyleSnapshot {
         local foreground_alpha := foreground_a / 255.0
         local background_alpha := background_a / 255.0
         local result_alpha := foreground_alpha + background_alpha * (1 - foreground_alpha)
+        if result_alpha == 0 {
+            return 0x00000000
+        }
         local result_r := Integer(
             (foreground_r * foreground_alpha + background_r * background_alpha * (1 - foreground_alpha))
             / result_alpha
@@ -347,7 +350,7 @@ class RabbitUIStyleSnapshot {
             / result_alpha
         )
 
-        return (Integer(result_alpha) * 255 << 24) | (result_r << 16) | (result_g << 8) | result_b
+        return (Integer(result_alpha * 255) << 24) | (result_r << 16) | (result_g << 8) | result_b
     }
 
     static GetColor(rime_api, config, key, fmt, fallback) {

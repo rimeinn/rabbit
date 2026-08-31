@@ -22,6 +22,8 @@
 RunTest("style snapshot copies constructor values", TestStyleSnapshotCopiesValues.Bind())
 RunTest("style snapshot parses active and dark styles", TestStyleSnapshotParsing.Bind())
 RunTest("style preview snapshot is independent", TestStylePreviewSnapshotIndependence.Bind())
+RunTest("style snapshot blends transparent colors safely", TestStyleSnapshotBlendsTransparentColorsSafely.Bind())
+RunTest("style snapshot loads transparent highlights", TestStyleSnapshotLoadsTransparentHighlights.Bind())
 
 TestStyleSnapshotCopiesValues() {
     local values := Map(
@@ -121,6 +123,29 @@ TestStylePreviewSnapshotIndependence() {
     AssertEqual(0xff112233, active_style.text_color, "Preview parsing mutated the active snapshot.")
     AssertEqual(0xffddeeff, preview_style.text_color, "The requested preview scheme was not parsed.")
     AssertEqual(false, preview_style.use_dark, "An explicit preview scheme was marked as system dark mode.")
+}
+
+TestStyleSnapshotBlendsTransparentColorsSafely() {
+    AssertEqual(
+        0x00000000,
+        RabbitUIStyleSnapshot.BlendColors(0x00112233, 0x00445566),
+        "Blending two transparent colors did not return transparent."
+    )
+    local blended := RabbitUIStyleSnapshot.BlendColors(0x80ff0000, 0x800000ff)
+    AssertEqual(0xbf, (blended >> 24) & 0xff, "Blending translucent colors produced the wrong alpha.")
+}
+
+TestStyleSnapshotLoadsTransparentHighlights() {
+    local rime_probe := RabbitUIStyleRimeProbe(Map(
+        "style/color_scheme", "transparent",
+        "preset_color_schemes/transparent/hilited_candidate_text_color", "0x00f6f6f6",
+        "preset_color_schemes/transparent/hilited_candidate_back_color", "0x006dbcdb",
+        "preset_color_schemes/transparent/hilited_label_color", "0xfff6f6f6"
+    ))
+    local style := RabbitUIStyleSnapshot.FromConfig(rime_probe, {})
+    AssertEqual(0x00f6f6f6, style.hilited_candidate_text_color, "The transparent candidate text changed.")
+    AssertEqual(0x006dbcdb, style.hilited_candidate_back_color, "The transparent candidate background changed.")
+    AssertEqual(0xfff6f6f6, style.hilited_label_color, "The explicit highlighted label color was ignored.")
 }
 
 CreateStyleConfigValues() {

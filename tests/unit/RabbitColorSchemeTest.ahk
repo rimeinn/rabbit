@@ -19,6 +19,7 @@
 #Include ..\..\Lib\RabbitColorScheme.ahk
 
 RunTest("color scheme converts formats through ARGB", TestColorSchemeConvertsFormats.Bind())
+RunTest("color scheme makes numeric RGB colors opaque", TestColorSchemeMakesNumericRgbOpaque.Bind())
 RunTest("color scheme preserves existing fields", TestColorSchemePreservesExistingFields.Bind())
 RunTest("color scheme copies as standard ARGB", TestColorSchemeCopiesAsArgb.Bind())
 RunTest("color scheme validates identifiers and ARGB text", TestColorSchemeValidatesInput.Bind())
@@ -41,6 +42,36 @@ TestColorSchemeConvertsFormats() {
             "The ARGB value did not round-trip through " . format . "."
         )
     }
+}
+
+TestColorSchemeMakesNumericRgbOpaque() {
+    local argb
+    AssertTrue(
+        RabbitColorScheme.TryParseConfigColor("0xbf7817", "abgr", &argb),
+        "The Smurfs ABGR background color could not be parsed."
+    )
+    AssertEqual(0xff1778bf, argb, "The Smurfs ABGR background color was not made opaque.")
+    for format, encoded in Map(
+        "argb", 0x402010,
+        "abgr", 0x102040,
+        "rgba", 0x402010
+    ) {
+        AssertTrue(
+            RabbitColorScheme.TryParseConfigColor(encoded, format, &argb),
+            "The numeric " . format . " RGB color could not be parsed."
+        )
+        AssertEqual(0xff402010, argb, "The numeric " . format . " RGB color was not made opaque.")
+    }
+    AssertTrue(
+        RabbitColorScheme.TryParseConfigColor("0x00000000", "argb", &argb),
+        "An explicitly transparent ARGB color could not be parsed."
+    )
+    AssertEqual(0x00000000, argb, "An explicitly transparent ARGB color was made opaque.")
+    AssertTrue(
+        RabbitColorScheme.TryParseConfigColor(0x20000000, "argb", &argb),
+        "A numeric translucent ARGB color could not be parsed."
+    )
+    AssertEqual(0x20000000, argb, "A numeric translucent ARGB color lost its alpha.")
 }
 
 TestColorSchemePreservesExistingFields() {
@@ -67,13 +98,13 @@ TestColorSchemeCopiesAsArgb() {
     local scheme := RabbitColorScheme("source", Map(
         "name", "Source",
         "color_format", "abgr",
-        "back_color", "0x80102040",
+        "back_color", 0x102040,
         "shadow_color", "0xff030201",
         "extension", "kept"
     ))
     local copied := scheme.CopyAs("copy", "Copy")
     AssertEqual("argb", copied.color_format, "A copied scheme did not use ARGB.")
-    AssertEqual("0x80402010", copied.values["back_color"], "The copied background was not converted.")
+    AssertEqual("0xff402010", copied.values["back_color"], "The copied numeric RGB color was not opaque.")
     AssertEqual("0xff010203", copied.values["shadow_color"], "An extension color was not converted.")
     AssertEqual("kept", copied.values["extension"], "Copying dropped an unknown field.")
 }
