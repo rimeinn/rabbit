@@ -21,6 +21,7 @@
 
 RunTest("settings window navigation", TestSettingsWindowNavigation.Bind())
 RunTest("settings window uses page-specific heights", TestSettingsWindowUsesPageSpecificHeights.Bind())
+RunTest("appearance color layout grows with the page", TestAppearanceColorLayoutGrowsWithPage.Bind())
 RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalidPage.Bind())
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
@@ -103,6 +104,22 @@ TestSettingsWindowUsesPageSpecificHeights() {
     }
 }
 
+TestAppearanceColorLayoutGrowsWithPage() {
+    local compact := RabbitSettingsWindow.CalculateAppearanceLayout(false, 660)
+    local expanded := RabbitSettingsWindow.CalculateAppearanceLayout(false, 724)
+    local dark := RabbitSettingsWindow.CalculateAppearanceLayout(true, 724)
+    AssertEqual(64, expanded.tabs_height - compact.tabs_height,
+        "The appearance tabs did not grow with the page.")
+    AssertEqual(64, expanded.color_list_height - compact.color_list_height,
+        "The color list did not absorb the additional page height.")
+    AssertEqual(12, expanded.color_actions_y - expanded.color_list_y - expanded.color_list_height,
+        "The color list did not preserve its gap above the action row.")
+    AssertEqual(42, expanded.color_details_y - expanded.color_actions_y,
+        "The color details did not remain below the action row.")
+    AssertEqual(24, expanded.color_list_height - dark.color_list_height,
+        "The dark list header offset changed the color list bottom edge.")
+}
+
 TestSettingsWindowRejectsInvalidPage() {
     local window := RabbitSettingsWindow()
     try {
@@ -154,7 +171,8 @@ TestSettingsWindowSavesAppearanceSettings() {
 
 TestSettingsWindowExposesAppearanceControls() {
     local calls := []
-    local color_details_y, color_list_height, color_list_width
+    local color_actions_y, color_details_y, color_list_height, color_list_width, color_list_y
+    local color_layout := RabbitSettingsWindow.CalculateAppearanceLayout(false)
     local font_group_width, height_label_width, layout_group_width, opacity_label_width, tabs_width
     local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
     try {
@@ -164,12 +182,17 @@ TestSettingsWindowExposesAppearanceControls() {
             "The appearance page retained its embedded bitmap preview."
         )
         window.appearance_tabs.GetPos(, , &tabs_width)
-        window.appearance_list.GetPos(, , &color_list_width, &color_list_height)
+        window.appearance_list.GetPos(, &color_list_y, &color_list_width, &color_list_height)
+        window.appearance_add.GetPos(, &color_actions_y)
         window.appearance_details.GetPos(, &color_details_y)
         AssertEqual(570, tabs_width, "The appearance tabs did not fill the main content width.")
         AssertTrue(color_list_width >= 500, "The color scheme list did not use the available width.")
-        AssertTrue(color_list_height >= 220, "The color scheme list did not fill the color tab.")
-        AssertEqual(520, color_details_y, "The color scheme details did not follow the action row.")
+        AssertEqual(color_layout.color_list_height, color_list_height,
+            "The color scheme list did not absorb the taller page.")
+        AssertEqual(12, color_actions_y - color_list_y - color_list_height,
+            "The color scheme list did not stop before the action row.")
+        AssertEqual(42, color_details_y - color_actions_y,
+            "The color scheme details did not follow the action row.")
         window.appearance_tabs.Choose(2)
         window.OnAppearanceTabChanged()
         AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")

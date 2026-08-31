@@ -39,6 +39,25 @@ class RabbitSettingsWindow extends Gui {
         { id: "about", title: "关于", description: "查看版本、许可证和项目链接。" },
     ]
 
+    static CalculateAppearanceLayout(dark_mode, height := 0) {
+        local color_actions_y, color_list_y
+        if !height {
+            height := RabbitSettingsWindow.APPEARANCE_HEIGHT
+        }
+        ; Anchor the bottom controls to the page edge so the color list absorbs height changes.
+        color_list_y := dark_mode ? 240 : 216
+        color_actions_y := height - 182
+        return {
+            tabs_height: height - 210,
+            color_list_y: color_list_y,
+            color_list_height: Max(1, color_actions_y - 12 - color_list_y),
+            color_actions_y: color_actions_y,
+            color_details_y: height - 140,
+            typesetting_layout_height: height - 448,
+            status_y: height - 72
+        }
+    }
+
     __New(
         workflow := 0,
         old_windows := RabbitIsOldWindows(),
@@ -48,7 +67,7 @@ class RabbitSettingsWindow extends Gui {
         installing := false,
         theme_factory := RabbitWindowThemeController
     ) {
-        local controls, initial_dark_mode := false, initial_page, key, factory
+        local appearance_layout, controls, initial_dark_mode := false, initial_page, key, factory
         local surface_options := ""
         local page_names := []
         initial_page := RabbitSettingsWindow.PageIndex(initial_page_id)
@@ -61,6 +80,7 @@ class RabbitSettingsWindow extends Gui {
         if HasMethod(theme_factory, "Prepare") {
             initial_dark_mode := !!theme_factory.Prepare()
         }
+        appearance_layout := RabbitSettingsWindow.CalculateAppearanceLayout(initial_dark_mode)
         super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】设置", this)
         this.workflow := workflow
         this.old_windows := old_windows
@@ -119,7 +139,7 @@ class RabbitSettingsWindow extends Gui {
         this.header_divider := this.AddText("x230 y112 w570 h1 +0x10")
 
         this.appearance_tabs := this.AddTab3(
-            "x230 y136 w570 h514 Hidden"
+            Format("x230 y136 w570 h{} Hidden", appearance_layout.tabs_height)
                 . (initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             ["配色", "排版"]
         )
@@ -134,7 +154,12 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_follow_light := this.AddCheckbox("x552 y174 w228 h24 Hidden", "跟随浅色模式配色")
         this.appearance_follow_light.OnEvent("Click", (*) => this.appearance_page.OnFollowLightChange())
         this.appearance_list := this.AddListView(
-            (initial_dark_mode ? "x250 y240 w530 h226 -Hdr" : "x250 y216 w530 h250")
+            Format(
+                "x250 y{} w530 h{}{}",
+                appearance_layout.color_list_y,
+                appearance_layout.color_list_height,
+                initial_dark_mode ? " -Hdr" : ""
+            )
                 . " -Multi NoSort Hidden",
             ["当前", "方案名称", "方案标识", "来源"]
         )
@@ -157,17 +182,35 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_list.OnEvent("ItemSelect", (ctrl, row, selected) =>
             selected ? this.OnAppearanceSelectionChange() : 0)
         this.appearance_list.OnEvent("DoubleClick", (ctrl, row) => this.appearance_page.EditColorScheme(row))
-        this.appearance_add := this.AddButton("x250 y478 w86 h32 Hidden", "新建")
+        this.appearance_add := this.AddButton(
+            Format("x250 y{} w86 h32 Hidden", appearance_layout.color_actions_y),
+            "新建"
+        )
         this.appearance_add.OnEvent("Click", (*) => this.appearance_page.AddColorScheme())
-        this.appearance_copy := this.AddButton("x344 y478 w86 h32 Hidden", "复制")
+        this.appearance_copy := this.AddButton(
+            Format("x344 y{} w86 h32 Hidden", appearance_layout.color_actions_y),
+            "复制"
+        )
         this.appearance_copy.OnEvent("Click", (*) => this.appearance_page.CopyColorScheme())
-        this.appearance_edit := this.AddButton("x438 y478 w86 h32 Hidden", "查看/编辑")
+        this.appearance_edit := this.AddButton(
+            Format("x438 y{} w86 h32 Hidden", appearance_layout.color_actions_y),
+            "查看/编辑"
+        )
         this.appearance_edit.OnEvent("Click", (*) => this.appearance_page.EditColorScheme())
-        this.appearance_delete := this.AddButton("x532 y478 w86 h32 Hidden", "删除")
+        this.appearance_delete := this.AddButton(
+            Format("x532 y{} w86 h32 Hidden", appearance_layout.color_actions_y),
+            "删除"
+        )
         this.appearance_delete.OnEvent("Click", (*) => this.appearance_page.DeleteColorScheme())
-        this.appearance_use := this.AddButton("x626 y478 w86 h32 Hidden", "设为当前")
+        this.appearance_use := this.AddButton(
+            Format("x626 y{} w86 h32 Hidden", appearance_layout.color_actions_y),
+            "设为当前"
+        )
         this.appearance_use.OnEvent("Click", (*) => this.appearance_page.UseSelectedColorScheme())
-        this.appearance_details := this.AddText("x250 y520 w530 h48 Hidden", "")
+        this.appearance_details := this.AddText(
+            Format("x250 y{} w530 h48 Hidden", appearance_layout.color_details_y),
+            ""
+        )
 
         this.appearance_tabs.UseTab(2)
         this.appearance_font_group := this.AddGroupBox("x246 y170 w538 h180 Hidden", "字体")
@@ -194,7 +237,10 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_label_format := this.AddEdit("x334 y312 w432 r1 -Multi Hidden")
         this.appearance_label_format.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
 
-        this.appearance_layout_group := this.AddGroupBox("x246 y356 w538 h276 Hidden", "布局")
+        this.appearance_layout_group := this.AddGroupBox(
+            Format("x246 y356 w538 h{} Hidden", appearance_layout.typesetting_layout_height),
+            "布局"
+        )
         this.appearance_layout_type_label := this.AddText("x260 y382 w72 h22 Hidden", "候选排列：")
         this.appearance_layout_type := this.AddDropDownList(
             "x334 y378 w160 Choose1 Hidden",
@@ -335,7 +381,10 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_floating_height_label,
             this.appearance_floating_height,
         ]
-        this.appearance_status := this.AddText("x230 y652 w570 h20 Hidden", "")
+        this.appearance_status := this.AddText(
+            Format("x230 y{} w570 h20 Hidden", appearance_layout.status_y),
+            ""
+        )
         this.appearance_page := RabbitAppearanceSettingsPage(
             this,
             workflow,
