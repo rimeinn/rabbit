@@ -22,6 +22,7 @@
 RunTest("settings window navigation", TestSettingsWindowNavigation.Bind())
 RunTest("settings window uses page-specific heights", TestSettingsWindowUsesPageSpecificHeights.Bind())
 RunTest("appearance color layout grows with the page", TestAppearanceColorLayoutGrowsWithPage.Bind())
+RunTest("settings window creates inactive pages on first use", TestSettingsWindowCreatesPagesLazily.Bind())
 RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalidPage.Bind())
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
@@ -121,6 +122,27 @@ TestAppearanceColorLayoutGrowsWithPage() {
         "The dark list header offset changed the color list bottom edge.")
 }
 
+TestSettingsWindowCreatesPagesLazily() {
+    local window := RabbitSettingsWindow(0, true)
+    try {
+        AssertEqual(1, window.page_controls_created.Count,
+            "The settings window eagerly created inactive pages.")
+        AssertTrue(!HasProp(window, "switcher_group"),
+            "The settings window created switcher controls before first use.")
+        AssertTrue(!HasProp(window, "behavior_tabs"),
+            "The settings window created behavior controls before first use.")
+        AssertTrue(window.SelectPage(7), "The settings window rejected its lazy about page.")
+        AssertTrue(HasProp(window, "about_group"),
+            "Opening the about page did not create its controls.")
+        AssertEqual(2, window.page_controls_created.Count,
+            "Opening one page created unrelated page controls.")
+        AssertTrue(!HasProp(window, "behavior_tabs"),
+            "Opening the about page also created behavior controls.")
+    } finally {
+        window.Dispose()
+    }
+}
+
 TestSettingsWindowRejectsInvalidPage() {
     local window := RabbitSettingsWindow()
     try {
@@ -178,6 +200,10 @@ TestSettingsWindowExposesAppearanceControls() {
     local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
     try {
         AssertEqual(1, window.appearance_tabs.Value, "The appearance page did not start on the color tab.")
+        AssertTrue(!window.appearance_typesetting_created,
+            "The appearance page eagerly created its inactive typesetting controls.")
+        AssertTrue(!HasProp(window, "appearance_font"),
+            "The inactive typesetting tab exposed controls before first use.")
         AssertTrue(
             !HasProp(window, "appearance_preview_img"),
             "The appearance page retained its embedded bitmap preview."
@@ -196,6 +222,8 @@ TestSettingsWindowExposesAppearanceControls() {
             "The color scheme details did not follow the action row.")
         window.appearance_tabs.Choose(2)
         window.OnAppearanceTabChanged()
+        AssertTrue(window.appearance_typesetting_created,
+            "The typesetting controls were not created when their tab was opened.")
         AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")
         AssertTrue(!window.appearance_list.Visible, "The typography tab left color controls visible.")
         window.appearance_font_group.GetPos(, , &font_group_width)
@@ -377,6 +405,8 @@ TestSettingsWindowPreviewsPendingLabels() {
         RabbitSettingsCapturingAppearancePreview
     )
     try {
+        window.SelectPage(3)
+        window.SelectPage(1)
         window.menu_labels.Value := "壹, 贰, 叁, 肆, 伍"
         AssertTrue(window.PreviewAppearance(), "The appearance page failed to refresh its preview.")
         AssertEqual(

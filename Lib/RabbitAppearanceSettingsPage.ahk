@@ -115,7 +115,9 @@ class RabbitAppearanceSettingsPage {
             this.style := style
             this.presets := this.settings.GetPresetColorSchemes()
             this.PopulateColorList()
-            this.PopulateStyle(style)
+            if owner.appearance_typesetting_created {
+                this.PopulateStyle(style)
+            }
             this.dirty := false
             this.selection_dirty := false
             owner.appearance_status.Value := this.presets.Length
@@ -124,7 +126,9 @@ class RabbitAppearanceSettingsPage {
         } finally {
             this.loading := false
         }
-        this.UpdateConditionalControls()
+        if owner.appearance_typesetting_created {
+            this.UpdateConditionalControls()
+        }
     }
 
     PopulateColorList(selected_id := "") {
@@ -500,6 +504,9 @@ class RabbitAppearanceSettingsPage {
 
     UpdateConditionalControls() {
         local owner := this.owner
+        if !owner.appearance_typesetting_created {
+            return
+        }
         local flow := owner.appearance_layout_type.Value = 2
         local vertical := owner.appearance_layout_type.Value = 3
         local stacked := !flow && !vertical
@@ -523,6 +530,9 @@ class RabbitAppearanceSettingsPage {
 
     GetValues() {
         local owner := this.owner
+        if !owner.appearance_typesetting_created {
+            return this.style
+        }
         local font_face := Trim(owner.appearance_font.Text)
         local preedit_font_face := Trim(owner.appearance_preedit_font.Text)
         local label_font_face := Trim(owner.appearance_label_font.Text)

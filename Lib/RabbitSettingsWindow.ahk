@@ -67,7 +67,7 @@ class RabbitSettingsWindow extends Gui {
         installing := false,
         theme_factory := RabbitWindowThemeController
     ) {
-        local appearance_layout, controls, initial_dark_mode := false, initial_page, key, factory
+        local appearance_layout, initial_dark_mode := false, initial_page, index, factory
         local surface_options := ""
         local page_names := []
         initial_page := RabbitSettingsWindow.PageIndex(initial_page_id)
@@ -214,6 +214,421 @@ class RabbitSettingsWindow extends Gui {
             ""
         )
 
+        this.appearance_typesetting_controls := []
+        this.appearance_typesetting_created := false
+        this.appearance_tabs.UseTab()
+
+        this.appearance_color_controls := [
+            this.appearance_target_label,
+            this.appearance_target,
+            this.appearance_follow_light,
+            this.appearance_list,
+            this.appearance_add,
+            this.appearance_copy,
+            this.appearance_edit,
+            this.appearance_delete,
+            this.appearance_use,
+            this.appearance_details,
+        ]
+        if initial_dark_mode {
+            this.appearance_color_controls.InsertAt(
+                1,
+                this.appearance_current_header,
+                this.appearance_name_header,
+                this.appearance_id_header,
+                this.appearance_source_header
+            )
+        }
+        this.appearance_status := this.AddText(
+            Format("x230 y{} w570 h20 Hidden", appearance_layout.status_y),
+            ""
+        )
+        this.appearance_page := RabbitAppearanceSettingsPage(
+            this,
+            workflow,
+            old_windows,
+            preview_factory
+        )
+
+        this.placeholder := this.AddGroupBox("x230 y136 w570 h290", "页面内容")
+        this.placeholder_text := this.AddText(
+            "x254 y174 w520 h80",
+            "这里将逐步迁入现有部署器功能。当前页面骨架不会读取或修改配置。"
+        )
+        this.page_controls_created := Map(1, true)
+
+        this.footer_status := this.AddText(
+            "x230 y612 w570 h22 cGray",
+            "设置内容将在确认后统一保存和部署。"
+        )
+        this.OnEvent("Close", this.OnClose.Bind(this))
+        this.OnEvent("Escape", this.OnClose.Bind(this))
+
+        this.SelectPage(initial_page)
+        this.navigation.Enabled := !installing
+        if installing {
+            this.footer_status.Value := "请选择输入方案，然后完成首次部署。"
+        }
+        this.UpdateApplyButton()
+        factory := theme_factory
+        this.window_theme := factory(this)
+        this.RegisterSharedControlThemes()
+        for index in this.page_controls_created {
+            this.RegisterPageControlThemes(index)
+        }
+        this.window_theme.Register()
+    }
+
+    static PageIndex(page_id := "") {
+        local index, page
+        if !page_id {
+            return 1
+        }
+        for index, page in RabbitSettingsWindow.pages {
+            if page.id = page_id {
+                return index
+            }
+        }
+        return 0
+    }
+
+    EnsurePageControls(index) {
+        if this.page_controls_created.Has(index) {
+            return false
+        }
+        switch index {
+            case 2:
+                this.CreateSwitcherControls()
+            case 3:
+                this.CreateBehaviorControls()
+            case 4:
+                this.CreateApplicationControls()
+            case 5:
+                this.CreateDictionaryControls()
+            case 6:
+                this.CreateMaintenanceControls()
+            case 7:
+                this.CreateAboutControls()
+            default:
+                return false
+        }
+        this.page_controls_created[index] := true
+        if HasProp(this, "window_theme") && this.window_theme {
+            this.RegisterPageControlThemes(index)
+            this.window_theme.Apply()
+        }
+        return true
+    }
+
+    RegisterSharedControlThemes() {
+        this.window_theme.RegisterMuted(
+            this.sidebar_subtitle,
+            this.page_description,
+            this.footer_status
+        )
+    }
+
+    RegisterPageControlThemes(index) {
+        switch index {
+            case 1:
+                this.window_theme.RegisterSurface(
+                    this.appearance_current_header,
+                    this.appearance_name_header,
+                    this.appearance_id_header,
+                    this.appearance_source_header
+                )
+            case 2:
+                this.window_theme.RegisterSurface(this.switcher_list_header)
+            case 3:
+                this.window_theme.RegisterMuted(this.menu_help, this.binding_help)
+                this.window_theme.RegisterSurface(
+                    this.binding_accept_header,
+                    this.binding_when_header,
+                    this.binding_action_header
+                )
+            case 4:
+                this.window_theme.RegisterSurface(
+                    this.application_process_header,
+                    this.application_mode_header
+                )
+            case 7:
+                this.window_theme.RegisterMuted(this.about_copyright)
+        }
+    }
+
+    CreateSwitcherControls() {
+        local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
+        this.switcher_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入方案")
+        this.switcher_list_header := this.AddText(
+            "x254 y174 w250 h24 Center +0x200 Hidden" . surface_options,
+            "方案名称"
+        )
+        this.switcher_list := this.AddListView(
+            (this.initial_dark_mode ? "x254 y198 w250 h154 -Hdr" : "x254 y174 w250 h178")
+                . " Checked NoSort -Multi Hidden",
+            ["方案名称"]
+        )
+        this.switcher_list.OnEvent("Click", (ctrl, row) => this.ShowSwitcherDetails(row))
+        this.switcher_list.OnEvent("ItemCheck", (*) => this.MarkSwitcherDirty())
+        this.switcher_details := this.AddText(
+            "x526 y174 w248 h178 Hidden",
+            "选择左侧方案以查看简介。"
+        )
+        this.switcher_hotkeys_label := this.AddText("x254 y374 w116 h24 Hidden", "方案选单快捷键：")
+        this.switcher_hotkeys := this.AddEdit("x374 y370 w400 r1 -Multi Hidden")
+        this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
+        this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
+    }
+
+    CreateBehaviorControls() {
+        local controls, key
+        local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
+        this.behavior_tabs := this.AddTab3(
+            "x230 y136 w570 h450 Hidden"
+                . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
+            ["常规", "按键绑定"]
+        )
+        this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
+        this.behavior_group := this.behavior_tabs
+
+        this.behavior_tabs.UseTab(1)
+        this.behavior_rabbit_group := this.AddGroupBox("x246 y170 w538 h190 Hidden", "玉兔毫行为")
+        this.show_tips := this.AddCheckbox("x260 y196 w190 h24 Hidden", "显示输入状态提示")
+        this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.show_tips_time_label := this.AddText("x478 y198 w130 h22 Hidden", "显示时长（毫秒）：")
+        this.show_tips_time := this.AddEdit("x612 y194 w80 r1 Number -Multi Hidden")
+        this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.suspend_hotkey_label := this.AddText("x260 y228 w132 h22 Hidden", "暂停/恢复快捷键：")
+        this.suspend_hotkey := this.AddEdit("x394 y224 w372 r1 -Multi Hidden")
+        this.SetEditCue(this.suspend_hotkey, "例如：Control+Shift+F12")
+        this.suspend_hotkey.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.clipboard_mode_label := this.AddText("x260 y260 w96 h22 Hidden", "剪贴板上屏：")
+        this.clipboard_mode := this.AddDropDownList(
+            "x358 y256 w164 Choose3 Hidden",
+            ["从不使用", "始终使用", "达到指定长度时"]
+        )
+        this.clipboard_mode.OnEvent("Change", (*) => this.OnClipboardModeChanged())
+        this.clipboard_length_label := this.AddText("x536 y260 w110 h22 Hidden", "指定长度（字）：")
+        this.clipboard_length := this.AddEdit("x648 y256 w118 r1 Number -Multi Hidden")
+        this.clipboard_length.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.global_ascii := this.AddCheckbox("x260 y286 w490 h24 Hidden", "在所有程序之间共享中西文状态")
+        this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.fix_candidate_box := this.AddCheckbox("x260 y312 w238 h24 Hidden", "组字时保持候选窗位置不变")
+        this.fix_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.use_legacy_candidate_box := this.AddCheckbox("x510 y312 w238 h24 Hidden", "使用旧版候选窗")
+        this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.bypass_password_fields := this.AddCheckbox("x260 y336 w490 h24 Hidden", "在密码输入框中绕过 Rime")
+        this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
+
+        this.ascii_switch_group := this.AddGroupBox("x246 y366 w538 h110 Hidden", "中西文切换键")
+        this.ascii_switch_controls := Map()
+        this.AddAsciiSwitchControl("Shift_L", "左 Shift：", 260, 392)
+        this.AddAsciiSwitchControl("Shift_R", "右 Shift：", 432, 392)
+        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 392)
+        this.AddAsciiSwitchControl("Control_L", "左 Ctrl：", 260, 432)
+        this.AddAsciiSwitchControl("Control_R", "右 Ctrl：", 432, 432)
+        this.AddAsciiSwitchControl("Eisu_toggle", "英数键：", 604, 432)
+
+        this.menu_group := this.AddGroupBox("x246 y482 w538 h86 Hidden", "候选与翻页")
+        this.menu_page_size_label := this.AddText("x260 y508 w88 h22 Hidden", "每页候选数：")
+        this.menu_page_size := this.AddEdit("x350 y504 w68 r1 Number -Multi Hidden")
+        this.SetEditCue(this.menu_page_size, "5")
+        this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.menu_labels_label := this.AddText("x438 y508 w90 h22 Hidden", "候选序号：")
+        this.menu_labels := this.AddEdit("x530 y504 w236 r1 -Multi Hidden")
+        this.SetEditCue(this.menu_labels, "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
+        this.menu_labels.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.menu_help := this.AddText(
+            "x260 y538 w506 h22 cGray Hidden",
+            "候选序号请用逗号分隔；具体输入方案仍可覆盖候选设置。"
+        )
+
+        this.behavior_tabs.UseTab(2)
+        this.binding_list := this.AddListView(
+            (this.initial_dark_mode ? "x250 y198 w530 h270 -Hdr" : "x250 y174 w530 h294")
+                . " -Multi NoSort Hidden",
+            ["接收按键", "生效条件", "动作"]
+        )
+        this.binding_accept_header := this.AddText(
+            "x250 y174 w150 h24 +0x200 Hidden" . surface_options,
+            "  接收按键"
+        )
+        this.binding_when_header := this.AddText(
+            "x400 y174 w100 h24 +0x200 Hidden" . surface_options,
+            "  生效条件"
+        )
+        this.binding_action_header := this.AddText(
+            "x500 y174 w280 h24 +0x200 Hidden" . surface_options,
+            "  动作"
+        )
+        this.binding_list.OnEvent("DoubleClick", (ctrl, row) => this.EditBinding(row))
+        this.binding_add := this.AddButton("x250 y478 w86 h32 Hidden", "添加")
+        this.binding_add.OnEvent("Click", (*) => this.AddBinding())
+        this.binding_edit := this.AddButton("x344 y478 w86 h32 Hidden", "编辑")
+        this.binding_edit.OnEvent("Click", (*) => this.EditBinding())
+        this.binding_delete := this.AddButton("x438 y478 w86 h32 Hidden", "删除")
+        this.binding_delete.OnEvent("Click", (*) => this.DeleteBinding())
+        this.binding_up := this.AddButton("x532 y478 w86 h32 Hidden", "上移")
+        this.binding_up.OnEvent("Click", (*) => this.MoveBinding(-1))
+        this.binding_down := this.AddButton("x626 y478 w86 h32 Hidden", "下移")
+        this.binding_down.OnEvent("Click", (*) => this.MoveBinding(1))
+        this.binding_help := this.AddText(
+            "x250 y520 w530 h48 cGray Hidden",
+            "这里显示当前生效的完整列表。修改后，default.custom.yaml 将完整接管此列表；" .
+                "要恢复默认值，请手动删除对应的 custom 配置。"
+        )
+        this.behavior_tabs.UseTab()
+
+        this.behavior_common_controls := [
+            this.behavior_rabbit_group,
+            this.show_tips,
+            this.show_tips_time_label,
+            this.show_tips_time,
+            this.suspend_hotkey_label,
+            this.suspend_hotkey,
+            this.clipboard_mode_label,
+            this.clipboard_mode,
+            this.clipboard_length_label,
+            this.clipboard_length,
+            this.global_ascii,
+            this.fix_candidate_box,
+            this.use_legacy_candidate_box,
+            this.bypass_password_fields,
+            this.ascii_switch_group,
+            this.menu_group,
+            this.menu_page_size_label,
+            this.menu_page_size,
+            this.menu_labels_label,
+            this.menu_labels,
+            this.menu_help,
+        ]
+        for key, controls in this.ascii_switch_controls {
+            this.behavior_common_controls.Push(controls.label)
+            this.behavior_common_controls.Push(controls.dropdown)
+        }
+        this.behavior_binding_controls := [
+            this.binding_list,
+            this.binding_add,
+            this.binding_edit,
+            this.binding_delete,
+            this.binding_up,
+            this.binding_down,
+            this.binding_help,
+        ]
+        if this.initial_dark_mode {
+            this.behavior_binding_controls.InsertAt(
+                1,
+                this.binding_accept_header,
+                this.binding_when_header,
+                this.binding_action_header
+            )
+        }
+        this.behavior_status := this.AddText("x230 y588 w570 h24 Hidden", "")
+    }
+
+    CreateApplicationControls() {
+        local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
+        this.application_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "应用适配")
+        this.application_process_header := this.AddText(
+            "x254 y174 w210 h24 +0x200 Hidden" . surface_options,
+            "  应用程序"
+        )
+        this.application_mode_header := this.AddText(
+            "x464 y174 w110 h24 +0x200 Hidden" . surface_options,
+            "  默认状态"
+        )
+        this.application_list := this.AddListView(
+            (this.initial_dark_mode ? "x254 y198 w320 h150 -Hdr" : "x254 y174 w320 h174")
+                . " -Multi NoSort Hidden",
+            ["应用程序", "默认状态"]
+        )
+        this.application_list.OnEvent(
+            "ItemSelect",
+            (ctrl, row, selected) => this.OnApplicationSelection(row, selected)
+        )
+        this.application_process_label := this.AddText("x596 y176 w178 h22 Hidden", "进程文件名：")
+        this.application_process := this.AddEdit("x596 y200 w178 r1 -Multi Hidden")
+        this.application_mode_label := this.AddText("x596 y238 w178 h22 Hidden", "默认输入状态：")
+        this.application_mode := this.AddDropDownList("x596 y262 w178 Choose2 Hidden", ["中文", "英文"])
+        this.application_update_button := this.AddButton("x596 y304 w178 h32 Hidden", "添加或更新")
+        this.application_update_button.OnEvent("Click", (*) => this.StageApplicationRule())
+        this.application_reset_button := this.AddButton("x596 y346 w178 h32 Hidden", "恢复默认或移除")
+        this.application_reset_button.OnEvent("Click", (*) => this.ResetSelectedApplicationRule())
+        this.application_status := this.AddText("x254 y390 w320 h24 Hidden", "")
+    }
+
+    CreateAboutControls() {
+        this.about_group := this.AddGroupBox("x230 y136 w570 h250 Hidden", "关于玉兔毫")
+        this.SetFont("s14 w600")
+        this.about_name := this.AddText("x254 y176 w496 h30 Hidden", "玉兔毫")
+        this.SetFont("s10 w400")
+        this.about_version := this.AddText(
+            "x254 y216 w496 h24 Hidden",
+            "版本：" . RABBIT_VERSION . (A_IsCompiled ? "（已编译）" : "（源代码运行）")
+        )
+        this.about_description := this.AddText(
+            "x254 y252 w496 h48 Hidden",
+            "由 AutoHotkey 实现的 Rime 输入法引擎 Windows 前端。"
+        )
+        this.about_project_link := this.AddLink(
+            "x254 y316 w160 h24 Hidden",
+            '<a href="https://github.com/rimeinn/rabbit">访问项目主页</a>'
+        )
+        this.about_project_link.OnEvent("Click", this.OnLinkClick.Bind(this))
+        this.about_license_link := this.AddLink(
+            "x430 y316 w160 h24 Hidden",
+            '<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 许可证</a>'
+        )
+        this.about_license_link.OnEvent("Click", this.OnLinkClick.Bind(this))
+        this.about_copyright := this.AddText(
+            "x254 y356 w496 h24 Hidden cGray",
+            "Copyright © 2023 - 2026 Xuesong Peng"
+        )
+    }
+
+    CreateDictionaryControls() {
+        this.dictionary_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "用户词典")
+        this.dictionary_list_label := this.AddText("x254 y170 w218 h22 Hidden", "用户词典列表：")
+        this.dictionary_list := this.AddListBox("x254 y194 w218 h204 -Multi Hidden")
+        this.dictionary_list.OnEvent("Change", (*) => this.OnDictionarySelectionChange())
+        this.dictionary_snapshot_text := this.AddText(
+            "x496 y170 w278 h44 Hidden",
+            "使用词典快照在不同的 Rime 系统之间迁移输入习惯。"
+        )
+        this.dictionary_backup := this.AddButton("x496 y220 w134 h32 Disabled Hidden", "输出词典快照")
+        this.dictionary_backup.OnEvent("Click", (*) => this.BackupSelectedDictionary())
+        this.dictionary_restore := this.AddButton("x640 y220 w134 h32 Disabled Hidden", "合入词典快照")
+        this.dictionary_restore.OnEvent("Click", (*) => this.RestoreDictionarySnapshot())
+        this.dictionary_table_text := this.AddText(
+            "x496 y270 w278 h44 Hidden",
+            "使用文本码表查看、编辑或导入词条；迁移数据请优先使用快照。"
+        )
+        this.dictionary_export := this.AddButton("x496 y320 w134 h32 Disabled Hidden", "导出文本码表")
+        this.dictionary_export.OnEvent("Click", (*) => this.ExportSelectedDictionary())
+        this.dictionary_import := this.AddButton("x640 y320 w134 h32 Disabled Hidden", "导入文本码表")
+        this.dictionary_import.OnEvent("Click", (*) => this.ImportSelectedDictionary())
+        this.dictionary_status := this.AddText("x496 y370 w278 h32 Hidden", "")
+    }
+
+    CreateMaintenanceControls() {
+        this.maintenance_group := this.AddGroupBox("x230 y136 w570 h220 Hidden", "维护与同步")
+        this.maintenance_text := this.AddText(
+            "x254 y174 w520 h52 Hidden",
+            "重新部署使配置改动生效；同步用户资料会合并本机与同步目录中的数据。"
+        )
+        this.deploy_button := this.AddButton("x254 y246 w130 h32 Hidden", "重新部署")
+        this.deploy_button.OnEvent("Click", (*) => this.RunDeploy())
+        this.sync_button := this.AddButton("x398 y246 w130 h32 Hidden", "同步用户资料")
+        this.sync_button.OnEvent("Click", (*) => this.RunSync())
+        this.operation_status := this.AddText("x254 y302 w520 h28 Hidden", "")
+    }
+
+    EnsureAppearanceTypesettingControls() {
+        local appearance_layout, loading
+        if this.appearance_typesetting_created {
+            return false
+        }
+        appearance_layout := RabbitSettingsWindow.CalculateAppearanceLayout(this.initial_dark_mode)
         this.appearance_tabs.UseTab(2)
         this.appearance_font_group := this.AddGroupBox("x246 y170 w538 h180 Hidden", "字体")
         this.appearance_font_label := this.AddText("x260 y196 w72 h22 Hidden", "候选文字：")
@@ -311,28 +726,6 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_floating_height := this.AddEdit("x702 y602 w64 r1 Number -Multi Hidden")
         this.appearance_floating_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_tabs.UseTab()
-
-        this.appearance_color_controls := [
-            this.appearance_target_label,
-            this.appearance_target,
-            this.appearance_follow_light,
-            this.appearance_list,
-            this.appearance_add,
-            this.appearance_copy,
-            this.appearance_edit,
-            this.appearance_delete,
-            this.appearance_use,
-            this.appearance_details,
-        ]
-        if initial_dark_mode {
-            this.appearance_color_controls.InsertAt(
-                1,
-                this.appearance_current_header,
-                this.appearance_name_header,
-                this.appearance_id_header,
-                this.appearance_source_header
-            )
-        }
         this.appearance_typesetting_controls := [
             this.appearance_font_group,
             this.appearance_font_label,
@@ -383,323 +776,21 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_floating_height_label,
             this.appearance_floating_height,
         ]
-        this.appearance_status := this.AddText(
-            Format("x230 y{} w570 h20 Hidden", appearance_layout.status_y),
-            ""
-        )
-        this.appearance_page := RabbitAppearanceSettingsPage(
-            this,
-            workflow,
-            old_windows,
-            preview_factory
-        )
-
-        this.placeholder := this.AddGroupBox("x230 y136 w570 h290", "页面内容")
-        this.placeholder_text := this.AddText(
-            "x254 y174 w520 h80",
-            "这里将逐步迁入现有部署器功能。当前页面骨架不会读取或修改配置。"
-        )
-
-        this.switcher_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入方案")
-        this.switcher_list_header := this.AddText(
-            "x254 y174 w250 h24 Center +0x200 Hidden" . surface_options,
-            "方案名称"
-        )
-        this.switcher_list := this.AddListView(
-            (initial_dark_mode ? "x254 y198 w250 h154 -Hdr" : "x254 y174 w250 h178")
-                . " Checked NoSort -Multi Hidden",
-            ["方案名称"]
-        )
-        this.switcher_list.OnEvent("Click", (ctrl, row) => this.ShowSwitcherDetails(row))
-        this.switcher_list.OnEvent("ItemCheck", (*) => this.MarkSwitcherDirty())
-        this.switcher_details := this.AddText(
-            "x526 y174 w248 h178 Hidden",
-            "选择左侧方案以查看简介。"
-        )
-        this.switcher_hotkeys_label := this.AddText("x254 y374 w116 h24 Hidden", "方案选单快捷键：")
-        this.switcher_hotkeys := this.AddEdit("x374 y370 w400 r1 -Multi Hidden")
-        this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
-        this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
-
-        this.behavior_tabs := this.AddTab3(
-            "x230 y136 w570 h450 Hidden"
-                . (initial_dark_mode ? " cF0F0F0 Background202020" : ""),
-            ["常规", "按键绑定"]
-        )
-        this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
-        this.behavior_group := this.behavior_tabs
-
-        this.behavior_tabs.UseTab(1)
-        this.behavior_rabbit_group := this.AddGroupBox("x246 y170 w538 h190 Hidden", "玉兔毫行为")
-        this.show_tips := this.AddCheckbox("x260 y196 w190 h24 Hidden", "显示输入状态提示")
-        this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.show_tips_time_label := this.AddText("x478 y198 w130 h22 Hidden", "显示时长（毫秒）：")
-        this.show_tips_time := this.AddEdit("x612 y194 w80 r1 Number -Multi Hidden")
-        this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.suspend_hotkey_label := this.AddText("x260 y228 w132 h22 Hidden", "暂停/恢复快捷键：")
-        this.suspend_hotkey := this.AddEdit("x394 y224 w372 r1 -Multi Hidden")
-        this.SetEditCue(this.suspend_hotkey, "例如：Control+Shift+F12")
-        this.suspend_hotkey.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.clipboard_mode_label := this.AddText("x260 y260 w96 h22 Hidden", "剪贴板上屏：")
-        this.clipboard_mode := this.AddDropDownList(
-            "x358 y256 w164 Choose3 Hidden",
-            ["从不使用", "始终使用", "达到指定长度时"]
-        )
-        this.clipboard_mode.OnEvent("Change", (*) => this.OnClipboardModeChanged())
-        this.clipboard_length_label := this.AddText("x536 y260 w110 h22 Hidden", "指定长度（字）：")
-        this.clipboard_length := this.AddEdit("x648 y256 w118 r1 Number -Multi Hidden")
-        this.clipboard_length.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.global_ascii := this.AddCheckbox("x260 y286 w490 h24 Hidden", "在所有程序之间共享中西文状态")
-        this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.fix_candidate_box := this.AddCheckbox("x260 y312 w238 h24 Hidden", "组字时保持候选窗位置不变")
-        this.fix_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.use_legacy_candidate_box := this.AddCheckbox("x510 y312 w238 h24 Hidden", "使用旧版候选窗")
-        this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.bypass_password_fields := this.AddCheckbox("x260 y336 w490 h24 Hidden", "在密码输入框中绕过 Rime")
-        this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
-
-        this.ascii_switch_group := this.AddGroupBox("x246 y366 w538 h110 Hidden", "中西文切换键")
-        this.ascii_switch_controls := Map()
-        this.AddAsciiSwitchControl("Shift_L", "左 Shift：", 260, 392)
-        this.AddAsciiSwitchControl("Shift_R", "右 Shift：", 432, 392)
-        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 392)
-        this.AddAsciiSwitchControl("Control_L", "左 Ctrl：", 260, 432)
-        this.AddAsciiSwitchControl("Control_R", "右 Ctrl：", 432, 432)
-        this.AddAsciiSwitchControl("Eisu_toggle", "英数键：", 604, 432)
-
-        this.menu_group := this.AddGroupBox("x246 y482 w538 h86 Hidden", "候选与翻页")
-        this.menu_page_size_label := this.AddText("x260 y508 w88 h22 Hidden", "每页候选数：")
-        this.menu_page_size := this.AddEdit("x350 y504 w68 r1 Number -Multi Hidden")
-        this.SetEditCue(this.menu_page_size, "5")
-        this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.menu_labels_label := this.AddText("x438 y508 w90 h22 Hidden", "候选序号：")
-        this.menu_labels := this.AddEdit("x530 y504 w236 r1 -Multi Hidden")
-        this.SetEditCue(this.menu_labels, "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
-        this.menu_labels.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.menu_help := this.AddText(
-            "x260 y538 w506 h22 cGray Hidden",
-            "候选序号请用逗号分隔；具体输入方案仍可覆盖候选设置。"
-        )
-
-        this.behavior_tabs.UseTab(2)
-        this.binding_list := this.AddListView(
-            (initial_dark_mode ? "x250 y198 w530 h270 -Hdr" : "x250 y174 w530 h294")
-                . " -Multi NoSort Hidden",
-            ["接收按键", "生效条件", "动作"]
-        )
-        this.binding_accept_header := this.AddText(
-            "x250 y174 w150 h24 +0x200 Hidden" . surface_options,
-            "  接收按键"
-        )
-        this.binding_when_header := this.AddText(
-            "x400 y174 w100 h24 +0x200 Hidden" . surface_options,
-            "  生效条件"
-        )
-        this.binding_action_header := this.AddText(
-            "x500 y174 w280 h24 +0x200 Hidden" . surface_options,
-            "  动作"
-        )
-        this.binding_list.OnEvent("DoubleClick", (ctrl, row) => this.EditBinding(row))
-        this.binding_add := this.AddButton("x250 y478 w86 h32 Hidden", "添加")
-        this.binding_add.OnEvent("Click", (*) => this.AddBinding())
-        this.binding_edit := this.AddButton("x344 y478 w86 h32 Hidden", "编辑")
-        this.binding_edit.OnEvent("Click", (*) => this.EditBinding())
-        this.binding_delete := this.AddButton("x438 y478 w86 h32 Hidden", "删除")
-        this.binding_delete.OnEvent("Click", (*) => this.DeleteBinding())
-        this.binding_up := this.AddButton("x532 y478 w86 h32 Hidden", "上移")
-        this.binding_up.OnEvent("Click", (*) => this.MoveBinding(-1))
-        this.binding_down := this.AddButton("x626 y478 w86 h32 Hidden", "下移")
-        this.binding_down.OnEvent("Click", (*) => this.MoveBinding(1))
-        this.binding_help := this.AddText(
-            "x250 y520 w530 h48 cGray Hidden",
-            "这里显示当前生效的完整列表。修改后，default.custom.yaml 将完整接管此列表；" .
-                "要恢复默认值，请手动删除对应的 custom 配置。"
-        )
-        this.behavior_tabs.UseTab()
-
-        this.behavior_common_controls := [
-            this.behavior_rabbit_group,
-            this.show_tips,
-            this.show_tips_time_label,
-            this.show_tips_time,
-            this.suspend_hotkey_label,
-            this.suspend_hotkey,
-            this.clipboard_mode_label,
-            this.clipboard_mode,
-            this.clipboard_length_label,
-            this.clipboard_length,
-            this.global_ascii,
-            this.fix_candidate_box,
-            this.use_legacy_candidate_box,
-            this.bypass_password_fields,
-            this.ascii_switch_group,
-            this.menu_group,
-            this.menu_page_size_label,
-            this.menu_page_size,
-            this.menu_labels_label,
-            this.menu_labels,
-            this.menu_help,
-        ]
-        for key, controls in this.ascii_switch_controls {
-            this.behavior_common_controls.Push(controls.label)
-            this.behavior_common_controls.Push(controls.dropdown)
-        }
-        this.behavior_binding_controls := [
-            this.binding_list,
-            this.binding_add,
-            this.binding_edit,
-            this.binding_delete,
-            this.binding_up,
-            this.binding_down,
-            this.binding_help,
-        ]
-        if initial_dark_mode {
-            this.behavior_binding_controls.InsertAt(
-                1,
-                this.binding_accept_header,
-                this.binding_when_header,
-                this.binding_action_header
-            )
-        }
-        this.behavior_status := this.AddText("x230 y588 w570 h24 Hidden", "")
-
-        this.application_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "应用适配")
-        this.application_process_header := this.AddText(
-            "x254 y174 w210 h24 +0x200 Hidden" . surface_options,
-            "  应用程序"
-        )
-        this.application_mode_header := this.AddText(
-            "x464 y174 w110 h24 +0x200 Hidden" . surface_options,
-            "  默认状态"
-        )
-        this.application_list := this.AddListView(
-            (initial_dark_mode ? "x254 y198 w320 h150 -Hdr" : "x254 y174 w320 h174")
-                . " -Multi NoSort Hidden",
-            ["应用程序", "默认状态"]
-        )
-        this.application_list.OnEvent(
-            "ItemSelect",
-            (ctrl, row, selected) => this.OnApplicationSelection(row, selected)
-        )
-        this.application_process_label := this.AddText("x596 y176 w178 h22 Hidden", "进程文件名：")
-        this.application_process := this.AddEdit("x596 y200 w178 r1 -Multi Hidden")
-        this.application_mode_label := this.AddText("x596 y238 w178 h22 Hidden", "默认输入状态：")
-        this.application_mode := this.AddDropDownList("x596 y262 w178 Choose2 Hidden", ["中文", "英文"])
-        this.application_update_button := this.AddButton("x596 y304 w178 h32 Hidden", "添加或更新")
-        this.application_update_button.OnEvent("Click", (*) => this.StageApplicationRule())
-        this.application_reset_button := this.AddButton("x596 y346 w178 h32 Hidden", "恢复默认或移除")
-        this.application_reset_button.OnEvent("Click", (*) => this.ResetSelectedApplicationRule())
-        this.application_status := this.AddText("x254 y390 w320 h24 Hidden", "")
-
-        this.about_group := this.AddGroupBox("x230 y136 w570 h250 Hidden", "关于玉兔毫")
-        this.SetFont("s14 w600")
-        this.about_name := this.AddText("x254 y176 w496 h30 Hidden", "玉兔毫")
-        this.SetFont("s10 w400")
-        this.about_version := this.AddText(
-            "x254 y216 w496 h24 Hidden",
-            "版本：" . RABBIT_VERSION . (A_IsCompiled ? "（已编译）" : "（源代码运行）")
-        )
-        this.about_description := this.AddText(
-            "x254 y252 w496 h48 Hidden",
-            "由 AutoHotkey 实现的 Rime 输入法引擎 Windows 前端。"
-        )
-        this.about_project_link := this.AddLink(
-            "x254 y316 w160 h24 Hidden",
-            '<a href="https://github.com/rimeinn/rabbit">访问项目主页</a>'
-        )
-        this.about_project_link.OnEvent("Click", this.OnLinkClick.Bind(this))
-        this.about_license_link := this.AddLink(
-            "x430 y316 w160 h24 Hidden",
-            '<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 许可证</a>'
-        )
-        this.about_license_link.OnEvent("Click", this.OnLinkClick.Bind(this))
-        this.about_copyright := this.AddText(
-            "x254 y356 w496 h24 Hidden cGray",
-            "Copyright © 2023 - 2026 Xuesong Peng"
-        )
-
-        this.dictionary_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "用户词典")
-        this.dictionary_list_label := this.AddText("x254 y170 w218 h22 Hidden", "用户词典列表：")
-        this.dictionary_list := this.AddListBox("x254 y194 w218 h204 -Multi Hidden")
-        this.dictionary_list.OnEvent("Change", (*) => this.OnDictionarySelectionChange())
-        this.dictionary_snapshot_text := this.AddText(
-            "x496 y170 w278 h44 Hidden",
-            "使用词典快照在不同的 Rime 系统之间迁移输入习惯。"
-        )
-        this.dictionary_backup := this.AddButton("x496 y220 w134 h32 Disabled Hidden", "输出词典快照")
-        this.dictionary_backup.OnEvent("Click", (*) => this.BackupSelectedDictionary())
-        this.dictionary_restore := this.AddButton("x640 y220 w134 h32 Disabled Hidden", "合入词典快照")
-        this.dictionary_restore.OnEvent("Click", (*) => this.RestoreDictionarySnapshot())
-        this.dictionary_table_text := this.AddText(
-            "x496 y270 w278 h44 Hidden",
-            "使用文本码表查看、编辑或导入词条；迁移数据请优先使用快照。"
-        )
-        this.dictionary_export := this.AddButton("x496 y320 w134 h32 Disabled Hidden", "导出文本码表")
-        this.dictionary_export.OnEvent("Click", (*) => this.ExportSelectedDictionary())
-        this.dictionary_import := this.AddButton("x640 y320 w134 h32 Disabled Hidden", "导入文本码表")
-        this.dictionary_import.OnEvent("Click", (*) => this.ImportSelectedDictionary())
-        this.dictionary_status := this.AddText("x496 y370 w278 h32 Hidden", "")
-
-        this.maintenance_group := this.AddGroupBox("x230 y136 w570 h220 Hidden", "维护与同步")
-        this.maintenance_text := this.AddText(
-            "x254 y174 w520 h52 Hidden",
-            "重新部署使配置改动生效；同步用户资料会合并本机与同步目录中的数据。"
-        )
-        this.deploy_button := this.AddButton("x254 y246 w130 h32 Hidden", "重新部署")
-        this.deploy_button.OnEvent("Click", (*) => this.RunDeploy())
-        this.sync_button := this.AddButton("x398 y246 w130 h32 Hidden", "同步用户资料")
-        this.sync_button.OnEvent("Click", (*) => this.RunSync())
-        this.operation_status := this.AddText("x254 y302 w520 h28 Hidden", "")
-
-        this.footer_status := this.AddText(
-            "x230 y612 w570 h22 cGray",
-            "设置内容将在确认后统一保存和部署。"
-        )
-        this.OnEvent("Close", this.OnClose.Bind(this))
-        this.OnEvent("Escape", this.OnClose.Bind(this))
-
-        this.SelectPage(initial_page)
-        this.navigation.Enabled := !installing
-        if installing {
-            this.footer_status.Value := "请选择输入方案，然后完成首次部署。"
-        }
-        this.UpdateApplyButton()
-        factory := theme_factory
-        this.window_theme := factory(this)
-        this.window_theme.RegisterMuted(
-            this.sidebar_subtitle,
-            this.page_description,
-            this.menu_help,
-            this.binding_help,
-            this.about_copyright,
-            this.footer_status
-        )
-        this.window_theme.RegisterSurface(
-            this.appearance_current_header,
-            this.appearance_name_header,
-            this.appearance_id_header,
-            this.appearance_source_header,
-            this.switcher_list_header,
-            this.binding_accept_header,
-            this.binding_when_header,
-            this.binding_action_header,
-            this.application_process_header,
-            this.application_mode_header
-        )
-        this.window_theme.Register()
-    }
-
-    static PageIndex(page_id := "") {
-        local index, page
-        if !page_id {
-            return 1
-        }
-        for index, page in RabbitSettingsWindow.pages {
-            if page.id = page_id {
-                return index
+        this.appearance_typesetting_created := true
+        if this.appearance_page.settings {
+            loading := this.appearance_page.loading
+            this.appearance_page.loading := true
+            try {
+                this.appearance_page.PopulateStyle(this.appearance_page.style)
+            } finally {
+                this.appearance_page.loading := loading
             }
+            this.appearance_page.UpdateConditionalControls()
         }
-        return 0
+        if HasProp(this, "window_theme") && this.window_theme {
+            this.window_theme.Apply()
+        }
+        return true
     }
 
     AddAsciiSwitchControl(key, label, x, y) {
@@ -833,10 +924,19 @@ class RabbitSettingsWindow extends Gui {
     }
 
     OnAppearanceTabChanged() {
+        if this.appearance_tabs.Value = 2 {
+            this.EnsureAppearanceTypesettingControls()
+        }
         this.appearance_page.OnTabChanged()
     }
 
     SetSwitcherVisible(visible) {
+        if visible {
+            this.EnsurePageControls(2)
+        }
+        if !this.page_controls_created.Has(2) {
+            return
+        }
         this.switcher_group.Visible := visible
         this.switcher_list_header.Visible := visible && this.initial_dark_mode
         this.switcher_list.Visible := visible
@@ -847,6 +947,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SetBehaviorVisible(visible) {
+        if visible {
+            this.EnsurePageControls(3)
+        }
+        if !this.page_controls_created.Has(3) {
+            return
+        }
         this.behavior_tabs.Visible := visible
         this.SetBehaviorTabControlsVisible(visible)
         this.behavior_status.Visible := visible
@@ -868,6 +974,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SetApplicationVisible(visible) {
+        if visible {
+            this.EnsurePageControls(4)
+        }
+        if !this.page_controls_created.Has(4) {
+            return
+        }
         this.application_group.Visible := visible
         this.application_process_header.Visible := visible && this.initial_dark_mode
         this.application_mode_header.Visible := visible && this.initial_dark_mode
@@ -882,6 +994,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SetDictionaryVisible(visible) {
+        if visible {
+            this.EnsurePageControls(5)
+        }
+        if !this.page_controls_created.Has(5) {
+            return
+        }
         this.dictionary_group.Visible := visible
         this.dictionary_list_label.Visible := visible
         this.dictionary_list.Visible := visible
@@ -895,6 +1013,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SetMaintenanceVisible(visible) {
+        if visible {
+            this.EnsurePageControls(6)
+        }
+        if !this.page_controls_created.Has(6) {
+            return
+        }
         this.maintenance_group.Visible := visible
         this.maintenance_text.Visible := visible
         this.deploy_button.Visible := visible
@@ -903,6 +1027,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SetAboutVisible(visible) {
+        if visible {
+            this.EnsurePageControls(7)
+        }
+        if !this.page_controls_created.Has(7) {
+            return
+        }
         this.about_group.Visible := visible
         this.about_name.Visible := visible
         this.about_version.Visible := visible
@@ -963,6 +1093,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     PopulateAppearanceStyle(style) {
+        this.EnsureAppearanceTypesettingControls()
         this.appearance_page.PopulateStyle(style)
     }
 
@@ -1017,7 +1148,7 @@ class RabbitSettingsWindow extends Gui {
     GetAppearancePreviewLabels() {
         local label
         local labels := []
-        if this.behavior_model || Trim(this.menu_labels.Value) {
+        if this.behavior_model || (HasProp(this, "menu_labels") && Trim(this.menu_labels.Value)) {
             Loop Parse this.menu_labels.Value, "," {
                 if (label := Trim(A_LoopField)) {
                     labels.Push(label)
@@ -1244,6 +1375,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     EnsureBehaviorSettings() {
+        this.EnsurePageControls(3)
         if this.behavior_model {
             return true
         }
@@ -1875,6 +2007,7 @@ class RabbitSettingsWindow extends Gui {
 
     RunMaintenanceAction(action, success_message, failure_message) {
         local result
+        this.EnsurePageControls(6)
         if !this.workflow {
             return false
         }
