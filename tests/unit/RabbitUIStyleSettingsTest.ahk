@@ -21,6 +21,7 @@
 RunTest("UI style settings save typography and layout", TestUIStyleSettingsSaveTypographyAndLayout.Bind())
 RunTest("UI style settings patch individual color schemes", TestUIStyleSettingsPatchColorSchemes.Bind())
 RunTest("UI style settings restore dark scheme following", TestUIStyleSettingsRestoreDarkFollowing.Bind())
+RunTest("UI style settings reuse common style fields across color schemes", TestUIStyleSettingsReuseBaseStyle.Bind())
 
 TestUIStyleSettingsSaveTypographyAndLayout() {
     local calls := []
@@ -110,6 +111,34 @@ TestUIStyleSettingsRestoreDarkFollowing() {
     )
 }
 
+TestUIStyleSettingsReuseBaseStyle() {
+    local calls := []
+    local rime := RabbitUIStyleSettingsReadRimeProbe()
+    local settings := UIStyleSettings(rime, RabbitUIStyleSettingsLeversProbe(calls))
+    try {
+        AssertTrue(settings.Load(), "The settings model failed to load its style config.")
+        local current := settings.GetCurrentStyle()
+        local reads_after_current := rime.shared_reads
+        local presets := settings.GetPresetColorSchemes()
+        AssertEqual(2, presets.Length, "The settings model loaded the wrong preset count.")
+        AssertEqual(
+            reads_after_current,
+            rime.shared_reads,
+            "Enumerating color schemes reread the common typography and layout fields."
+        )
+        AssertEqual(0xff101010, current.back_color, "The active scheme lost its background color.")
+        AssertEqual(0xff101010, presets[1].style.back_color, "The first preset used the wrong background color.")
+        AssertEqual(0xff202020, presets[2].style.back_color, "The second preset used the wrong background color.")
+        AssertEqual(
+            presets[2].style.back_color,
+            presets[2].style.candidate_back_color,
+            "The optimized preset path changed dependent color fallbacks."
+        )
+    } finally {
+        settings.Dispose()
+    }
+}
+
 JoinUIStyleSettingsCalls(calls) {
     local result := ""
     for call in calls {
@@ -135,6 +164,10 @@ class RabbitUIStyleSettingsLeversProbe {
     load_settings(settings) {
         this.calls.Push("load")
         return true
+    }
+
+    settings_get_config(settings) {
+        return "config"
     }
 
     save_settings(settings) {
@@ -180,5 +213,100 @@ class RabbitUIStyleSettingsRimeProbe {
 
     config_close(config) {
         this.calls.Push("close:" . config)
+    }
+}
+
+class RabbitUIStyleSettingsReadRimeProbe {
+    __New() {
+        this.shared_reads := 0
+        this.preset_keys := ["aqua", "azure"]
+    }
+
+    user_config_open(config_id) {
+        return 0
+    }
+
+    config_begin_map(config, path) {
+        if path != "preset_color_schemes" {
+            return 0
+        }
+        return { index: 0, key: "", path: "" }
+    }
+
+    config_next(iter) {
+        iter.index += 1
+        if iter.index > this.preset_keys.Length {
+            return false
+        }
+        iter.key := this.preset_keys[iter.index]
+        iter.path := "preset_color_schemes/" . iter.key
+        return true
+    }
+
+    config_end(iter) {
+    }
+
+    config_get_cstring(config, key) {
+        if RegExMatch(key, "^preset_color_schemes/([^/]+)/name$", &match) {
+            return "Scheme " . match[1]
+        }
+        if InStr(key, "/author") {
+            return "Tester"
+        }
+        return ""
+    }
+
+    config_get_string(config, key) {
+        if InStr(key, "style/") = 1 {
+            this.shared_reads += 1
+        }
+        switch key {
+            case "style/font_face", "style/preedit_font_face", "style/label_font_face", "style/comment_font_face":
+                return "Test Font"
+            case "style/color_scheme":
+                return "aqua"
+        }
+        if InStr(key, "/color_format") {
+            return "argb"
+        }
+        return ""
+    }
+
+    config_get_int(config, key) {
+        if InStr(key, "style/") = 1 {
+            this.shared_reads += 1
+        }
+        return 14
+    }
+
+    config_test_get_string(config, key, &value) {
+        if InStr(key, "style/") = 1 {
+            this.shared_reads += 1
+            return false
+        }
+        if InStr(key, "preset_color_schemes/aqua/back_color") {
+            value := "0xff101010"
+            return true
+        }
+        if InStr(key, "preset_color_schemes/azure/back_color") {
+            value := "0xff202020"
+            return true
+        }
+        return false
+    }
+
+    config_test_get_int(config, key, &value) {
+        this.shared_reads += 1
+        return false
+    }
+
+    config_test_get_bool(config, key, &value) {
+        this.shared_reads += 1
+        return false
+    }
+
+    config_test_get_double(config, key, &value) {
+        this.shared_reads += 1
+        return false
     }
 }

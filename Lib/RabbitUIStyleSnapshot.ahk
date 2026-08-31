@@ -126,6 +126,12 @@ class RabbitUIStyleSnapshot {
         return RabbitUIStyleSnapshot(this, overrides)
     }
 
+    WithColorSchemeFromConfig(rime_api, config, color_scheme) {
+        local colors := Map()
+        RabbitUIStyleSnapshot.ApplyColorScheme(rime_api, config, color_scheme, colors)
+        return this.With(colors)
+    }
+
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
         local fmt, bw, cr, r, mx, my, candidate_padding_x, candidate_padding_y, candidate_spacing
         local w, h, vertical_text_left_to_right, floating_preedit

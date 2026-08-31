@@ -30,6 +30,7 @@ class UIStyleSettings {
     color_scheme_dark_changed := false
     color_scheme_changes := Map()
     style_values := 0
+    base_style := 0
     disposed := false
 
     __New(rime_api, levers_api := 0) {
@@ -39,16 +40,18 @@ class UIStyleSettings {
     }
 
     Load() {
+        this.base_style := 0
         return this.api.load_settings(this.settings)
     }
 
     GetPresetColorSchemes() {
-        local config, preset, name, scheme_item, style, values
+        local base_style, config, preset, name, scheme_item, style, values
         local custom_ids := this.GetCustomColorSchemeIds()
         local result := []
         if !(config := this.api.settings_get_config(this.settings)) {
             return result
         }
+        base_style := this.GetBaseStyle(config)
         if !(preset := this.rime.config_begin_map(config, "preset_color_schemes")) {
             return result
         }
@@ -82,12 +85,7 @@ class UIStyleSettings {
                         }
                     }
                 }
-                style := RabbitUIStyleSnapshot.FromConfig(
-                    this.rime,
-                    config,
-                    false,
-                    StrLower(preset.key)
-                )
+                style := base_style.WithColorSchemeFromConfig(this.rime, config, StrLower(preset.key))
                 result.Push(RabbitColorScheme(
                     preset.key,
                     values,
@@ -176,11 +174,20 @@ class UIStyleSettings {
     }
 
     GetCurrentStyle() {
-        local config
+        local color_scheme, config, style
         if !(config := this.api.settings_get_config(this.settings)) {
             return RabbitUIStyleSnapshot()
         }
-        return RabbitUIStyleSnapshot.FromConfig(this.rime, config)
+        style := this.GetBaseStyle(config)
+        color_scheme := this.rime.config_get_string(config, "style/color_scheme")
+        return color_scheme ? style.WithColorSchemeFromConfig(this.rime, config, color_scheme) : style
+    }
+
+    GetBaseStyle(config) {
+        if !this.base_style {
+            this.base_style := RabbitUIStyleSnapshot.FromConfig(this.rime, config, false, "")
+        }
+        return this.base_style
     }
 
     SelectColorScheme(color_scheme_id) {
@@ -220,6 +227,7 @@ class UIStyleSettings {
     }
 
     SetStyleValues(values) {
+        this.base_style := 0
         this.style_values := Map()
         for name in [
             "font_face",
