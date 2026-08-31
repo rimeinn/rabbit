@@ -210,7 +210,7 @@ class RabbitApplication {
 
     ResolveKeyboardLayout(layout := 0) {
         if layout == 0 {
-            layout := DllCall("GetKeyboardLayout", "UInt", 0)
+            layout := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
         }
         return layout
     }

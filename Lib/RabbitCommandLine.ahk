@@ -191,7 +191,8 @@ RabbitParseKeyboardLayout(value) {
 }
 
 RabbitFormatKeyboardLayout(layout) {
-    return Format("0x{:04X}", layout)
+    ; Legacy IME HKLs may be sign-extended; command-line layout IDs use the low 32 bits.
+    return Format("0x{:04X}", layout & 0xffffffff)
 }
 
 RabbitQuoteCommandLineArgument(argument) {

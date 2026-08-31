@@ -22,6 +22,7 @@
 RunTest("Rabbit named command line options", TestRabbitCommandLineOptions.Bind())
 RunTest("deployer named command line options", TestDeployerCommandLineOptions.Bind())
 RunTest("command line rejects invalid forms", TestCommandLineRejectsInvalidForms.Bind())
+RunTest("keyboard layout handle round trip", TestKeyboardLayoutHandleRoundTrip.Bind())
 RunTest("Windows command line quoting", TestWindowsCommandLineQuoting.Bind())
 
 TestRabbitCommandLineOptions() {
@@ -90,6 +91,26 @@ TestCommandLineRejectsInvalidForms() {
             "RabbitDeployer accepted an invalid command line."
         )
     }
+}
+
+TestKeyboardLayoutHandleRoundTrip() {
+    local sign_extended_layout := 0xE0200804 - 0x100000000
+    local formatted := RabbitFormatKeyboardLayout(sign_extended_layout)
+    AssertEqual(
+        "0xE0200804",
+        formatted,
+        "A sign-extended keyboard layout handle was not normalized for the command line."
+    )
+
+    local options := RabbitApplicationOptions.Parse([
+        "--keyboard-layout",
+        formatted,
+    ])
+    AssertEqual(
+        0xE0200804,
+        options.keyboard_layout,
+        "Rabbit did not preserve a keyboard layout with the high bit set."
+    )
 }
 
 TestWindowsCommandLineQuoting() {
