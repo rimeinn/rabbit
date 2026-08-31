@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitDeployerApplication.ahk
 
 RunTest("settings window ownership", TestSettingsWindowOwnership.Bind())
+RunTest("deployer defers the initial settings page load", TestDeployerDefersInitialSettingsLoad.Bind())
 RunTest("old Windows uses legacy deployer", TestOldWindowsUsesLegacyDeployer.Bind())
 RunTest("deployer validates settings page IDs", TestDeployerValidatesSettingsPageIds.Bind())
 RunTest("old Windows redirects dictionary settings", TestOldWindowsRedirectsDictionarySettings.Bind())
@@ -34,6 +35,19 @@ TestSettingsWindowOwnership() {
         JoinSettingsWindowCalls(calls),
         "The deployer application did not own the settings window for its complete lifetime."
     )
+}
+
+TestDeployerDefersInitialSettingsLoad() {
+    local application := RabbitDeployerApplication(0)
+    local window := application.CreateSettingsWindow()
+    try {
+        AssertTrue(window.initial_page_load_pending,
+            "The deployer loaded settings before showing its window.")
+        AssertTrue(!window.appearance_page.settings,
+            "The deployer initialized the appearance model during window construction.")
+    } finally {
+        window.Dispose()
+    }
 }
 
 TestDeployerValidatesSettingsPageIds() {

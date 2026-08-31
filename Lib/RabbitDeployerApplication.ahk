@@ -88,7 +88,9 @@ class RabbitDeployerApplication {
             RabbitAppearancePreview,
             0,
             page_id,
-            installing
+            installing,
+            RabbitWindowThemeController,
+            true
         )
     }
 

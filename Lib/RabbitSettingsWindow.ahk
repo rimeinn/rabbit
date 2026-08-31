@@ -65,7 +65,8 @@ class RabbitSettingsWindow extends Gui {
         close_prompt := 0,
         initial_page_id := "",
         installing := false,
-        theme_factory := RabbitWindowThemeController
+        theme_factory := RabbitWindowThemeController,
+        load_after_show := false
     ) {
         local appearance_layout, initial_dark_mode := false, initial_page, index, factory
         local surface_options := ""
@@ -107,6 +108,8 @@ class RabbitSettingsWindow extends Gui {
         this.disposed := false
         this.selected_page := 0
         this.window_shown := false
+        this.initial_page_load_pending := !!load_after_show
+        this.initial_page_load_callback := this.LoadInitialPage.Bind(this)
         this.initial_dark_mode := initial_dark_mode
 
         if initial_dark_mode {
@@ -820,7 +823,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     SelectPage(index) {
-        local page
+        local page, was_pending := false
         if index < 1 || index > RabbitSettingsWindow.pages.Length {
             return false
         }
@@ -848,6 +851,25 @@ class RabbitSettingsWindow extends Gui {
         this.SetMaintenanceVisible(index = 6)
         this.SetAboutVisible(index = 7)
         this.ResizeForPage(index)
+        if this.initial_page_load_pending && !this.window_shown {
+            this.footer_status.Value := "正在加载设置…"
+            this.UpdateApplyButton()
+            return true
+        }
+        if this.initial_page_load_pending {
+            was_pending := true
+            this.initial_page_load_pending := false
+            SetTimer(this.initial_page_load_callback, 0)
+        }
+        this.LoadPageSettings(index)
+        if was_pending {
+            this.FinishInitialPageLoad()
+        }
+        this.UpdateApplyButton()
+        return true
+    }
+
+    LoadPageSettings(index) {
         if index = 1 {
             this.EnsureAppearanceSettings()
             if this.window_shown {
@@ -862,8 +884,24 @@ class RabbitSettingsWindow extends Gui {
         } else if index = 5 {
             this.EnsureDictionarySettings()
         }
+    }
+
+    LoadInitialPage() {
+        if this.disposed || !this.initial_page_load_pending {
+            return
+        }
+        this.initial_page_load_pending := false
+        this.LoadPageSettings(this.selected_page)
+        this.FinishInitialPageLoad()
         this.UpdateApplyButton()
-        return true
+    }
+
+    FinishInitialPageLoad() {
+        if this.footer_status.Value = "正在加载设置…" {
+            this.footer_status.Value := this.installing
+                ? "请选择输入方案，然后完成首次部署。"
+                : "设置内容将在确认后统一保存和部署。"
+        }
     }
 
     GetPageWindowHeight(index := 0) {
@@ -2141,7 +2179,9 @@ class RabbitSettingsWindow extends Gui {
         )))
         this.window_shown := true
         this.ClampWindowToWorkArea()
-        if this.selected_page = 1 {
+        if this.initial_page_load_pending {
+            SetTimer(this.initial_page_load_callback, -1)
+        } else if this.selected_page = 1 {
             this.PreviewAppearance()
         }
     }
@@ -2178,6 +2218,7 @@ class RabbitSettingsWindow extends Gui {
             return
         }
         this.disposed := true
+        SetTimer(this.initial_page_load_callback, 0)
         try {
             if this.window_theme {
                 this.window_theme.Dispose()
