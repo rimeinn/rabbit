@@ -410,7 +410,7 @@ class RabbitAppearanceSettingsPage {
             this.owner.appearance_status.Value := "请先将浅色和深色模式切换到其他配色。"
             return false
         }
-        if MsgBox(
+        if this.owner.ShowMessage(
             "确定删除配色方案“" . color_scheme.name . "”吗？",
             "【玉兔毫】",
             "YesNo Icon!"

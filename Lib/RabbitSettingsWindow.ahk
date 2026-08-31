@@ -917,9 +917,26 @@ class RabbitSettingsWindow extends Gui {
             Run(link)
             return true
         } catch as err {
-            MsgBox("无法打开链接：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
+            this.ShowMessage("无法打开链接：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
             return false
         }
+    }
+
+    RunOwnedDialog(callback) {
+        this.Opt("+OwnDialogs")
+        try {
+            return callback.Call()
+        } finally {
+            this.Opt("-OwnDialogs")
+        }
+    }
+
+    ShowMessage(text, title := "", options := "") {
+        return this.RunOwnedDialog(MsgBox.Bind(text, title, options))
+    }
+
+    SelectFile(options := "", root_dir_or_file := "", title := "", filter := "") {
+        return this.RunOwnedDialog(FileSelect.Bind(options, root_dir_or_file, title, filter))
     }
 
     EnsureAppearanceSettings() {
@@ -1036,7 +1053,7 @@ class RabbitSettingsWindow extends Gui {
         if this.close_prompt {
             return this.close_prompt.Call()
         }
-        return MsgBox(
+        return this.ShowMessage(
             "设置窗口中有尚未保存的更改。`n`n" .
                 "选择“是”保存并部署；选择“否”放弃更改；选择“取消”继续编辑。",
             "【玉兔毫】",
@@ -1628,7 +1645,7 @@ class RabbitSettingsWindow extends Gui {
         }
         schema_ids := this.SelectedSchemaIds()
         if schema_ids.Length = 0 {
-            MsgBox("至少要选用一项输入方案。", "【玉兔毫】", "Ok Icon!")
+            this.ShowMessage("至少要选用一项输入方案。", "【玉兔毫】", "Ok Icon!")
             return false
         }
 
@@ -1742,7 +1759,7 @@ class RabbitSettingsWindow extends Gui {
             this.dictionary_status.Value := "当前环境无法访问用户词典。"
             return false
         }
-        if !(selected_path := FileSelect("1", , "打开", filter)) {
+        if !(selected_path := this.SelectFile("1", "", "打开", filter)) {
             return false
         }
         try {
@@ -1764,7 +1781,7 @@ class RabbitSettingsWindow extends Gui {
         if !(dict_name := this.SelectedDictionaryName()) {
             return false
         }
-        if !(selected_path := FileSelect("S18", dict_name . "_export.txt", "另存为", filter)) {
+        if !(selected_path := this.SelectFile("S18", dict_name . "_export.txt", "另存为", filter)) {
             return false
         }
         if StrLower(SubStr(selected_path, -4)) != ".txt" {
@@ -1794,7 +1811,7 @@ class RabbitSettingsWindow extends Gui {
         if !(dict_name := this.SelectedDictionaryName()) {
             return false
         }
-        if !(selected_path := FileSelect("1", dict_name . "_export.txt", "打开", filter)) {
+        if !(selected_path := this.SelectFile("1", dict_name . "_export.txt", "打开", filter)) {
             return false
         }
         try {
@@ -1818,7 +1835,7 @@ class RabbitSettingsWindow extends Gui {
         try {
             return this.workflow.DictManagement() = 0
         } catch as err {
-            MsgBox("未能打开用户词典管理：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
+            this.ShowMessage("未能打开用户词典管理：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
             return false
         }
     }

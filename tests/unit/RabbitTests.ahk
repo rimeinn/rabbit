@@ -31,6 +31,7 @@
 #Include RabbitDeployerApplicationTest.ahk
 #Include RabbitDeployerContextTest.ahk
 #Include RabbitDeployerWorkflowTest.ahk
+#Include RabbitDialogPlacementTest.ahk
 #Include RabbitDictionarySettingsModelTest.ahk
 #Include RabbitInputControllerTest.ahk
 #Include RabbitInputTargetTest.ahk

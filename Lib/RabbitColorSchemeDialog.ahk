@@ -16,6 +16,7 @@
  */
 
 #Include RabbitColorScheme.ahk
+#Include RabbitDialogPlacement.ahk
 #Include RabbitWindowTheme.ahk
 
 class RabbitColorSchemeDialog extends Gui {
@@ -129,7 +130,7 @@ class RabbitColorSchemeDialog extends Gui {
 
     ShowModal() {
         local hwnd := this.Hwnd
-        this.Show("w640 h542")
+        RabbitDialogPlacement.ShowOnOwnerMonitor(this, this.owner_window.Hwnd, "w640 h542")
         if this.preview && HasMethod(this.preview, "SetOwner") {
             this.preview.SetOwner(this)
             this.preview_attached := true

@@ -17,6 +17,7 @@
  */
 
 #Include RabbitBehaviorSettingsModel.ahk
+#Include RabbitDialogPlacement.ahk
 #Include RabbitWindowTheme.ahk
 
 class RabbitKeyBindingDialog extends Gui {
@@ -37,6 +38,7 @@ class RabbitKeyBindingDialog extends Gui {
             binding ? "编辑快捷键规则" : "添加快捷键规则",
             this
         )
+        this.owner_window := owner
         this.binding := binding
             ? RabbitBehaviorSettingsModel.CloneValue(binding)
             : Map()
@@ -86,7 +88,7 @@ class RabbitKeyBindingDialog extends Gui {
     }
 
     ShowModal() {
-        this.Show("w460 h222")
+        RabbitDialogPlacement.ShowOnOwnerMonitor(this, this.owner_window.Hwnd, "w460 h222")
         WinWaitClose("ahk_id " . this.Hwnd)
         return this.result
     }
