@@ -24,7 +24,7 @@
 
 class RabbitSettingsWindow extends Gui {
     static WINDOW_WIDTH := 820
-    static APPEARANCE_HEIGHT := 660
+    static APPEARANCE_HEIGHT := 724
     static BEHAVIOR_HEIGHT := 660
     static COMPACT_HEIGHT := 500
     static SWITCH_ACTION_VALUES := ["noop", "inline_ascii", "commit_text", "commit_code", "clear"]
@@ -119,7 +119,7 @@ class RabbitSettingsWindow extends Gui {
         this.header_divider := this.AddText("x230 y112 w570 h1 +0x10")
 
         this.appearance_tabs := this.AddTab3(
-            "x230 y136 w570 h450 Hidden"
+            "x230 y136 w570 h514 Hidden"
                 . (initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             ["配色", "排版"]
         )
@@ -194,7 +194,7 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_label_format := this.AddEdit("x334 y312 w432 r1 -Multi Hidden")
         this.appearance_label_format.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
 
-        this.appearance_layout_group := this.AddGroupBox("x246 y356 w538 h212 Hidden", "布局")
+        this.appearance_layout_group := this.AddGroupBox("x246 y356 w538 h276 Hidden", "布局")
         this.appearance_layout_type_label := this.AddText("x260 y382 w72 h22 Hidden", "候选排列：")
         this.appearance_layout_type := this.AddDropDownList(
             "x334 y378 w160 Choose1 Hidden",
@@ -207,45 +207,60 @@ class RabbitSettingsWindow extends Gui {
             ["顶部", "居中", "底部"]
         )
         this.appearance_align_type.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_margin_x_label := this.AddText("x260 y414 w72 h22 Hidden", "水平边距：")
-        this.appearance_margin_x := this.AddEdit("x334 y410 w120 r1 Number -Multi Hidden")
+        this.appearance_margin_x_label := this.AddText("x260 y414 w112 h22 Hidden", "窗口水平边距：")
+        this.appearance_margin_x := this.AddEdit("x374 y410 w80 r1 Number -Multi Hidden")
         this.appearance_margin_x.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_margin_y_label := this.AddText("x478 y414 w72 h22 Hidden", "垂直边距：")
-        this.appearance_margin_y := this.AddEdit("x552 y410 w120 r1 Number -Multi Hidden")
+        this.appearance_margin_y_label := this.AddText("x478 y414 w112 h22 Hidden", "窗口垂直边距：")
+        this.appearance_margin_y := this.AddEdit("x592 y410 w80 r1 Number -Multi Hidden")
         this.appearance_margin_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_border_width_label := this.AddText("x260 y446 w72 h22 Hidden", "边框宽度：")
-        this.appearance_border_width := this.AddEdit("x334 y442 w120 r1 Number -Multi Hidden")
+        this.appearance_candidate_padding_x_label := this.AddText(
+            "x260 y446 w112 h22 Hidden",
+            "候选水平内边距："
+        )
+        this.appearance_candidate_padding_x := this.AddEdit("x374 y442 w80 r1 Number -Multi Hidden")
+        this.appearance_candidate_padding_x.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_candidate_padding_y_label := this.AddText(
+            "x478 y446 w112 h22 Hidden",
+            "候选垂直内边距："
+        )
+        this.appearance_candidate_padding_y := this.AddEdit("x592 y442 w80 r1 Number -Multi Hidden")
+        this.appearance_candidate_padding_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_candidate_spacing_label := this.AddText("x260 y478 w72 h22 Hidden", "候选间距：")
+        this.appearance_candidate_spacing := this.AddEdit("x334 y474 w120 r1 Number -Multi Hidden")
+        this.appearance_candidate_spacing.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_border_width_label := this.AddText("x478 y478 w72 h22 Hidden", "边框宽度：")
+        this.appearance_border_width := this.AddEdit("x552 y474 w120 r1 Number -Multi Hidden")
         this.appearance_border_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_corner_radius_label := this.AddText("x478 y446 w72 h22 Hidden", "窗口圆角：")
-        this.appearance_corner_radius := this.AddEdit("x552 y442 w120 r1 Number -Multi Hidden")
+        this.appearance_corner_radius_label := this.AddText("x260 y510 w72 h22 Hidden", "窗口圆角：")
+        this.appearance_corner_radius := this.AddEdit("x334 y506 w120 r1 Number -Multi Hidden")
         this.appearance_corner_radius.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_round_corner_label := this.AddText("x260 y478 w112 h22 Hidden", "候选及高亮圆角：")
-        this.appearance_round_corner := this.AddEdit("x374 y474 w48 r1 Number -Multi Hidden")
+        this.appearance_round_corner_label := this.AddText("x478 y510 w112 h22 Hidden", "候选及高亮圆角：")
+        this.appearance_round_corner := this.AddEdit("x592 y506 w80 r1 Number -Multi Hidden")
         this.appearance_round_corner.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_min_width_label := this.AddText("x438 y478 w112 h22 Hidden", "堆叠最小宽度：")
-        this.appearance_min_width := this.AddEdit("x552 y474 w48 r1 Number -Multi Hidden")
+        this.appearance_min_width_label := this.AddText("x260 y542 w112 h22 Hidden", "堆叠最小宽度：")
+        this.appearance_min_width := this.AddEdit("x374 y538 w80 r1 Number -Multi Hidden")
         this.appearance_min_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_min_height_label := this.AddText("x616 y478 w112 h22 Hidden", "竖排最小高度：")
-        this.appearance_min_height := this.AddEdit("x730 y474 w48 r1 Number -Multi Hidden")
+        this.appearance_min_height_label := this.AddText("x478 y542 w112 h22 Hidden", "竖排最小高度：")
+        this.appearance_min_height := this.AddEdit("x592 y538 w80 r1 Number -Multi Hidden")
         this.appearance_min_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_flow_rows_label := this.AddText("x260 y510 w72 h22 Hidden", "展开页数：")
-        this.appearance_flow_rows := this.AddEdit("x334 y506 w120 r1 Number -Multi Hidden")
+        this.appearance_flow_rows_label := this.AddText("x260 y574 w72 h22 Hidden", "展开页数：")
+        this.appearance_flow_rows := this.AddEdit("x334 y570 w120 r1 Number -Multi Hidden")
         this.appearance_flow_rows.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_vertical_direction := this.AddCheckbox(
-            "x478 y508 w288 h24 Hidden",
+            "x478 y572 w288 h24 Hidden",
             "竖排候选从左向右排列"
         )
         this.appearance_vertical_direction.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
         this.appearance_floating_preedit := this.AddCheckbox(
-            "x260 y538 w190 h24 Hidden",
+            "x260 y604 w190 h24 Hidden",
             "显示浮动预编辑框"
         )
         this.appearance_floating_preedit.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_floating_opacity_label := this.AddText("x478 y540 w72 h22 Hidden", "不透明度：")
-        this.appearance_floating_opacity := this.AddEdit("x552 y536 w60 r1 Number -Multi Hidden")
+        this.appearance_floating_opacity_label := this.AddText("x478 y606 w72 h22 Hidden", "不透明度：")
+        this.appearance_floating_opacity := this.AddEdit("x552 y602 w60 r1 Number -Multi Hidden")
         this.appearance_floating_opacity.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_floating_height_label := this.AddText("x628 y540 w72 h22 Hidden", "最小高度：")
-        this.appearance_floating_height := this.AddEdit("x702 y536 w64 r1 Number -Multi Hidden")
+        this.appearance_floating_height_label := this.AddText("x628 y606 w72 h22 Hidden", "最小高度：")
+        this.appearance_floating_height := this.AddEdit("x702 y602 w64 r1 Number -Multi Hidden")
         this.appearance_floating_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_tabs.UseTab()
 
@@ -295,6 +310,12 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_margin_x,
             this.appearance_margin_y_label,
             this.appearance_margin_y,
+            this.appearance_candidate_padding_x_label,
+            this.appearance_candidate_padding_x,
+            this.appearance_candidate_padding_y_label,
+            this.appearance_candidate_padding_y,
+            this.appearance_candidate_spacing_label,
+            this.appearance_candidate_spacing,
             this.appearance_border_width_label,
             this.appearance_border_width,
             this.appearance_corner_radius_label,
@@ -314,7 +335,7 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_floating_height_label,
             this.appearance_floating_height,
         ]
-        this.appearance_status := this.AddText("x230 y588 w570 h20 Hidden", "")
+        this.appearance_status := this.AddText("x230 y652 w570 h20 Hidden", "")
         this.appearance_page := RabbitAppearanceSettingsPage(
             this,
             workflow,

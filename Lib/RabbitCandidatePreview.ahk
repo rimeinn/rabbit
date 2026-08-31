@@ -64,8 +64,11 @@ class CandidatePreview {
         this.borderColor := style.border_color
         this.boxCornerR := style.corner_radius
         this.hlCornerR := style.round_corner
-        this.lineSpacing := style.margin_y
-        this.padding := style.margin_x
+        this.marginX := style.margin_x
+        this.marginY := style.margin_y
+        this.candidatePaddingX := style.candidate_padding_x
+        this.candidatePaddingY := style.candidate_padding_y
+        this.candidateSpacing := style.candidate_spacing
 
         ; only use one font to preview
         this.fontName := style.font_face
@@ -86,10 +89,16 @@ class CandidatePreview {
         this.prdSelSize := this.d2d.GetMetrics("RIME", this.fontName, this.fontSize)
         this.prdHlSize := this.d2d.GetMetrics("shu ru fa", this.fontName, this.fontSize)
         this.candSize := this.d2d.GetMetrics("1. 输入法", this.fontName, this.fontSize)
-        this.maxRowWidth := this.prdSelSize.w + this.padding + this.prdHlSize.w
-        this.previewWidth := Ceil(this.maxRowWidth) + this.padding * 2 + this.borderWidth * 2
-        this.previewHeight := Ceil((this.candSize.h + this.lineSpacing) * 6) + this.lineSpacing * 2
-            + this.borderWidth * 2 - this.lineSpacing ; Remove last line spacing
+        this.maxRowWidth := Max(
+            this.prdSelSize.w + this.prdHlSize.w,
+            this.candSize.w + this.candidatePaddingX * 2
+        )
+        this.previewWidth := Ceil(this.maxRowWidth) + this.marginX * 2 + this.borderWidth * 2
+        this.previewHeight := Ceil(
+            Max(this.prdSelSize.h, this.prdHlSize.h)
+                + (this.candSize.h + this.candidatePaddingY * 2) * 5
+                + this.candidateSpacing * 4
+        ) + this.marginY * 2 + this.borderWidth * 2
         calc_width := this.previewWidth
         calc_height := this.previewHeight
     }
@@ -143,17 +152,17 @@ class CandidatePreview {
         }
 
         ; Draw preedit
-        current_y := this.padding + this.borderWidth
+        current_y := this.marginY + this.borderWidth
         preedit_text_rect := {
             text: "RIME",
-            x: this.padding + this.borderWidth,
+            x: this.marginX + this.borderWidth,
             y: current_y,
             w: this.prdSelSize.w,
             h: this.prdSelSize.h
         }
         highlighted_preedit_rect := {
             text: "shu ru fa",
-            x: this.padding + this.borderWidth + this.padding + this.prdSelSize.w,
+            x: this.marginX + this.borderWidth + this.prdSelSize.w,
             y: current_y,
             w: this.prdHlSize.w,
             h: this.prdHlSize.h
@@ -184,15 +193,15 @@ class CandidatePreview {
             this.hlTxtColor,
             this.fontName
         )
-        current_y += Max(this.prdSelSize.h, this.prdHlSize) + this.lineSpacing
+        current_y += Max(this.prdSelSize.h, this.prdHlSize.h)
 
         ; Draw candidates
         for i, candidate in candidates {
             candidate_color := this.candTxtColor
-            highlight_x := this.borderWidth + this.padding / 2
-            highlight_y := current_y - this.lineSpacing / 2
-            highlight_width := this.previewWidth - this.borderWidth * 2 - this.padding
-            highlight_height := this.candSize.h + this.lineSpacing
+            highlight_x := this.borderWidth + this.marginX
+            highlight_y := current_y
+            highlight_width := this.previewWidth - this.borderWidth * 2 - this.marginX * 2
+            highlight_height := this.candSize.h + this.candidatePaddingY * 2
             candidate_background := this.candBgColor
             if A_Index == selected_index { ; Draw highlight if selected
                 candidate_color := this.hlCandTxtColor
@@ -210,8 +219,8 @@ class CandidatePreview {
 
             text_to_draw := i . ". " . candidate
             candidate_row_rect := {
-                x: this.padding + this.borderWidth,
-                y: current_y,
+                x: highlight_x + this.candidatePaddingX,
+                y: current_y + this.candidatePaddingY,
                 w: this.maxRowWidth,
                 h: this.candSize.h
             }
@@ -223,7 +232,7 @@ class CandidatePreview {
                 candidate_color,
                 this.fontName
             )
-            current_y += this.candSize.h + this.lineSpacing
+            current_y += highlight_height + this.candidateSpacing
         }
         this.d2d.EndDraw()
 

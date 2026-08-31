@@ -64,16 +64,16 @@ TestSettingsWindowUsesPageSpecificHeights() {
     local apply_y, divider_height, footer_y, navigation_height, navigation_y
     local window := RabbitSettingsWindow(0, true)
     try {
-        AssertEqual(660, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
+        AssertEqual(724, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
         window.apply_button.GetPos(, &apply_y)
         window.navigation.GetPos(, &navigation_y, , &navigation_height)
         window.sidebar_divider.GetPos(, , , &divider_height)
         window.footer_status.GetPos(, &footer_y)
-        AssertEqual(490, navigation_height, "The tall layout used the wrong navigation height.")
+        AssertEqual(554, navigation_height, "The tall layout used the wrong navigation height.")
         AssertEqual(16, apply_y - navigation_y - navigation_height, "The tall navigation used the wrong bottom gap.")
-        AssertEqual(594, apply_y, "The tall layout misplaced the global apply button.")
-        AssertEqual(598, divider_height, "The tall layout used the wrong sidebar divider height.")
-        AssertEqual(612, footer_y, "The tall layout misplaced the footer status.")
+        AssertEqual(658, apply_y, "The tall layout misplaced the global apply button.")
+        AssertEqual(662, divider_height, "The tall layout used the wrong sidebar divider height.")
+        AssertEqual(676, footer_y, "The tall layout misplaced the footer status.")
 
         window.SelectPage(2)
         AssertEqual(500, window.GetPageWindowHeight(), "A compact page used the wrong window height.")
@@ -97,7 +97,7 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(1, window.behavior_tabs.Value, "The behavior page did not select the general tab.")
 
         window.SelectPage(1)
-        AssertEqual(660, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
+        AssertEqual(724, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
     } finally {
         window.Dispose()
     }
@@ -187,6 +187,16 @@ TestSettingsWindowExposesAppearanceControls() {
             window.appearance_round_corner_label.Text,
             "The candidate and highlight corner label is inaccurate."
         )
+        AssertEqual("窗口水平边距：", window.appearance_margin_x_label.Text,
+            "The horizontal margin label is unclear.")
+        AssertEqual("窗口垂直边距：", window.appearance_margin_y_label.Text,
+            "The vertical margin label is unclear.")
+        AssertEqual("候选水平内边距：", window.appearance_candidate_padding_x_label.Text,
+            "The horizontal candidate padding control is missing.")
+        AssertEqual("候选垂直内边距：", window.appearance_candidate_padding_y_label.Text,
+            "The vertical candidate padding control is missing.")
+        AssertEqual("候选间距：", window.appearance_candidate_spacing_label.Text,
+            "The candidate spacing control is missing.")
         AssertTrue(window.appearance_min_width.Enabled, "Stacked layout did not enable its minimum width.")
         AssertTrue(!window.appearance_min_height.Enabled, "Stacked layout enabled vertical text minimum height.")
 
@@ -223,6 +233,11 @@ TestSettingsWindowExposesAppearanceControls() {
             "flow",
             window.appearance_page.settings.last_values["layout_type"],
             "The appearance page staged the wrong layout type."
+        )
+        AssertEqual(
+            6,
+            window.appearance_page.settings.last_values["candidate_spacing"],
+            "The appearance page did not stage candidate spacing."
         )
     } finally {
         window.Dispose()

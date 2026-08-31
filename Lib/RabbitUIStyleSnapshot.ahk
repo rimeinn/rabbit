@@ -43,6 +43,12 @@ class RabbitUIStyleSnapshot {
         this.round_corner := this.GetValue(overrides, "round_corner", this.GetValue(values, "round_corner", 4))
         this.margin_x := this.GetValue(overrides, "margin_x", this.GetValue(values, "margin_x", 6))
         this.margin_y := this.GetValue(overrides, "margin_y", this.GetValue(values, "margin_y", 6))
+        this.candidate_padding_x := this.GetValue(
+            overrides, "candidate_padding_x", this.GetValue(values, "candidate_padding_x", 0))
+        this.candidate_padding_y := this.GetValue(
+            overrides, "candidate_padding_y", this.GetValue(values, "candidate_padding_y", 0))
+        this.candidate_spacing := this.GetValue(
+            overrides, "candidate_spacing", this.GetValue(values, "candidate_spacing", 6))
         this.min_width := this.GetValue(overrides, "min_width", this.GetValue(values, "min_width", 160))
         this.min_height := this.GetValue(overrides, "min_height", this.GetValue(values, "min_height", 160))
         this.layout_type := this.GetValue(overrides, "layout_type", this.GetValue(values, "layout_type", "stacked"))
@@ -121,7 +127,8 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, bw, cr, r, mx, my, w, h, vertical_text_left_to_right, floating_preedit
+        local fmt, bw, cr, r, mx, my, candidate_padding_x, candidate_padding_y, candidate_spacing
+        local w, h, vertical_text_left_to_right, floating_preedit
         local floating_preedit_opacity
         local floating_preedit_min_height
         local flow_rows, layout_type, align_type
@@ -179,6 +186,27 @@ class RabbitUIStyleSnapshot {
         }
         if rime_api.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0 {
             values["margin_y"] := my
+        }
+        if rime_api.config_test_get_int(
+            config,
+            "style/layout/candidate_padding_x",
+            &candidate_padding_x
+        ) && candidate_padding_x >= 0 {
+            values["candidate_padding_x"] := candidate_padding_x
+        }
+        if rime_api.config_test_get_int(
+            config,
+            "style/layout/candidate_padding_y",
+            &candidate_padding_y
+        ) && candidate_padding_y >= 0 {
+            values["candidate_padding_y"] := candidate_padding_y
+        }
+        if rime_api.config_test_get_int(
+            config,
+            "style/layout/candidate_spacing",
+            &candidate_spacing
+        ) && candidate_spacing >= 0 {
+            values["candidate_spacing"] := candidate_spacing
         }
         if rime_api.config_test_get_int(config, "style/layout/min_width", &w) && w >= 0 {
             values["min_width"] := w

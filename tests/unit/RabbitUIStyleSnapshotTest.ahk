@@ -52,6 +52,9 @@ TestStyleSnapshotCopiesValues() {
     AssertEqual("stacked", style.layout_type, "The default candidate layout is not stacked.")
     AssertEqual(160, style.min_width, "The default stacked minimum width changed.")
     AssertEqual(160, style.min_height, "The default vertical text minimum height changed.")
+    AssertEqual(0, style.candidate_padding_x, "The default horizontal candidate padding changed.")
+    AssertEqual(0, style.candidate_padding_y, "The default vertical candidate padding changed.")
+    AssertEqual(6, style.candidate_spacing, "The default candidate spacing changed.")
     AssertTrue(!style.vertical_text_left_to_right, "The default vertical text direction is not right to left.")
     AssertTrue(!style.floating_preedit, "Floating preedit is not disabled by default.")
     AssertEqual(0.8, style.floating_preedit_opacity, "The default floating preedit opacity changed.")
@@ -76,6 +79,9 @@ TestStyleSnapshotParsing() {
     AssertEqual(5, light_style.border_width, "The active border width was not parsed.")
     AssertEqual(9, light_style.margin_x, "The active horizontal margin was not parsed.")
     AssertEqual(11, light_style.margin_y, "The active vertical margin was not parsed.")
+    AssertEqual(3, light_style.candidate_padding_x, "The horizontal candidate padding was not parsed.")
+    AssertEqual(4, light_style.candidate_padding_y, "The vertical candidate padding was not parsed.")
+    AssertEqual(7, light_style.candidate_spacing, "The candidate spacing was not parsed.")
     AssertEqual(180, light_style.min_width, "The stacked minimum width was not parsed.")
     AssertEqual(240, light_style.min_height, "The vertical text minimum height was not parsed.")
     AssertEqual("flow", light_style.layout_type, "The active layout type was not parsed.")
@@ -157,6 +163,9 @@ CreateStyleConfigValues() {
         "style/comment_font_point", 15,
         "style/layout/margin_x", 9,
         "style/layout/margin_y", 11,
+        "style/layout/candidate_padding_x", 3,
+        "style/layout/candidate_padding_y", 4,
+        "style/layout/candidate_spacing", 7,
         "style/layout/border_width", 5,
         "style/layout/min_width", 180,
         "style/layout/min_height", 240,

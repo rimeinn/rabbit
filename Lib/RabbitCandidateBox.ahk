@@ -113,8 +113,11 @@ class CandidateBox {
         this.borderColor := style.border_color
         this.boxCornerR := style.corner_radius
         this.hlCornerR := style.round_corner
-        this.lineSpacing := style.margin_y
-        this.padding := style.margin_x
+        this.marginX := style.margin_x
+        this.marginY := style.margin_y
+        this.candidatePaddingX := style.candidate_padding_x
+        this.candidatePaddingY := style.candidate_padding_y
+        this.candidateSpacing := style.candidate_spacing
         this.layoutType := style.layout_type = "flow"
             ? "flow"
             : style.layout_type = "vertical_text" ? "vertical_text" : "stacked"
@@ -245,88 +248,93 @@ class CandidateBox {
     }
 
     BuildStacked(presentation, &win_w, &win_h, include_preedit := true) { ; build text layout
-        local base_x, base_y, max_row_width
-        local total_rows_height, label_box, candidate_box
-        local comment_text, comment_box, row_rect, increment, label_width, candidate_width, comment, comment_gap
+        local base_x := this.borderWidth + this.marginX
+        local base_y := this.borderWidth + this.marginY
+        local content_width, candidate_width := 0, total_height
+        local label_box, candidate_box, comment_box, row_rect, row, text_height
         this.num_candidates := presentation.candidates.Length
         this.hilited_index := presentation.highlighted_index
         this.candidateHighlights := []
 
         ; Build preedit layout
-        base_x := this.borderWidth + this.padding
-        base_y := this.borderWidth + this.lineSpacing
         this.preeditLayout := include_preedit
             ? this.BuildPreeditLayout(presentation, base_x, base_y)
             : this.CreateEmptyPreeditLayout(base_x, base_y)
-        max_row_width := this.preeditLayout.width
+        content_width := this.preeditLayout.width
+        total_height := this.preeditLayout.height
 
         ; Build candidates layout
-        total_rows_height := include_preedit ? this.preeditLayout.height + this.lineSpacing : 0
-        base_y := base_y + total_rows_height
+        base_y += this.preeditLayout.height
         this.candidatesLayout := { labels: [], cands: [], comments: [], rows: [] }
 
         Loop this.num_candidates {
             local candidate := presentation.candidates[A_Index]
             this.candidateHighlights.Push(candidate.highlighted)
             label_box := this.GetLabelTextMetrics(candidate.label, this.labFont)
-            this.candidatesLayout.labels.Push(
-                { x: base_x, y: base_y, w: label_box.w, h: label_box.h, text: candidate.label })
-
             candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
+            comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
+            text_height := Max(label_box.h, candidate_box.h, comment_box.h)
+            row_rect := {
+                x: base_x, y: base_y,
+                w: label_box.w + candidate_box.w + comment_box.w + this.candidatePaddingX * 2,
+                h: text_height + this.candidatePaddingY * 2
+            }
+            this.candidatesLayout.labels.Push({
+                x: base_x + this.candidatePaddingX,
+                y: base_y + this.candidatePaddingY,
+                w: label_box.w,
+                h: label_box.h,
+                text: candidate.label
+            })
             this.candidatesLayout.cands.Push({
-                x: base_x + label_box.w + this.padding,
-                y: base_y,
+                x: base_x + this.candidatePaddingX + label_box.w,
+                y: base_y + this.candidatePaddingY,
                 w: candidate_box.w,
                 h: candidate_box.h,
                 text: candidate.text
             })
-
-            comment_text := candidate.comment
-            comment_box := this.GetTextMetrics(comment_text, this.commentFont)
-            this.candidatesLayout.comments.Push({ x: base_x + label_box.w + candidate_box.w, y: base_y, w: comment_box.w, h: comment_box.h, text: comment_text })
-
-            row_rect := {
-                x: base_x, y: base_y,
-                w: label_box.w + this.padding + candidate_box.w + (comment_text ? this.padding * 2 + comment_box.w : 0),
-                h: Max(label_box.h, candidate_box.h, comment_box.h)
-            }
+            this.candidatesLayout.comments.Push({
+                x: base_x + this.candidatePaddingX + label_box.w + candidate_box.w,
+                y: base_y + this.candidatePaddingY,
+                w: comment_box.w,
+                h: comment_box.h,
+                text: candidate.comment
+            })
             this.candidatesLayout.rows.Push(row_rect)
-            if row_rect.w > max_row_width {
-                max_row_width := row_rect.w
+            candidate_width := Max(candidate_width, row_rect.w)
+            base_y += row_rect.h
+            total_height += row_rect.h
+            if A_Index < this.num_candidates {
+                base_y += this.candidateSpacing
+                total_height += this.candidateSpacing
             }
-            increment := row_rect.h + this.lineSpacing
-            base_y += increment, total_rows_height += increment
         }
-        if this.num_candidates {
-            total_rows_height -= this.lineSpacing ; remove extra line spacing
-        }
-
-        this.commentOffset := 0
-        this.boxWidth := Ceil(max_row_width) + (this.borderWidth + this.padding) * 2
+        content_width := Max(content_width, candidate_width)
+        this.boxWidth := Ceil(content_width) + this.borderWidth * 2 + this.marginX * 2
         if this.boxWidth < this.style.min_width {
-            this.commentOffset := this.style.min_width - this.boxWidth
             this.boxWidth := this.style.min_width
         }
-        this.boxHeight := Ceil(total_rows_height) + (this.borderWidth + this.padding) * 2
+        content_width := this.boxWidth - this.borderWidth * 2 - this.marginX * 2
+        for row in this.candidatesLayout.rows {
+            row.w := content_width
+        }
+        this.boxHeight := Ceil(total_height) + this.borderWidth * 2 + this.marginY * 2
         win_w := this.boxWidth
         win_h := this.boxHeight
         this.built := true
 
         ; get better spacing to align comments
-        loop this.num_candidates {
-            label_width := this.candidatesLayout.labels[A_Index].w
-            candidate_width := this.candidatesLayout.cands[A_Index].w
-            comment := this.candidatesLayout.comments[A_Index]
-
+        Loop this.num_candidates {
+            local comment := this.candidatesLayout.comments[A_Index]
             if comment.w > 0 {
-                comment_gap := max_row_width - label_width - candidate_width - comment.w - this.padding
-                comment.x += comment_gap + this.commentOffset
+                comment.x := base_x + content_width - this.candidatePaddingX - comment.w
             }
         }
     }
 
     BuildPreeditLayout(presentation, base_x, base_y) {
         local groups := RabbitGetPreeditGroups(presentation.preedit)
+        local group, segment
         local x := base_x
         local height := 0
         local selected_x := 0
@@ -341,10 +349,7 @@ class CandidateBox {
             height: 0
         }
 
-        for group_index, group in groups {
-            if group_index == 2 || group_index == 3 {
-                x += this.padding
-            }
+        for group in groups {
             for segment in group.segments {
                 local metrics := this.GetTextMetrics(segment.text, this.preeditFont)
                 layout.segments.Push({
@@ -393,8 +398,8 @@ class CandidateBox {
     }
 
     BuildVerticalText(presentation, &win_w, &win_h, include_preedit := true) {
-        local base_x := this.borderWidth + this.padding
-        local base_y := this.borderWidth + this.lineSpacing
+        local base_x := this.borderWidth + this.marginX
+        local base_y := this.borderWidth + this.marginY
         local preedit_layout := include_preedit
             ? this.BuildVerticalPreeditLayout(presentation, base_x, base_y)
             : this.CreateEmptyPreeditLayout(base_x, base_y)
@@ -419,14 +424,13 @@ class CandidateBox {
                 label: label,
                 candidate: candidate_box,
                 comment: comment,
-                width: Max(label.w, candidate_box.w, comment.w),
-                height: label.h + (label.h ? this.padding : 0) + candidate_box.h
-                    + (comment.h ? this.padding + comment.h : 0)
+                width: Max(label.w, candidate_box.w, comment.w) + this.candidatePaddingX * 2,
+                height: label.h + candidate_box.h + comment.h + this.candidatePaddingY * 2
             }
             cards.Push(card)
             candidates_width += card.width
             if A_Index > 1 {
-                candidates_width += this.padding
+                candidates_width += this.candidateSpacing
             }
             content_height := Max(content_height, card.height)
             this.candidateHighlights.Push(candidate.highlighted)
@@ -434,24 +438,20 @@ class CandidateBox {
 
         content_width := candidates_width
         if preedit_layout.width {
-            if content_width {
-                content_width += this.padding
-            }
             content_width += preedit_layout.width
         }
-        this.boxWidth := Ceil(content_width) + (this.borderWidth + this.padding) * 2
-        this.boxHeight := Max(this.style.min_height, Ceil(content_height) + (this.borderWidth + this.lineSpacing) * 2)
-        content_bottom := this.boxHeight - this.borderWidth - this.lineSpacing
+        this.boxWidth := Ceil(content_width) + this.borderWidth * 2 + this.marginX * 2
+        this.boxHeight := Max(
+            this.style.min_height,
+            Ceil(content_height) + this.borderWidth * 2 + this.marginY * 2
+        )
+        content_bottom := this.boxHeight - this.borderWidth - this.marginY
         x := this.verticalTextLeftToRight ? base_x : base_x + content_width
         if preedit_layout.width && !this.verticalTextLeftToRight {
             x -= preedit_layout.width
             this.OffsetLayoutX(preedit_layout, x - preedit_layout.left)
-            x -= this.padding
         } else if preedit_layout.width {
             x += preedit_layout.width
-            if this.num_candidates {
-                x += this.padding
-            }
         }
 
         Loop this.num_candidates {
@@ -460,7 +460,7 @@ class CandidateBox {
             if !this.verticalTextLeftToRight {
                 x -= card.width
             }
-            y := base_y
+            y := base_y + this.candidatePaddingY
             this.candidatesLayout.labels.Push({
                 x: x + (card.width - card.label.w) / 2,
                 y: y,
@@ -468,7 +468,7 @@ class CandidateBox {
                 h: card.label.h,
                 text: candidate.label
             })
-            y += card.label.h + (card.label.h ? this.padding : 0)
+            y += card.label.h
             this.candidatesLayout.cands.Push({
                 x: x + (card.width - card.candidate.w) / 2,
                 y: y,
@@ -478,13 +478,13 @@ class CandidateBox {
             })
             this.candidatesLayout.comments.Push({
                 x: x + (card.width - card.comment.w) / 2,
-                y: content_bottom - card.comment.h,
+                y: content_bottom - this.candidatePaddingY - card.comment.h,
                 w: card.comment.w,
                 h: card.comment.h,
                 text: candidate.comment
             })
             this.candidatesLayout.rows.Push({ x: x, y: base_y, w: card.width, h: content_bottom - base_y })
-            x += this.verticalTextLeftToRight ? card.width + this.padding : -this.padding
+            x += this.verticalTextLeftToRight ? card.width + this.candidateSpacing : -this.candidateSpacing
         }
 
         win_w := this.boxWidth
@@ -494,6 +494,7 @@ class CandidateBox {
 
     BuildVerticalPreeditLayout(presentation, base_x, base_y) {
         local groups := RabbitGetPreeditGroups(presentation.preedit)
+        local group, segment
         local y := base_y
         local width := 0
         local selected_y := 0
@@ -507,10 +508,7 @@ class CandidateBox {
             height: 0
         }
 
-        for group_index, group in groups {
-            if group_index == 2 || group_index == 3 {
-                y += this.padding
-            }
+        for group in groups {
             for segment in group.segments {
                 local metrics := this.GetVerticalTextMetrics(segment.text, this.preeditFont)
                 layout.segments.Push({
@@ -567,8 +565,8 @@ class CandidateBox {
     }
 
     BuildFlow(presentation, &win_w, &win_h, max_width, include_preedit := true) {
-        local base_x := this.borderWidth + this.padding
-        local base_y := this.borderWidth + this.lineSpacing
+        local base_x := this.borderWidth + this.marginX
+        local base_y := this.borderWidth + this.marginY
         local preedit_layout := include_preedit
             ? this.BuildPreeditLayout(presentation, base_x, base_y)
             : this.CreateEmptyPreeditLayout(base_x, base_y)
@@ -576,9 +574,11 @@ class CandidateBox {
         local preedit_height := preedit_layout.height
         local page_size := presentation.flow_page_size
         local max_row_width := preedit_width
-        local available_width := max_width ? Max(1, max_width - (this.borderWidth + this.padding) * 2) : 0
+        local available_width := max_width
+            ? Max(1, max_width - this.borderWidth * 2 - this.marginX * 2)
+            : 0
         local card_max_width := available_width
-            ? Max(1, (available_width - (page_size - 1) * this.padding) / page_size)
+            ? Max(1, (available_width - (page_size - 1) * this.candidateSpacing) / page_size)
             : 0
         local column_count, row_count, column_widths := [], label_widths := [], row_heights := []
         local cards := [], column_x := [], row_y := []
@@ -591,7 +591,7 @@ class CandidateBox {
         this.preeditLayout := preedit_layout
         this.candidatesLayout := { labels: [], cands: [], comments: [], rows: [] }
         if include_preedit {
-            base_y += preedit_height + this.lineSpacing
+            base_y += preedit_height
         }
 
         Loop page_size {
@@ -600,7 +600,8 @@ class CandidateBox {
         Loop this.num_candidates {
             local candidate := presentation.candidates[A_Index]
             local column := Mod(A_Index - 1, page_size) + 1
-            label_widths[column] := Max(label_widths[column], this.GetLabelTextMetrics(candidate.label, this.labFont).w)
+            local label_box := this.GetLabelTextMetrics(candidate.label, this.labFont)
+            label_widths[column] := Max(label_widths[column], label_box.w)
         }
         column_count := Min(page_size, this.num_candidates)
         row_count := Ceil(this.num_candidates / page_size)
@@ -619,18 +620,12 @@ class CandidateBox {
             local label_width := label_widths[column]
             local candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
             local comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
-            local card_width := label_width + (label_width ? this.padding : 0) + candidate_box.w
-            if comment_box.w {
-                card_width += this.padding + comment_box.w
-            }
+            local card_width := label_width + candidate_box.w + comment_box.w + this.candidatePaddingX * 2
             if card_max_width && card_width > card_max_width {
                 this.TruncateFlowCandidate(candidate, label_width, card_max_width)
                 candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
                 comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
-                card_width := label_width + (label_width ? this.padding : 0) + candidate_box.w
-                if comment_box.w {
-                    card_width += this.padding + comment_box.w
-                }
+                card_width := label_width + candidate_box.w + comment_box.w + this.candidatePaddingX * 2
             }
             cards.Push({
                 label_box: label_box,
@@ -639,7 +634,7 @@ class CandidateBox {
                 column: column,
                 row: row,
                 width: card_width,
-                height: Max(label_box.h, candidate_box.h, comment_box.h)
+                height: Max(label_box.h, candidate_box.h, comment_box.h) + this.candidatePaddingY * 2
             })
             column_widths[column] := Max(column_widths[column], card_width)
             row_heights[row] := Max(row_heights[row], cards[A_Index].height)
@@ -649,7 +644,7 @@ class CandidateBox {
             column_x.Push(base_x + content_width)
             content_width += column_widths[A_Index]
             if A_Index < column_count {
-                content_width += this.padding
+                content_width += this.candidateSpacing
             }
         }
         max_row_width := Max(max_row_width, content_width)
@@ -657,7 +652,7 @@ class CandidateBox {
             row_y.Push(base_y)
             base_y += row_heights[A_Index]
             if A_Index < row_count {
-                base_y += this.lineSpacing
+                base_y += this.candidateSpacing
             }
         }
 
@@ -667,28 +662,28 @@ class CandidateBox {
             local label_width := label_widths[card_info.column]
             local card_x := column_x[card_info.column]
             local card_y := row_y[card_info.row]
-            local candidate_x := card_x + label_width + (label_width ? this.padding : 0)
+            local text_x := card_x + this.candidatePaddingX
+            local text_y := card_y + this.candidatePaddingY
+            local text_height := row_heights[card_info.row] - this.candidatePaddingY * 2
+            local candidate_x := text_x + label_width
             local comment_x := candidate_x + card_info.candidate_box.w
-            if card_info.comment_box.w {
-                comment_x += this.padding
-            }
             this.candidatesLayout.labels.Push({
-                x: card_x,
-                y: this.AlignFlowText(card_y, row_heights[card_info.row], card_info.label_box.h),
+                x: text_x,
+                y: this.AlignFlowText(text_y, text_height, card_info.label_box.h),
                 w: card_info.label_box.w,
                 h: card_info.label_box.h,
                 text: candidate.label
             })
             this.candidatesLayout.cands.Push({
                 x: candidate_x,
-                y: this.AlignFlowText(card_y, row_heights[card_info.row], card_info.candidate_box.h),
+                y: this.AlignFlowText(text_y, text_height, card_info.candidate_box.h),
                 w: card_info.candidate_box.w,
                 h: card_info.candidate_box.h,
                 text: candidate.text
             })
             this.candidatesLayout.comments.Push({
                 x: comment_x,
-                y: this.AlignFlowText(card_y, row_heights[card_info.row], card_info.comment_box.h),
+                y: this.AlignFlowText(text_y, text_height, card_info.comment_box.h),
                 w: card_info.comment_box.w,
                 h: card_info.comment_box.h,
                 text: candidate.comment
@@ -699,8 +694,8 @@ class CandidateBox {
             this.candidateHighlights.Push(candidate.highlighted)
         }
 
-        this.boxWidth := Ceil(max_row_width) + (this.borderWidth + this.padding) * 2
-        this.boxHeight := Ceil(base_y + this.borderWidth + this.lineSpacing)
+        this.boxWidth := Ceil(max_row_width) + this.borderWidth * 2 + this.marginX * 2
+        this.boxHeight := Ceil(base_y + this.borderWidth + this.marginY)
         win_w := this.boxWidth
         win_h := this.boxHeight
         this.built := true
@@ -717,8 +712,7 @@ class CandidateBox {
     }
 
     TruncateFlowCandidate(candidate, label_width, available_width) {
-        local gap_width := label_width ? this.padding : 0
-        local content_width := Max(0, available_width - label_width - gap_width)
+        local content_width := Max(0, available_width - label_width - this.candidatePaddingX * 2)
         local candidate_width := this.GetTextMetrics(candidate.text, this.mainFont).w
         if candidate_width > content_width {
             candidate.comment := ""
@@ -726,7 +720,7 @@ class CandidateBox {
             return
         }
         if candidate.comment {
-            local comment_width := Max(0, content_width - candidate_width - this.padding)
+            local comment_width := Max(0, content_width - candidate_width)
             candidate.comment := this.TruncateText(candidate.comment, comment_width, this.commentFont)
         }
     }
@@ -880,7 +874,7 @@ class CandidateBox {
     }
 
     RenderFrame(height) {
-        local background_x, background_y, background_width, background_height, background_radius, highlight_width
+        local background_x, background_y, background_width, background_height, background_radius
         local row_rect, row_width, row_background
         local label_color, candidate_color, comment_color, label, cand, comment
         local segment, selected_box, source_y, display_y
@@ -931,11 +925,10 @@ class CandidateBox {
                 this.DrawLayoutText(segment, this.preeditFont, segment.highlighted ? this.hlTxtColor : this.textColor)
             }
 
-            highlight_width := this.boxWidth - this.borderWidth * 2 - this.padding * 2
             ; Draw candidates
             Loop num_candidates {
                 row_rect := candidates_layout.rows[A_Index]
-                row_width := this.layoutType != "stacked" ? row_rect.w : highlight_width
+                row_width := row_rect.w
                 row_background := this.candBgColor
                 label_color := this.labelColor
                 candidate_color := this.candTxtColor

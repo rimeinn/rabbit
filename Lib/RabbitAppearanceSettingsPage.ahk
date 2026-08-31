@@ -190,6 +190,9 @@ class RabbitAppearanceSettingsPage {
             style.align_type = "center" ? 2 : style.align_type = "bottom" ? 3 : 1)
         owner.appearance_margin_x.Value := style.margin_x
         owner.appearance_margin_y.Value := style.margin_y
+        owner.appearance_candidate_padding_x.Value := style.candidate_padding_x
+        owner.appearance_candidate_padding_y.Value := style.candidate_padding_y
+        owner.appearance_candidate_spacing.Value := style.candidate_spacing
         owner.appearance_border_width.Value := style.border_width
         owner.appearance_corner_radius.Value := style.corner_radius
         owner.appearance_round_corner.Value := style.round_corner
@@ -551,8 +554,13 @@ class RabbitAppearanceSettingsPage {
             "label_format", label_format,
             "layout_type", ["stacked", "flow", "vertical_text"][owner.appearance_layout_type.Value],
             "align_type", ["top", "center", "bottom"][owner.appearance_align_type.Value],
-            "margin_x", this.ReadNumber(owner.appearance_margin_x, "水平边距", 0, 500),
-            "margin_y", this.ReadNumber(owner.appearance_margin_y, "垂直边距", 0, 500),
+            "margin_x", this.ReadNumber(owner.appearance_margin_x, "窗口水平边距", 0, 500),
+            "margin_y", this.ReadNumber(owner.appearance_margin_y, "窗口垂直边距", 0, 500),
+            "candidate_padding_x", this.ReadNumber(
+                owner.appearance_candidate_padding_x, "候选水平内边距", 0, 500),
+            "candidate_padding_y", this.ReadNumber(
+                owner.appearance_candidate_padding_y, "候选垂直内边距", 0, 500),
+            "candidate_spacing", this.ReadNumber(owner.appearance_candidate_spacing, "候选间距", 0, 500),
             "border_width", this.ReadNumber(owner.appearance_border_width, "边框宽度", 0, 500),
             "corner_radius", this.ReadNumber(owner.appearance_corner_radius, "窗口圆角", 0, 500),
             "round_corner", this.ReadNumber(owner.appearance_round_corner, "候选及高亮圆角", 0, 500),
@@ -570,7 +578,7 @@ class RabbitAppearanceSettingsPage {
 
     ReadNumber(ctrl, name, minimum, maximum) {
         local text := Trim(ctrl.Value)
-        if !text || !IsNumber(text) {
+        if text = "" || !IsNumber(text) {
             throw Error(name . "必须是数字。")
         }
         local value := Number(text)

@@ -94,6 +94,9 @@ TestSharedRabbitSettingsPersistence() {
         style.SetStyleValues(Map(
             "font_point", current_style.font_point + 1,
             "margin_x", current_style.margin_x + 1,
+            "candidate_padding_x", current_style.candidate_padding_x + 1,
+            "candidate_padding_y", current_style.candidate_padding_y + 1,
+            "candidate_spacing", current_style.candidate_spacing + 1,
             "floating_preedit", !current_style.floating_preedit,
             "floating_preedit_opacity", 0.65
         ))
@@ -135,6 +138,12 @@ TestSharedRabbitSettingsPersistence() {
         AssertTrue(InStr(saved, "style/color_scheme"), "A later save removed the UI style setting.")
         AssertTrue(InStr(saved, "style/font_point"), "The saved config omitted the candidate font size.")
         AssertTrue(InStr(saved, "style/layout/margin_x"), "The saved config omitted the horizontal margin.")
+        AssertTrue(InStr(saved, "style/layout/candidate_padding_x"),
+            "The saved config omitted horizontal candidate padding.")
+        AssertTrue(InStr(saved, "style/layout/candidate_padding_y"),
+            "The saved config omitted vertical candidate padding.")
+        AssertTrue(InStr(saved, "style/layout/candidate_spacing"),
+            "The saved config omitted candidate spacing.")
         AssertTrue(InStr(saved, "style/floating_preedit"), "The saved config omitted floating preedit.")
         AssertTrue(InStr(saved, "show_tips"), "A later save removed the behavior setting.")
         AssertTrue(InStr(saved, "rabbit-settings-test.exe"), "The application setting was not saved.")

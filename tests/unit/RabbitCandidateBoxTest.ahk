@@ -84,6 +84,10 @@ RunTest(
     "modern labels include trailing whitespace",
     TestModernLabelTrailingWhitespace.Bind(candidate_style)
 )
+RunTest(
+    "modern candidate geometry separates margins padding and spacing",
+    TestModernCandidateGeometry.Bind(candidate_style)
+)
 RunTest("modern candidate rows use candidate background colors", TestModernCandidateBackgroundColors.Bind(candidate_style))
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
@@ -228,13 +232,56 @@ TestModernLabelTrailingWhitespace(style) {
                 layout_type . " label layout excluded trailing whitespace."
             )
             AssertEqual(
-                candidate_box.candidatesLayout.labels[1].x + included_metrics.w + candidate_box.padding,
+                candidate_box.candidatesLayout.labels[1].x + included_metrics.w,
                 candidate_box.candidatesLayout.cands[1].x,
                 layout_type . " candidate did not start after the full label width."
             )
         } finally {
             candidate_box.Dispose()
         }
+    }
+}
+
+TestModernCandidateGeometry(style) {
+    local candidate_box := CandidateBox(style.With(Map(
+        "min_width", 0,
+        "margin_x", 11,
+        "margin_y", 13,
+        "candidate_padding_x", 3,
+        "candidate_padding_y", 4,
+        "candidate_spacing", 7
+    )), RabbitTextMetricsProbe)
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height, first_row, second_row, label, text_height
+    try {
+        candidate_box.BuildPresentation(presentation, &width, &height)
+        first_row := candidate_box.candidatesLayout.rows[1]
+        second_row := candidate_box.candidatesLayout.rows[2]
+        label := candidate_box.candidatesLayout.labels[1]
+        text_height := Max(
+            label.h,
+            candidate_box.candidatesLayout.cands[1].h,
+            candidate_box.candidatesLayout.comments[1].h
+        )
+        AssertEqual(candidate_box.borderWidth + 11, first_row.x,
+            "The horizontal margin did not offset the candidate content area.")
+        AssertEqual(candidate_box.borderWidth + 13, candidate_box.preeditLayout.top,
+            "The vertical margin did not offset the complete content area.")
+        AssertEqual(candidate_box.preeditLayout.top + candidate_box.preeditLayout.height, first_row.y,
+            "Candidate spacing was incorrectly inserted between preedit and candidates.")
+        AssertEqual(3, label.x - first_row.x, "The horizontal candidate padding was not internal to the row.")
+        AssertEqual(4, label.y - first_row.y, "The vertical candidate padding was not internal to the row.")
+        AssertEqual(8, first_row.h - text_height, "The vertical candidate padding did not cover both sides.")
+        AssertEqual(7, second_row.y - first_row.y - first_row.h,
+            "Candidate spacing was not measured between candidate rectangles.")
+        AssertEqual(22, width - first_row.w - candidate_box.borderWidth * 2,
+            "The horizontal margin was mixed into candidate width.")
+        AssertTrue(
+            Abs(height - second_row.y - second_row.h - candidate_box.borderWidth - 13) < 0.001,
+            "The vertical margin was not preserved below the final candidate."
+        )
+    } finally {
+        candidate_box.Dispose()
     }
 }
 
@@ -746,8 +793,11 @@ TestModernFlowCandidateLayout(style) {
     local candidate_box := CandidateBox(style.With(Map(
         "layout_type", "flow",
         "min_width", 1000,
-        "margin_x", 7,
-        "margin_y", 9,
+        "margin_x", 11,
+        "margin_y", 13,
+        "candidate_padding_x", 3,
+        "candidate_padding_y", 4,
+        "candidate_spacing", 7,
         "align_type", "center"
     )))
     local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
@@ -775,18 +825,28 @@ TestModernFlowCandidateLayout(style) {
             "Candidates from the same flow page were split into separate rows."
         )
         AssertEqual(
-            candidate_box.padding,
+            candidate_box.borderWidth + candidate_box.marginX,
+            candidate_box.candidatesLayout.rows[1].x,
+            "The flow layout did not preserve the horizontal window margin."
+        )
+        AssertEqual(
+            candidate_box.candidatePaddingX,
+            candidate_box.candidatesLayout.labels[1].x - candidate_box.candidatesLayout.rows[1].x,
+            "The flow layout did not apply horizontal candidate padding."
+        )
+        AssertEqual(
+            candidate_box.candidateSpacing,
             candidate_box.candidatesLayout.rows[2].x
                 - candidate_box.candidatesLayout.rows[1].x
                 - candidate_box.candidatesLayout.rows[1].w,
-            "Flow candidate columns did not use the horizontal margin."
+            "Flow candidate columns did not use candidate spacing."
         )
         AssertEqual(
-            candidate_box.lineSpacing,
+            candidate_box.candidateSpacing,
             candidate_box.candidatesLayout.rows[3].y
                 - candidate_box.candidatesLayout.rows[1].y
                 - candidate_box.candidatesLayout.rows[1].h,
-            "Flow candidate rows did not use the vertical margin."
+            "Flow candidate rows did not use candidate spacing."
         )
         AssertEqual(
             candidate_box.candidatesLayout.cands[1].x,
@@ -1100,7 +1160,7 @@ TestFloatingPreeditLayout(style) {
                 layout_type . " floating preedit removed candidate rows."
             )
             AssertEqual(
-                candidate_box.borderWidth + candidate_box.lineSpacing,
+                candidate_box.borderWidth + candidate_box.marginY,
                 candidate_box.candidatesLayout.rows[1].y,
                 layout_type . " candidate rows retained space for floating preedit."
             )
@@ -1219,7 +1279,11 @@ TestModernVerticalTextCandidateLayout(style) {
         "layout_type", "vertical_text",
         "min_width", 1000,
         "min_height", 400,
-        "margin_x", 7
+        "margin_x", 11,
+        "margin_y", 13,
+        "candidate_padding_x", 3,
+        "candidate_padding_y", 4,
+        "candidate_spacing", 7
     )))
     local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
     local width, height
@@ -1234,11 +1298,25 @@ TestModernVerticalTextCandidateLayout(style) {
             "Vertical text candidates were not ordered from right to left."
         )
         AssertEqual(
-            candidate_box.padding,
+            candidate_box.candidateSpacing,
             candidate_box.candidatesLayout.rows[1].x
                 - candidate_box.candidatesLayout.rows[2].x
                 - candidate_box.candidatesLayout.rows[2].w,
-            "Vertical text candidate columns did not use the horizontal margin."
+            "Vertical text candidate columns did not use candidate spacing."
+        )
+        AssertEqual(
+            candidate_box.candidatePaddingX * 2,
+            candidate_box.candidatesLayout.rows[1].w - Max(
+                candidate_box.candidatesLayout.labels[1].w,
+                candidate_box.candidatesLayout.cands[1].w,
+                candidate_box.candidatesLayout.comments[1].w
+            ),
+            "Vertical text did not apply horizontal candidate padding."
+        )
+        AssertEqual(
+            candidate_box.candidatePaddingY,
+            candidate_box.candidatesLayout.labels[1].y - candidate_box.candidatesLayout.rows[1].y,
+            "Vertical text did not apply vertical candidate padding."
         )
         AssertTrue(
             candidate_box.candidatesLayout.labels[1].y < candidate_box.candidatesLayout.cands[1].y,
@@ -1249,12 +1327,12 @@ TestModernVerticalTextCandidateLayout(style) {
             "The vertical preedit column was not placed to the right of the candidates."
         )
         AssertEqual(
-            height - candidate_box.borderWidth - candidate_box.lineSpacing,
+            height - candidate_box.borderWidth - candidate_box.marginY - candidate_box.candidatePaddingY,
             candidate_box.candidatesLayout.comments[1].y + candidate_box.candidatesLayout.comments[1].h,
             "Vertical text comments were not aligned with the content bottom."
         )
         AssertEqual(
-            height - candidate_box.borderWidth - candidate_box.lineSpacing,
+            height - candidate_box.borderWidth - candidate_box.marginY,
             candidate_box.candidatesLayout.rows[1].y + candidate_box.candidatesLayout.rows[1].h,
             "The selected vertical text column did not cover its bottom-aligned comment."
         )
