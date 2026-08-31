@@ -23,6 +23,7 @@ RunTest("deploy workflow ownership", TestDeployWorkflowOwnership.Bind())
 RunTest("sync workflow ownership", TestSyncWorkflowOwnership.Bind())
 RunTest("deploy workflow failure cleanup", TestDeployWorkflowFailureCleanup.Bind())
 RunTest("deploy workflow checks librime results", TestDeployWorkflowChecksLibrimeResults.Bind())
+RunTest("settings workflow reads candidate labels without a behavior model", TestWorkflowReadsCandidateLabels.Bind())
 
 TestDeployWorkflowOwnership() {
     local calls := []
@@ -87,12 +88,31 @@ TestDeployWorkflowChecksLibrimeResults() {
     )
 }
 
+TestWorkflowReadsCandidateLabels() {
+    local calls := []
+    local workflow := RabbitCandidateLabelWorkflowProbe(RabbitCandidateLabelRimeProbe(calls), calls)
+    local labels := workflow.ReadCandidateLabels()
+    AssertEqual(2, labels.Length, "The workflow loaded the wrong candidate label count.")
+    AssertEqual("①", labels[1], "The workflow loaded the wrong first candidate label.")
+    AssertEqual("②", labels[2], "The workflow loaded the wrong second candidate label.")
+    AssertTrue(WorkflowCallsHave(calls, "destroy:default"), "The workflow leaked its candidate label settings.")
+}
+
 JoinWorkflowCalls(calls) {
     local result := ""
     for call in calls {
         result .= (result ? "," : "") . call
     }
     return result
+}
+
+WorkflowCallsHave(calls, expected) {
+    for call in calls {
+        if call = expected {
+            return true
+        }
+    }
+    return false
 }
 
 class RabbitDeployerWorkflowProbe extends RabbitDeployerWorkflow {
@@ -111,6 +131,74 @@ class RabbitDeployerWorkflowProbe extends RabbitDeployerWorkflow {
 
     CreateMutex() {
         return RabbitDeployerWorkflowMutexProbe(this.calls)
+    }
+}
+
+class RabbitCandidateLabelWorkflowProbe extends RabbitDeployerWorkflowProbe {
+    __New(rime_api, calls) {
+        this.label_api := RabbitCandidateLabelLeversProbe(calls)
+        super.__New(rime_api, calls)
+    }
+
+    CreateLevers() {
+        this.calls.Push("levers")
+        return this.label_api
+    }
+}
+
+class RabbitCandidateLabelLeversProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    custom_settings_init(config_id, generator_id) {
+        this.calls.Push("init:" . config_id)
+        return config_id
+    }
+
+    load_settings(settings) {
+        this.calls.Push("load:" . settings)
+        return true
+    }
+
+    settings_get_config(settings) {
+        this.calls.Push("config:" . settings)
+        return settings
+    }
+
+    custom_settings_destroy(settings) {
+        this.calls.Push("destroy:" . settings)
+    }
+}
+
+class RabbitCandidateLabelRimeProbe {
+    __New(calls) {
+        this.calls := calls
+        this.labels := ["①", "②"]
+    }
+
+    config_begin_list(config, path) {
+        this.calls.Push("begin:" . path)
+        return { index: 0, path: "" }
+    }
+
+    config_next(iter) {
+        iter.index += 1
+        if iter.index > this.labels.Length {
+            return false
+        }
+        iter.path := "menu/alternative_select_labels/@" . (iter.index - 1)
+        return true
+    }
+
+    config_test_get_string(config, path, &value) {
+        local index := Integer(SubStr(path, InStr(path, "@") + 1)) + 1
+        value := this.labels[index]
+        return true
+    }
+
+    config_end(iter) {
+        this.calls.Push("end")
     }
 }
 

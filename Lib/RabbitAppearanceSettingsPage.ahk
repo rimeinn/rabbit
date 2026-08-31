@@ -81,7 +81,6 @@ class RabbitAppearanceSettingsPage {
                 owner.appearance_status.Value := "旧版 Windows 暂不支持预览。"
             } else try {
                 this.CreatePreview()
-                this.RenderPreview()
             } catch as err {
                 owner.appearance_status.Value := "无法显示预览：" . err.Message
             }
@@ -126,7 +125,6 @@ class RabbitAppearanceSettingsPage {
             this.loading := false
         }
         this.UpdateConditionalControls()
-        this.RenderPreview()
     }
 
     PopulateColorList(selected_id := "") {

@@ -30,6 +30,7 @@ RunTest("settings window browses color schemes without changing selection", Test
 RunTest("settings window stages custom color schemes", TestSettingsWindowStagesCustomColorSchemes.Bind())
 RunTest("settings window restores dark scheme following", TestSettingsWindowRestoresDarkSchemeFollowing.Bind())
 RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
+RunTest("settings window defers its initial appearance preview", TestSettingsWindowDefersInitialPreview.Bind())
 RunTest("settings window previews pending candidate labels", TestSettingsWindowPreviewsPendingLabels.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
@@ -326,8 +327,13 @@ TestSettingsWindowContainsPreviewFailures() {
     )
     try {
         AssertTrue(
+            InStr(window.appearance_status.Value, "无法显示预览：") != 1,
+            "The settings window rendered its preview before it was shown."
+        )
+        AssertTrue(!window.PreviewAppearance(), "The appearance page ignored a preview failure.")
+        AssertTrue(
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
-            "The settings window did not report the initial preview failure."
+            "The settings window did not report a requested preview failure."
         )
         window.appearance_target.Choose(2)
         window.OnAppearanceTargetChange()
@@ -335,6 +341,29 @@ TestSettingsWindowContainsPreviewFailures() {
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
             "The settings window let an event-driven preview failure escape."
         )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowDefersInitialPreview() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsCombinedWorkflowProbe(calls),
+        false,
+        RabbitSettingsCapturingAppearancePreview
+    )
+    try {
+        AssertEqual(0, RabbitSettingsCapturingAppearancePreview.render_count,
+            "The settings window rendered its preview during construction.")
+        AssertEqual("create_style", JoinSettingsWorkflowCalls(calls),
+            "Constructing the appearance page loaded unrelated settings.")
+        local labels := window.GetAppearancePreviewLabels()
+        AssertEqual("①", labels[1], "The lightweight preview label reader returned the wrong label.")
+        window.GetAppearancePreviewLabels()
+        AssertEqual("create_style,read_labels", JoinSettingsWorkflowCalls(calls),
+            "The preview labels were not cached independently of the behavior model.")
+        AssertTrue(!window.behavior_model, "Reading preview labels initialized the behavior model.")
     } finally {
         window.Dispose()
     }
@@ -713,6 +742,11 @@ class RabbitSettingsCombinedWorkflowProbe {
         return RabbitSettingsBehaviorModelProbe(this.calls)
     }
 
+    ReadCandidateLabels() {
+        this.calls.Push("read_labels")
+        return ["①", "②", "③", "④", "⑤"]
+    }
+
     CreateApplicationSettingsModel() {
         this.calls.Push("create_application")
         return RabbitSettingsApplicationModelProbe(this.calls)
@@ -991,12 +1025,15 @@ class RabbitSettingsFailingAppearancePreview {
 
 class RabbitSettingsCapturingAppearancePreview {
     static last_labels := []
+    static render_count := 0
 
     __New(ctrl) {
         RabbitSettingsCapturingAppearancePreview.last_labels := []
+        RabbitSettingsCapturingAppearancePreview.render_count := 0
     }
 
     Render(style, select_labels := 0) {
+        RabbitSettingsCapturingAppearancePreview.render_count += 1
         RabbitSettingsCapturingAppearancePreview.last_labels := select_labels is Array
             ? select_labels.Clone()
             : []

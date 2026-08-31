@@ -102,19 +102,23 @@ class RabbitBehaviorSettingsModel {
     }
 
     LoadStringList(config, path) {
+        return RabbitBehaviorSettingsModel.ReadStringList(this.rime, config, path)
+    }
+
+    static ReadStringList(rime_api, config, path) {
         local iter, value
         local result := []
-        if !(iter := this.rime.config_begin_list(config, path)) {
+        if !(iter := rime_api.config_begin_list(config, path)) {
             return result
         }
         try {
-            while this.rime.config_next(iter) {
-                if this.rime.config_test_get_string(config, iter.path, &value) {
+            while rime_api.config_next(iter) {
+                if rime_api.config_test_get_string(config, iter.path, &value) {
                     result.Push(value)
                 }
             }
         } finally {
-            this.rime.config_end(iter)
+            rime_api.config_end(iter)
         }
         return result
     }

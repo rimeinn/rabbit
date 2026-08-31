@@ -97,6 +97,8 @@ class RabbitSettingsWindow extends Gui {
         this.application_changes := Map()
         this.application_loading := false
         this.application_dirty := false
+        this.appearance_preview_labels := []
+        this.appearance_preview_labels_loaded := false
         this.dictionary_model := 0
         this.switcher_model := 0
         this.switcher_items := Map()
@@ -757,7 +759,9 @@ class RabbitSettingsWindow extends Gui {
         this.ResizeForPage(index)
         if index = 1 {
             this.EnsureAppearanceSettings()
-            this.PreviewAppearance()
+            if this.window_shown {
+                this.PreviewAppearance()
+            }
         } else if index = 2 {
             this.EnsureSwitcherSettings()
         } else if index = 3 {
@@ -949,6 +953,9 @@ class RabbitSettingsWindow extends Gui {
 
     PopulateAppearanceSettings() {
         this.appearance_page.PopulateSettings()
+        if this.window_shown {
+            this.PreviewAppearance()
+        }
     }
 
     PopulateAppearanceColorList() {
@@ -1010,20 +1017,27 @@ class RabbitSettingsWindow extends Gui {
     GetAppearancePreviewLabels() {
         local label
         local labels := []
-        if !this.behavior_model {
-            if !this.workflow || !HasMethod(this.workflow, "CreateBehaviorSettingsModel") {
-                return labels
+        if this.behavior_model || Trim(this.menu_labels.Value) {
+            Loop Parse this.menu_labels.Value, "," {
+                if (label := Trim(A_LoopField)) {
+                    labels.Push(label)
+                }
             }
-            if !this.EnsureBehaviorSettings() {
-                return labels
+            return labels
+        }
+
+        if !this.appearance_preview_labels_loaded {
+            this.appearance_preview_labels_loaded := true
+            if this.workflow && HasMethod(this.workflow, "ReadCandidateLabels") {
+                try {
+                    labels := this.workflow.ReadCandidateLabels()
+                    if labels is Array {
+                        this.appearance_preview_labels := labels.Clone()
+                    }
+                }
             }
         }
-        Loop Parse this.menu_labels.Value, "," {
-            if (label := Trim(A_LoopField)) {
-                labels.Push(label)
-            }
-        }
-        return labels
+        return this.appearance_preview_labels.Clone()
     }
 
     ApplyAppearanceSettings() {

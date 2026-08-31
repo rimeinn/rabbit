@@ -57,6 +57,32 @@ class RabbitDeployerWorkflow {
         return RabbitBehaviorSettingsModel(this.CreateLevers(), this.rime)
     }
 
+    ReadCandidateLabels() {
+        local api := this.CreateLevers()
+        local config, settings := 0
+        if !api {
+            throw Error("Failed to initialize Rime settings API.")
+        }
+        try {
+            settings := api.custom_settings_init("default", "Rabbit.CandidateLabels")
+            if !settings || !api.load_settings(settings) {
+                throw Error("Failed to load candidate labels.")
+            }
+            if !(config := api.settings_get_config(settings)) {
+                throw Error("Failed to read candidate label settings.")
+            }
+            return RabbitBehaviorSettingsModel.ReadStringList(
+                this.rime,
+                config,
+                "menu/alternative_select_labels"
+            )
+        } finally {
+            if settings {
+                api.custom_settings_destroy(settings)
+            }
+        }
+    }
+
     CreateApplicationSettingsModel() {
         return RabbitApplicationSettingsModel(this.CreateLevers(), this.rime)
     }
