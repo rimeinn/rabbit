@@ -36,6 +36,7 @@ RunTest("settings window contains appearance preview failures", TestSettingsWind
 RunTest("settings window defers its initial appearance preview", TestSettingsWindowDefersInitialPreview.Bind())
 RunTest("settings window previews pending candidate labels", TestSettingsWindowPreviewsPendingLabels.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
+RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOptionHeaders.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
 RunTest("key binding dialog preserves unknown fields", TestKeyBindingDialogPreservesUnknownFields.Bind())
@@ -81,6 +82,11 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(676, footer_y, "The tall layout misplaced the footer status.")
 
         window.SelectPage(2)
+        AssertEqual(660, window.GetPageWindowHeight(), "The switcher page used the wrong window height.")
+        AssertTrue(window.switcher_tabs.Visible, "The switcher page did not show its tabs.")
+        AssertEqual(1, window.switcher_tabs.Value, "The switcher page did not select the schema tab.")
+
+        window.SelectPage(4)
         AssertEqual(500, window.GetPageWindowHeight(), "A compact page used the wrong window height.")
         window.apply_button.GetPos(, &apply_y)
         window.navigation.GetPos(, &navigation_y, , &navigation_height)
@@ -488,6 +494,14 @@ TestSettingsWindowSavesSwitcherSettings() {
     try {
         AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
         AssertEqual(2, window.switcher_list.GetCount(), "The switcher page showed the wrong schema count.")
+        window.switcher_tabs.Choose(2)
+        window.OnSwitcherTabChanged()
+        AssertTrue(window.switcher_caption.Visible, "The switcher menu tab did not show its caption field.")
+        AssertEqual(1, window.switcher_save_list.GetCount(), "The switcher menu tab lost discovered options.")
+        AssertTrue(window.switcher_prefix.Enabled, "Folded option formatting was unexpectedly disabled.")
+        window.switcher_fold_options.Value := false
+        window.OnSwitcherFoldChanged()
+        AssertTrue(!window.switcher_prefix.Enabled, "Disabling folding left folded formatting enabled.")
         window.switcher_list.Modify(1, "-Check")
         window.switcher_list.Modify(2, "Check")
         window.switcher_hotkeys.Value := "F4"
@@ -1025,6 +1039,32 @@ class RabbitSettingsColorSchemeDialogProbe {
     }
 }
 
+TestDarkSwitcherUsesThemedOptionHeaders() {
+    local calls := []
+    local list_y, name_y
+    local window := RabbitSettingsWindow(
+        RabbitSettingsSwitcherWorkflowProbe(calls),
+        true,
+        RabbitAppearancePreview,
+        0,
+        "input-schemes",
+        false,
+        RabbitSettingsDarkThemeProbe
+    )
+    try {
+        window.switcher_tabs.Choose(2)
+        window.OnSwitcherTabChanged()
+        AssertTrue(window.switcher_option_name_header.Visible, "The dark option-name header stayed hidden.")
+        AssertTrue(window.switcher_option_source_header.Visible, "The dark option-source header stayed hidden.")
+        AssertTrue(window.switcher_option_hint_header.Visible, "The dark option-hint header stayed hidden.")
+        window.switcher_option_name_header.GetPos(, &name_y)
+        window.switcher_save_list.GetPos(, &list_y)
+        AssertEqual(24, list_y - name_y, "The dark option list did not start below its themed header.")
+    } finally {
+        window.Dispose()
+    }
+}
+
 class RabbitSettingsCancelingColorSchemeDialogProbe {
     static last_preview_style_overrides := 0
 
@@ -1176,18 +1216,61 @@ class RabbitSettingsSwitcherModelProbe {
     __New(calls) {
         this.calls := calls
         this.hotkeys := "Control+grave"
+        this.caption := "〔方案选单〕"
+        this.save_options := ["full_shape"]
+        this.fold_options := true
+        this.abbreviate_options := true
+        this.option_list_prefix := ""
+        this.option_list_suffix := ""
+        this.option_list_separator := "／"
+        this.fix_schema_list_order := false
         this.items := [
             { id: "schema_a", name: "方案 A", author: "", description: "A", selected: true },
             { id: "schema_b", name: "方案 B", author: "", description: "B", selected: false },
         ]
     }
 
-    Save(schema_ids, hotkeys) {
-        this.calls.Push("save:" . schema_ids[1] . ":" . hotkeys)
+    GetOptionItems(schema_ids) {
+        return [{
+            name: "full_shape",
+            source: "方案 A",
+            reset: false,
+            custom: false,
+            selected: true,
+        }]
+    }
+
+    Save(values) {
+        this.calls.Push("save:" . values.schema_ids[1] . ":" . values.hotkeys)
         return true
     }
 
     Dispose() {
         this.calls.Push("dispose_model")
+    }
+}
+
+class RabbitSettingsDarkThemeProbe {
+    static Prepare() {
+        return true
+    }
+
+    __New(window) {
+        this.dark_mode_reader := (*) => true
+    }
+
+    RegisterMuted(controls*) {
+    }
+
+    RegisterSurface(controls*) {
+    }
+
+    Register() {
+    }
+
+    Apply() {
+    }
+
+    Dispose() {
     }
 }

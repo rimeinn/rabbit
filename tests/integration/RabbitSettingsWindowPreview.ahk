@@ -52,6 +52,13 @@ RunSettingsWindowPreview() {
             window.appearance_floating_preedit.Value := true
             window.OnAppearanceControlsChanged()
             window.SelectPage(2)
+            window.switcher_tabs.Choose(2)
+            window.OnSwitcherTabChanged()
+            AssertTrue(window.switcher_caption.Visible, "The switcher menu tab did not become visible.")
+            AssertTrue(
+                window.switcher_save_list.GetCount() > 0,
+                "The switcher menu tab did not discover any schema options."
+            )
             window.SelectPage(3)
             SetTimer(window.Dispose.Bind(window), -100)
         }

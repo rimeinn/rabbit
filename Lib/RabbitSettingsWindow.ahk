@@ -26,12 +26,13 @@ class RabbitSettingsWindow extends Gui {
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 724
     static BEHAVIOR_HEIGHT := 660
+    static SWITCHER_HEIGHT := 660
     static COMPACT_HEIGHT := 500
     static SWITCH_ACTION_VALUES := ["noop", "inline_ascii", "commit_text", "commit_code", "clear"]
     static SWITCH_ACTION_LABELS := ["不切换", "临时英文", "提交文字", "提交编码", "清空输入"]
     static pages := [
         { id: "appearance", title: "外观", description: "配置候选窗口的配色和排版。" },
-        { id: "input-schemes", title: "输入方案", description: "选择输入方案并设置方案选单快捷键。" },
+        { id: "input-schemes", title: "输入方案与选单", description: "选择输入方案并设置方案选单的显示、快捷键和状态记忆。" },
         { id: "behavior", title: "输入与行为", description: "设置玉兔毫的输入、提示和候选行为。" },
         { id: "applications", title: "应用适配", description: "按应用程序设置默认输入状态。" },
         { id: "dictionary", title: "用户词典", description: "备份、恢复、导入和导出用户词典。" },
@@ -103,6 +104,10 @@ class RabbitSettingsWindow extends Gui {
         this.dictionary_model := 0
         this.switcher_model := 0
         this.switcher_items := Map()
+        this.switcher_option_items := Map()
+        this.switcher_option_selection := Map()
+        this.switcher_custom_options := Map()
+        this.switcher_removed_options := Map()
         this.switcher_loading := false
         this.switcher_dirty := false
         this.disposed := false
@@ -341,7 +346,18 @@ class RabbitSettingsWindow extends Gui {
                     this.appearance_source_header
                 )
             case 2:
+                this.window_theme.RegisterMuted(
+                    this.switcher_schema_help,
+                    this.switcher_preview,
+                    this.switcher_save_help,
+                    this.switcher_option_note
+                )
                 this.window_theme.RegisterSurface(this.switcher_list_header)
+                this.window_theme.RegisterSurface(
+                    this.switcher_option_name_header,
+                    this.switcher_option_source_header,
+                    this.switcher_option_hint_header
+                )
             case 3:
                 this.window_theme.RegisterMuted(this.menu_help, this.binding_help)
                 this.window_theme.RegisterSurface(
@@ -361,26 +377,135 @@ class RabbitSettingsWindow extends Gui {
 
     CreateSwitcherControls() {
         local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
-        this.switcher_group := this.AddGroupBox("x230 y136 w570 h290 Hidden", "输入方案")
+        this.switcher_tabs := this.AddTab3(
+            "x230 y136 w570 h450 Hidden"
+                . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
+            ["输入方案", "方案选单"]
+        )
+        this.switcher_tabs.OnEvent("Change", (*) => this.OnSwitcherTabChanged())
+        this.switcher_group := this.switcher_tabs
+
+        this.switcher_tabs.UseTab(1)
         this.switcher_list_header := this.AddText(
             "x254 y174 w250 h24 Center +0x200 Hidden" . surface_options,
             "方案名称"
         )
         this.switcher_list := this.AddListView(
-            (this.initial_dark_mode ? "x254 y198 w250 h154 -Hdr" : "x254 y174 w250 h178")
+            (this.initial_dark_mode ? "x254 y198 w250 h250 -Hdr" : "x254 y174 w250 h274")
                 . " Checked NoSort -Multi Hidden",
             ["方案名称"]
         )
         this.switcher_list.OnEvent("Click", (ctrl, row) => this.ShowSwitcherDetails(row))
         this.switcher_list.OnEvent("ItemCheck", (*) => this.MarkSwitcherDirty())
         this.switcher_details := this.AddText(
-            "x526 y174 w248 h178 Hidden",
+            "x526 y174 w248 h274 Hidden",
             "选择左侧方案以查看简介。"
         )
-        this.switcher_hotkeys_label := this.AddText("x254 y374 w116 h24 Hidden", "方案选单快捷键：")
-        this.switcher_hotkeys := this.AddEdit("x374 y370 w400 r1 -Multi Hidden")
+        this.switcher_fix_order := this.AddCheckbox(
+            "x254 y466 w510 h24 Hidden",
+            "启动时始终使用第一个方案"
+        )
+        this.switcher_fix_order.OnEvent("Click", (*) => this.MarkSwitcherDirty())
+        this.switcher_schema_help := this.AddText(
+            "x254 y496 w520 h42 cGray Hidden",
+            "关闭时恢复上次使用的方案。"
+        )
+        this.switcher_schema_controls := [
+            this.switcher_list_header,
+            this.switcher_list,
+            this.switcher_details,
+            this.switcher_fix_order,
+            this.switcher_schema_help,
+        ]
+
+        this.switcher_tabs.UseTab(2)
+        this.switcher_caption_label := this.AddText("x254 y174 w88 h24 Hidden", "选单标题：")
+        this.switcher_caption := this.AddEdit("x344 y170 w430 r1 -Multi Hidden")
+        this.switcher_caption.OnEvent("Change", (*) => this.MarkSwitcherDirty())
+        this.switcher_hotkeys_label := this.AddText("x254 y206 w88 h24 Hidden", "快捷键：")
+        this.switcher_hotkeys := this.AddEdit("x344 y202 w430 r1 -Multi Hidden")
+        this.SetEditCue(this.switcher_hotkeys, "多个快捷键使用逗号分隔")
         this.switcher_hotkeys.OnEvent("Change", (*) => this.MarkSwitcherDirty())
-        this.switcher_status := this.AddText("x254 y402 w520 h20 Hidden", "")
+        this.switcher_fold_options := this.AddCheckbox("x254 y234 w208 h24 Hidden", "折叠状态选项")
+        this.switcher_fold_options.OnEvent("Click", (*) => this.OnSwitcherFoldChanged())
+        this.switcher_abbreviate_options := this.AddCheckbox("x478 y234 w208 h24 Hidden", "使用状态缩写")
+        this.switcher_abbreviate_options.OnEvent("Click", (*) => this.OnSwitcherDisplayChanged())
+        this.switcher_prefix_label := this.AddText("x254 y270 w48 h24 Hidden", "前缀：")
+        this.switcher_prefix := this.AddEdit("x304 y266 w100 r1 -Multi Hidden")
+        this.switcher_prefix.OnEvent("Change", (*) => this.OnSwitcherDisplayChanged())
+        this.switcher_separator_label := this.AddText("x416 y270 w64 h24 Hidden", "分隔符：")
+        this.switcher_separator := this.AddEdit("x482 y266 w100 r1 -Multi Hidden")
+        this.switcher_separator.OnEvent("Change", (*) => this.OnSwitcherDisplayChanged())
+        this.switcher_suffix_label := this.AddText("x594 y270 w48 h24 Hidden", "后缀：")
+        this.switcher_suffix := this.AddEdit("x644 y266 w130 r1 -Multi Hidden")
+        this.switcher_suffix.OnEvent("Change", (*) => this.OnSwitcherDisplayChanged())
+        this.switcher_preview := this.AddText("x254 y298 w520 h24 cGray Hidden", "")
+
+        this.switcher_save_group := this.AddGroupBox("x246 y326 w538 h228 Hidden", "记忆选项")
+        this.switcher_save_help := this.AddText(
+            "x260 y348 w510 h38 cGray Hidden",
+            "勾选需要记忆状态的选项。方案设置的初始状态可能覆盖记忆值。"
+        )
+        this.switcher_save_list := this.AddListView(
+            (this.initial_dark_mode ? "x260 y408 w510 h92 -Hdr" : "x260 y384 w510 h116")
+                . " Checked NoSort -Multi Hidden",
+            ["选项标识", "来源", "提示"]
+        )
+        this.switcher_option_name_header := this.AddText(
+            "x260 y384 w172 h24 +0x200 Hidden" . surface_options,
+            "  选项标识"
+        )
+        this.switcher_option_source_header := this.AddText(
+            "x432 y384 w150 h24 +0x200 Hidden" . surface_options,
+            "  来源"
+        )
+        this.switcher_option_hint_header := this.AddText(
+            "x582 y384 w188 h24 +0x200 Hidden" . surface_options,
+            "  提示"
+        )
+        this.switcher_save_list.OnEvent(
+            "ItemCheck",
+            (ctrl, row, checked) => this.OnSwitcherOptionCheck(row, checked)
+        )
+        this.switcher_option_add := this.AddButton("x260 y510 w92 h30 Hidden", "添加自定义")
+        this.switcher_option_add.OnEvent("Click", (*) => this.AddSwitcherOption())
+        this.switcher_option_delete := this.AddButton("x362 y510 w92 h30 Hidden", "删除")
+        this.switcher_option_delete.OnEvent("Click", (*) => this.DeleteSwitcherOption())
+        this.switcher_option_note := this.AddText(
+            "x468 y512 w302 h34 cGray Hidden",
+            "仅记忆通过方案选单完成的切换。"
+        )
+        this.switcher_menu_controls := [
+            this.switcher_caption_label,
+            this.switcher_caption,
+            this.switcher_hotkeys_label,
+            this.switcher_hotkeys,
+            this.switcher_fold_options,
+            this.switcher_abbreviate_options,
+            this.switcher_prefix_label,
+            this.switcher_prefix,
+            this.switcher_separator_label,
+            this.switcher_separator,
+            this.switcher_suffix_label,
+            this.switcher_suffix,
+            this.switcher_preview,
+            this.switcher_save_group,
+            this.switcher_save_help,
+            this.switcher_save_list,
+            this.switcher_option_add,
+            this.switcher_option_delete,
+            this.switcher_option_note,
+        ]
+        if this.initial_dark_mode {
+            this.switcher_menu_controls.InsertAt(
+                1,
+                this.switcher_option_name_header,
+                this.switcher_option_source_header,
+                this.switcher_option_hint_header
+            )
+        }
+        this.switcher_tabs.UseTab()
+        this.switcher_status := this.AddText("x230 y590 w570 h18 Hidden", "")
     }
 
     CreateBehaviorControls() {
@@ -911,6 +1036,9 @@ class RabbitSettingsWindow extends Gui {
         if index = 1 {
             return RabbitSettingsWindow.APPEARANCE_HEIGHT
         }
+        if index = 2 {
+            return RabbitSettingsWindow.SWITCHER_HEIGHT
+        }
         return index = 3 ? RabbitSettingsWindow.BEHAVIOR_HEIGHT : RabbitSettingsWindow.COMPACT_HEIGHT
     }
 
@@ -975,13 +1103,27 @@ class RabbitSettingsWindow extends Gui {
         if !this.page_controls_created.Has(2) {
             return
         }
-        this.switcher_group.Visible := visible
-        this.switcher_list_header.Visible := visible && this.initial_dark_mode
-        this.switcher_list.Visible := visible
-        this.switcher_details.Visible := visible
-        this.switcher_hotkeys_label.Visible := visible
-        this.switcher_hotkeys.Visible := visible
+        this.switcher_tabs.Visible := visible
+        this.SetSwitcherTabControlsVisible(visible)
         this.switcher_status.Visible := visible
+    }
+
+    SetSwitcherTabControlsVisible(visible) {
+        local schema_visible := visible && this.switcher_tabs.Value = 1
+        local menu_visible := visible && this.switcher_tabs.Value = 2
+        for ctrl in this.switcher_schema_controls {
+            ctrl.Visible := schema_visible && (ctrl != this.switcher_list_header || this.initial_dark_mode)
+        }
+        for ctrl in this.switcher_menu_controls {
+            ctrl.Visible := menu_visible
+        }
+    }
+
+    OnSwitcherTabChanged() {
+        if this.switcher_tabs.Value = 2 {
+            this.RefreshSwitcherOptions()
+        }
+        this.SetSwitcherTabControlsVisible(this.selected_page = 2)
     }
 
     SetBehaviorVisible(visible) {
@@ -1247,7 +1389,8 @@ class RabbitSettingsWindow extends Gui {
     ApplyAllPendingSettings() {
         local appearance_values := 0
         local behavior_values := 0
-        local deploy_result, schema_ids := 0
+        local switcher_values := 0
+        local deploy_result
         if this.installing {
             return this.CompleteInstallation()
         }
@@ -1256,8 +1399,14 @@ class RabbitSettingsWindow extends Gui {
         }
 
         if this.switcher_dirty {
-            schema_ids := this.SelectedSchemaIds()
-            if schema_ids.Length = 0 {
+            try {
+                switcher_values := this.GetSwitcherValues()
+            } catch as err {
+                this.SelectPage(2)
+                this.switcher_status.Value := err.Message
+                return false
+            }
+            if switcher_values.schema_ids.Length = 0 {
                 this.SelectPage(2)
                 this.switcher_status.Value := "至少要选用一项输入方案。"
                 return false
@@ -1296,10 +1445,7 @@ class RabbitSettingsWindow extends Gui {
                 }
             }
             if this.switcher_dirty {
-                if !this.switcher_model || !this.switcher_model.Save(
-                    schema_ids,
-                    Trim(this.switcher_hotkeys.Value)
-                ) {
+                if !this.switcher_model || !this.switcher_model.Save(switcher_values) {
                     this.SelectPage(2)
                     this.switcher_status.Value := "未能保存输入方案设置。"
                     return false
@@ -1356,12 +1502,17 @@ class RabbitSettingsWindow extends Gui {
     }
 
     CompleteInstallation() {
-        local deploy_result, reloaded, schema_ids
+        local deploy_result, reloaded, values
         if !this.installing || !this.EnsureSwitcherSettings() {
             return false
         }
-        schema_ids := this.SelectedSchemaIds()
-        if schema_ids.Length = 0 {
+        try {
+            values := this.GetSwitcherValues()
+        } catch as err {
+            this.switcher_status.Value := err.Message
+            return false
+        }
+        if values.schema_ids.Length = 0 {
             this.switcher_status.Value := "至少要选用一项输入方案。"
             return false
         }
@@ -1369,7 +1520,7 @@ class RabbitSettingsWindow extends Gui {
         this.Opt("+Disabled")
         this.footer_status.Value := "正在保存输入方案并完成首次部署…"
         try {
-            if !this.switcher_model.Save(schema_ids, Trim(this.switcher_hotkeys.Value)) {
+            if !this.switcher_model.Save(values) {
                 this.switcher_status.Value := "未能保存输入方案设置。"
                 return false
             }
@@ -1760,10 +1911,14 @@ class RabbitSettingsWindow extends Gui {
             this.switcher_model := 0
         }
         this.switcher_items := Map()
+        this.switcher_option_items := Map()
+        this.switcher_option_selection := Map()
+        this.switcher_custom_options := Map()
+        this.switcher_removed_options := Map()
     }
 
     PopulateSwitcherSettings() {
-        local row
+        local option_name, row
         this.switcher_loading := true
         try {
             this.switcher_items := Map()
@@ -1774,6 +1929,22 @@ class RabbitSettingsWindow extends Gui {
             }
             this.switcher_list.ModifyCol(1, 228)
             this.switcher_hotkeys.Value := this.switcher_model.hotkeys
+            this.switcher_caption.Value := this.switcher_model.caption
+            this.switcher_fold_options.Value := this.switcher_model.fold_options
+            this.switcher_abbreviate_options.Value := this.switcher_model.abbreviate_options
+            this.switcher_prefix.Value := this.switcher_model.option_list_prefix
+            this.switcher_suffix.Value := this.switcher_model.option_list_suffix
+            this.switcher_separator.Value := this.switcher_model.option_list_separator
+            this.switcher_fix_order.Value := this.switcher_model.fix_schema_list_order
+            this.switcher_option_selection := Map()
+            this.switcher_custom_options := Map()
+            this.switcher_removed_options := Map()
+            for option_name in this.switcher_model.save_options {
+                this.switcher_option_selection[option_name] := true
+            }
+            this.RefreshSwitcherOptions()
+            this.UpdateSwitcherFoldControls()
+            this.UpdateSwitcherPreview()
             this.switcher_dirty := false
             this.UpdateApplyButton()
             this.switcher_status.Value := ""
@@ -1784,6 +1955,148 @@ class RabbitSettingsWindow extends Gui {
         } finally {
             this.switcher_loading := false
         }
+    }
+
+    RefreshSwitcherOptions() {
+        local existing_names := Map()
+        local item, option_name, row
+        local option_items := []
+        local visible_items := []
+        local was_loading := this.switcher_loading
+        if !HasProp(this, "switcher_save_list") || !this.switcher_model {
+            return
+        }
+        this.switcher_loading := true
+        try {
+            if HasMethod(this.switcher_model, "GetOptionItems") {
+                option_items := this.switcher_model.GetOptionItems(this.SelectedSchemaIds())
+            }
+            for item in option_items {
+                if item.custom && this.switcher_removed_options.Has(item.name) {
+                    continue
+                }
+                visible_items.Push(item)
+                existing_names[item.name] := true
+                if !this.switcher_option_selection.Has(item.name) {
+                    this.switcher_option_selection[item.name] := !!item.selected
+                }
+                if item.custom {
+                    this.switcher_custom_options[item.name] := true
+                }
+            }
+            for option_name in this.switcher_custom_options {
+                if !existing_names.Has(option_name) {
+                    visible_items.Push({
+                        name: option_name,
+                        source: "自定义",
+                        reset: false,
+                        custom: true,
+                        selected: this.switcher_option_selection.Has(option_name)
+                            && this.switcher_option_selection[option_name],
+                    })
+                }
+            }
+
+            this.switcher_option_items := Map()
+            this.switcher_save_list.Delete()
+            for item in visible_items {
+                row := this.switcher_save_list.Add(
+                    this.switcher_option_selection.Has(item.name)
+                        && this.switcher_option_selection[item.name] ? "Check" : "",
+                    item.name,
+                    item.source,
+                    item.reset ? "初始状态可能覆盖记忆值" : ""
+                )
+                this.switcher_option_items[row] := item
+            }
+            this.switcher_save_list.ModifyCol(1, 172)
+            this.switcher_save_list.ModifyCol(2, 150)
+            this.switcher_save_list.ModifyCol(3, 166)
+        } finally {
+            this.switcher_loading := was_loading
+        }
+    }
+
+    OnSwitcherOptionCheck(row, checked) {
+        if this.switcher_loading || !this.switcher_option_items.Has(row) {
+            return
+        }
+        this.switcher_option_selection[this.switcher_option_items[row].name] := !!checked
+        this.MarkSwitcherDirty()
+    }
+
+    AddSwitcherOption() {
+        local item, name, option_row, result
+        result := InputBox(
+            "请输入需要记忆的 Rime 选项标识。",
+            "添加自定义选项",
+            "w420 h150"
+        )
+        if result.Result != "OK" {
+            return
+        }
+        name := Trim(result.Value)
+        if !name || RegExMatch(name, "[\s/]") {
+            this.ShowMessage("选项标识不能为空，也不能包含空白或斜线。", "【玉兔毫】", "Ok Icon!")
+            return
+        }
+        for option_row, item in this.switcher_option_items {
+            if item.name = name {
+                this.ShowMessage("该选项已经在列表中。", "【玉兔毫】", "Ok Icon!")
+                return
+            }
+        }
+        this.switcher_custom_options[name] := true
+        if this.switcher_removed_options.Has(name) {
+            this.switcher_removed_options.Delete(name)
+        }
+        this.switcher_option_selection[name] := true
+        this.RefreshSwitcherOptions()
+        this.MarkSwitcherDirty()
+    }
+
+    DeleteSwitcherOption() {
+        local item, row := this.switcher_save_list.GetNext(0)
+        if !row || !this.switcher_option_items.Has(row) {
+            return
+        }
+        item := this.switcher_option_items[row]
+        if !item.custom {
+            this.ShowMessage("方案提供的选项不能删除；可以取消勾选。", "【玉兔毫】", "Ok Icon!")
+            return
+        }
+        this.switcher_custom_options.Delete(item.name)
+        this.switcher_option_selection.Delete(item.name)
+        this.switcher_removed_options[item.name] := true
+        this.RefreshSwitcherOptions()
+        this.MarkSwitcherDirty()
+    }
+
+    OnSwitcherFoldChanged() {
+        this.UpdateSwitcherFoldControls()
+        this.OnSwitcherDisplayChanged()
+    }
+
+    OnSwitcherDisplayChanged() {
+        this.UpdateSwitcherPreview()
+        this.MarkSwitcherDirty()
+    }
+
+    UpdateSwitcherFoldControls() {
+        local enabled := !!this.switcher_fold_options.Value
+        this.switcher_abbreviate_options.Enabled := enabled
+        this.switcher_prefix.Enabled := enabled
+        this.switcher_separator.Enabled := enabled
+        this.switcher_suffix.Enabled := enabled
+    }
+
+    UpdateSwitcherPreview() {
+        local labels := this.switcher_abbreviate_options.Value
+            ? ["中", "半", "简"]
+            : ["中文", "半角", "简体"]
+        this.switcher_preview.Value := "摘要预览：" . this.switcher_prefix.Value
+            . labels[1] . this.switcher_separator.Value . labels[2]
+            . this.switcher_separator.Value . labels[3] . this.switcher_suffix.Value
     }
 
     ShowSwitcherDetails(row) {
@@ -1822,13 +2135,43 @@ class RabbitSettingsWindow extends Gui {
         return ids
     }
 
+    GetSwitcherValues() {
+        local save_options := []
+        local row := 0
+        if !Trim(this.switcher_caption.Value) {
+            throw ValueError("方案选单标题不能为空。")
+        }
+        while (row := this.switcher_save_list.GetNext(row, "Checked")) {
+            if this.switcher_option_items.Has(row) {
+                save_options.Push(this.switcher_option_items[row].name)
+            }
+        }
+        return {
+            schema_ids: this.SelectedSchemaIds(),
+            hotkeys: Trim(this.switcher_hotkeys.Value),
+            caption: this.switcher_caption.Value,
+            save_options: save_options,
+            fold_options: !!this.switcher_fold_options.Value,
+            abbreviate_options: !!this.switcher_abbreviate_options.Value,
+            option_list_prefix: this.switcher_prefix.Value,
+            option_list_suffix: this.switcher_suffix.Value,
+            option_list_separator: this.switcher_separator.Value,
+            fix_schema_list_order: !!this.switcher_fix_order.Value,
+        }
+    }
+
     ApplySwitcherSettings() {
-        local schema_ids, deploy_result
+        local deploy_result, values
         if !this.switcher_model || !this.switcher_dirty {
             return false
         }
-        schema_ids := this.SelectedSchemaIds()
-        if schema_ids.Length = 0 {
+        try {
+            values := this.GetSwitcherValues()
+        } catch as err {
+            this.switcher_status.Value := err.Message
+            return false
+        }
+        if values.schema_ids.Length = 0 {
             this.ShowMessage("至少要选用一项输入方案。", "【玉兔毫】", "Ok Icon!")
             return false
         }
@@ -1836,7 +2179,7 @@ class RabbitSettingsWindow extends Gui {
         this.Opt("+Disabled")
         this.switcher_status.Value := "正在保存…"
         try {
-            if !this.switcher_model.Save(schema_ids, Trim(this.switcher_hotkeys.Value)) {
+            if !this.switcher_model.Save(values) {
                 this.switcher_status.Value := "未能保存输入方案设置。"
                 return false
             }

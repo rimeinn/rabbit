@@ -26,17 +26,22 @@
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
 #Include ..\support\TestCommon.ahk
 
-RunTest("switcher hotkeys persist through generic customization", TestSwitcherHotkeyPersistence.Bind())
+RunTest("switcher settings persist through generic customization", TestSwitcherHotkeyPersistence.Bind())
 RunTest("shared rabbit settings preserve earlier saves", TestSharedRabbitSettingsPersistence.Bind())
 ExitApp()
 
 TestSwitcherHotkeyPersistence() {
     local model := 0
+    local option_items := []
     local rime := 0
     local schema_ids := []
     local test_dir := RabbitSettingsPersistenceTestDirectory("switcher")
     try {
-        FileAppend("patch: {}`n", test_dir . "\default.custom.yaml", "UTF-8")
+        FileAppend(
+            "patch:`n  switcher/save_options/+: [legacy_option]`n",
+            test_dir . "\default.custom.yaml",
+            "UTF-8"
+        )
         rime := RabbitSettingsPersistenceRime(test_dir)
         model := RabbitSwitcherSettingsModel(RimeLeversApi(rime), rime)
         for item in model.items {
@@ -49,13 +54,40 @@ TestSwitcherHotkeyPersistence() {
         }
 
         AssertTrue(schema_ids.Length > 0, "The integration data did not provide an input schema.")
+        option_items := model.GetOptionItems(schema_ids)
+        AssertTrue(option_items.Length > 0, "The model did not discover options from a real schema config.")
+        local values := model.GetCurrentValues()
+        values.schema_ids := schema_ids
+        values.hotkeys := "F4, Control+grave"
+        values.caption := "测试选单"
+        values.save_options := ["ascii_mode", "custom_test_option"]
+        values.fold_options := false
+        values.abbreviate_options := false
+        values.option_list_prefix := "["
+        values.option_list_suffix := "]"
+        values.option_list_separator := " | "
+        values.fix_schema_list_order := true
         AssertTrue(
-            model.Save(schema_ids, "F4, Control+grave"),
+            model.Save(values),
             "The bundled librime failed to save switcher hotkeys through customize_item."
         )
         local saved := FileRead(test_dir . "\default.custom.yaml", "UTF-8")
         AssertTrue(InStr(saved, "switcher/hotkeys"), "The saved config omitted switcher hotkeys.")
         AssertTrue(InStr(saved, "Control+grave"), "The saved config omitted a configured hotkey.")
+        AssertTrue(InStr(saved, "switcher/caption"), "The saved config omitted the switcher caption.")
+        AssertTrue(InStr(saved, "测试选单"), "The saved config omitted the configured caption.")
+        AssertTrue(InStr(saved, "custom_test_option"), "The saved config omitted a saved option.")
+        AssertTrue(
+            !InStr(saved, "switcher/save_options/+"),
+            "The full save_options edit retained an incremental patch."
+        )
+        AssertTrue(InStr(saved, "switcher/option_list_prefix"), "The saved config omitted the option prefix.")
+        AssertTrue(InStr(saved, "switcher/option_list_suffix"), "The saved config omitted the option suffix.")
+        AssertTrue(InStr(saved, "switcher/option_list_separator"), "The saved config omitted the separator.")
+        AssertTrue(
+            InStr(saved, "switcher/fix_schema_list_order"),
+            "The saved config omitted the fixed-order option."
+        )
     } finally {
         if model {
             model.Dispose()

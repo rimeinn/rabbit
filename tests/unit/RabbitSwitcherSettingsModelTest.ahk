@@ -19,44 +19,80 @@
 #Include ..\support\TestCommon.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsModel.ahk
 
-RunTest("switcher settings model lifecycle", TestSwitcherSettingsModelLifecycle.Bind())
+RunTest("switcher settings model loads, discovers, and saves all fields", TestSwitcherSettingsModel.Bind())
 
-TestSwitcherSettingsModelLifecycle() {
+TestSwitcherSettingsModel() {
     local calls := []
     local api := RabbitSwitcherModelLeversProbe(calls)
     local model := RabbitSwitcherSettingsModelProbe(api, RabbitSwitcherModelRimeProbe(calls))
+    local options, values
 
     try {
         AssertEqual(2, model.items.Length, "The switcher model loaded the wrong number of schemas.")
         AssertEqual("schema_b", model.items[1].id, "The switcher model lost the selected schema order.")
-        AssertTrue(model.items[1].selected, "The switcher model did not mark the selected schema.")
-        AssertEqual("schema_a", model.items[2].id, "The switcher model lost an available schema.")
-        AssertTrue(!model.items[2].selected, "The switcher model selected an available schema.")
         AssertEqual("Control+grave", model.hotkeys, "The switcher model loaded the wrong hotkeys.")
+        AssertEqual("〔方案选单〕", model.caption, "The switcher model loaded the wrong caption.")
+        AssertTrue(model.fold_options, "The switcher model lost fold_options.")
+        AssertTrue(model.abbreviate_options, "The switcher model lost abbreviate_options.")
+        AssertEqual("〔", model.option_list_prefix, "The switcher model lost the option prefix.")
+        AssertEqual("〕", model.option_list_suffix, "The switcher model lost the option suffix.")
+        AssertEqual("／", model.option_list_separator, "The switcher model lost the option separator.")
+        AssertTrue(model.fix_schema_list_order, "The switcher model lost fix_schema_list_order.")
+        AssertEqual(2, model.save_options.Length, "The switcher model loaded the wrong saved options.")
+
+        options := model.GetOptionItems(["schema_b"])
+        AssertEqual(4, options.Length, "The switcher model discovered the wrong number of options.")
+        AssertEqual("ascii_mode", options[1].name, "The switcher model lost a toggle option.")
+        AssertTrue(options[1].reset, "The switcher model lost a reset warning.")
+        AssertEqual("simplification", options[2].name, "The switcher model lost a radio option.")
+        AssertEqual("custom_option", options[4].name, "The switcher model dropped an unknown configured option.")
+        AssertTrue(options[4].custom, "The switcher model did not mark an unknown option as custom.")
         AssertTrue(
-            model.Save(["schema_a"], "F4, Control+grave"),
-            "The switcher model failed to save valid settings."
+            RabbitSwitcherSettingsModel.StringSetsEqual(
+                ["ascii_mode", "custom_option"],
+                ["custom_option", "ascii_mode"]
+            ),
+            "Saved options treated list ordering as a semantic change."
+        )
+
+        values := model.GetCurrentValues()
+        values.schema_ids := ["schema_a"]
+        values.hotkeys := "F4, Control+grave"
+        values.caption := "方案"
+        values.save_options := ["ascii_mode"]
+        values.fold_options := false
+        values.abbreviate_options := false
+        values.option_list_prefix := "["
+        values.option_list_suffix := "]"
+        values.option_list_separator := " | "
+        values.fix_schema_list_order := false
+        AssertTrue(model.Save(values), "The switcher model failed to save valid settings.")
+
+        AssertTrue(HasSwitcherModelCall(calls, "select:schema_a"), "The model did not save schema selection.")
+        AssertTrue(HasSwitcherModelCall(calls, "string:switcher/caption:方案"), "The model did not save caption.")
+        AssertTrue(HasSwitcherModelCall(calls, "bool:switcher/fold_options:0"), "The model did not save folding.")
+        AssertTrue(
+            HasSwitcherModelCall(calls, "reset:switcher/save_options/+"),
+            "The model did not remove the incremental save_options patch."
+        )
+        AssertTrue(
+            HasSwitcherModelCall(calls, 'item:switcher/save_options:["ascii_mode"]'),
+            "The model did not save the full option list."
         )
     } finally {
         model.Dispose()
         model.Dispose()
     }
-
-    AssertEqual(
-        "init,load,available,selected,hotkeys,destroy,destroy,load,select:schema_a," .
-            'yaml:["F4", "Control+grave"],hotkeys_set:switcher/hotkeys:84,config_close,' .
-            "save,settings_destroy",
-        JoinSwitcherModelCalls(calls),
-        "The switcher model did not own or save its Rime settings correctly."
-    )
+    AssertTrue(HasSwitcherModelCall(calls, "settings_destroy"), "The switcher settings leaked.")
 }
 
-JoinSwitcherModelCalls(calls) {
-    local result := ""
+HasSwitcherModelCall(calls, expected) {
     for call in calls {
-        result .= (result ? "," : "") . call
+        if call = expected {
+            return true
+        }
     }
-    return result
+    return false
 }
 
 class RabbitSwitcherSettingsModelProbe extends RabbitSwitcherSettingsModel {
@@ -80,25 +116,22 @@ class RabbitSwitcherModelLeversProbe {
         return true
     }
 
+    settings_get_config(settings) {
+        return "default"
+    }
+
     get_available_schema_list(settings) {
-        this.calls.Push("available")
         return {
             size: 2,
             list: [
-                { id: "schema_a", name: "方案 A", author: "", description: "A" },
-                { id: "schema_b", name: "方案 B", author: "", description: "B" },
+                { id: "schema_a", name: "方案 A", author: "", description: "A", file_path: "a.yaml" },
+                { id: "schema_b", name: "方案 B", author: "", description: "B", file_path: "b.yaml" },
             ],
         }
     }
 
     get_selected_schema_list(settings) {
-        this.calls.Push("selected")
-        return {
-            size: 1,
-            list: [
-                { schema_id: "schema_b", name: "方案 B" },
-            ],
-        }
+        return { size: 1, list: [{ schema_id: "schema_b", name: "方案 B" }] }
     }
 
     schema_list_destroy(list) {
@@ -106,7 +139,6 @@ class RabbitSwitcherModelLeversProbe {
     }
 
     get_hotkeys(settings) {
-        this.calls.Push("hotkeys")
         return "Control+grave"
     }
 
@@ -115,8 +147,18 @@ class RabbitSwitcherModelLeversProbe {
         return true
     }
 
+    customize_string(settings, key, value) {
+        this.calls.Push("string:" . key . ":" . value)
+        return true
+    }
+
+    customize_bool(settings, key, value) {
+        this.calls.Push("bool:" . key . ":" . value)
+        return true
+    }
+
     customize_item(settings, key, value) {
-        this.calls.Push("hotkeys_set:" . key . ":" . value)
+        this.calls.Push((value ? "item:" : "reset:") . key . (value ? ":" . value.yaml : ""))
         return true
     }
 
@@ -135,13 +177,95 @@ class RabbitSwitcherModelRimeProbe {
         this.calls := calls
     }
 
+    config_test_get_string(config, key, &value) {
+        local values := Map(
+            "switcher/caption", "〔方案选单〕",
+            "switcher/option_list_prefix", "〔",
+            "switcher/option_list_suffix", "〕",
+            "switcher/option_list_separator", "／",
+            "switches/@0/name", "ascii_mode"
+        )
+        if config = "schema_b" && values.Has(key) {
+            value := values[key]
+            return true
+        }
+        if config = "default" && values.Has(key) {
+            value := values[key]
+            return true
+        }
+        if config = "default" && key = "switcher/save_options/@0" {
+            value := "ascii_mode"
+            return true
+        }
+        if config = "default" && key = "switcher/save_options/@1" {
+            value := "custom_option"
+            return true
+        }
+        if config = "schema_b" && key = "switches/@1/options/@0" {
+            value := "simplification"
+            return true
+        }
+        if config = "schema_b" && key = "switches/@1/options/@1" {
+            value := "traditionalization"
+            return true
+        }
+        return false
+    }
+
+    config_test_get_bool(config, key, &value) {
+        local values := Map(
+            "switcher/fold_options", true,
+            "switcher/abbreviate_options", true,
+            "switcher/fix_schema_list_order", true
+        )
+        if config = "default" && values.Has(key) {
+            value := values[key]
+            return true
+        }
+        return false
+    }
+
+    config_test_get_int(config, key, &value) {
+        if config = "schema_b" && key = "switches/@0/reset" {
+            value := 0
+            return true
+        }
+        return false
+    }
+
+    config_begin_list(config, path) {
+        local size := 0
+        if config = "default" && path = "switcher/save_options" {
+            size := 2
+        } else if config = "schema_b" && path = "switches" {
+            size := 2
+        } else if config = "schema_b" && path = "switches/@1/options" {
+            size := 2
+        }
+        return size ? { root: path, index: 0, size: size, path: "" } : 0
+    }
+
+    config_next(iter) {
+        if iter.index >= iter.size {
+            return false
+        }
+        iter.path := iter.root . "/@" . iter.index
+        iter.index += 1
+        return true
+    }
+
+    config_end(iter) {
+    }
+
+    schema_open(schema_id) {
+        return schema_id
+    }
+
     config_load_string(yaml) {
-        this.calls.Push("yaml:" . yaml)
-        return 84
+        return { yaml: yaml }
     }
 
     config_close(config) {
-        this.calls.Push("config_close")
         return true
     }
 }
