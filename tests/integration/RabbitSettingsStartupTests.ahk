@@ -25,11 +25,13 @@ RunTest("settings window reaches first show before loading config", TestSettings
 ExitApp()
 
 TestSettingsStartupFirstShow() {
-    static FIRST_SHOW_GOLDEN_MS := 750
-    static INITIAL_CONTROL_GOLDEN := 40
+    ; Native GUI creation varies with desktop load. Treat time as a gross regression guard;
+    ; config ordering and the deterministic control count provide the tighter checks.
+    static FIRST_SHOW_GOLDEN_MS := 1000
+    static INITIAL_CONTROL_GOLDEN := 30
     local calls := []
     local control_count := 0
-    local elapsed, start
+    local construction_elapsed, elapsed, show_elapsed, show_start, start
     local window := 0
     RabbitSettingsStartupPreview.render_count := 0
     start := A_TickCount
@@ -43,11 +45,14 @@ TestSettingsStartupFirstShow() {
         RabbitWindowThemeController,
         true
     )
+    construction_elapsed := A_TickCount - start
     try {
         for hwnd, control in window {
             control_count += 1
         }
+        show_start := A_TickCount
         window.Show("Center")
+        show_elapsed := A_TickCount - show_start
         elapsed := A_TickCount - start
         AssertTrue(
             elapsed <= FIRST_SHOW_GOLDEN_MS,
@@ -64,7 +69,13 @@ TestSettingsStartupFirstShow() {
         AssertEqual(1, RabbitSettingsStartupPreview.render_count,
             "The deferred startup rendered the preview more than once.")
         ExerciseLazySettingsPages(window)
-        FileAppend Format("METRIC: first_show_ms={} initial_controls={}`n", elapsed, control_count), "*"
+        FileAppend Format(
+            "METRIC: first_show_ms={} construction_ms={} show_ms={} initial_controls={}`n",
+            elapsed,
+            construction_elapsed,
+            show_elapsed,
+            control_count
+        ), "*"
     } finally {
         if window {
             window.Dispose()

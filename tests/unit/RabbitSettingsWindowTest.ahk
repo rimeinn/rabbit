@@ -28,6 +28,7 @@ RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActi
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
 RunTest("settings window browses color schemes without changing selection", TestSettingsWindowBrowsesColorSchemes.Bind())
+RunTest("settings window previews the browsed color scheme", TestSettingsWindowPreviewsBrowsedColorScheme.Bind())
 RunTest("settings window stages custom color schemes", TestSettingsWindowStagesCustomColorSchemes.Bind())
 RunTest("settings window restores dark scheme following", TestSettingsWindowRestoresDarkSchemeFollowing.Bind())
 RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
@@ -368,6 +369,28 @@ TestSettingsWindowContainsPreviewFailures() {
         AssertTrue(
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
             "The settings window let an event-driven preview failure escape."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowPreviewsBrowsedColorScheme() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsAppearanceWorkflowProbe(calls),
+        false,
+        RabbitSettingsCapturingAppearancePreview
+    )
+    try {
+        AssertTrue(!window.appearance_typesetting_created,
+            "The regression test unexpectedly created the typesetting controls.")
+        window.appearance_list.Modify(2, "Select Focus")
+        window.OnAppearanceSelectionChange()
+        AssertEqual(
+            0xff202020,
+            RabbitSettingsCapturingAppearancePreview.last_style.back_color,
+            "Browsing a color scheme kept the startup preview colors."
         )
     } finally {
         window.Dispose()
@@ -901,10 +924,22 @@ class RabbitSettingsAppearanceModelProbe {
         return "theme_a"
     }
 
+    GetCurrentStyle() {
+        return RabbitUIStyleSnapshot(0, Map("back_color", 0xff101010))
+    }
+
     GetPresetColorSchemes() {
         return [
-            RabbitColorScheme("theme_a", Map("name", "主题 A", "author", "甲"), "builtin"),
-            RabbitColorScheme("theme_b", Map("name", "主题 B", "author", "乙"), "builtin"),
+            RabbitColorScheme(
+                "theme_a",
+                Map("name", "主题 A", "author", "甲", "color_format", "argb", "back_color", "0xff101010"),
+                "builtin"
+            ),
+            RabbitColorScheme(
+                "theme_b",
+                Map("name", "主题 B", "author", "乙", "color_format", "argb", "back_color", "0xff202020"),
+                "builtin"
+            ),
         ]
     }
 
@@ -1055,15 +1090,18 @@ class RabbitSettingsFailingAppearancePreview {
 
 class RabbitSettingsCapturingAppearancePreview {
     static last_labels := []
+    static last_style := 0
     static render_count := 0
 
     __New(ctrl) {
         RabbitSettingsCapturingAppearancePreview.last_labels := []
+        RabbitSettingsCapturingAppearancePreview.last_style := 0
         RabbitSettingsCapturingAppearancePreview.render_count := 0
     }
 
     Render(style, select_labels := 0) {
         RabbitSettingsCapturingAppearancePreview.render_count += 1
+        RabbitSettingsCapturingAppearancePreview.last_style := style
         RabbitSettingsCapturingAppearancePreview.last_labels := select_labels is Array
             ? select_labels.Clone()
             : []

@@ -42,6 +42,7 @@ RunSettingsWindowPreview() {
         window := RabbitSettingsWindow(RabbitDeployerWorkflow(rime))
         window.Show("Center")
         if A_Args.Length > 0 && A_Args[1] = "ci" {
+            AssertColorSchemeBrowsingPreview(window)
             window.appearance_page.dialog_factory := RabbitSettingsAutoClosingColorSchemeDialog
             window.appearance_page.EditColorScheme(1)
             window.appearance_tabs.Choose(2)
@@ -61,6 +62,32 @@ RunSettingsWindowPreview() {
         }
         rime.finalize()
     }
+}
+
+AssertColorSchemeBrowsingPreview(window) {
+    local field_name := ""
+    local initial_style := window.appearance_page.preview.style
+    local selected_index := 0
+    for index, info in window.appearance_page.presets {
+        for field in RabbitColorScheme.EDITABLE_COLOR_FIELDS {
+            if info.style.%field.key% != initial_style.%field.key% {
+                selected_index := index
+                field_name := field.key
+                break
+            }
+        }
+        if selected_index {
+            break
+        }
+    }
+    AssertTrue(selected_index, "The real settings data has no distinct color scheme for preview testing.")
+    window.appearance_list.Modify(selected_index, "Select Focus")
+    window.OnAppearanceSelectionChange()
+    AssertEqual(
+        window.appearance_page.presets[selected_index].style.%field_name%,
+        window.appearance_page.preview.style.%field_name%,
+        "Browsing the real color scheme list kept the startup preview colors."
+    )
 }
 
 class RabbitSettingsAutoClosingColorSchemeDialog extends RabbitColorSchemeDialog {

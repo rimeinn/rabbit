@@ -626,7 +626,10 @@ class RabbitAppearanceSettingsPage {
                 }
             }
             info := this.presets[index]
-            if !values {
+            ; Preset snapshots already contain the shared typography and layout values. Before the
+            ; typesetting controls exist, GetValues() returns the full startup snapshot, whose colors
+            ; must not override the scheme selected for preview.
+            if !values && owner.appearance_typesetting_created {
                 try values := this.GetValues()
             }
             style := values ? info.style.With(values) : info.style
