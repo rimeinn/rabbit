@@ -348,6 +348,7 @@ class RabbitSettingsWindow extends Gui {
             case 2:
                 this.window_theme.RegisterMuted(
                     this.switcher_schema_help,
+                    this.switcher_order_help,
                     this.switcher_preview,
                     this.switcher_save_help,
                     this.switcher_option_note
@@ -395,25 +396,42 @@ class RabbitSettingsWindow extends Gui {
                 . " Checked NoSort -Multi Hidden",
             ["方案名称"]
         )
-        this.switcher_list.OnEvent("Click", (ctrl, row) => this.ShowSwitcherDetails(row))
-        this.switcher_list.OnEvent("ItemCheck", (*) => this.MarkSwitcherDirty())
+        this.switcher_list.OnEvent(
+            "ItemSelect",
+            (ctrl, row, selected) => selected ? this.OnSwitcherSchemaSelected(row) : 0
+        )
+        this.switcher_list.OnEvent(
+            "ItemCheck",
+            (ctrl, row, checked) => this.OnSwitcherSchemaCheck(row, checked)
+        )
         this.switcher_details := this.AddText(
             "x526 y174 w248 h274 Hidden",
             "选择左侧方案以查看简介。"
         )
+        this.switcher_move_up := this.AddButton("x254 y456 w84 h30 Disabled Hidden", "上移")
+        this.switcher_move_up.OnEvent("Click", (*) => this.MoveSwitcherSchema(-1))
+        this.switcher_move_down := this.AddButton("x348 y456 w84 h30 Disabled Hidden", "下移")
+        this.switcher_move_down.OnEvent("Click", (*) => this.MoveSwitcherSchema(1))
+        this.switcher_order_help := this.AddText(
+            "x448 y460 w326 h24 cGray Hidden",
+            "选中已启用的方案后可调整选单顺序。"
+        )
         this.switcher_fix_order := this.AddCheckbox(
-            "x254 y466 w510 h24 Hidden",
+            "x254 y496 w510 h24 Hidden",
             "启动时始终使用第一个方案"
         )
         this.switcher_fix_order.OnEvent("Click", (*) => this.MarkSwitcherDirty())
         this.switcher_schema_help := this.AddText(
-            "x254 y496 w520 h42 cGray Hidden",
+            "x254 y526 w520 h32 cGray Hidden",
             "关闭时恢复上次使用的方案。"
         )
         this.switcher_schema_controls := [
             this.switcher_list_header,
             this.switcher_list,
             this.switcher_details,
+            this.switcher_move_up,
+            this.switcher_move_down,
+            this.switcher_order_help,
             this.switcher_fix_order,
             this.switcher_schema_help,
         ]
@@ -1951,6 +1969,7 @@ class RabbitSettingsWindow extends Gui {
             if this.switcher_list.GetCount() > 0 {
                 this.switcher_list.Modify(1, "Select Focus")
                 this.ShowSwitcherDetails(1)
+                this.UpdateSwitcherMoveButtons(1)
             }
         } finally {
             this.switcher_loading := false
@@ -2113,6 +2132,100 @@ class RabbitSettingsWindow extends Gui {
             details .= "`r`n`r`n" . item.description
         }
         this.switcher_details.Value := details
+    }
+
+    OnSwitcherSchemaSelected(row) {
+        this.ShowSwitcherDetails(row)
+        this.UpdateSwitcherMoveButtons(row)
+    }
+
+    OnSwitcherSchemaCheck(row, checked) {
+        if this.switcher_loading {
+            return
+        }
+        this.switcher_list.Modify(row, "Select Focus")
+        this.MarkSwitcherDirty()
+        this.UpdateSwitcherMoveButtons(row, checked)
+    }
+
+    GetCheckedSwitcherRows() {
+        local row := 0
+        local rows := []
+        while (row := this.switcher_list.GetNext(row, "Checked")) {
+            rows.Push(row)
+        }
+        return rows
+    }
+
+    UpdateSwitcherMoveButtons(row := 0, checked := -1) {
+        local checked_index, checked_row, insert_at := 0, index := 0
+        local rows := this.GetCheckedSwitcherRows()
+        if !row {
+            row := this.switcher_list.GetNext(0)
+        }
+        if checked = 0 {
+            this.switcher_move_up.Enabled := false
+            this.switcher_move_down.Enabled := false
+            return
+        }
+        if checked < 0 && this.switcher_list.GetNext(Max(0, row - 1), "Checked") != row {
+            this.switcher_move_up.Enabled := false
+            this.switcher_move_down.Enabled := false
+            return
+        }
+        for checked_index, checked_row in rows {
+            if checked_row = row {
+                index := checked_index
+                break
+            }
+        }
+        if !index && checked > 0 {
+            insert_at := rows.Length + 1
+            for checked_index, checked_row in rows {
+                if row < checked_row {
+                    insert_at := checked_index
+                    break
+                }
+            }
+            rows.InsertAt(insert_at, row)
+            for checked_index, checked_row in rows {
+                if checked_row = row {
+                    index := checked_index
+                    break
+                }
+            }
+        }
+        this.switcher_move_up.Enabled := index > 1
+        this.switcher_move_down.Enabled := index > 0 && index < rows.Length
+    }
+
+    MoveSwitcherSchema(direction) {
+        local checked_index, checked_row, current_item, index := 0
+        local row := this.switcher_list.GetNext(0)
+        local rows := this.GetCheckedSwitcherRows()
+        local target_row
+        if !row || (direction != -1 && direction != 1) {
+            return false
+        }
+        for checked_index, checked_row in rows {
+            if checked_row = row {
+                index := checked_index
+                break
+            }
+        }
+        if !index || index + direction < 1 || index + direction > rows.Length {
+            return false
+        }
+        target_row := rows[index + direction]
+        current_item := this.switcher_items[row]
+        this.switcher_items[row] := this.switcher_items[target_row]
+        this.switcher_items[target_row] := current_item
+        this.switcher_list.Modify(row, "", this.switcher_items[row].name)
+        this.switcher_list.Modify(target_row, "Select Focus Vis", this.switcher_items[target_row].name)
+        this.ShowSwitcherDetails(target_row)
+        this.UpdateSwitcherMoveButtons(target_row)
+        this.MarkSwitcherDirty()
+        return true
     }
 
     MarkSwitcherDirty() {

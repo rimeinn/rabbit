@@ -36,6 +36,7 @@ RunTest("settings window contains appearance preview failures", TestSettingsWind
 RunTest("settings window defers its initial appearance preview", TestSettingsWindowDefersInitialPreview.Bind())
 RunTest("settings window previews pending candidate labels", TestSettingsWindowPreviewsPendingLabels.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
+RunTest("settings window reorders selected schemas", TestSettingsWindowReordersSelectedSchemas.Bind())
 RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOptionHeaders.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
@@ -515,6 +516,52 @@ TestSettingsWindowSavesSwitcherSettings() {
         JoinSettingsWorkflowCalls(calls),
         "The switcher page did not save, deploy, and dispose in order."
     )
+}
+
+TestSettingsWindowReordersSelectedSchemas() {
+    local calls := []
+    local schema_ids
+    local window := RabbitSettingsWindow(RabbitSettingsSwitcherWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
+        window.switcher_list.Modify(2, "Check Select Focus")
+        window.UpdateSwitcherMoveButtons(2, 1)
+        AssertTrue(window.switcher_move_up.Enabled, "The second selected schema could not move up.")
+        AssertTrue(window.MoveSwitcherSchema(-1), "The selected schema failed to move up.")
+        schema_ids := window.SelectedSchemaIds()
+        AssertEqual("schema_b", schema_ids[1], "Moving up did not update the first schema.")
+        AssertEqual("schema_a", schema_ids[2], "Moving up did not update the second schema.")
+        AssertTrue(!window.switcher_move_up.Enabled, "The first selected schema could still move up.")
+        AssertTrue(window.switcher_move_down.Enabled, "The first selected schema could not move down.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestDarkSwitcherUsesThemedOptionHeaders() {
+    local calls := []
+    local list_y, name_y
+    local window := RabbitSettingsWindow(
+        RabbitSettingsSwitcherWorkflowProbe(calls),
+        true,
+        RabbitAppearancePreview,
+        0,
+        "input-schemes",
+        false,
+        RabbitSettingsDarkThemeProbe
+    )
+    try {
+        window.switcher_tabs.Choose(2)
+        window.OnSwitcherTabChanged()
+        AssertTrue(window.switcher_option_name_header.Visible, "The dark option-name header stayed hidden.")
+        AssertTrue(window.switcher_option_source_header.Visible, "The dark option-source header stayed hidden.")
+        AssertTrue(window.switcher_option_hint_header.Visible, "The dark option-hint header stayed hidden.")
+        window.switcher_option_name_header.GetPos(, &name_y)
+        window.switcher_save_list.GetPos(, &list_y)
+        AssertEqual(24, list_y - name_y, "The dark option list did not start below its themed header.")
+    } finally {
+        window.Dispose()
+    }
 }
 
 TestSettingsWindowSavesBehaviorSettings() {
@@ -1036,32 +1083,6 @@ class RabbitSettingsColorSchemeDialogProbe {
     }
 
     Dispose() {
-    }
-}
-
-TestDarkSwitcherUsesThemedOptionHeaders() {
-    local calls := []
-    local list_y, name_y
-    local window := RabbitSettingsWindow(
-        RabbitSettingsSwitcherWorkflowProbe(calls),
-        true,
-        RabbitAppearancePreview,
-        0,
-        "input-schemes",
-        false,
-        RabbitSettingsDarkThemeProbe
-    )
-    try {
-        window.switcher_tabs.Choose(2)
-        window.OnSwitcherTabChanged()
-        AssertTrue(window.switcher_option_name_header.Visible, "The dark option-name header stayed hidden.")
-        AssertTrue(window.switcher_option_source_header.Visible, "The dark option-source header stayed hidden.")
-        AssertTrue(window.switcher_option_hint_header.Visible, "The dark option-hint header stayed hidden.")
-        window.switcher_option_name_header.GetPos(, &name_y)
-        window.switcher_save_list.GetPos(, &list_y)
-        AssertEqual(24, list_y - name_y, "The dark option list did not start below its themed header.")
-    } finally {
-        window.Dispose()
     }
 }
 

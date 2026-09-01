@@ -79,6 +79,7 @@ TestSwitcherSettingsModel() {
             HasSwitcherModelCall(calls, 'item:switcher/save_options:["ascii_mode"]'),
             "The model did not save the full option list."
         )
+        AssertEqual("schema_a", model.items[1].id, "The model did not retain the saved schema order.")
     } finally {
         model.Dispose()
         model.Dispose()

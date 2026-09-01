@@ -371,13 +371,27 @@ class RabbitSwitcherSettingsModel {
 
     SetCurrentValues(values) {
         local item, schema_id
+        local items_by_id := Map()
+        local ordered_items := []
         local selected := Map()
+        for item in this.items {
+            items_by_id[item.id] := item
+        }
         for schema_id in values.schema_ids {
             selected[schema_id] := true
+            if items_by_id.Has(schema_id) {
+                item := items_by_id[schema_id]
+                item.selected := true
+                ordered_items.Push(item)
+            }
         }
         for item in this.items {
-            item.selected := selected.Has(item.id)
+            if !selected.Has(item.id) {
+                item.selected := false
+                ordered_items.Push(item)
+            }
         }
+        this.items := ordered_items
         this.hotkeys := values.hotkeys
         this.caption := values.caption
         this.save_options := values.save_options.Clone()
