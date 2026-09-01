@@ -30,6 +30,7 @@ RunTest("settings window exposes appearance controls", TestSettingsWindowExposes
 RunTest("settings window browses color schemes without changing selection", TestSettingsWindowBrowsesColorSchemes.Bind())
 RunTest("settings window previews the browsed color scheme", TestSettingsWindowPreviewsBrowsedColorScheme.Bind())
 RunTest("settings window stages custom color schemes", TestSettingsWindowStagesCustomColorSchemes.Bind())
+RunTest("color scheme dialog previews pending typesetting", TestColorSchemeDialogPreviewsPendingTypesetting.Bind())
 RunTest("settings window restores dark scheme following", TestSettingsWindowRestoresDarkSchemeFollowing.Bind())
 RunTest("settings window contains appearance preview failures", TestSettingsWindowContainsPreviewFailures.Bind())
 RunTest("settings window defers its initial appearance preview", TestSettingsWindowDefersInitialPreview.Bind())
@@ -382,6 +383,26 @@ TestSettingsWindowContainsPreviewFailures() {
         AssertTrue(
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
             "The settings window let an event-driven preview failure escape."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestColorSchemeDialogPreviewsPendingTypesetting() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
+    try {
+        window.appearance_tabs.Choose(2)
+        window.OnAppearanceTabChanged()
+        window.appearance_floating_preedit.Value := true
+        window.OnAppearanceControlsChanged()
+        RabbitSettingsCancelingColorSchemeDialogProbe.last_preview_style_overrides := 0
+        window.appearance_page.dialog_factory := RabbitSettingsCancelingColorSchemeDialogProbe
+        AssertTrue(!window.appearance_page.EditColorScheme(), "The canceling color scheme dialog returned a result.")
+        AssertTrue(
+            RabbitSettingsCancelingColorSchemeDialogProbe.last_preview_style_overrides["floating_preedit"],
+            "The color scheme dialog did not receive the pending floating preedit mode."
         )
     } finally {
         window.Dispose()
@@ -991,13 +1012,28 @@ class RabbitSettingsAppearanceModelProbe {
 class RabbitSettingsColorSchemeDialogProbe {
     static last_color_scheme := 0
 
-    __New(owner, color_scheme, mode, preview, labels, id_validator, dark_mode_reader) {
+    __New(owner, color_scheme, mode, preview, labels, preview_style_overrides, id_validator, dark_mode_reader) {
         RabbitSettingsColorSchemeDialogProbe.last_color_scheme := color_scheme
         this.result := color_scheme
     }
 
     ShowModal() {
         return this.result
+    }
+
+    Dispose() {
+    }
+}
+
+class RabbitSettingsCancelingColorSchemeDialogProbe {
+    static last_preview_style_overrides := 0
+
+    __New(owner, color_scheme, mode, preview, labels, preview_style_overrides, id_validator, dark_mode_reader) {
+        RabbitSettingsCancelingColorSchemeDialogProbe.last_preview_style_overrides := preview_style_overrides
+    }
+
+    ShowModal() {
+        return 0
     }
 
     Dispose() {

@@ -41,6 +41,7 @@ TestColorSchemeDialogEditsArgb() {
         0,
         [],
         0,
+        0,
         (*) => false,
         RabbitColorSchemeDialogThemeProbe
     )
@@ -74,6 +75,7 @@ TestColorSchemeDialogCopiesArgb() {
         "copy",
         0,
         [],
+        0,
         (*) => true,
         (*) => false,
         RabbitColorSchemeDialogThemeProbe
@@ -90,6 +92,7 @@ TestColorSchemeDialogCopiesArgb() {
 }
 
 TestColorSchemeDialogAttachesPreview() {
+    local close_callback
     local owner := Gui()
     local preview := RabbitColorSchemeDialogPreviewProbe()
     local dialog := RabbitColorSchemeDialog(
@@ -98,17 +101,21 @@ TestColorSchemeDialogAttachesPreview() {
         "edit",
         preview,
         ["一"],
+        Map("floating_preedit", true),
         0,
         (*) => false,
         RabbitColorSchemeDialogThemeProbe
     )
     try {
-        SetTimer((*) => dialog.Dispose(), -200)
-        dialog.ShowModal()
+        close_callback := (*) => preview.render_count ? dialog.Dispose() : 0
+        SetTimer(close_callback, 10)
+        try dialog.ShowModal()
+        finally SetTimer(close_callback, 0)
         AssertEqual(2, preview.owners.Length, "The dialog did not attach and restore the preview owner.")
         AssertTrue(preview.owners[1] = dialog, "The preview was not attached to the editor window.")
         AssertTrue(preview.owners[2] = owner, "The preview owner was not restored after editing.")
         AssertTrue(preview.render_count > 0, "The editor did not render the real preview.")
+        AssertTrue(preview.last_style.floating_preedit, "The editor preview ignored pending typesetting values.")
     } finally {
         dialog.Dispose()
         owner.Destroy()
@@ -123,6 +130,7 @@ TestColorSchemeDialogPreparesDarkMode() {
         "view",
         0,
         [],
+        0,
         0,
         (*) => true,
         RabbitColorSchemeDialogDarkThemeProbe
@@ -147,6 +155,7 @@ TestColorSchemeDialogPreparesDarkMode() {
 class RabbitColorSchemeDialogPreviewProbe {
     owners := []
     render_count := 0
+    last_style := 0
 
     SetOwner(owner) {
         this.owners.Push(owner)
@@ -154,6 +163,7 @@ class RabbitColorSchemeDialogPreviewProbe {
 
     Render(style, labels) {
         this.render_count += 1
+        this.last_style := style
         return true
     }
 }

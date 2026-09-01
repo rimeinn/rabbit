@@ -26,6 +26,7 @@ class RabbitColorSchemeDialog extends Gui {
         mode := "edit",
         preview := 0,
         select_labels := 0,
+        preview_style_overrides := 0,
         id_validator := 0,
         dark_mode_reader := RabbitIsUserDarkMode,
         theme_factory := RabbitWindowThemeController
@@ -45,6 +46,7 @@ class RabbitColorSchemeDialog extends Gui {
         this.mode := mode
         this.preview := preview
         this.select_labels := select_labels is Array ? select_labels.Clone() : []
+        this.preview_style_overrides := preview_style_overrides
         this.id_validator := id_validator
         this.colors := color_scheme.GetEditableColors()
         this.color_controls := Map()
@@ -175,7 +177,10 @@ class RabbitColorSchemeDialog extends Gui {
             return false
         }
         try {
-            this.preview.Render(this.color_scheme.BuildPreviewStyle(0, this.colors), this.select_labels)
+            this.preview.Render(
+                this.color_scheme.BuildPreviewStyle(this.preview_style_overrides, this.colors),
+                this.select_labels
+            )
             return true
         } catch as err {
             this.status.Value := "无法显示预览：" . err.Message

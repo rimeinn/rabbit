@@ -119,13 +119,19 @@ TestColorSchemePreviewCombinesStyleAndColors() {
     ))
     local scheme := RabbitColorScheme.CreateDefault("new_scheme", "New Scheme", "", base_style)
     local preview_style := scheme.BuildPreviewStyle(
-        Map("font_point", 27),
-        Map("back_color", 0xff654321)
+        Map("font_point", 27, "floating_preedit", true),
+        Map("back_color", 0xff654321, "hilited_back_color", 0xff112233)
     )
     AssertEqual("Preview Font", preview_style.font_face, "The preview did not inherit the shared font.")
     AssertEqual(27, preview_style.font_point, "The preview did not apply the pending font size.")
     AssertEqual(420, preview_style.min_width, "The preview did not inherit the shared minimum width.")
     AssertEqual(0xff654321, preview_style.back_color, "The preview did not apply the edited color.")
+    AssertTrue(preview_style.floating_preedit, "The preview did not apply the pending floating preedit mode.")
+    AssertEqual(
+        0xff112233,
+        preview_style.floating_preedit_hilited_back_color,
+        "The floating preedit preview did not use the edited highlighted background."
+    )
 }
 
 TestColorSchemeValidatesInput() {

@@ -68,8 +68,13 @@ class RabbitColorScheme {
     }
 
     BuildPreviewStyle(style_overrides := 0, color_overrides := 0) {
+        local normalized_colors := color_overrides
         local style := style_overrides ? this.style.With(style_overrides) : this.style
-        return color_overrides ? style.With(color_overrides) : style
+        if color_overrides is Map && color_overrides.Has("hilited_back_color") {
+            normalized_colors := RabbitColorScheme.CloneValue(color_overrides)
+            normalized_colors["floating_preedit_hilited_back_color"] := color_overrides["hilited_back_color"]
+        }
+        return normalized_colors ? style.With(normalized_colors) : style
     }
 
     CopyAs(color_scheme_id, name, author := "") {

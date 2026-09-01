@@ -430,14 +430,16 @@ class RabbitAppearanceSettingsPage {
     }
 
     ShowColorSchemeDialog(color_scheme, mode, replace_index := 0) {
-        local dialog, factory, result
+        local dialog, factory, preview_style_overrides, result
         factory := this.dialog_factory
+        preview_style_overrides := this.GetPreviewStyleValues()
         dialog := factory(
             this.owner,
             color_scheme,
             mode,
             this.preview,
             this.owner.GetAppearancePreviewLabels(),
+            preview_style_overrides,
             mode = "new" || mode = "copy" ? this.IsColorSchemeIdAvailable.Bind(this) : 0,
             this.owner.window_theme.dark_mode_reader
         )
