@@ -86,7 +86,7 @@ style:
     min_height: 160
     # 横向流式布局展开后显示的候选页数，取值范围为 1 到 9
     flow_rows: 5
-    # 横向流式布局中文字的垂直对齐方式：top、center 或 bottom
+    # 纵向堆叠及横向流式布局中文字的垂直对齐方式：top、center 或 bottom
     align_type: top
 
 # 以下预设配色方案复制自 weasel.yaml

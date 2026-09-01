@@ -511,7 +511,7 @@ class RabbitAppearanceSettingsPage {
         local vertical := owner.appearance_layout_type.Value = 3
         local stacked := !flow && !vertical
         local floating := !!owner.appearance_floating_preedit.Value
-        owner.appearance_align_type.Enabled := flow
+        owner.appearance_align_type.Enabled := !vertical
         owner.appearance_flow_rows.Enabled := flow
         owner.appearance_vertical_direction.Enabled := vertical
         owner.appearance_min_width_label.Enabled := stacked

@@ -250,6 +250,7 @@ TestSettingsWindowExposesAppearanceControls() {
             "The vertical candidate padding control is missing.")
         AssertEqual("候选间距：", window.appearance_candidate_spacing_label.Text,
             "The candidate spacing control is missing.")
+        AssertTrue(window.appearance_align_type.Enabled, "Stacked layout did not enable alignment.")
         AssertTrue(window.appearance_min_width.Enabled, "Stacked layout did not enable its minimum width.")
         AssertTrue(!window.appearance_min_height.Enabled, "Stacked layout enabled vertical text minimum height.")
 
@@ -266,6 +267,7 @@ TestSettingsWindowExposesAppearanceControls() {
 
         window.appearance_layout_type.Choose(3)
         window.OnAppearanceControlsChanged()
+        AssertTrue(!window.appearance_align_type.Enabled, "Vertical text layout enabled alignment.")
         AssertTrue(!window.appearance_min_width.Enabled, "Vertical text layout enabled stacked minimum width.")
         AssertTrue(window.appearance_min_height.Enabled, "Vertical text layout did not enable its minimum height.")
 

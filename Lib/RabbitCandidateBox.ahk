@@ -281,21 +281,33 @@ class CandidateBox {
             }
             this.candidatesLayout.labels.Push({
                 x: base_x + this.candidatePaddingX,
-                y: base_y + this.candidatePaddingY,
+                y: this.AlignCandidateText(
+                    base_y + this.candidatePaddingY,
+                    text_height,
+                    label_box.h
+                ),
                 w: label_box.w,
                 h: label_box.h,
                 text: candidate.label
             })
             this.candidatesLayout.cands.Push({
                 x: base_x + this.candidatePaddingX + label_box.w,
-                y: base_y + this.candidatePaddingY,
+                y: this.AlignCandidateText(
+                    base_y + this.candidatePaddingY,
+                    text_height,
+                    candidate_box.h
+                ),
                 w: candidate_box.w,
                 h: candidate_box.h,
                 text: candidate.text
             })
             this.candidatesLayout.comments.Push({
                 x: base_x + this.candidatePaddingX + label_box.w + candidate_box.w,
-                y: base_y + this.candidatePaddingY,
+                y: this.AlignCandidateText(
+                    base_y + this.candidatePaddingY,
+                    text_height,
+                    comment_box.h
+                ),
                 w: comment_box.w,
                 h: comment_box.h,
                 text: candidate.comment
@@ -669,21 +681,21 @@ class CandidateBox {
             local comment_x := candidate_x + card_info.candidate_box.w
             this.candidatesLayout.labels.Push({
                 x: text_x,
-                y: this.AlignFlowText(text_y, text_height, card_info.label_box.h),
+                y: this.AlignCandidateText(text_y, text_height, card_info.label_box.h),
                 w: card_info.label_box.w,
                 h: card_info.label_box.h,
                 text: candidate.label
             })
             this.candidatesLayout.cands.Push({
                 x: candidate_x,
-                y: this.AlignFlowText(text_y, text_height, card_info.candidate_box.h),
+                y: this.AlignCandidateText(text_y, text_height, card_info.candidate_box.h),
                 w: card_info.candidate_box.w,
                 h: card_info.candidate_box.h,
                 text: candidate.text
             })
             this.candidatesLayout.comments.Push({
                 x: comment_x,
-                y: this.AlignFlowText(text_y, text_height, card_info.comment_box.h),
+                y: this.AlignCandidateText(text_y, text_height, card_info.comment_box.h),
                 w: card_info.comment_box.w,
                 h: card_info.comment_box.h,
                 text: candidate.comment
@@ -701,7 +713,7 @@ class CandidateBox {
         this.built := true
     }
 
-    AlignFlowText(row_y, row_height, text_height) {
+    AlignCandidateText(row_y, row_height, text_height) {
         if this.alignType = "center" {
             return row_y + (row_height - text_height) / 2
         }

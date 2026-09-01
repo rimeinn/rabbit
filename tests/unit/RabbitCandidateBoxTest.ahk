@@ -88,6 +88,7 @@ RunTest(
     "modern candidate geometry separates margins padding and spacing",
     TestModernCandidateGeometry.Bind(candidate_style)
 )
+RunTest("modern candidate text alignment", TestModernCandidateTextAlignment.Bind(candidate_style))
 RunTest("modern candidate rows use candidate background colors", TestModernCandidateBackgroundColors.Bind(candidate_style))
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
@@ -282,6 +283,52 @@ TestModernCandidateGeometry(style) {
         )
     } finally {
         candidate_box.Dispose()
+    }
+}
+
+TestModernCandidateTextAlignment(style) {
+    local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
+    local width, height, candidate_box, row, text_layout, content_y, content_height, expected_y
+    presentation.flow_page_size := 2
+    for layout_type in ["stacked", "flow"] {
+        for align_type in ["top", "center", "bottom"] {
+            candidate_box := CandidateBox(style.With(Map(
+                "layout_type", layout_type,
+                "align_type", align_type,
+                "font_point", 24,
+                "label_font_point", 12,
+                "comment_font_point", 8,
+                "candidate_padding_y", 4
+            )), RabbitTextMetricsProbe)
+            try {
+                candidate_box.BuildPresentation(presentation, &width, &height, 400)
+                row := candidate_box.candidatesLayout.rows[1]
+                content_y := row.y + candidate_box.candidatePaddingY
+                content_height := row.h - candidate_box.candidatePaddingY * 2
+                for text_layout in [
+                    candidate_box.candidatesLayout.labels[1],
+                    candidate_box.candidatesLayout.cands[1],
+                    candidate_box.candidatesLayout.comments[1]
+                ] {
+                    expected_y := content_y
+                    if align_type = "center" {
+                        expected_y += (content_height - text_layout.h) / 2
+                    } else if align_type = "bottom" {
+                        expected_y += content_height - text_layout.h
+                    }
+                    AssertTrue(
+                        Abs(expected_y - text_layout.y) < 0.001,
+                        Format(
+                            "{} layout did not apply {} candidate text alignment.",
+                            layout_type,
+                            align_type
+                        )
+                    )
+                }
+            } finally {
+                candidate_box.Dispose()
+            }
+        }
     }
 }
 
