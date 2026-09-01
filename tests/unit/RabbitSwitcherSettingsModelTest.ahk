@@ -43,7 +43,6 @@ TestSwitcherSettingsModel() {
         options := model.GetOptionItems(["schema_b"])
         AssertEqual(4, options.Length, "The switcher model discovered the wrong number of options.")
         AssertEqual("ascii_mode", options[1].name, "The switcher model lost a toggle option.")
-        AssertTrue(options[1].reset, "The switcher model lost a reset warning.")
         AssertEqual("simplification", options[2].name, "The switcher model lost a radio option.")
         AssertEqual("custom_option", options[4].name, "The switcher model dropped an unknown configured option.")
         AssertTrue(options[4].custom, "The switcher model did not mark an unknown option as custom.")
@@ -221,14 +220,6 @@ class RabbitSwitcherModelRimeProbe {
         )
         if config = "default" && values.Has(key) {
             value := values[key]
-            return true
-        }
-        return false
-    }
-
-    config_test_get_int(config, key, &value) {
-        if config = "schema_b" && key = "switches/@0/reset" {
-            value := 0
             return true
         }
         return false

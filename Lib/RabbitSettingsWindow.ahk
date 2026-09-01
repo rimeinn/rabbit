@@ -356,8 +356,7 @@ class RabbitSettingsWindow extends Gui {
                 this.window_theme.RegisterSurface(this.switcher_list_header)
                 this.window_theme.RegisterSurface(
                     this.switcher_option_name_header,
-                    this.switcher_option_source_header,
-                    this.switcher_option_hint_header
+                    this.switcher_option_source_header
                 )
             case 3:
                 this.window_theme.RegisterMuted(this.menu_help, this.binding_help)
@@ -462,24 +461,20 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_save_group := this.AddGroupBox("x246 y326 w538 h228 Hidden", "记忆选项")
         this.switcher_save_help := this.AddText(
             "x260 y348 w510 h38 cGray Hidden",
-            "勾选需要记忆状态的选项。方案设置的初始状态可能覆盖记忆值。"
+            "勾选需要记忆状态的选项。"
         )
         this.switcher_save_list := this.AddListView(
             (this.initial_dark_mode ? "x260 y408 w510 h92 -Hdr" : "x260 y384 w510 h116")
                 . " Checked NoSort -Multi Hidden",
-            ["选项标识", "来源", "提示"]
+            ["选项标识", "来源"]
         )
         this.switcher_option_name_header := this.AddText(
-            "x260 y384 w172 h24 +0x200 Hidden" . surface_options,
+            "x260 y384 w232 h24 +0x200 Hidden" . surface_options,
             "  选项标识"
         )
         this.switcher_option_source_header := this.AddText(
-            "x432 y384 w150 h24 +0x200 Hidden" . surface_options,
+            "x492 y384 w278 h24 +0x200 Hidden" . surface_options,
             "  来源"
-        )
-        this.switcher_option_hint_header := this.AddText(
-            "x582 y384 w188 h24 +0x200 Hidden" . surface_options,
-            "  提示"
         )
         this.switcher_save_list.OnEvent(
             "ItemCheck",
@@ -518,8 +513,7 @@ class RabbitSettingsWindow extends Gui {
             this.switcher_menu_controls.InsertAt(
                 1,
                 this.switcher_option_name_header,
-                this.switcher_option_source_header,
-                this.switcher_option_hint_header
+                this.switcher_option_source_header
             )
         }
         this.switcher_tabs.UseTab()
@@ -2008,7 +2002,6 @@ class RabbitSettingsWindow extends Gui {
                     visible_items.Push({
                         name: option_name,
                         source: "自定义",
-                        reset: false,
                         custom: true,
                         selected: this.switcher_option_selection.Has(option_name)
                             && this.switcher_option_selection[option_name],
@@ -2023,14 +2016,12 @@ class RabbitSettingsWindow extends Gui {
                     this.switcher_option_selection.Has(item.name)
                         && this.switcher_option_selection[item.name] ? "Check" : "",
                     item.name,
-                    item.source,
-                    item.reset ? "初始状态可能覆盖记忆值" : ""
+                    item.source
                 )
                 this.switcher_option_items[row] := item
             }
-            this.switcher_save_list.ModifyCol(1, 172)
-            this.switcher_save_list.ModifyCol(2, 150)
-            this.switcher_save_list.ModifyCol(3, 166)
+            this.switcher_save_list.ModifyCol(1, 232)
+            this.switcher_save_list.ModifyCol(2, 250)
         } finally {
             this.switcher_loading := was_loading
         }

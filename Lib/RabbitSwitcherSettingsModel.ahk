@@ -214,7 +214,6 @@ class RabbitSwitcherSettingsModel {
                 item := {
                     name: option_name,
                     source: "当前配置",
-                    reset: false,
                     custom: true,
                     selected: true,
                 }
@@ -230,7 +229,7 @@ class RabbitSwitcherSettingsModel {
 
     DiscoverSchemaOptions(schema_id, schema_name, discovered, result) {
         local config := 0
-        local iter, name, options, reset
+        local iter, name, options
         try {
             if !(config := this.rime.schema_open(schema_id)) {
                 return
@@ -240,14 +239,13 @@ class RabbitSwitcherSettingsModel {
             }
             try {
                 while this.rime.config_next(iter) {
-                    reset := this.HasReset(config, iter.path)
                     if this.rime.config_test_get_string(config, iter.path . "/name", &name) {
-                        this.AddDiscoveredOption(name, schema_name, reset, discovered, result)
+                        this.AddDiscoveredOption(name, schema_name, discovered, result)
                         continue
                     }
                     options := this.ReadStringList(config, iter.path . "/options")
                     for name in options {
-                        this.AddDiscoveredOption(name, schema_name, reset, discovered, result)
+                        this.AddDiscoveredOption(name, schema_name, discovered, result)
                     }
                 }
             } finally {
@@ -260,13 +258,7 @@ class RabbitSwitcherSettingsModel {
         }
     }
 
-    HasReset(config, path) {
-        local value
-        return this.rime.config_test_get_int(config, path . "/reset", &value)
-            || this.rime.config_test_get_bool(config, path . "/reset", &value)
-    }
-
-    AddDiscoveredOption(name, schema_name, reset, discovered, result) {
+    AddDiscoveredOption(name, schema_name, discovered, result) {
         local item
         if !name {
             return
@@ -276,13 +268,11 @@ class RabbitSwitcherSettingsModel {
             if !InStr("、" . item.source . "、", "、" . schema_name . "、") {
                 item.source .= "、" . schema_name
             }
-            item.reset := item.reset || reset
             return
         }
         item := {
             name: name,
             source: schema_name,
-            reset: !!reset,
             custom: false,
             selected: false,
         }

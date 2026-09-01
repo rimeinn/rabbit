@@ -555,7 +555,6 @@ TestDarkSwitcherUsesThemedOptionHeaders() {
         window.OnSwitcherTabChanged()
         AssertTrue(window.switcher_option_name_header.Visible, "The dark option-name header stayed hidden.")
         AssertTrue(window.switcher_option_source_header.Visible, "The dark option-source header stayed hidden.")
-        AssertTrue(window.switcher_option_hint_header.Visible, "The dark option-hint header stayed hidden.")
         window.switcher_option_name_header.GetPos(, &name_y)
         window.switcher_save_list.GetPos(, &list_y)
         AssertEqual(24, list_y - name_y, "The dark option list did not start below its themed header.")
@@ -1255,7 +1254,6 @@ class RabbitSettingsSwitcherModelProbe {
         return [{
             name: "full_shape",
             source: "方案 A",
-            reset: false,
             custom: false,
             selected: true,
         }]
