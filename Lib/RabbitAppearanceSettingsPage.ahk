@@ -371,7 +371,9 @@ class RabbitAppearanceSettingsPage {
 
     AddColorScheme() {
         local color_scheme_id := this.SuggestColorSchemeId("custom")
-        local draft := RabbitColorScheme.CreateDefault(color_scheme_id, "新配色")
+        local style_values := this.GetPreviewStyleValues()
+        local base_style := style_values ? this.style.With(style_values) : this.style
+        local draft := RabbitColorScheme.CreateDefault(color_scheme_id, "新配色", "", base_style)
         return this.ShowColorSchemeDialog(draft, "new")
     }
 
@@ -608,6 +610,13 @@ class RabbitAppearanceSettingsPage {
         return 0
     }
 
+    GetPreviewStyleValues(values := 0) {
+        if !values && this.owner.appearance_typesetting_created {
+            try values := this.GetValues()
+        }
+        return values
+    }
+
     RenderPreview(values := 0) {
         local owner := this.owner
         local index, info, selected_id, style
@@ -629,10 +638,8 @@ class RabbitAppearanceSettingsPage {
             ; Preset snapshots already contain the shared typography and layout values. Before the
             ; typesetting controls exist, GetValues() returns the full startup snapshot, whose colors
             ; must not override the scheme selected for preview.
-            if !values && owner.appearance_typesetting_created {
-                try values := this.GetValues()
-            }
-            style := values ? info.style.With(values) : info.style
+            values := this.GetPreviewStyleValues(values)
+            style := info.BuildPreviewStyle(values)
             this.preview.Render(style, owner.GetAppearancePreviewLabels())
             if InStr(owner.appearance_status.Value, "无法显示预览：") = 1 {
                 owner.appearance_status.Value := ""

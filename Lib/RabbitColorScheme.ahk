@@ -67,6 +67,11 @@ class RabbitColorScheme {
         return RabbitColorScheme(this.color_scheme_id, values, this.origin, this.style)
     }
 
+    BuildPreviewStyle(style_overrides := 0, color_overrides := 0) {
+        local style := style_overrides ? this.style.With(style_overrides) : this.style
+        return color_overrides ? style.With(color_overrides) : style
+    }
+
     CopyAs(color_scheme_id, name, author := "") {
         local argb, key
         RabbitColorScheme.ValidateId(color_scheme_id)
@@ -89,7 +94,7 @@ class RabbitColorScheme {
         return RabbitColorScheme(color_scheme_id, values, "custom", this.style)
     }
 
-    static CreateDefault(color_scheme_id, name, author := "") {
+    static CreateDefault(color_scheme_id, name, author := "", base_style := 0) {
         this.ValidateId(color_scheme_id)
         local defaults := RabbitUIStyleSnapshot()
         local values := Map(
@@ -102,7 +107,7 @@ class RabbitColorScheme {
         for field in this.EDITABLE_COLOR_FIELDS {
             values[field.key] := this.FormatConfigColor(defaults.%field.key%, "argb")
         }
-        return RabbitColorScheme(color_scheme_id, values, "custom", defaults)
+        return RabbitColorScheme(color_scheme_id, values, "custom", base_style ? base_style : defaults)
     }
 
     GetColorFormat() {

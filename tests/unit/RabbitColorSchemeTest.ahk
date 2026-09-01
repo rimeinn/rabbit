@@ -22,6 +22,7 @@ RunTest("color scheme converts formats through ARGB", TestColorSchemeConvertsFor
 RunTest("color scheme makes numeric RGB colors opaque", TestColorSchemeMakesNumericRgbOpaque.Bind())
 RunTest("color scheme preserves existing fields", TestColorSchemePreservesExistingFields.Bind())
 RunTest("color scheme copies as standard ARGB", TestColorSchemeCopiesAsArgb.Bind())
+RunTest("color scheme preview combines shared style and colors", TestColorSchemePreviewCombinesStyleAndColors.Bind())
 RunTest("color scheme validates identifiers and ARGB text", TestColorSchemeValidatesInput.Bind())
 
 TestColorSchemeConvertsFormats() {
@@ -107,6 +108,24 @@ TestColorSchemeCopiesAsArgb() {
     AssertEqual("0xff402010", copied.values["back_color"], "The copied numeric RGB color was not opaque.")
     AssertEqual("0xff010203", copied.values["shadow_color"], "An extension color was not converted.")
     AssertEqual("kept", copied.values["extension"], "Copying dropped an unknown field.")
+}
+
+TestColorSchemePreviewCombinesStyleAndColors() {
+    local base_style := RabbitUIStyleSnapshot(0, Map(
+        "font_face", "Preview Font",
+        "font_point", 23,
+        "min_width", 420,
+        "back_color", 0xff123456
+    ))
+    local scheme := RabbitColorScheme.CreateDefault("new_scheme", "New Scheme", "", base_style)
+    local preview_style := scheme.BuildPreviewStyle(
+        Map("font_point", 27),
+        Map("back_color", 0xff654321)
+    )
+    AssertEqual("Preview Font", preview_style.font_face, "The preview did not inherit the shared font.")
+    AssertEqual(27, preview_style.font_point, "The preview did not apply the pending font size.")
+    AssertEqual(420, preview_style.min_width, "The preview did not inherit the shared minimum width.")
+    AssertEqual(0xff654321, preview_style.back_color, "The preview did not apply the edited color.")
 }
 
 TestColorSchemeValidatesInput() {

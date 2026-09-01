@@ -318,8 +318,19 @@ TestSettingsWindowStagesCustomColorSchemes() {
     local calls := []
     local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
     try {
+        RabbitSettingsColorSchemeDialogProbe.last_color_scheme := 0
         window.appearance_page.dialog_factory := RabbitSettingsColorSchemeDialogProbe
         AssertTrue(window.appearance_page.AddColorScheme(), "The appearance page rejected a new scheme.")
+        AssertEqual(
+            window.appearance_page.style.font_face,
+            RabbitSettingsColorSchemeDialogProbe.last_color_scheme.style.font_face,
+            "The new scheme preview did not inherit the active font."
+        )
+        AssertEqual(
+            window.appearance_page.style.min_width,
+            RabbitSettingsColorSchemeDialogProbe.last_color_scheme.style.min_width,
+            "The new scheme preview did not inherit the active candidate width."
+        )
         AssertEqual(3, window.appearance_page.presets.Length, "The new scheme was not added to the catalog.")
         AssertTrue(
             InStr(JoinSettingsWorkflowCalls(calls), "upsert:custom"),
@@ -927,7 +938,12 @@ class RabbitSettingsAppearanceModelProbe {
     }
 
     GetCurrentStyle() {
-        return RabbitUIStyleSnapshot(0, Map("back_color", 0xff101010))
+        return RabbitUIStyleSnapshot(0, Map(
+            "font_face", "Current Preview Font",
+            "font_point", 23,
+            "min_width", 420,
+            "back_color", 0xff101010
+        ))
     }
 
     GetPresetColorSchemes() {
@@ -973,7 +989,10 @@ class RabbitSettingsAppearanceModelProbe {
 }
 
 class RabbitSettingsColorSchemeDialogProbe {
+    static last_color_scheme := 0
+
     __New(owner, color_scheme, mode, preview, labels, id_validator, dark_mode_reader) {
+        RabbitSettingsColorSchemeDialogProbe.last_color_scheme := color_scheme
         this.result := color_scheme
     }
 

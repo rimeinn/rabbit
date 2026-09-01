@@ -175,7 +175,7 @@ class RabbitColorSchemeDialog extends Gui {
             return false
         }
         try {
-            this.preview.Render(this.color_scheme.style.With(this.colors), this.select_labels)
+            this.preview.Render(this.color_scheme.BuildPreviewStyle(0, this.colors), this.select_labels)
             return true
         } catch as err {
             this.status.Value := "无法显示预览：" . err.Message
