@@ -268,6 +268,9 @@ class RabbitApplication {
             OnMessage(AHK_NOTIFYICON, this.tray_click_callback, 0)
             this.tray_message_registered := false
         }
+        if this.tray && HasMethod(this.tray, "Dispose") {
+            this.tray.Dispose()
+        }
         this.context.Dispose()
     }
 }

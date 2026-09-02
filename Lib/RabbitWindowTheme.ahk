@@ -24,6 +24,7 @@ class RabbitWindowThemeController {
     static DARK_TEXT := "F0F0F0"
     static DARK_MUTED_TEXT := "A0A0A0"
     static DARK_ERROR_TEXT := "FF8080"
+    static LIGHT_LINK_TEXT := "0067C0"
     static DARK_LINK_TEXT := "4CC2FF"
 
     static Prepare() {
@@ -43,6 +44,7 @@ class RabbitWindowThemeController {
         this.registered := false
         this.list_brush := 0
         this.command_callback := this.OnCommand.Bind(this)
+        this.static_color_callback := this.OnCtlColorStatic.Bind(this)
         this.list_color_callback := this.OnCtlColorListBox.Bind(this)
     }
 
@@ -64,12 +66,19 @@ class RabbitWindowThemeController {
         }
     }
 
+    RegisterLink(controls*) {
+        for control in controls {
+            this.roles[control.Hwnd] := "link"
+        }
+    }
+
     Register() {
         if this.registered {
             return
         }
         ; Keep one theme for the window lifetime; reopening follows a later system theme change.
         OnMessage(WM_COMMAND, this.command_callback)
+        OnMessage(WM_CTLCOLORSTATIC, this.static_color_callback)
         OnMessage(WM_CTLCOLORLISTBOX, this.list_color_callback)
         this.registered := true
         this.Apply()
@@ -78,6 +87,7 @@ class RabbitWindowThemeController {
     Dispose() {
         if this.registered {
             OnMessage(WM_COMMAND, this.command_callback, 0)
+            OnMessage(WM_CTLCOLORSTATIC, this.static_color_callback, 0)
             OnMessage(WM_CTLCOLORLISTBOX, this.list_color_callback, 0)
         }
         if this.list_brush {
@@ -108,6 +118,18 @@ class RabbitWindowThemeController {
         return this.list_brush
     }
 
+    OnCtlColorStatic(w_param, l_param, msg, hwnd) {
+        if hwnd != this.window.Hwnd || this.roles.Get(l_param, "") != "link" {
+            return
+        }
+        this.native.SetLinkColors(
+            w_param,
+            this.dark_mode
+                ? 0x00FFC24C
+                : 0x00C06700
+        )
+    }
+
     Apply() {
         local control, hwnd
         this.dark_mode := !!this.dark_mode_reader.Call()
@@ -129,8 +151,11 @@ class RabbitWindowThemeController {
     ApplyControl(control, dark_mode) {
         local background, color, role := this.roles.Get(control.Hwnd, "normal")
         color := this.ControlTextColor(control.Type, role, dark_mode)
+        if role = "link" {
+            this.native.SetLinkDefaultColors(control.Hwnd)
+        }
         if !dark_mode {
-            if role = "muted" || role = "error" {
+            if role = "muted" || role = "error" || role = "link" {
                 control.SetFont("c" . color)
             }
             return
@@ -158,6 +183,8 @@ class RabbitWindowThemeController {
                     return "Gray"
                 case "error":
                     return "Red"
+                case "link":
+                    return RabbitWindowThemeController.LIGHT_LINK_TEXT
                 default:
                     return "Default"
             }
@@ -167,10 +194,10 @@ class RabbitWindowThemeController {
                 return RabbitWindowThemeController.DARK_MUTED_TEXT
             case "error":
                 return RabbitWindowThemeController.DARK_ERROR_TEXT
+            case "link":
+                return RabbitWindowThemeController.DARK_LINK_TEXT
             default:
-                return control_type = "Link"
-                    ? RabbitWindowThemeController.DARK_LINK_TEXT
-                    : RabbitWindowThemeController.DARK_TEXT
+                return RabbitWindowThemeController.DARK_TEXT
         }
     }
 }
@@ -311,6 +338,35 @@ class RabbitWindowThemeNative {
     static SetListBoxColors(hdc, text_color, background_color) {
         DllCall("Gdi32\SetTextColor", "Ptr", hdc, "UInt", text_color, "UInt")
         DllCall("Gdi32\SetBkColor", "Ptr", hdc, "UInt", background_color, "UInt")
+    }
+
+    static SetLinkColors(hdc, text_color) {
+        DllCall("Gdi32\SetTextColor", "Ptr", hdc, "UInt", text_color, "UInt")
+        DllCall("Gdi32\SetBkMode", "Ptr", hdc, "Int", 1, "Int")
+    }
+
+    static SetLinkDefaultColors(hwnd) {
+        static LM_SETITEM := 0x0702
+        static LIF_ITEMINDEX := 0x00000001
+        static LIF_STATE := 0x00000002
+        static LIS_DEFAULTCOLORS := 0x00000010
+        local item := Buffer(4280, 0)
+        NumPut("UInt", LIF_ITEMINDEX | LIF_STATE, item, 0)
+        NumPut("Int", 0, item, 4)
+        NumPut("UInt", LIS_DEFAULTCOLORS, item, 8)
+        NumPut("UInt", LIS_DEFAULTCOLORS, item, 12)
+        return DllCall(
+            "User32\SendMessageW",
+            "Ptr",
+            hwnd,
+            "UInt",
+            LM_SETITEM,
+            "Ptr",
+            0,
+            "Ptr",
+            item,
+            "Ptr"
+        )
     }
 
     static AllowDarkModeForWindow(hwnd, dark_mode) {

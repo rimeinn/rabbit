@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitTrayMenu.ahk
 
 RunTest("status tip follows current tray icon", TestStatusTipFollowsTrayIcon.Bind())
+RunTest("tray about opens a standalone window", TestTrayAboutOpensStandaloneWindow.Bind())
 
 TestStatusTipFollowsTrayIcon() {
     local config := RabbitConfigSnapshot(Map("schema_icon", Map("custom", "custom.ico")))
@@ -36,6 +37,13 @@ TestStatusTipFollowsTrayIcon() {
     AssertEqual(2, tray.update_icon_calls, "Schema changes did not refresh the tray icon.")
 }
 
+TestTrayAboutOpensStandaloneWindow() {
+    local tray := RabbitTrayAboutProbe()
+    AssertTrue(tray.StartAbout(), "The tray about action did not report success.")
+    AssertTrue(tray.about_created, "The tray about action did not create a standalone about window.")
+    AssertTrue(tray.about_shown, "The tray about action did not show the standalone about window.")
+}
+
 class RabbitTrayStatusTipProbe extends RabbitTrayController {
     __New(args*) {
         this.update_icon_calls := 0
@@ -44,5 +52,34 @@ class RabbitTrayStatusTipProbe extends RabbitTrayController {
 
     UpdateIcon() {
         this.update_icon_calls++
+    }
+}
+
+class RabbitTrayAboutProbe extends RabbitTrayController {
+    __New() {
+        this.about_created := false
+        this.about_shown := false
+        super.__New(0, 0, 0, 0, 0, 0, (*) => 0)
+    }
+
+    UseLegacySettings() {
+        return false
+    }
+
+    CreateAboutDialog() {
+        this.about_created := true
+        return RabbitTrayAboutDialogProbe(this)
+    }
+}
+
+class RabbitTrayAboutDialogProbe {
+    __New(owner) {
+        this.owner := owner
+        this.disposed := false
+        this.Hwnd := 0
+    }
+
+    Show(options := "") {
+        this.owner.about_shown := true
     }
 }

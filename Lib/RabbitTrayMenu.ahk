@@ -19,6 +19,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitCommandLine.ahk
 #Include RabbitConfigSnapshot.ahk
+#Include RabbitAbout.ahk
 
 A_IconTip := "玉兔毫（维护中）"
 
@@ -77,6 +78,7 @@ class RabbitTrayController {
         this.full_shape := false
         this.ascii_punct := false
         this.current_schema_icon := ""
+        this.about_dialog := 0
         ; TraySetIcon loads the icon from disk or the executable resource on
         ; every call. Remember the last resolved icon so repeated calls with an
         ; unchanged key do not reload it.
@@ -140,17 +142,7 @@ class RabbitTrayController {
         A_TrayMenu.Add()
         A_TrayMenu.Add("仓库主页", (*) => Run("https://github.com/rimeinn/rabbit"))
         A_TrayMenu.Add("参加讨论", (*) => Run("https://github.com/rimeinn/rabbit/discussions"))
-        A_TrayMenu.Add(
-            "关于",
-            (*) => MsgBox(
-                Format(
-                    "由 AutoHotkey 实现的 Rime 输入法引擎前端`r`n版本：{}{}",
-                    RABBIT_VERSION,
-                    A_IsCompiled ? "（已编译）" : ""
-                ),
-                "玉兔毫输入法"
-            )
-        )
+        A_TrayMenu.Add("关于", (*) => this.StartAbout())
         A_TrayMenu.Add()
         A_TrayMenu.Add("检查新版本", (*) => this.CheckNewVersion())
         A_TrayMenu.Add(
@@ -167,6 +159,27 @@ class RabbitTrayController {
 
     UseLegacySettings() {
         return RabbitIsOldWindows()
+    }
+
+    StartAbout() {
+        if this.about_dialog && !this.about_dialog.disposed {
+            WinActivate("ahk_id " . this.about_dialog.Hwnd)
+            return true
+        }
+        this.about_dialog := this.CreateAboutDialog()
+        this.about_dialog.Show("Center")
+        return true
+    }
+
+    CreateAboutDialog() {
+        return RabbitAboutDialog()
+    }
+
+    Dispose() {
+        if this.about_dialog && !this.about_dialog.disposed {
+            this.about_dialog.Dispose()
+        }
+        this.about_dialog := 0
     }
 
     StartSettings(page_id := "") {

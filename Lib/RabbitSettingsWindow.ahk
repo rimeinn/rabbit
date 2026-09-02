@@ -17,6 +17,7 @@
  */
 
 #Include RabbitAppearanceSettingsPage.ahk
+#Include RabbitAbout.ahk
 #Include RabbitCommon.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
@@ -27,6 +28,7 @@ class RabbitSettingsWindow extends Gui {
     static APPEARANCE_HEIGHT := 724
     static BEHAVIOR_HEIGHT := 660
     static SWITCHER_HEIGHT := 660
+    static ABOUT_HEIGHT := 660
     static COMPACT_HEIGHT := 500
     static SWITCH_ACTION_VALUES := ["noop", "inline_ascii", "commit_text", "commit_code", "clear"]
     static SWITCH_ACTION_LABELS := ["不切换", "临时英文", "提交文字", "提交编码", "清空输入"]
@@ -37,7 +39,7 @@ class RabbitSettingsWindow extends Gui {
         { id: "applications", title: "应用适配", description: "按应用程序设置默认输入状态。" },
         { id: "dictionary", title: "用户词典", description: "备份、恢复、导入和导出用户词典。" },
         { id: "maintenance", title: "维护与同步", description: "重新部署、同步用户资料并查看诊断信息。" },
-        { id: "about", title: "关于", description: "查看版本、许可证和项目链接。" },
+        { id: "about", title: "关于", description: "查看版本、许可证以及使用的开源项目。" },
     ]
 
     static CalculateAppearanceLayout(dark_mode, height := 0) {
@@ -371,7 +373,7 @@ class RabbitSettingsWindow extends Gui {
                     this.application_mode_header
                 )
             case 7:
-                this.window_theme.RegisterMuted(this.about_copyright)
+                this.about_page.RegisterTheme(this.window_theme)
         }
     }
 
@@ -698,32 +700,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     CreateAboutControls() {
-        this.about_group := this.AddGroupBox("x230 y136 w570 h250 Hidden", "关于玉兔毫")
-        this.SetFont("s14 w600")
-        this.about_name := this.AddText("x254 y176 w496 h30 Hidden", "玉兔毫")
-        this.SetFont("s10 w400")
-        this.about_version := this.AddText(
-            "x254 y216 w496 h24 Hidden",
-            "版本：" . RABBIT_VERSION . (A_IsCompiled ? "（已编译）" : "（源代码运行）")
-        )
-        this.about_description := this.AddText(
-            "x254 y252 w496 h48 Hidden",
-            "由 AutoHotkey 实现的 Rime 输入法引擎 Windows 前端。"
-        )
-        this.about_project_link := this.AddLink(
-            "x254 y316 w160 h24 Hidden",
-            '<a href="https://github.com/rimeinn/rabbit">访问项目主页</a>'
-        )
-        this.about_project_link.OnEvent("Click", this.OnLinkClick.Bind(this))
-        this.about_license_link := this.AddLink(
-            "x430 y316 w160 h24 Hidden",
-            '<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 许可证</a>'
-        )
-        this.about_license_link.OnEvent("Click", this.OnLinkClick.Bind(this))
-        this.about_copyright := this.AddText(
-            "x254 y356 w496 h24 Hidden cGray",
-            "Copyright © 2023 - 2026 Xuesong Peng"
-        )
+        this.about_page := RabbitAboutPage(this, 230, 136, 570, this.ShowMessage.Bind(this))
     }
 
     CreateDictionaryControls() {
@@ -1090,6 +1067,9 @@ class RabbitSettingsWindow extends Gui {
         if index = 2 {
             return RabbitSettingsWindow.SWITCHER_HEIGHT
         }
+        if index = 7 {
+            return RabbitSettingsWindow.ABOUT_HEIGHT
+        }
         return index = 3 ? RabbitSettingsWindow.BEHAVIOR_HEIGHT : RabbitSettingsWindow.COMPACT_HEIGHT
     }
 
@@ -1264,27 +1244,7 @@ class RabbitSettingsWindow extends Gui {
         if !this.page_controls_created.Has(7) {
             return
         }
-        this.about_group.Visible := visible
-        this.about_name.Visible := visible
-        this.about_version.Visible := visible
-        this.about_description.Visible := visible
-        this.about_project_link.Visible := visible
-        this.about_license_link.Visible := visible
-        this.about_copyright.Visible := visible
-    }
-
-    OnLinkClick(ctrl, index, link) {
-        return this.OpenLink(link)
-    }
-
-    OpenLink(link) {
-        try {
-            Run(link)
-            return true
-        } catch as err {
-            this.ShowMessage("无法打开链接：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
-            return false
-        }
+        this.about_page.SetVisible(visible)
     }
 
     RunOwnedDialog(callback) {

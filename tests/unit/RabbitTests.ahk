@@ -19,6 +19,7 @@
 #Requires AutoHotkey v2.0
 
 #Include RabbitAppContextTest.ahk
+#Include RabbitAboutTest.ahk
 #Include RabbitApplicationTest.ahk
 #Include RabbitApplicationSettingsModelTest.ahk
 #Include RabbitAdvancedFontSettingsModelTest.ahk

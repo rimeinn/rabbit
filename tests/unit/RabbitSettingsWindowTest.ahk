@@ -24,6 +24,7 @@ RunTest("settings window uses page-specific heights", TestSettingsWindowUsesPage
 RunTest("appearance color layout grows with the page", TestAppearanceColorLayoutGrowsWithPage.Bind())
 RunTest("settings window creates inactive pages on first use", TestSettingsWindowCreatesPagesLazily.Bind())
 RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalidPage.Bind())
+RunTest("settings window exposes open source licenses", TestSettingsWindowExposesOpenSourceLicenses.Bind())
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
@@ -63,7 +64,7 @@ TestSettingsWindowNavigation() {
         AssertEqual(4, window.selected_page, "The settings window did not update its selected page.")
         AssertEqual("应用适配", window.page_title.Value, "The settings window showed the wrong selected page.")
         AssertTrue(window.SelectPage(7), "The settings window rejected the about page.")
-        AssertTrue(window.about_group.Visible, "The settings window did not show the about page.")
+        AssertTrue(window.about_page.about_group.Visible, "The settings window did not show the about page.")
     } finally {
         window.Dispose()
     }
@@ -143,7 +144,7 @@ TestSettingsWindowCreatesPagesLazily() {
         AssertTrue(!HasProp(window, "behavior_tabs"),
             "The settings window created behavior controls before first use.")
         AssertTrue(window.SelectPage(7), "The settings window rejected its lazy about page.")
-        AssertTrue(HasProp(window, "about_group"),
+        AssertTrue(HasProp(window, "about_page"),
             "Opening the about page did not create its controls.")
         AssertEqual(2, window.page_controls_created.Count,
             "Opening one page created unrelated page controls.")
@@ -401,6 +402,38 @@ TestSettingsWindowContainsPreviewFailures() {
         AssertTrue(
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
             "The settings window let an event-driven preview failure escape."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowExposesOpenSourceLicenses() {
+    local window := RabbitSettingsWindow(0, true)
+    try {
+        AssertEqual(660, window.GetPageWindowHeight(7), "The about page used the wrong window height.")
+        AssertTrue(window.SelectPage(7), "The settings window rejected the about page.")
+        AssertEqual(
+            9,
+            RabbitAboutPage.OPEN_SOURCE_PROJECTS.Length,
+            "The about page did not keep the complete open source project list."
+        )
+        AssertEqual(
+            "BSD 3-Clause",
+            RabbitAboutPage.OPEN_SOURCE_PROJECTS[2].license,
+            "The about page displayed the wrong librime license."
+        )
+        AssertEqual(
+            "LGPL-3.0",
+            RabbitAboutPage.OPEN_SOURCE_PROJECTS[8].license,
+            "The about page displayed the wrong plum license."
+        )
+        AssertTrue(window.about_page.about_open_source_group.Visible,
+            "The about page did not show the open source project section.")
+        AssertEqual(
+            9,
+            window.about_page.about_open_source_project_links.Length,
+            "The about page did not create a project link for every component."
         )
     } finally {
         window.Dispose()

@@ -23,6 +23,7 @@ RunTest("light window keeps native control rendering", TestLightWindowKeepsNativ
 RunTest("combo box exposes its drop-down list", TestComboBoxExposesDropDownList.Bind())
 RunTest("dark combo box paints only its popup list", TestDarkComboBoxPaintsOnlyItsPopupList.Bind())
 RunTest("window theme preserves semantic text roles", TestWindowThemePreservesSemanticTextRoles.Bind())
+RunTest("window theme applies link colors", TestWindowThemeAppliesLinkColors.Bind())
 
 TestWindowThemeAppliesSystemAppearance() {
     local window := Gui()
@@ -158,6 +159,41 @@ TestWindowThemePreservesSemanticTextRoles() {
     }
 }
 
+TestWindowThemeAppliesLinkColors() {
+    local window := Gui()
+    local link := window.AddLink(, '<a href="https://example.com">Link</a>')
+    local native := RabbitWindowThemeNativeProbe()
+    local controller := RabbitWindowThemeController(window, RabbitWindowThemeModeProbe(true), native)
+    try {
+        window.Show("Hide")
+        AssertTrue(
+            RabbitWindowThemeNative.SetLinkDefaultColors(link.Hwnd),
+            "The SysLink rejected the custom-color state."
+        )
+        controller.RegisterLink(link)
+        AssertEqual(
+            RabbitWindowThemeController.LIGHT_LINK_TEXT,
+            controller.ControlTextColor("Link", "link", false),
+            "Light mode did not expose the semantic link color."
+        )
+        AssertEqual(
+            RabbitWindowThemeController.DARK_LINK_TEXT,
+            controller.ControlTextColor("Link", "link", true),
+            "Dark mode did not expose the semantic link color."
+        )
+        controller.Register()
+        controller.OnCtlColorStatic(123, link.Hwnd, WM_CTLCOLORSTATIC, window.Hwnd)
+        AssertEqual(1, native.link_default_color_calls.Length,
+            "The SysLink did not opt into custom colors.")
+        AssertEqual(1, native.link_color_calls.Length, "The link color handler did not run.")
+        AssertEqual(0x00FFC24C, native.link_color_calls[1].text_color,
+            "The dark link color was not passed to the native control.")
+    } finally {
+        controller.Dispose()
+        window.Destroy()
+    }
+}
+
 class RabbitWindowThemeModeProbe {
     __New(dark_mode) {
         this.dark_mode := dark_mode
@@ -174,6 +210,8 @@ class RabbitWindowThemeNativeProbe {
         this.window_modes := []
         this.control_modes := []
         this.list_color_calls := []
+        this.link_color_calls := []
+        this.link_default_color_calls := []
         this.combo_list_hwnd := 4321
         this.brush := 8765
         this.deleted_handle := 0
@@ -206,6 +244,14 @@ class RabbitWindowThemeNativeProbe {
 
     SetListBoxColors(hdc, text_color, background_color) {
         this.list_color_calls.Push({ hdc: hdc, text_color: text_color, background_color: background_color })
+    }
+
+    SetLinkColors(hdc, text_color) {
+        this.link_color_calls.Push({ hdc: hdc, text_color: text_color })
+    }
+
+    SetLinkDefaultColors(hwnd) {
+        this.link_default_color_calls.Push(hwnd)
     }
 
     Redraw(hwnd) {
