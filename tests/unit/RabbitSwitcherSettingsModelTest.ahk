@@ -55,6 +55,11 @@ TestSwitcherSettingsModel() {
         )
 
         values := model.GetCurrentValues()
+        AssertTrue(model.Save(values, true), "The model failed to force-save the current schema selection.")
+        AssertTrue(HasSwitcherModelCall(calls, "select:schema_b"),
+            "The model did not force-save the displayed schema selection.")
+
+        values := model.GetCurrentValues()
         values.schema_ids := ["schema_a"]
         values.hotkeys := "F4, Control+grave"
         values.caption := "方案"

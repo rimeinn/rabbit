@@ -1401,6 +1401,18 @@ class RabbitSettingsWindow extends Gui {
         )
     }
 
+    PromptInstallationClose() {
+        if this.close_prompt {
+            return this.close_prompt.Call()
+        }
+        return this.ShowMessage(
+            "首次安装尚未完成。`n`n" .
+                "选择“是”不保存当前设置并直接部署；选择“否”继续安装。",
+            "【玉兔毫】",
+            "YesNo Icon!"
+        )
+    }
+
     ApplyAllPendingSettings() {
         local appearance_values := 0
         local behavior_values := 0
@@ -1535,7 +1547,7 @@ class RabbitSettingsWindow extends Gui {
         this.Opt("+Disabled")
         this.footer_status.Value := "正在保存输入方案并完成首次部署…"
         try {
-            if !this.switcher_model.Save(values) {
+            if !this.switcher_model.Save(values, true) {
                 this.switcher_status.Value := "未能保存输入方案设置。"
                 return false
             }
@@ -2647,7 +2659,13 @@ class RabbitSettingsWindow extends Gui {
             return true
         }
         if this.installing {
-            this.footer_status.Value := "首次安装尚未完成，请先点击“完成安装并部署”。"
+            decision := this.PromptInstallationClose()
+            if decision = "Yes" {
+                if !this.DeployInstallationWithoutSaving() {
+                    return true
+                }
+                this.Dispose()
+            }
             return true
         }
         if this.HasUnsavedSettings() {
@@ -2661,6 +2679,25 @@ class RabbitSettingsWindow extends Gui {
         }
         this.Dispose()
         return true
+    }
+
+    DeployInstallationWithoutSaving() {
+        local deploy_result
+        this.Opt("+Disabled")
+        this.footer_status.Value := "正在不保存设置并完成首次部署…"
+        try {
+            deploy_result := this.workflow.UpdateWorkspace(true)
+            if deploy_result != 0 {
+                this.footer_status.Value := "首次部署失败，请重试。"
+                return false
+            }
+            return true
+        } catch as err {
+            this.footer_status.Value := "首次部署失败：" . err.Message
+            return false
+        } finally {
+            this.Opt("-Disabled")
+        }
     }
 
     Dispose() {

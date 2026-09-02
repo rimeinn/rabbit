@@ -280,7 +280,7 @@ class RabbitSwitcherSettingsModel {
         result.Push(item)
     }
 
-    Save(values) {
+    Save(values, force_schema_selection := false) {
         local key, name
         local original := this.original_values
         if values.schema_ids.Length = 0 || !Trim(values.caption) {
@@ -289,7 +289,7 @@ class RabbitSwitcherSettingsModel {
         if !this.api.load_settings(this.settings) {
             return false
         }
-        if !RabbitSwitcherSettingsModel.ValuesEqual(values.schema_ids, original.schema_ids)
+        if (force_schema_selection || !RabbitSwitcherSettingsModel.ValuesEqual(values.schema_ids, original.schema_ids))
             && !this.api.select_schemas(this.settings, values.schema_ids) {
             return false
         }

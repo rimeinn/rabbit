@@ -50,6 +50,10 @@ RunTest("settings window uses a global apply action", TestSettingsWindowUsesGlob
 RunTest("settings window preserves canceled close", TestSettingsWindowPreservesCanceledClose.Bind())
 RunTest("settings window saves all settings on close", TestSettingsWindowSavesAllSettingsOnClose.Bind())
 RunTest("settings window completes first install in place", TestSettingsWindowCompletesFirstInstallInPlace.Bind())
+RunTest(
+    "settings window deploys first install without saving on confirmed close",
+    TestSettingsWindowDeploysFirstInstallWithoutSaving.Bind()
+)
 RunTest("settings window keeps failed first install locked", TestSettingsWindowKeepsFailedFirstInstallLocked.Bind())
 
 TestSettingsWindowNavigation() {
@@ -874,7 +878,7 @@ TestSettingsWindowCompletesFirstInstallInPlace() {
         AssertEqual("应用并重新部署", window.apply_button.Text, "The unlocked window kept the install action label.")
         AssertTrue(window.SelectPage(7), "The unlocked window could not open another settings page.")
         AssertEqual(
-            "create_model,save:schema_a:Control+grave,dispose_model,deploy,create_model",
+            "create_model,force_schema_selection,save:schema_a:Control+grave,dispose_model,deploy,create_model",
             JoinSettingsWorkflowCalls(calls),
             "Install mode did not dispose, deploy, and recreate its model in order."
         )
@@ -883,13 +887,36 @@ TestSettingsWindowCompletesFirstInstallInPlace() {
     }
 }
 
+TestSettingsWindowDeploysFirstInstallWithoutSaving() {
+    local calls := []
+    local window := RabbitSettingsWindow(
+        RabbitSettingsInstallWorkflowProbe(calls),
+        true,
+        RabbitAppearancePreview,
+        RabbitSettingsClosePrompt.Bind(calls, "Yes"),
+        "input-schemes",
+        true
+    )
+    try {
+        AssertTrue(window.OnClose(), "The settings window did not handle a confirmed install close.")
+        AssertTrue(window.disposed, "The settings window stayed open after deploying without saving.")
+    } finally {
+        window.Dispose()
+    }
+    AssertEqual(
+        "create_model,prompt,deploy,dispose_model",
+        JoinSettingsWorkflowCalls(calls),
+        "Confirmed install close did not deploy without saving."
+    )
+}
+
 TestSettingsWindowKeepsFailedFirstInstallLocked() {
     local calls := []
     local window := RabbitSettingsWindow(
         RabbitSettingsInstallWorkflowProbe(calls, 1),
         true,
         RabbitAppearancePreview,
-        0,
+        RabbitSettingsClosePrompt.Bind(calls, "No"),
         "input-schemes",
         true
     )
@@ -1409,7 +1436,10 @@ class RabbitSettingsSwitcherModelProbe {
         }]
     }
 
-    Save(values) {
+    Save(values, force_schema_selection := false) {
+        if force_schema_selection {
+            this.calls.Push("force_schema_selection")
+        }
         this.calls.Push("save:" . values.schema_ids[1] . ":" . values.hotkeys)
         return true
     }
