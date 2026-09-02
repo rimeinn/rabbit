@@ -91,6 +91,8 @@ class Direct2D {
     static guid := Map(
         'REFIID_D2DFactory',  Direct2D.str2guid('{06152247-6f50-465a-9245-118bfd3b6007}'),
         'REFIID_DWriteFactory',  Direct2D.str2guid('{B859EE5A-D838-4B5B-A2E8-1ADC7D93DB48}'),
+        'REFIID_DWriteFactory2', Direct2D.str2guid('{0439FC60-CA44-4994-8DEE-3A9AF7B732EC}'),
+        'REFIID_DWriteTextFormat1', Direct2D.str2guid('{5F174B49-0D8B-4CFB-8BCA-F1CCE9D06C67}'),
         ; imagingWic
         'GUID_WICPixelFormat32bppBGRA', Direct2D.str2guid('{6fddc324-4e03-4bfe-b185-3d77768dc90f}'),
         'GUID_WICPixelFormat32bppPBGRA', Direct2D.str2guid('{6fddc324-4e03-4bfe-b185-3d77768dc910}'),
@@ -222,6 +224,7 @@ class Direct2D {
 
     class IDWriteFactory {
         __New() {
+            this.pWF2 := 0
             DWriteCreateFactory := DllCall("GetProcAddress", "ptr", DllCall("LoadLibrary", "str", "dwrite.dll", "ptr"), "astr", "DWriteCreateFactory", "ptr")
             if !DWriteCreateFactory
                 throw Error("Failed to load DWriteCreateFactory")
@@ -239,6 +242,8 @@ class Direct2D {
         }
 
         __Delete() {
+            if this.pWF2
+                Direct2D.release(this.pWF2)
             if this.pWF
                 Direct2D.release(this.pWF)
         }
@@ -277,6 +282,10 @@ class Direct2D {
                 this.ApplyTextFormatOption(pTextFormat, 4, "paragraph alignment", paragraphAlignment)
                 this.ApplyTextFormatOption(pTextFormat, 6, "reading direction", readingDirection)
                 this.ApplyTextFormatOption(pTextFormat, 7, "flow direction", flowDirection)
+                this.ApplyFontFallback(
+                    pTextFormat,
+                    this.GetOption(options, "font_fallback_mappings", 0)
+                )
             } catch as exception {
                 Direct2D.release(pTextFormat)
                 throw exception
@@ -308,6 +317,139 @@ class Direct2D {
                 throw exception
             }
             return pTextLayout
+        }
+
+        ApplyFontFallback(pTextFormat, mappings) {
+            local pBuilder := 0
+            local pFallback := 0
+            local pSystemFallback := 0
+            if !mappings {
+                return
+            }
+            if !IsObject(mappings) {
+                throw TypeError("Font fallback mappings must be an object or 0.")
+            }
+
+            this.EnsureFactory2()
+            try {
+                local hr := DllCall(Direct2D.vTable(this.pWF2, 26), ; IDWriteFactory2::GetSystemFontFallback
+                    "ptr", this.pWF2,
+                    "ptr*", &pSystemFallback,
+                    "hresult"
+                )
+                if hr != 0 {
+                    Direct2D.ThrowHResult("GetSystemFontFallback", hr)
+                }
+                hr := DllCall(Direct2D.vTable(this.pWF2, 27), ; IDWriteFactory2::CreateFontFallbackBuilder
+                    "ptr", this.pWF2,
+                    "ptr*", &pBuilder,
+                    "hresult"
+                )
+                if hr != 0 {
+                    Direct2D.ThrowHResult("CreateFontFallbackBuilder", hr)
+                }
+                for mapping in mappings {
+                    this.AddFontFallbackMapping(pBuilder, mapping)
+                }
+                hr := DllCall(Direct2D.vTable(pBuilder, 4), ; IDWriteFontFallbackBuilder::AddMappings
+                    "ptr", pBuilder,
+                    "ptr", pSystemFallback,
+                    "hresult"
+                )
+                if hr != 0 {
+                    Direct2D.ThrowHResult("Add system font fallback mappings", hr)
+                }
+                hr := DllCall(Direct2D.vTable(pBuilder, 5), ; IDWriteFontFallbackBuilder::CreateFontFallback
+                    "ptr", pBuilder,
+                    "ptr*", &pFallback,
+                    "hresult"
+                )
+                if hr != 0 {
+                    Direct2D.ThrowHResult("CreateFontFallback", hr)
+                }
+                this.SetTextFormatFallback(pTextFormat, pFallback)
+            } finally {
+                if pFallback {
+                    Direct2D.release(pFallback)
+                }
+                if pBuilder {
+                    Direct2D.release(pBuilder)
+                }
+                if pSystemFallback {
+                    Direct2D.release(pSystemFallback)
+                }
+            }
+        }
+
+        EnsureFactory2() {
+            if this.pWF2 {
+                return
+            }
+            local pFactory2 := 0
+            local hr := DllCall(Direct2D.vTable(this.pWF, 0), ; IUnknown::QueryInterface
+                "ptr", this.pWF,
+                "ptr", Direct2D.guid["REFIID_DWriteFactory2"],
+                "ptr*", &pFactory2,
+                "hresult"
+            )
+            if hr != 0 {
+                Direct2D.ThrowHResult("Query IDWriteFactory2", hr)
+            }
+            this.pWF2 := pFactory2
+        }
+
+        AddFontFallbackMapping(pBuilder, mapping) {
+            local family := String(mapping.family)
+            if !family {
+                throw ValueError("Font fallback family cannot be empty.")
+            }
+            local range := Buffer(8, 0) ; DWRITE_UNICODE_RANGE
+            NumPut("uint", mapping.start_code_point, range, 0)
+            NumPut("uint", mapping.end_code_point, range, 4)
+            local family_buffer := Buffer(StrPut(family, "UTF-16") * 2, 0)
+            StrPut(family, family_buffer, "UTF-16")
+            local family_names := Buffer(A_PtrSize, 0)
+            NumPut("ptr", family_buffer.Ptr, family_names)
+            local hr := DllCall(Direct2D.vTable(pBuilder, 3), ; IDWriteFontFallbackBuilder::AddMapping
+                "ptr", pBuilder,
+                "ptr", range.Ptr,
+                "uint", 1,
+                "ptr", family_names.Ptr,
+                "uint", 1,
+                "ptr", 0, ; fontCollection
+                "ptr", 0, ; localeName
+                "ptr", 0, ; baseFamilyName
+                "float", 1.0,
+                "hresult"
+            )
+            if hr != 0 {
+                Direct2D.ThrowHResult("Add font fallback mapping", hr)
+            }
+        }
+
+        SetTextFormatFallback(pTextFormat, pFallback) {
+            local pTextFormat1 := 0
+            local hr := DllCall(Direct2D.vTable(pTextFormat, 0), ; IUnknown::QueryInterface
+                "ptr", pTextFormat,
+                "ptr", Direct2D.guid["REFIID_DWriteTextFormat1"],
+                "ptr*", &pTextFormat1,
+                "hresult"
+            )
+            if hr != 0 {
+                Direct2D.ThrowHResult("Query IDWriteTextFormat1", hr)
+            }
+            try {
+                hr := DllCall(Direct2D.vTable(pTextFormat1, 34), ; IDWriteTextFormat1::SetFontFallback
+                    "ptr", pTextFormat1,
+                    "ptr", pFallback,
+                    "hresult"
+                )
+                if hr != 0 {
+                    Direct2D.ThrowHResult("SetFontFallback", hr)
+                }
+            } finally {
+                Direct2D.release(pTextFormat1)
+            }
         }
 
         GetTextLayoutMetrics(pTextLayout, textMetricPrps) {
@@ -1652,11 +1794,13 @@ class Direct2D {
         horizonAlign := 0,
         verticalAlign := 0,
         readingDirection := 0,
-        flowDirection := 0
+        flowDirection := 0,
+        fontFallbackMappings := 0,
+        fontCacheKey := ""
     ) {
         fK := Format(
             "{}|{}|{}|{}|{}|{}|{}|{}",
-            fontName,
+            fontCacheKey ? fontCacheKey : fontName,
             fontSize,
             fontWeight,
             fontStyle,
@@ -1677,7 +1821,8 @@ class Direct2D {
                 "text_alignment", horizonAlign,
                 "paragraph_alignment", verticalAlign,
                 "reading_direction", readingDirection,
-                "flow_direction", flowDirection
+                "flow_direction", flowDirection,
+                "font_fallback_mappings", fontFallbackMappings
             )
         )
         return this.textFormats[fK] := pTextFormat

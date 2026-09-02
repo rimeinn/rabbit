@@ -18,8 +18,8 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitCandidatePresentation.ahk
+#Include RabbitDirect2D.ahk
 #Include RabbitLayeredWindow.ahk
-#Include Direct2D/Direct2D.ahk
 
 class RabbitFloatingPreedit {
     static FONT_HEIGHT_CALIBRATION_TEXT := "中M"
@@ -28,7 +28,7 @@ class RabbitFloatingPreedit {
     ; and each change rebuilds the whole Direct2D stack.
     static render_target_recreate_count := 0
 
-    __New(style, d2d_constructor := Direct2D) {
+    __New(style, d2d_constructor := RabbitDirect2D) {
         this.gui := 0
         this.d2d := 0
         this.d2d_constructor := d2d_constructor

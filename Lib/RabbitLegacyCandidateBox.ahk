@@ -19,6 +19,7 @@
 
 #Include RabbitCandidateBoxCommon.ahk
 #Include RabbitCandidatePresentation.ahk
+#Include RabbitFontSpec.ahk
 #Include RabbitLegacyCandidateLayout.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
@@ -99,6 +100,9 @@ class LegacyCandidateBox {
         this.base_font_opt := Format("s{} q5", style.font_point)
         this.label_font_opt := Format("s{} q5", style.label_font_point)
         this.comment_font_opt := Format("s{} q5", style.comment_font_point)
+        this.base_font_face := RabbitFontSpec.Parse(style.font_face).legacy_family
+        this.label_font_face := RabbitFontSpec.Parse(style.label_font_face).legacy_family
+        this.comment_font_face := RabbitFontSpec.Parse(style.comment_font_face).legacy_family
 
         if this.gui {
             this.gui.BackColor := this.back_color
@@ -166,7 +170,7 @@ class LegacyCandidateBox {
                 "-DPIScale -Caption +Owner +AlwaysOnTop {} {} {}",
                 WS_EX_NOACTIVATE, WS_EX_COMPOSITED, WS_EX_LAYERED))
             this.BackColor := this.owner.back_color
-            this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
+            this.SetFont(this.owner.base_font_opt, this.owner.base_font_face)
             this.MarginX := this.owner.style.margin_x
             this.MarginY := this.owner.style.margin_y
             this.num_candidates := 0
@@ -250,7 +254,7 @@ class LegacyCandidateBox {
                     this.preedit_visible_count := segment_index
                     local name := "P" . segment_index
                     if !HasProp(this, name) || !this.%name% {
-                        this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
+                        this.SetFont(this.owner.base_font_opt, this.owner.base_font_face)
                         this.%name% := this.AddText(
                             Format("x0 y0 {} v{}", this.owner.border, name), segment.text)
                     }
@@ -276,12 +280,12 @@ class LegacyCandidateBox {
             loop num_candidates - this.num_candidates {
                 local index := this.num_candidates + A_Index
                 local row := presentation.candidates[index]
-                this.SetFont(this.owner.label_font_opt, this.owner.style.label_font_face)
+                this.SetFont(this.owner.label_font_opt, this.owner.label_font_face)
                 this.AddText(
                     Format("x0 y0 Right {} vL{}", this.owner.border, index), row.label)
-                this.SetFont(this.owner.base_font_opt, this.owner.style.font_face)
+                this.SetFont(this.owner.base_font_opt, this.owner.base_font_face)
                 this.AddText(Format("x0 y0 {} vC{}", this.owner.border, index), row.text)
-                this.SetFont(this.owner.comment_font_opt, this.owner.style.comment_font_face)
+                this.SetFont(this.owner.comment_font_opt, this.owner.comment_font_face)
                 this.AddText(Format("x0 y0 {} vM{}", this.owner.border, index), row.comment)
             }
             this.num_candidates := num_candidates
@@ -290,15 +294,15 @@ class LegacyCandidateBox {
         ApplyControlFonts() {
             loop this.preedit_segment_count {
                 this["P" . A_Index].SetFont(
-                    this.owner.base_font_opt, this.owner.style.font_face)
+                    this.owner.base_font_opt, this.owner.base_font_face)
             }
             loop this.num_candidates {
                 this["L" . A_Index].SetFont(
-                    this.owner.label_font_opt, this.owner.style.label_font_face)
+                    this.owner.label_font_opt, this.owner.label_font_face)
                 this["C" . A_Index].SetFont(
-                    this.owner.base_font_opt, this.owner.style.font_face)
+                    this.owner.base_font_opt, this.owner.base_font_face)
                 this["M" . A_Index].SetFont(
-                    this.owner.comment_font_opt, this.owner.style.comment_font_face)
+                    this.owner.comment_font_opt, this.owner.comment_font_face)
             }
         }
 

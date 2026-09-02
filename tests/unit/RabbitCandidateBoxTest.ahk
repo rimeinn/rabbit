@@ -67,6 +67,7 @@ RunTest(
 )
 RunTest("legacy dynamic calculated layout", TestLegacyDynamicCalculatedLayout.Bind(candidate_style))
 RunTest("legacy GDI text measurement parity", TestLegacyGdiTextMeasurementParity.Bind(candidate_style))
+RunTest("legacy font fallback settings degrade to primary families", TestLegacyFontFallbackDegradation.Bind())
 RunTest("legacy fake GUI uniform row backgrounds", TestLegacyFakeGuiUniformRowBackgrounds)
 RunTest("legacy pure layout calculation", TestLegacyPureLayoutCalculation.Bind())
 RunTest(
@@ -699,6 +700,34 @@ TestLegacyGdiTextMeasurementParity(style) {
         }
     }
     AssertEqual(baseline, CountProcessGuiWindows(), "The native measurement oracle leaked a GUI window.")
+}
+
+TestLegacyFontFallbackDegradation() {
+    local style := RabbitUIStyleSnapshot(Map(
+        "font_face", "Segoe UI Emoji:1f300:1faff, Microsoft YaHei UI, Segoe UI Emoji",
+        "label_font_face", "Segoe UI:30:39, Microsoft YaHei UI",
+        "comment_font_face", "Segoe UI Symbol:2000:2bff"
+    ))
+    local candidate_box := LegacyCandidateBox(style)
+    try {
+        AssertEqual(
+            "Microsoft YaHei UI",
+            candidate_box.base_font_face,
+            "Legacy candidate text selected a scoped font instead of the primary family."
+        )
+        AssertEqual(
+            "Microsoft YaHei UI",
+            candidate_box.label_font_face,
+            "Legacy labels selected a scoped font instead of the primary family."
+        )
+        AssertEqual(
+            "Segoe UI Symbol",
+            candidate_box.comment_font_face,
+            "Legacy comments did not retain a usable family from a fully scoped setting."
+        )
+    } finally {
+        candidate_box.Dispose()
+    }
 }
 
 TestLegacyFakeGuiUniformRowBackgrounds() {

@@ -17,6 +17,7 @@
 
 #Include RabbitAppearancePreview.ahk
 #Include RabbitColorSchemeDialog.ahk
+#Include RabbitFontSpec.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
 class RabbitAppearanceSettingsPage {
@@ -545,6 +546,10 @@ class RabbitAppearanceSettingsPage {
         if !font_face || !preedit_font_face || !label_font_face || !comment_font_face {
             throw Error("字体名称不能为空。")
         }
+        this.ValidateFontSetting(font_face, "候选文字")
+        this.ValidateFontSetting(preedit_font_face, "预编辑文字")
+        this.ValidateFontSetting(label_font_face, "候选序号")
+        this.ValidateFontSetting(comment_font_face, "候选注释")
         if !label_format {
             throw Error("候选序号格式不能为空。")
         }
@@ -586,6 +591,14 @@ class RabbitAppearanceSettingsPage {
             "floating_preedit_min_height", this.ReadNumber(
                 owner.appearance_floating_height, "浮动预编辑最小高度", 0, 500)
         )
+    }
+
+    ValidateFontSetting(value, label) {
+        try {
+            RabbitFontSpec.Parse(value)
+        } catch as err {
+            throw Error(label . "字体设置无效：" . err.Message)
+        }
     }
 
     ReadNumber(ctrl, name, minimum, maximum) {

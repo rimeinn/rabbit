@@ -22,7 +22,7 @@
 #Include RabbitUIStyleSnapshot.ahk
 #Include RabbitLayeredWindow.ahk
 #Include RabbitIcon.ahk
-#Include Direct2D/Direct2D.ahk
+#Include RabbitDirect2D.ahk
 
 class RabbitStatusTip {
     ; Track render target recreations: the tip box size changes with the shown
@@ -32,7 +32,7 @@ class RabbitStatusTip {
     __New(
         style,
         config,
-        d2d_constructor := Direct2D,
+        d2d_constructor := RabbitDirect2D,
         layered_window_constructor := RabbitLayeredWindow,
         gui_constructor := Gui
     ) {

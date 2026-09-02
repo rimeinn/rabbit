@@ -23,7 +23,7 @@
 #Include RabbitCandidatePresentation.ahk
 #Include RabbitFloatingPreedit.ahk
 #Include RabbitLayeredWindow.ahk
-#Include Direct2D/Direct2D.ahk
+#Include RabbitDirect2D.ahk
 
 class CandidateBox {
     gui := 0
@@ -34,7 +34,7 @@ class CandidateBox {
     ; size oscillation and for old instances not being released.
     static render_target_recreate_count := 0
 
-    __New(style, d2d_constructor := Direct2D) {
+    __New(style, d2d_constructor := RabbitDirect2D) {
         this.gui := 0
         this.d2d := 0
         this.d2d_constructor := d2d_constructor

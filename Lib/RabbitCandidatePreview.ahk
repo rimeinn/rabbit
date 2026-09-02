@@ -18,7 +18,7 @@
  */
 
 #Include RabbitUIStyleSnapshot.ahk
-#Include Direct2D\Direct2D.ahk
+#Include RabbitDirect2D.ahk
 
 class CandidatePreview {
     hBitmap := 0
@@ -27,7 +27,7 @@ class CandidatePreview {
 
     __New(ctrl) {
         this.imgCtrl := ctrl
-        this.d2d := Direct2D()
+        this.d2d := RabbitDirect2D()
         this.dpiScale := this.d2d.GetDesktopDpiScale()
     }
 

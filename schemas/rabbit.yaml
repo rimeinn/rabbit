@@ -43,7 +43,9 @@ style:
   color_scheme: aqua
   # Windows 使用深色应用模式时使用的配色方案；设为 null 时继续使用 color_scheme
   color_scheme_dark: null
-  # 候选文字、预编辑文字、候选标签和候选注释使用的字体
+  # 候选文字、预编辑文字、候选标签和候选注释使用的字体；新版候选窗支持按顺序回退
+  # 格式：字体名[:起始码位[:结束码位]][:字重][:字形], 后备字体……；码位使用十六进制
+  # 示例："Segoe UI Emoji:1f300:1faff, Microsoft YaHei UI, Segoe UI Emoji"
   font_face: Microsoft YaHei UI
   preedit_font_face: Microsoft YaHei UI
   label_font_face: Microsoft YaHei UI

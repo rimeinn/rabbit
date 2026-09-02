@@ -33,6 +33,7 @@
 #Include RabbitDeployerWorkflowTest.ahk
 #Include RabbitDialogPlacementTest.ahk
 #Include RabbitDictionarySettingsModelTest.ahk
+#Include RabbitFontSpecTest.ahk
 #Include RabbitInputControllerTest.ahk
 #Include RabbitInputTargetTest.ahk
 #Include RabbitNativeListViewTest.ahk
