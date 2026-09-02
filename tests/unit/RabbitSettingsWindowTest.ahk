@@ -27,6 +27,7 @@ RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalid
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
+RunTest("settings window loads font choices on first drop-down", TestSettingsWindowLoadsFontChoicesLazily.Bind())
 RunTest("settings window opens one advanced font editor", TestSettingsWindowOpensAdvancedFontEditor.Bind())
 RunTest("settings window browses color schemes without changing selection", TestSettingsWindowBrowsesColorSchemes.Bind())
 RunTest("settings window previews the browsed color scheme", TestSettingsWindowPreviewsBrowsedColorScheme.Bind())
@@ -205,10 +206,11 @@ TestSettingsWindowSavesAppearanceSettings() {
 TestSettingsWindowExposesAppearanceControls() {
     local calls := []
     local color_actions_y, color_details_y, color_list_height, color_list_width, color_list_y
-    local color_layout := RabbitSettingsWindow.CalculateAppearanceLayout(false)
+    local color_layout
     local font_group_width, height_label_width, layout_group_width, opacity_label_width, tabs_width
     local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
     try {
+        color_layout := RabbitSettingsWindow.CalculateAppearanceLayout(window.initial_dark_mode)
         AssertEqual(1, window.appearance_tabs.Value, "The appearance page did not start on the color tab.")
         AssertTrue(!window.appearance_typesetting_created,
             "The appearance page eagerly created its inactive typesetting controls.")
@@ -236,6 +238,14 @@ TestSettingsWindowExposesAppearanceControls() {
             "The typesetting controls were not created when their tab was opened.")
         AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")
         AssertTrue(!window.appearance_list.Visible, "The typography tab left color controls visible.")
+        AssertEqual(0, GetComboBoxItemCount(window.appearance_font),
+            "The typography tab eagerly populated the candidate font list.")
+        AssertEqual(0, GetComboBoxItemCount(window.appearance_preedit_font),
+            "The typography tab eagerly populated the preedit font list.")
+        AssertEqual(0, GetComboBoxItemCount(window.appearance_label_font),
+            "The typography tab eagerly populated the label font list.")
+        AssertEqual(0, GetComboBoxItemCount(window.appearance_comment_font),
+            "The typography tab eagerly populated the comment font list.")
         window.appearance_font_group.GetPos(, , &font_group_width)
         window.appearance_layout_group.GetPos(, , &layout_group_width)
         AssertTrue(font_group_width >= 530, "The font group did not fill the appearance tab.")
@@ -395,6 +405,61 @@ TestSettingsWindowContainsPreviewFailures() {
     } finally {
         window.Dispose()
     }
+}
+
+TestSettingsWindowLoadsFontChoicesLazily() {
+    static CB_GETDROPPEDSTATE := 0x0157
+    static LB_GETCOUNT := 0x018B
+    local expected_font, item_count, list_height, list_hwnd
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe([]), true)
+    try {
+        window.appearance_tabs.Choose(2)
+        window.OnAppearanceTabChanged()
+        Gui.Prototype.Show.Call(window, "NA x-32000 y-32000")
+        expected_font := window.appearance_page.style.font_face
+        AssertEqual(
+            expected_font,
+            window.appearance_font.Text,
+            "The unloaded font list did not preserve the configured font text."
+        )
+        ControlShowDropDown(window.appearance_font)
+        item_count := GetComboBoxItemCount(window.appearance_font)
+        AssertTrue(item_count > 0, "The first drop-down did not populate the candidate font list.")
+        AssertEqual(1, SendMessage(CB_GETDROPPEDSTATE, 0, 0, window.appearance_font.Hwnd),
+            "The candidate font list did not remain expanded after lazy loading.")
+        list_hwnd := RabbitWindowThemeNative.GetComboBoxListHwnd(window.appearance_font.Hwnd)
+        AssertTrue(list_hwnd, "The expanded font combo box did not expose its list window.")
+        AssertEqual(item_count, SendMessage(LB_GETCOUNT, 0, 0, list_hwnd),
+            "The visible font list did not receive the combo box items.")
+        WinGetPos(, , , &list_height, "ahk_id " . list_hwnd)
+        AssertTrue(list_height > 30,
+            Format("The populated font list remained too short to show items: {} px.", list_height))
+        AssertEqual(
+            expected_font,
+            window.appearance_font.Text,
+            "Populating the candidate font list changed the configured font text."
+        )
+        AssertTrue(
+            window.appearance_page.loaded_font_controls.Has(window.appearance_font.Hwnd),
+            "The populated font list was not marked as loaded."
+        )
+        AssertEqual(0, GetComboBoxItemCount(window.appearance_preedit_font),
+            "Opening one font list populated another font control.")
+        ControlHideDropDown(window.appearance_font)
+        ControlShowDropDown(window.appearance_font)
+        AssertEqual(
+            item_count,
+            GetComboBoxItemCount(window.appearance_font),
+            "Opening an already loaded font list populated it again."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+GetComboBoxItemCount(ctrl) {
+    static CB_GETCOUNT := 0x0146
+    return SendMessage(CB_GETCOUNT, 0, 0, ctrl.Hwnd)
 }
 
 TestSettingsWindowOpensAdvancedFontEditor() {

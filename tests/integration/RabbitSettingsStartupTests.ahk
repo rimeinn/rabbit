@@ -29,9 +29,12 @@ TestSettingsStartupFirstShow() {
     ; config ordering and the deterministic control count provide the tighter checks.
     static FIRST_SHOW_GOLDEN_MS := 1000
     static INITIAL_CONTROL_GOLDEN := 30
+    ; The lazy typesetting tab takes about 60-160 ms locally; the former eager font lists took about 300 ms.
+    static TYPESETTING_LOAD_GOLDEN_MS := 200
     local calls := []
     local control_count := 0
     local construction_elapsed, elapsed, show_elapsed, show_start, start
+    local typesetting_elapsed
     local window := 0
     RabbitSettingsStartupPreview.render_count := 0
     start := A_TickCount
@@ -68,13 +71,24 @@ TestSettingsStartupFirstShow() {
             "The deferred settings load ran in the wrong order.")
         AssertEqual(1, RabbitSettingsStartupPreview.render_count,
             "The deferred startup rendered the preview more than once.")
+        typesetting_elapsed := MeasureTypesettingLoad(window)
+        AssertTrue(
+            typesetting_elapsed <= TYPESETTING_LOAD_GOLDEN_MS,
+            Format(
+                "Typesetting load took {} ms; golden is {} ms.",
+                typesetting_elapsed,
+                TYPESETTING_LOAD_GOLDEN_MS
+            )
+        )
         ExerciseLazySettingsPages(window)
         FileAppend Format(
-            "METRIC: first_show_ms={} construction_ms={} show_ms={} initial_controls={}`n",
+            "METRIC: first_show_ms={} construction_ms={} show_ms={} initial_controls={} "
+                . "typesetting_load_ms={}`n",
             elapsed,
             construction_elapsed,
             show_elapsed,
-            control_count
+            control_count,
+            typesetting_elapsed
         ), "*"
     } finally {
         if window {
@@ -88,11 +102,17 @@ ExerciseLazySettingsPages(window) {
         AssertTrue(window.SelectPage(index), "The GUI smoke test could not open page " . index . ".")
         Sleep(20)
     }
+}
+
+MeasureTypesettingLoad(window) {
+    local typesetting_elapsed, typesetting_started_at
     window.appearance_tabs.Choose(2)
+    typesetting_started_at := A_TickCount
     window.OnAppearanceTabChanged()
+    typesetting_elapsed := A_TickCount - typesetting_started_at
     AssertTrue(window.appearance_font_group.Visible,
         "The GUI smoke test did not show the lazy typesetting controls.")
-    Sleep(20)
+    return typesetting_elapsed
 }
 
 WaitForSettingsStartup(calls) {

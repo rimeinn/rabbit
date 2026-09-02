@@ -18,11 +18,15 @@
 #Include RabbitAppearancePreview.ahk
 #Include RabbitAdvancedFontSettingsDialog.ahk
 #Include RabbitColorSchemeDialog.ahk
+#Include RabbitCommon.ahk
 #Include Direct2D\Direct2D.ahk
 #Include RabbitFontSpec.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
 class RabbitAppearanceSettingsPage {
+    static CBN_DROPDOWN := 7
+    static CB_INITSTORAGE := 0x0161
+
     __New(owner, workflow, old_windows, preview_factory) {
         this.owner := owner
         this.workflow := workflow
@@ -40,6 +44,7 @@ class RabbitAppearanceSettingsPage {
         this.disposed := false
         this.dialog_factory := RabbitColorSchemeDialog
         this.font_dialog_factory := RabbitAdvancedFontSettingsDialog
+        this.loaded_font_controls := Map()
     }
 
     SetVisible(visible) {
@@ -181,11 +186,15 @@ class RabbitAppearanceSettingsPage {
     }
 
     PopulateStyle(style) {
+        local font_controls_elapsed, font_controls_started_at := A_TickCount
+        local other_controls_started_at
         local owner := this.owner
         this.SetFontValue(owner.appearance_font, style.font_face)
         this.SetFontValue(owner.appearance_preedit_font, style.preedit_font_face)
         this.SetFontValue(owner.appearance_label_font, style.label_font_face)
         this.SetFontValue(owner.appearance_comment_font, style.comment_font_face)
+        font_controls_elapsed := A_TickCount - font_controls_started_at
+        other_controls_started_at := A_TickCount
         owner.appearance_font_point.Value := style.font_point
         owner.appearance_label_font_point.Value := style.label_font_point
         owner.appearance_comment_font_point.Value := style.comment_font_point
@@ -209,11 +218,44 @@ class RabbitAppearanceSettingsPage {
         owner.appearance_floating_preedit.Value := style.floating_preedit
         owner.appearance_floating_opacity.Value := Round(style.floating_preedit_opacity * 100)
         owner.appearance_floating_height.Value := style.floating_preedit_min_height
+        RabbitDebug(
+            Format(
+                "typesetting style populated: total_ms={} font_controls_ms={} other_controls_ms={}",
+                A_TickCount - font_controls_started_at,
+                font_controls_elapsed,
+                A_TickCount - other_controls_started_at
+            ),
+            Format("RabbitAppearanceSettingsPage.ahk:{}", A_LineNumber),
+            1
+        )
     }
 
     SetFontValue(ctrl, value) {
-        local fonts := RabbitAppearanceSettingsPage.GetInstalledFontFaces()
-        local selected := 0
+        if !this.loaded_font_controls.Has(ctrl.Hwnd) {
+            ctrl.Text := value
+            return
+        }
+        this.PopulateFontChoices(ctrl, value)
+    }
+
+    LoadFontChoices(ctrl) {
+        if this.loaded_font_controls.Has(ctrl.Hwnd) {
+            return false
+        }
+        this.PopulateFontChoices(ctrl, ctrl.Text)
+        return true
+    }
+
+    PopulateFontChoices(ctrl, value) {
+        local add_elapsed, add_started_at, catalog_elapsed, catalog_started_at
+        local fonts, item, loading := this.loading
+        local prepare_elapsed, prepare_started_at, reserve_bytes := 0
+        local reserve_elapsed, reserve_result, reserve_started_at, selected := 0
+        local total_started_at := A_TickCount
+        catalog_started_at := A_TickCount
+        fonts := RabbitAppearanceSettingsPage.GetInstalledFontFaces()
+        catalog_elapsed := A_TickCount - catalog_started_at
+        prepare_started_at := A_TickCount
         for index, font_face in fonts {
             if font_face = value {
                 selected := index
@@ -224,9 +266,46 @@ class RabbitAppearanceSettingsPage {
             fonts.InsertAt(1, value)
             selected := 1
         }
-        ctrl.Delete()
-        ctrl.Add(fonts)
-        ctrl.Choose(selected)
+        for item in fonts {
+            reserve_bytes += (StrLen(item) + 1) * 2
+        }
+        prepare_elapsed := A_TickCount - prepare_started_at
+        this.loading := true
+        try {
+            ctrl.Delete()
+            reserve_started_at := A_TickCount
+            ; Reserve the UTF-16 item storage before sending the bulk of CB_ADDSTRING messages.
+            reserve_result := SendMessage(
+                RabbitAppearanceSettingsPage.CB_INITSTORAGE,
+                fonts.Length,
+                reserve_bytes,
+                ctrl.Hwnd
+            )
+            reserve_elapsed := A_TickCount - reserve_started_at
+            add_started_at := A_TickCount
+            ctrl.Add(fonts)
+            ctrl.Choose(selected)
+            add_elapsed := A_TickCount - add_started_at
+            this.loaded_font_controls[ctrl.Hwnd] := true
+        } finally {
+            this.loading := loading
+        }
+        RabbitDebug(
+            Format(
+                "typesetting font combo populated: total_ms={} catalog_ms={} prepare_ms={} "
+                    . "reserve_ms={} add_ms={} items={} reserve_bytes={} reserve_result={}",
+                A_TickCount - total_started_at,
+                catalog_elapsed,
+                prepare_elapsed,
+                reserve_elapsed,
+                add_elapsed,
+                fonts.Length,
+                reserve_bytes,
+                reserve_result
+            ),
+            Format("RabbitAppearanceSettingsPage.ahk:{}", A_LineNumber),
+            1
+        )
     }
 
     OpenAdvancedFontSettings() {
@@ -273,6 +352,7 @@ class RabbitAppearanceSettingsPage {
 
     static GetInstalledFontFaces() {
         static cached := 0
+        local enumerate_elapsed, enumerate_started_at, sort_started_at
         local face, factory := 0
         local names := Map()
         local result := []
@@ -280,6 +360,7 @@ class RabbitAppearanceSettingsPage {
         if cached {
             return cached.Clone()
         }
+        enumerate_started_at := A_TickCount
         try {
             factory := Direct2D.IDWriteFactory()
             for face in factory.GetSystemFontFaces() {
@@ -289,6 +370,8 @@ class RabbitAppearanceSettingsPage {
                 }
             }
         }
+        enumerate_elapsed := A_TickCount - enumerate_started_at
+        sort_started_at := A_TickCount
         for name in names {
             text .= name . "`n"
         }
@@ -301,6 +384,17 @@ class RabbitAppearanceSettingsPage {
         if !result.Length {
             result.Push("Microsoft YaHei UI")
         }
+        RabbitDebug(
+            Format(
+                "typesetting font catalog initialized: total_ms={} enumerate_ms={} sort_ms={} families={}",
+                A_TickCount - enumerate_started_at,
+                enumerate_elapsed,
+                A_TickCount - sort_started_at,
+                result.Length
+            ),
+            Format("RabbitAppearanceSettingsPage.ahk:{}", A_LineNumber),
+            1
+        )
         cached := result
         return cached.Clone()
     }

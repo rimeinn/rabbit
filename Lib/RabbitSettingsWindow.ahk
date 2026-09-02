@@ -764,7 +764,8 @@ class RabbitSettingsWindow extends Gui {
     }
 
     EnsureAppearanceTypesettingControls() {
-        local appearance_layout, loading
+        local appearance_layout, controls_elapsed, controls_started_at := A_TickCount
+        local loading, populate_elapsed, populate_started_at, theme_elapsed, theme_started_at
         if this.appearance_typesetting_created {
             return false
         }
@@ -772,22 +773,38 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_tabs.UseTab(2)
         this.appearance_font_group := this.AddGroupBox("x246 y170 w538 h180 Hidden", "字体")
         this.appearance_font_label := this.AddText("x260 y196 w72 h22 Hidden", "候选文字：")
-        this.appearance_font := this.AddComboBox("x334 y192 w320 Hidden", [])
+        this.appearance_font := this.AddComboBox("x334 y192 w320 r10 Hidden", [])
         this.appearance_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_font.OnCommand(
+            RabbitAppearanceSettingsPage.CBN_DROPDOWN,
+            (*) => this.appearance_page.LoadFontChoices(this.appearance_font)
+        )
         this.appearance_font_point_label := this.AddText("x664 y196 w42 h22 Hidden", "字号：")
         this.appearance_font_point := this.AddEdit("x708 y192 w58 r1 Number -Multi Hidden")
         this.appearance_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_preedit_font_label := this.AddText("x260 y226 w72 h22 Hidden", "预编辑：")
-        this.appearance_preedit_font := this.AddComboBox("x334 y222 w432 Hidden", [])
+        this.appearance_preedit_font := this.AddComboBox("x334 y222 w432 r10 Hidden", [])
         this.appearance_preedit_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_preedit_font.OnCommand(
+            RabbitAppearanceSettingsPage.CBN_DROPDOWN,
+            (*) => this.appearance_page.LoadFontChoices(this.appearance_preedit_font)
+        )
         this.appearance_label_font_label := this.AddText("x260 y256 w72 h22 Hidden", "候选序号：")
-        this.appearance_label_font := this.AddComboBox("x334 y252 w320 Hidden", [])
+        this.appearance_label_font := this.AddComboBox("x334 y252 w320 r10 Hidden", [])
         this.appearance_label_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_label_font.OnCommand(
+            RabbitAppearanceSettingsPage.CBN_DROPDOWN,
+            (*) => this.appearance_page.LoadFontChoices(this.appearance_label_font)
+        )
         this.appearance_label_font_point := this.AddEdit("x708 y252 w58 r1 Number -Multi Hidden")
         this.appearance_label_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_comment_font_label := this.AddText("x260 y286 w72 h22 Hidden", "候选注释：")
-        this.appearance_comment_font := this.AddComboBox("x334 y282 w320 Hidden", [])
+        this.appearance_comment_font := this.AddComboBox("x334 y282 w320 r10 Hidden", [])
         this.appearance_comment_font.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_comment_font.OnCommand(
+            RabbitAppearanceSettingsPage.CBN_DROPDOWN,
+            (*) => this.appearance_page.LoadFontChoices(this.appearance_comment_font)
+        )
         this.appearance_comment_font_point := this.AddEdit("x708 y282 w58 r1 Number -Multi Hidden")
         this.appearance_comment_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_label_format_label := this.AddText("x260 y316 w72 h22 Hidden", "序号格式：")
@@ -922,7 +939,9 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_floating_height_label,
             this.appearance_floating_height,
         ]
+        controls_elapsed := A_TickCount - controls_started_at
         this.appearance_typesetting_created := true
+        populate_started_at := A_TickCount
         if this.appearance_page.settings {
             loading := this.appearance_page.loading
             this.appearance_page.loading := true
@@ -933,9 +952,23 @@ class RabbitSettingsWindow extends Gui {
             }
             this.appearance_page.UpdateConditionalControls()
         }
+        populate_elapsed := A_TickCount - populate_started_at
+        theme_started_at := A_TickCount
         if HasProp(this, "window_theme") && this.window_theme {
             this.window_theme.Apply()
         }
+        theme_elapsed := A_TickCount - theme_started_at
+        RabbitDebug(
+            Format(
+                "typesetting controls initialized: total_ms={} create_ms={} populate_ms={} theme_ms={}",
+                A_TickCount - controls_started_at,
+                controls_elapsed,
+                populate_elapsed,
+                theme_elapsed
+            ),
+            Format("RabbitSettingsWindow.ahk:{}", A_LineNumber),
+            1
+        )
         return true
     }
 
