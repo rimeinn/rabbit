@@ -41,7 +41,21 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
     static RANGE_PRESETS := [
         { label: "全部字符", start: 0, end: RabbitFontSpec.MAX_CODE_POINT },
         { label: "基本拉丁（0020–007E）", start: 0x20, end: 0x7e },
+        { label: "CJK 部首补充（2E80–2EFF）", start: 0x2e80, end: 0x2eff },
+        { label: "康熙部首（2F00–2FDF）", start: 0x2f00, end: 0x2fdf },
+        { label: "CJK 符号和标点（3000–303F）", start: 0x3000, end: 0x303f },
+        { label: "CJK 笔画（31C0–31EF）", start: 0x31c0, end: 0x31ef },
+        { label: "CJK Ext A（3400–4DBF）", start: 0x3400, end: 0x4dbf },
         { label: "中日韩统一表意文字（4E00–9FFF）", start: 0x4e00, end: 0x9fff },
+        { label: "CJK Ext B（20000–2A6DF）", start: 0x20000, end: 0x2a6df },
+        { label: "CJK Ext C（2A700–2B73F）", start: 0x2a700, end: 0x2b73f },
+        { label: "CJK Ext D（2B740–2B81F）", start: 0x2b740, end: 0x2b81f },
+        { label: "CJK Ext E（2B820–2CEAF）", start: 0x2b820, end: 0x2ceaf },
+        { label: "CJK Ext F（2CEB0–2EBEF）", start: 0x2ceb0, end: 0x2ebef },
+        { label: "CJK Ext G（30000–3134F）", start: 0x30000, end: 0x3134f },
+        { label: "CJK Ext H（31350–323AF）", start: 0x31350, end: 0x323af },
+        { label: "CJK Ext I（2EBF0–2EE5F）", start: 0x2ebf0, end: 0x2ee5f },
+        { label: "CJK Ext J（323B0–3347F）", start: 0x323b0, end: 0x3347f },
         { label: "Emoji 补充区（1F300–1FAFF）", start: 0x1f300, end: 0x1faff },
         { label: "自定义范围", custom: true }
     ]

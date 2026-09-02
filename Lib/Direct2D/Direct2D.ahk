@@ -248,6 +248,128 @@ class Direct2D {
                 Direct2D.release(this.pWF)
         }
 
+        GetSystemFontFaces(preferredLocale := "en-us") {
+            local familyCount, hr, name, names := []
+            local pCollection := 0
+            local pFamily := 0
+            local pFamilyNames := 0
+            hr := DllCall(Direct2D.vTable(this.pWF, 3), ; IDWriteFactory::GetSystemFontCollection
+                "ptr", this.pWF,
+                "ptr*", &pCollection,
+                "int", true,
+                "hresult"
+            )
+            if hr != 0 {
+                Direct2D.ThrowHResult("GetSystemFontCollection", hr)
+            }
+            try {
+                familyCount := DllCall(
+                    Direct2D.vTable(pCollection, 3), ; IDWriteFontCollection::GetFontFamilyCount
+                    "ptr",
+                    pCollection,
+                    "uint"
+                )
+                Loop familyCount {
+                    hr := DllCall(
+                        Direct2D.vTable(pCollection, 4), ; IDWriteFontCollection::GetFontFamily
+                        "ptr",
+                        pCollection,
+                        "uint",
+                        A_Index - 1,
+                        "ptr*",
+                        &pFamily,
+                        "hresult"
+                    )
+                    if hr != 0 {
+                        Direct2D.ThrowHResult("GetFontFamily", hr)
+                    }
+                    try {
+                        hr := DllCall(
+                            Direct2D.vTable(pFamily, 6), ; IDWriteFontFamily::GetFamilyNames
+                            "ptr",
+                            pFamily,
+                            "ptr*",
+                            &pFamilyNames,
+                            "hresult"
+                        )
+                        if hr != 0 {
+                            Direct2D.ThrowHResult("GetFamilyNames", hr)
+                        }
+                        try {
+                            name := this.GetLocalizedString(pFamilyNames, preferredLocale)
+                            if name {
+                                names.Push(name)
+                            }
+                        } finally {
+                            Direct2D.release(pFamilyNames)
+                            pFamilyNames := 0
+                        }
+                    } finally {
+                        Direct2D.release(pFamily)
+                        pFamily := 0
+                    }
+                }
+            } finally {
+                Direct2D.release(pCollection)
+            }
+            return names
+        }
+
+        GetLocalizedString(pStrings, preferredLocale := "") {
+            local exists := false
+            local hr, index := 0, length := 0
+            if preferredLocale {
+                hr := DllCall(
+                    Direct2D.vTable(pStrings, 4), ; IDWriteLocalizedStrings::FindLocaleName
+                    "ptr",
+                    pStrings,
+                    "wstr",
+                    preferredLocale,
+                    "uint*",
+                    &index,
+                    "int*",
+                    &exists,
+                    "hresult"
+                )
+                if hr != 0 {
+                    Direct2D.ThrowHResult("FindLocaleName", hr)
+                }
+            }
+            if !exists {
+                index := 0
+            }
+            hr := DllCall(
+                Direct2D.vTable(pStrings, 7), ; IDWriteLocalizedStrings::GetStringLength
+                "ptr",
+                pStrings,
+                "uint",
+                index,
+                "uint*",
+                &length,
+                "hresult"
+            )
+            if hr != 0 {
+                Direct2D.ThrowHResult("GetStringLength", hr)
+            }
+            local value := Buffer((length + 1) * 2, 0)
+            hr := DllCall(
+                Direct2D.vTable(pStrings, 8), ; IDWriteLocalizedStrings::GetString
+                "ptr",
+                pStrings,
+                "uint",
+                index,
+                "ptr",
+                value,
+                "uint",
+                length + 1,
+                "hresult"
+            )
+            if hr != 0 {
+                Direct2D.ThrowHResult("GetString", hr)
+            }
+            return StrGet(value, length, "UTF-16")
+        }
+
         CreateTextFormat(fontName, fontSize, fontWeight := 400, fontStyle := 0, options := 0) {
             local readingDirection := this.GetOption(options, "reading_direction", 0)
             local flowDirection := this.GetOption(options, "flow_direction", 0)

@@ -23,6 +23,7 @@
 
 RunTest("advanced font dialog edits every font role", TestAdvancedFontDialogEditsRoles.Bind())
 RunTest("advanced font dialog switches simple font tabs", TestAdvancedFontDialogSwitchesSimpleTabs.Bind())
+RunTest("advanced font dialog offers CJK range presets", TestAdvancedFontDialogCjkRangePresets.Bind())
 RunTest("advanced font dialog prepares dark native controls", TestAdvancedFontDialogDarkMode.Bind())
 
 TestAdvancedFontDialogEditsRoles() {
@@ -36,7 +37,7 @@ TestAdvancedFontDialogEditsRoles() {
     )
     try {
         dialog.family.Text := "Segoe UI Emoji"
-        dialog.range_preset.Choose(4)
+        dialog.range_preset.Choose(dialog.FindRangePreset(0x1f300, 0x1faff))
         dialog.OnRangePresetChanged()
         AssertTrue(dialog.ApplyEntry(), "The dialog rejected a valid Emoji range.")
         dialog.font_weight.Choose(8)
@@ -61,6 +62,36 @@ TestAdvancedFontDialogEditsRoles() {
     } finally {
         dialog.Dispose()
         owner.Destroy()
+    }
+}
+
+TestAdvancedFontDialogCjkRangePresets() {
+    local expected := Map(
+        "CJK 部首补充（2E80–2EFF）", [0x2e80, 0x2eff],
+        "康熙部首（2F00–2FDF）", [0x2f00, 0x2fdf],
+        "CJK 符号和标点（3000–303F）", [0x3000, 0x303f],
+        "CJK 笔画（31C0–31EF）", [0x31c0, 0x31ef],
+        "CJK Ext A（3400–4DBF）", [0x3400, 0x4dbf],
+        "CJK Ext B（20000–2A6DF）", [0x20000, 0x2a6df],
+        "CJK Ext C（2A700–2B73F）", [0x2a700, 0x2b73f],
+        "CJK Ext D（2B740–2B81F）", [0x2b740, 0x2b81f],
+        "CJK Ext E（2B820–2CEAF）", [0x2b820, 0x2ceaf],
+        "CJK Ext F（2CEB0–2EBEF）", [0x2ceb0, 0x2ebef],
+        "CJK Ext G（30000–3134F）", [0x30000, 0x3134f],
+        "CJK Ext H（31350–323AF）", [0x31350, 0x323af],
+        "CJK Ext I（2EBF0–2EE5F）", [0x2ebf0, 0x2ee5f],
+        "CJK Ext J（323B0–3347F）", [0x323b0, 0x3347f]
+    )
+    local found := Map()
+    for preset in RabbitAdvancedFontSettingsDialog.RANGE_PRESETS {
+        if !HasProp(preset, "custom") {
+            found[preset.label] := [preset.start, preset.end]
+        }
+    }
+    for label, code_points in expected {
+        AssertTrue(found.Has(label), "Missing CJK range preset: " . label)
+        AssertEqual(code_points[1], found[label][1], "The CJK preset has the wrong start: " . label)
+        AssertEqual(code_points[2], found[label][2], "The CJK preset has the wrong end: " . label)
     }
 }
 

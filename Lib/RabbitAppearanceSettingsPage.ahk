@@ -18,6 +18,7 @@
 #Include RabbitAppearancePreview.ahk
 #Include RabbitAdvancedFontSettingsDialog.ahk
 #Include RabbitColorSchemeDialog.ahk
+#Include Direct2D\Direct2D.ahk
 #Include RabbitFontSpec.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
@@ -272,6 +273,7 @@ class RabbitAppearanceSettingsPage {
 
     static GetInstalledFontFaces() {
         static cached := 0
+        local face, factory := 0
         local names := Map()
         local result := []
         local text := ""
@@ -279,13 +281,11 @@ class RabbitAppearanceSettingsPage {
             return cached.Clone()
         }
         try {
-            Loop Reg, "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts", "V" {
-                local name := RegExReplace(A_LoopRegName, "\s+\([^)]*\)$")
-                for face in StrSplit(name, " & ") {
-                    face := Trim(face)
-                    if face {
-                        names[face] := true
-                    }
+            factory := Direct2D.IDWriteFactory()
+            for face in factory.GetSystemFontFaces() {
+                face := Trim(face)
+                if face {
+                    names[face] := true
                 }
             }
         }
