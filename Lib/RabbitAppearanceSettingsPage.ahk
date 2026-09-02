@@ -16,6 +16,7 @@
  */
 
 #Include RabbitAppearancePreview.ahk
+#Include RabbitAdvancedFontSettingsDialog.ahk
 #Include RabbitColorSchemeDialog.ahk
 #Include RabbitFontSpec.ahk
 #Include RabbitUIStyleSnapshot.ahk
@@ -37,6 +38,7 @@ class RabbitAppearanceSettingsPage {
         this.selection_dirty := false
         this.disposed := false
         this.dialog_factory := RabbitColorSchemeDialog
+        this.font_dialog_factory := RabbitAdvancedFontSettingsDialog
     }
 
     SetVisible(visible) {
@@ -224,6 +226,48 @@ class RabbitAppearanceSettingsPage {
         ctrl.Delete()
         ctrl.Add(fonts)
         ctrl.Choose(selected)
+    }
+
+    OpenAdvancedFontSettings() {
+        local dialog, factory, result
+        local owner := this.owner
+        local values := Map(
+            "font_face", Trim(owner.appearance_font.Text),
+            "preedit_font_face", Trim(owner.appearance_preedit_font.Text),
+            "label_font_face", Trim(owner.appearance_label_font.Text),
+            "comment_font_face", Trim(owner.appearance_comment_font.Text)
+        )
+        factory := this.font_dialog_factory
+        try {
+            dialog := factory(
+                owner,
+                values,
+                RabbitAppearanceSettingsPage.GetInstalledFontFaces(),
+                owner.window_theme.dark_mode_reader
+            )
+        } catch as err {
+            owner.appearance_status.Value := err.Message
+            return false
+        }
+        try {
+            result := dialog.ShowModal()
+        } finally {
+            dialog.Dispose()
+        }
+        if !result {
+            return false
+        }
+        this.loading := true
+        try {
+            this.SetFontValue(owner.appearance_font, result["font_face"])
+            this.SetFontValue(owner.appearance_preedit_font, result["preedit_font_face"])
+            this.SetFontValue(owner.appearance_label_font, result["label_font_face"])
+            this.SetFontValue(owner.appearance_comment_font, result["comment_font_face"])
+        } finally {
+            this.loading := false
+        }
+        this.OnControlsChanged()
+        return true
     }
 
     static GetInstalledFontFaces() {

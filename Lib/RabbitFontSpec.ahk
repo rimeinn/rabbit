@@ -40,6 +40,24 @@ class RabbitFontSpec {
         "oblique", 1,
         "italic", 2
     )
+    static FONT_WEIGHT_NAMES := Map(
+        100, "thin",
+        200, "extra_light",
+        300, "light",
+        350, "semi_light",
+        400, "normal",
+        500, "medium",
+        600, "semi_bold",
+        700, "bold",
+        800, "extra_bold",
+        900, "black",
+        950, "extra_black"
+    )
+    static FONT_STYLE_NAMES := Map(
+        0, "normal",
+        1, "oblique",
+        2, "italic"
+    )
 
     __New(source, entries, font_weight, font_style, has_weight, has_style) {
         this.source := source
@@ -150,6 +168,61 @@ class RabbitFontSpec {
             throw ValueError("Unicode code point cannot exceed 10FFFF.")
         }
         return code_point
+    }
+
+    Serialize() {
+        local entry, index, unit
+        local units := []
+        for index, entry in this.entries {
+            unit := entry.family
+            if !(entry.start_code_point = 0
+                && entry.end_code_point = RabbitFontSpec.MAX_CODE_POINT) {
+                if entry.end_code_point = RabbitFontSpec.MAX_CODE_POINT {
+                    unit .= ":" . RabbitFontSpec.FormatCodePoint(entry.start_code_point)
+                } else if entry.start_code_point = 0 {
+                    unit .= "::" . RabbitFontSpec.FormatCodePoint(entry.end_code_point)
+                } else {
+                    unit .= ":" . RabbitFontSpec.FormatCodePoint(entry.start_code_point)
+                        . ":" . RabbitFontSpec.FormatCodePoint(entry.end_code_point)
+                }
+            }
+            if index = 1 {
+                if this.has_weight {
+                    unit .= ":" . RabbitFontSpec.GetFontWeightName(this.font_weight)
+                }
+                if this.has_style {
+                    unit .= ":" . RabbitFontSpec.GetFontStyleName(this.font_style)
+                }
+            }
+            units.Push(unit)
+        }
+        return RabbitFontSpec.Join(units, ", ")
+    }
+
+    static FormatCodePoint(code_point) {
+        return Format("{:x}", code_point)
+    }
+
+    static GetFontWeightName(font_weight) {
+        if !this.FONT_WEIGHT_NAMES.Has(font_weight) {
+            throw ValueError("Unsupported DirectWrite font weight: " . font_weight)
+        }
+        return this.FONT_WEIGHT_NAMES[font_weight]
+    }
+
+    static GetFontStyleName(font_style) {
+        if !this.FONT_STYLE_NAMES.Has(font_style) {
+            throw ValueError("Unsupported DirectWrite font style: " . font_style)
+        }
+        return this.FONT_STYLE_NAMES[font_style]
+    }
+
+    static Join(values, separator) {
+        local result := ""
+        for index, value in values {
+            result .= (index = 1 ? "" : separator) . value
+        }
+        return result
     }
 
     FindLegacyFamily() {

@@ -791,8 +791,13 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_comment_font_point := this.AddEdit("x708 y282 w58 r1 Number -Multi Hidden")
         this.appearance_comment_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_label_format_label := this.AddText("x260 y316 w72 h22 Hidden", "序号格式：")
-        this.appearance_label_format := this.AddEdit("x334 y312 w432 r1 -Multi Hidden")
+        this.appearance_label_format := this.AddEdit("x334 y312 w288 r1 -Multi Hidden")
         this.appearance_label_format.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_advanced_font := this.AddButton(
+            "x634 y310 w132 h30 Hidden",
+            "高级字体设置…"
+        )
+        this.appearance_advanced_font.OnEvent("Click", (*) => this.OpenAdvancedFontSettings())
 
         this.appearance_layout_group := this.AddGroupBox(
             Format("x246 y356 w538 h{} Hidden", appearance_layout.typesetting_layout_height),
@@ -882,6 +887,7 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_comment_font_point,
             this.appearance_label_format_label,
             this.appearance_label_format,
+            this.appearance_advanced_font,
             this.appearance_layout_group,
             this.appearance_layout_type_label,
             this.appearance_layout_type,
@@ -1311,6 +1317,10 @@ class RabbitSettingsWindow extends Gui {
 
     OnAppearanceControlsChanged() {
         this.appearance_page.OnControlsChanged()
+    }
+
+    OpenAdvancedFontSettings() {
+        return this.appearance_page.OpenAdvancedFontSettings()
     }
 
     UpdateAppearanceConditionalControls() {

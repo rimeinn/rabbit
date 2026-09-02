@@ -27,6 +27,7 @@ RunTest("settings window rejects invalid page", TestSettingsWindowRejectsInvalid
 RunTest("settings window maintenance actions", TestSettingsWindowMaintenanceActions.Bind())
 RunTest("settings window saves appearance settings", TestSettingsWindowSavesAppearanceSettings.Bind())
 RunTest("settings window exposes appearance controls", TestSettingsWindowExposesAppearanceControls.Bind())
+RunTest("settings window opens one advanced font editor", TestSettingsWindowOpensAdvancedFontEditor.Bind())
 RunTest("settings window browses color schemes without changing selection", TestSettingsWindowBrowsesColorSchemes.Bind())
 RunTest("settings window previews the browsed color scheme", TestSettingsWindowPreviewsBrowsedColorScheme.Bind())
 RunTest("settings window stages custom color schemes", TestSettingsWindowStagesCustomColorSchemes.Bind())
@@ -390,6 +391,40 @@ TestSettingsWindowContainsPreviewFailures() {
         AssertTrue(
             InStr(window.appearance_status.Value, "无法显示预览：") = 1,
             "The settings window let an event-driven preview failure escape."
+        )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowOpensAdvancedFontEditor() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
+    try {
+        window.appearance_tabs.Choose(2)
+        window.OnAppearanceTabChanged()
+        AssertEqual(
+            "高级字体设置…",
+            window.appearance_advanced_font.Text,
+            "The typography page used the wrong advanced font action."
+        )
+        RabbitSettingsAdvancedFontDialogProbe.last_values := 0
+        window.appearance_page.font_dialog_factory := RabbitSettingsAdvancedFontDialogProbe
+        AssertTrue(window.OpenAdvancedFontSettings(), "The appearance page rejected advanced font edits.")
+        AssertEqual(
+            "Segoe UI Emoji:1f300:1faff, Microsoft YaHei UI",
+            window.appearance_font.Text,
+            "The advanced font result did not update the candidate font control."
+        )
+        AssertEqual(
+            "Microsoft YaHei UI",
+            RabbitSettingsAdvancedFontDialogProbe.last_values["comment_font_face"],
+            "The font editor did not receive all four current font settings."
+        )
+        AssertEqual(
+            "Segoe UI Emoji:1f300:1faff, Microsoft YaHei UI",
+            window.appearance_page.settings.last_values["font_face"],
+            "The advanced font result was not staged for saving."
         )
     } finally {
         window.Dispose()
@@ -1094,6 +1129,23 @@ class RabbitSettingsCancelingColorSchemeDialogProbe {
 
     ShowModal() {
         return 0
+    }
+
+    Dispose() {
+    }
+}
+
+class RabbitSettingsAdvancedFontDialogProbe {
+    static last_values := 0
+
+    __New(owner, values, installed_fonts, dark_mode_reader) {
+        RabbitSettingsAdvancedFontDialogProbe.last_values := values
+        this.result := values.Clone()
+        this.result["font_face"] := "Segoe UI Emoji:1f300:1faff, Microsoft YaHei UI"
+    }
+
+    ShowModal() {
+        return this.result
     }
 
     Dispose() {

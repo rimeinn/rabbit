@@ -22,6 +22,7 @@ RunTest("font spec parses fallback order and ranges", TestFontSpecFallbackRanges
 RunTest("font spec parses open Unicode ranges", TestFontSpecOpenRanges.Bind())
 RunTest("font spec parses weight and style", TestFontSpecWeightAndStyle.Bind())
 RunTest("font spec selects a legacy family", TestFontSpecLegacyFamily.Bind())
+RunTest("font spec serializes canonical fallback settings", TestFontSpecSerialization.Bind())
 RunTest("font spec rejects invalid settings", TestFontSpecValidation.Bind())
 
 TestFontSpecFallbackRanges() {
@@ -81,6 +82,30 @@ TestFontSpecLegacyFamily() {
         "Segoe UI Emoji",
         RabbitFontSpec.Parse("Segoe UI Emoji:1f300:1faff").legacy_family,
         "A fully scoped setting did not retain a usable legacy family."
+    )
+}
+
+TestFontSpecSerialization() {
+    for source in [
+        "Microsoft YaHei UI",
+        "Font A:80",
+        "Font B::6ff",
+        "Segoe UI Emoji:1f300:1faff:bold:italic, Microsoft YaHei UI",
+        "Font A:normal:normal, Font B"
+    ] {
+        local serialized := RabbitFontSpec.Parse(source).Serialize()
+        AssertEqual(
+            serialized,
+            RabbitFontSpec.Parse(serialized).Serialize(),
+            "Serializing a parsed font setting was not stable: " . source
+        )
+    }
+    AssertEqual(
+        "Segoe UI Emoji:1f300:1faff:bold:italic, Microsoft YaHei UI",
+        RabbitFontSpec.Parse(
+            "Segoe UI Emoji:1F300:1FAFF:italic:bold,Microsoft YaHei UI"
+        ).Serialize(),
+        "The serializer did not normalize fields and separators."
     )
 }
 
