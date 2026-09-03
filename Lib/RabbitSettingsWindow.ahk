@@ -26,12 +26,30 @@
 class RabbitSettingsWindow extends Gui {
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 724
-    static BEHAVIOR_HEIGHT := 660
+    static BEHAVIOR_HEIGHT := 692
     static SWITCHER_HEIGHT := 660
     static ABOUT_HEIGHT := 660
     static COMPACT_HEIGHT := 500
-    static SWITCH_ACTION_VALUES := ["noop", "inline_ascii", "commit_text", "commit_code", "clear"]
-    static SWITCH_ACTION_LABELS := ["不切换", "临时英文", "提交文字", "提交编码", "清空输入"]
+    static SWITCH_ACTION_VALUES := [
+        "noop",
+        "inline_ascii",
+        "commit_text",
+        "commit_code",
+        "clear",
+        "set_ascii_mode",
+        "unset_ascii_mode",
+    ]
+    static SWITCH_ACTION_LABELS := [
+        "不切换",
+        "临时英文",
+        "提交文字",
+        "提交编码",
+        "清空输入",
+        "切到英文",
+        "切到中文",
+    ]
+    static CAPS_LOCK_ACTION_VALUES := ["noop", "commit_text", "commit_code", "clear"]
+    static CAPS_LOCK_ACTION_LABELS := ["不切换", "提交文字", "提交编码", "清空输入"]
     static pages := [
         { id: "appearance", title: "外观", description: "配置候选窗口的配色和排版。" },
         { id: "input-schemes", title: "输入方案与选单", description: "选择输入方案并设置方案选单的显示、快捷键和状态记忆。" },
@@ -526,7 +544,7 @@ class RabbitSettingsWindow extends Gui {
         local controls, key
         local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
         this.behavior_tabs := this.AddTab3(
-            "x230 y136 w570 h450 Hidden"
+            "x230 y136 w570 h482 Hidden"
                 . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             ["常规", "按键绑定"]
         )
@@ -562,7 +580,7 @@ class RabbitSettingsWindow extends Gui {
         this.bypass_password_fields := this.AddCheckbox("x260 y336 w490 h24 Hidden", "在密码输入框中绕过 Rime")
         this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
 
-        this.ascii_switch_group := this.AddGroupBox("x246 y366 w538 h110 Hidden", "中西文切换键")
+        this.ascii_switch_group := this.AddGroupBox("x246 y366 w538 h142 Hidden", "中西文切换键")
         this.ascii_switch_controls := Map()
         this.AddAsciiSwitchControl("Shift_L", "左 Shift：", 260, 392)
         this.AddAsciiSwitchControl("Shift_R", "右 Shift：", 432, 392)
@@ -570,24 +588,29 @@ class RabbitSettingsWindow extends Gui {
         this.AddAsciiSwitchControl("Control_L", "左 Ctrl：", 260, 432)
         this.AddAsciiSwitchControl("Control_R", "右 Ctrl：", 432, 432)
         this.AddAsciiSwitchControl("Eisu_toggle", "英数键：", 604, 432)
+        this.good_old_caps_lock := this.AddCheckbox(
+            "x260 y464 w310 h24 Hidden",
+            "保留 Caps Lock 的系统大写锁定行为"
+        )
+        this.good_old_caps_lock.OnEvent("Click", (*) => this.OnBehaviorChanged())
 
-        this.menu_group := this.AddGroupBox("x246 y482 w538 h86 Hidden", "候选与翻页")
-        this.menu_page_size_label := this.AddText("x260 y508 w88 h22 Hidden", "每页候选数：")
-        this.menu_page_size := this.AddEdit("x350 y504 w68 r1 Number -Multi Hidden")
+        this.menu_group := this.AddGroupBox("x246 y514 w538 h86 Hidden", "候选与翻页")
+        this.menu_page_size_label := this.AddText("x260 y540 w88 h22 Hidden", "每页候选数：")
+        this.menu_page_size := this.AddEdit("x350 y536 w68 r1 Number -Multi Hidden")
         this.SetEditCue(this.menu_page_size, "5")
         this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.menu_labels_label := this.AddText("x438 y508 w90 h22 Hidden", "候选序号：")
-        this.menu_labels := this.AddEdit("x530 y504 w236 r1 -Multi Hidden")
+        this.menu_labels_label := this.AddText("x438 y540 w90 h22 Hidden", "候选序号：")
+        this.menu_labels := this.AddEdit("x530 y536 w236 r1 -Multi Hidden")
         this.SetEditCue(this.menu_labels, "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
         this.menu_labels.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.menu_help := this.AddText(
-            "x260 y538 w506 h22 cGray Hidden",
+            "x260 y570 w506 h22 cGray Hidden",
             "候选序号请用逗号分隔；具体输入方案仍可覆盖候选设置。"
         )
 
         this.behavior_tabs.UseTab(2)
         this.binding_list := this.AddListView(
-            (this.initial_dark_mode ? "x250 y198 w530 h270 -Hdr" : "x250 y174 w530 h294")
+            (this.initial_dark_mode ? "x250 y198 w530 h302 -Hdr" : "x250 y174 w530 h326")
                 . " -Multi NoSort Hidden",
             ["接收按键", "生效条件", "动作"]
         )
@@ -604,18 +627,18 @@ class RabbitSettingsWindow extends Gui {
             "  动作"
         )
         this.binding_list.OnEvent("DoubleClick", (ctrl, row) => this.EditBinding(row))
-        this.binding_add := this.AddButton("x250 y478 w86 h32 Hidden", "添加")
+        this.binding_add := this.AddButton("x250 y510 w86 h32 Hidden", "添加")
         this.binding_add.OnEvent("Click", (*) => this.AddBinding())
-        this.binding_edit := this.AddButton("x344 y478 w86 h32 Hidden", "编辑")
+        this.binding_edit := this.AddButton("x344 y510 w86 h32 Hidden", "编辑")
         this.binding_edit.OnEvent("Click", (*) => this.EditBinding())
-        this.binding_delete := this.AddButton("x438 y478 w86 h32 Hidden", "删除")
+        this.binding_delete := this.AddButton("x438 y510 w86 h32 Hidden", "删除")
         this.binding_delete.OnEvent("Click", (*) => this.DeleteBinding())
-        this.binding_up := this.AddButton("x532 y478 w86 h32 Hidden", "上移")
+        this.binding_up := this.AddButton("x532 y510 w86 h32 Hidden", "上移")
         this.binding_up.OnEvent("Click", (*) => this.MoveBinding(-1))
-        this.binding_down := this.AddButton("x626 y478 w86 h32 Hidden", "下移")
+        this.binding_down := this.AddButton("x626 y510 w86 h32 Hidden", "下移")
         this.binding_down.OnEvent("Click", (*) => this.MoveBinding(1))
         this.binding_help := this.AddText(
-            "x250 y520 w530 h48 cGray Hidden",
+            "x250 y552 w530 h48 cGray Hidden",
             "这里显示当前生效的完整列表。修改后，default.custom.yaml 将完整接管此列表；" .
                 "要恢复默认值，请手动删除对应的 custom 配置。"
         )
@@ -637,6 +660,7 @@ class RabbitSettingsWindow extends Gui {
             this.use_legacy_candidate_box,
             this.bypass_password_fields,
             this.ascii_switch_group,
+            this.good_old_caps_lock,
             this.menu_group,
             this.menu_page_size_label,
             this.menu_page_size,
@@ -665,7 +689,7 @@ class RabbitSettingsWindow extends Gui {
                 this.binding_action_header
             )
         }
-        this.behavior_status := this.AddText("x230 y588 w570 h24 Hidden", "")
+        this.behavior_status := this.AddText("x230 y620 w570 h24 Hidden", "")
     }
 
     CreateApplicationControls() {
@@ -950,13 +974,23 @@ class RabbitSettingsWindow extends Gui {
     }
 
     AddAsciiSwitchControl(key, label, x, y) {
+        local labels := key = "Caps_Lock"
+            ? RabbitSettingsWindow.CAPS_LOCK_ACTION_LABELS
+            : RabbitSettingsWindow.SWITCH_ACTION_LABELS
+        local values := key = "Caps_Lock"
+            ? RabbitSettingsWindow.CAPS_LOCK_ACTION_VALUES
+            : RabbitSettingsWindow.SWITCH_ACTION_VALUES
         local label_ctrl := this.AddText(Format("x{} y{} w68 h22 Hidden", x, y), label)
         local dropdown := this.AddDropDownList(
             Format("x{} y{} w96 Choose1 Hidden", x + 68, y - 4),
-            RabbitSettingsWindow.SWITCH_ACTION_LABELS
+            labels
         )
-        dropdown.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.ascii_switch_controls[key] := { label: label_ctrl, dropdown: dropdown }
+        dropdown.OnEvent("Change", (*) => this.OnAsciiSwitchChanged(key))
+        this.ascii_switch_controls[key] := {
+            label: label_ctrl,
+            dropdown: dropdown,
+            values: values.Clone(),
+        }
     }
 
     SetEditCue(ctrl, text) {
@@ -1628,8 +1662,9 @@ class RabbitSettingsWindow extends Gui {
             this.fix_candidate_box.Value := this.behavior_model.fix_candidate_box
             this.use_legacy_candidate_box.Value := this.behavior_model.use_legacy_candidate_box
             this.bypass_password_fields.Value := this.behavior_model.bypass_password_fields
+            this.good_old_caps_lock.Value := this.behavior_model.good_old_caps_lock
             for key, controls in this.ascii_switch_controls {
-                controls.dropdown.Choose(this.SwitchActionIndex(this.behavior_model.switch_key[key]))
+                this.SelectAsciiSwitchAction(controls, this.behavior_model.switch_key[key])
             }
             this.menu_page_size.Value := this.behavior_model.page_size
             this.menu_labels.Value := RabbitBehaviorSettingsModel.Join(
@@ -1640,6 +1675,7 @@ class RabbitSettingsWindow extends Gui {
             this.RefreshBindingList()
             this.show_tips_time.Enabled := !!this.show_tips.Value
             this.UpdateClipboardControls()
+            this.UpdateGoodOldCapsLockControl()
             this.behavior_dirty := false
             this.behavior_status.Value := ""
         } finally {
@@ -1696,7 +1732,7 @@ class RabbitSettingsWindow extends Gui {
         }
         local switch_key := Map()
         for key, controls in this.ascii_switch_controls {
-            switch_key[key] := RabbitSettingsWindow.SWITCH_ACTION_VALUES[controls.dropdown.Value]
+            switch_key[key] := controls.values[controls.dropdown.Value]
         }
         return {
             show_tips: !!this.show_tips.Value,
@@ -1709,6 +1745,7 @@ class RabbitSettingsWindow extends Gui {
             fix_candidate_box: !!this.fix_candidate_box.Value,
             use_legacy_candidate_box: !!this.use_legacy_candidate_box.Value,
             bypass_password_fields: !!this.bypass_password_fields.Value,
+            good_old_caps_lock: !!this.good_old_caps_lock.Value,
             switch_key: switch_key,
             page_size: Number(page_size),
             alternative_select_labels: labels,
@@ -2525,14 +2562,44 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
-    SwitchActionIndex(action) {
+    SwitchActionIndex(action, values := 0) {
         local index, value
-        for index, value in RabbitSettingsWindow.SWITCH_ACTION_VALUES {
+        if !values {
+            values := RabbitSettingsWindow.SWITCH_ACTION_VALUES
+        }
+        for index, value in values {
             if value = action {
                 return index
             }
         }
-        return 1
+        return 0
+    }
+
+    SelectAsciiSwitchAction(controls, action) {
+        local index := this.SwitchActionIndex(action, controls.values)
+        if !index {
+            controls.values.Push(action)
+            controls.dropdown.Add(["自定义（保留）：" . action])
+            index := controls.values.Length
+        }
+        controls.dropdown.Choose(index)
+    }
+
+    OnAsciiSwitchChanged(key) {
+        if key = "Caps_Lock" {
+            this.UpdateGoodOldCapsLockControl()
+        }
+        this.OnBehaviorChanged()
+    }
+
+    UpdateGoodOldCapsLockControl() {
+        local controls, index
+        if !HasProp(this, "good_old_caps_lock") || !this.ascii_switch_controls.Has("Caps_Lock") {
+            return
+        }
+        controls := this.ascii_switch_controls["Caps_Lock"]
+        index := controls.dropdown.Value
+        this.good_old_caps_lock.Enabled := index && controls.values[index] != "noop"
     }
 
     RefreshBindingList(selected_row := 0) {

@@ -75,7 +75,7 @@ TestSettingsWindowNavigation() {
 }
 
 TestSettingsWindowUsesPageSpecificHeights() {
-    local apply_y, divider_height, footer_y, navigation_height, navigation_y
+    local apply_y, divider_height, footer_y, navigation_height, navigation_y, tabs_height
     local window := RabbitSettingsWindow(0, true)
     try {
         AssertEqual(724, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
@@ -93,6 +93,8 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(660, window.GetPageWindowHeight(), "The switcher page used the wrong window height.")
         AssertTrue(window.switcher_tabs.Visible, "The switcher page did not show its tabs.")
         AssertEqual(1, window.switcher_tabs.Value, "The switcher page did not select the schema tab.")
+        window.switcher_tabs.GetPos(, , , &tabs_height)
+        AssertEqual(450, tabs_height, "The behavior layout changed the switcher tab height.")
 
         window.SelectPage(4)
         AssertEqual(500, window.GetPageWindowHeight(), "A compact page used the wrong window height.")
@@ -111,9 +113,11 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(452, footer_y, "The compact layout misplaced the footer status.")
 
         window.SelectPage(3)
-        AssertEqual(660, window.GetPageWindowHeight(), "The behavior page used the wrong window height.")
+        AssertEqual(692, window.GetPageWindowHeight(), "The behavior page used the wrong window height.")
         AssertTrue(window.behavior_tabs.Visible, "The behavior page did not show its tabs.")
         AssertEqual(1, window.behavior_tabs.Value, "The behavior page did not select the general tab.")
+        window.behavior_tabs.GetPos(, , , &tabs_height)
+        AssertEqual(482, tabs_height, "The behavior tab did not grow with its page.")
 
         window.SelectPage(1)
         AssertEqual(724, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
@@ -1141,6 +1145,7 @@ class RabbitSettingsBehaviorModelProbe {
         this.fix_candidate_box := false
         this.use_legacy_candidate_box := false
         this.bypass_password_fields := true
+        this.good_old_caps_lock := true
         this.switch_key := Map(
             "Shift_L", "inline_ascii",
             "Shift_R", "commit_text",
@@ -1314,6 +1319,33 @@ TestSettingsWindowDefaultBehaviorControls() {
             "The behavior page parsed candidate labels incorrectly."
         )
         AssertEqual("inline_ascii", values.switch_key["Shift_L"], "The behavior page returned the wrong switch action.")
+        AssertTrue(values.good_old_caps_lock, "The behavior page returned the wrong Caps Lock compatibility value.")
+        AssertTrue(
+            window.SwitchActionIndex("set_ascii_mode", window.ascii_switch_controls["Shift_L"].values),
+            "A regular switch key did not offer the set-ASCII action."
+        )
+        AssertTrue(
+            window.SwitchActionIndex("unset_ascii_mode", window.ascii_switch_controls["Shift_R"].values),
+            "A regular switch key did not offer the unset-ASCII action."
+        )
+        AssertEqual(
+            0,
+            window.SwitchActionIndex("set_ascii_mode", window.ascii_switch_controls["Caps_Lock"].values),
+            "Caps Lock offered an action that librime coerces to clear."
+        )
+        window.SelectAsciiSwitchAction(window.ascii_switch_controls["Shift_L"], "future_action")
+        values := window.GetBehaviorValues()
+        AssertEqual(
+            "future_action",
+            values.switch_key["Shift_L"],
+            "The behavior page replaced an unknown switch action."
+        )
+        window.ascii_switch_controls["Caps_Lock"].dropdown.Choose(1)
+        window.OnAsciiSwitchChanged("Caps_Lock")
+        AssertTrue(
+            !window.good_old_caps_lock.Enabled,
+            "Disabling the Caps Lock switch left its compatibility option enabled."
+        )
         AssertEqual(
             "Control+Shift+F12",
             values.suspend_hotkey,

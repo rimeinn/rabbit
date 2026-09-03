@@ -66,6 +66,11 @@ class RabbitBehaviorSettingsModel {
         this.fix_candidate_box := this.GetBool(config, "fix_candidate_box", false)
         this.use_legacy_candidate_box := this.GetBool(config, "use_legacy_candidate_box", false)
         this.bypass_password_fields := this.GetBool(config, "bypass_password_fields", true)
+        this.good_old_caps_lock := this.GetBool(
+            default_config,
+            "ascii_composer/good_old_caps_lock",
+            true
+        )
         this.switch_key := this.LoadSwitchKeys(default_config)
         this.page_size := this.GetInt(default_config, "menu/page_size", 5)
         this.alternative_select_labels := this.LoadStringList(default_config, "menu/alternative_select_labels")
@@ -210,6 +215,7 @@ class RabbitBehaviorSettingsModel {
             fix_candidate_box: this.fix_candidate_box,
             use_legacy_candidate_box: this.use_legacy_candidate_box,
             bypass_password_fields: this.bypass_password_fields,
+            good_old_caps_lock: this.good_old_caps_lock,
             switch_key: RabbitBehaviorSettingsModel.CloneValue(this.switch_key),
             page_size: this.page_size,
             alternative_select_labels: RabbitBehaviorSettingsModel.CloneValue(this.alternative_select_labels),
@@ -253,6 +259,7 @@ class RabbitBehaviorSettingsModel {
     HasDefaultChanges(values) {
         local original := this.original_values
         return !RabbitBehaviorSettingsModel.ValuesEqual(values.switch_key, original.switch_key)
+            || values.good_old_caps_lock != original.good_old_caps_lock
             || values.page_size != original.page_size
             || !RabbitBehaviorSettingsModel.ValuesEqual(
                 values.alternative_select_labels,
@@ -314,6 +321,14 @@ class RabbitBehaviorSettingsModel {
         local key
         local original := this.original_values
         if !this.api.load_settings(this.default_settings) {
+            return false
+        }
+        if values.good_old_caps_lock != original.good_old_caps_lock
+            && !this.api.customize_bool(
+                this.default_settings,
+                "ascii_composer/good_old_caps_lock",
+                values.good_old_caps_lock
+            ) {
             return false
         }
         for key in RabbitBehaviorSettingsModel.SWITCH_KEYS {
@@ -381,6 +396,7 @@ class RabbitBehaviorSettingsModel {
         this.fix_candidate_box := values.fix_candidate_box
         this.use_legacy_candidate_box := values.use_legacy_candidate_box
         this.bypass_password_fields := values.bypass_password_fields
+        this.good_old_caps_lock := values.good_old_caps_lock
         this.switch_key := RabbitBehaviorSettingsModel.CloneValue(values.switch_key)
         this.page_size := values.page_size
         this.alternative_select_labels := RabbitBehaviorSettingsModel.CloneValue(values.alternative_select_labels)

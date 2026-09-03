@@ -35,6 +35,7 @@ TestBehaviorSettingsModelLoadsDefaults() {
             "The behavior model loaded the wrong suspend hotkey."
         )
         AssertEqual(12, model.send_by_clipboard_length, "The model loaded the wrong clipboard threshold.")
+        AssertTrue(model.good_old_caps_lock, "The model loaded the wrong Caps Lock compatibility value.")
         AssertEqual("inline_ascii", model.switch_key["Shift_L"], "The model loaded the wrong switch action.")
         AssertEqual(6, model.page_size, "The model loaded the wrong candidate page size.")
         AssertEqual("①", model.alternative_select_labels[1], "The model loaded the wrong candidate label.")
@@ -85,6 +86,29 @@ TestBehaviorSettingsModelIsolatesConfigFiles() {
         AssertTrue(!BehaviorCallsHave(calls, "save:rabbit"), "A default-only edit wrote rabbit.custom.yaml.")
         AssertTrue(BehaviorCallsHave(calls, "set_int:default:menu/page_size:7"), "The page size was not customized.")
         AssertTrue(BehaviorCallsHave(calls, "save:default"), "The model did not save default.custom.yaml.")
+
+        calls.Length := 0
+        values := model.GetCurrentValues()
+        values.good_old_caps_lock := false
+        values.switch_key["Shift_L"] := "set_ascii_mode"
+        values.switch_key["Shift_R"] := "unset_ascii_mode"
+        AssertTrue(model.Save(values), "The model failed to save ASCII composer settings.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_bool:default:ascii_composer/good_old_caps_lock:0"),
+            "The Caps Lock compatibility setting was not customized."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_string:default:ascii_composer/switch_key/Shift_L:set_ascii_mode"),
+            "The set-ASCII action was not customized."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_string:default:ascii_composer/switch_key/Shift_R:unset_ascii_mode"),
+            "The unset-ASCII action was not customized."
+        )
+        AssertTrue(
+            !BehaviorCallsContain(calls, "set_string:default:ascii_composer/switch_key/", "Super"),
+            "Saving exposed a deliberately unsupported Super key."
+        )
     } finally {
         model.Dispose()
     }
@@ -214,6 +238,10 @@ class RabbitBehaviorRimeProbe {
     }
 
     config_test_get_bool(config, key, &value) {
+        if config = "default" && key = "ascii_composer/good_old_caps_lock" {
+            value := true
+            return true
+        }
         if config != "rabbit" {
             return false
         }
