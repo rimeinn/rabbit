@@ -274,6 +274,11 @@ class RabbitInputController {
             if KeyDef.rime_to_ahk.Has(target_key) {
                 target_key := KeyDef.rime_to_ahk[target_key]
             }
+            ; Caps Lock is reserved for its standalone ascii_composer switch.
+            ; Do not let the suspend setting introduce a Caps Lock combination.
+            if target_key = "CapsLock" {
+                return
+            }
             callback := this.ProcessConfiguredKey.Bind(this, target_key, mask, false)
             if num_modifiers = 1 {
                 if mask & ctrl {
@@ -452,12 +457,12 @@ class RabbitInputController {
     }
 
     ProcessKey(key, mask, pass_through := false, this_hotkey := "", requires_text_target := false) {
-        local check_key, check_code, caps, status, processed, commit, context
+        local check_key, check_code, caps, status, processed, commit, context, good_old_caps_lock
         local candidate_revision, foreground_hwnd, hide_candidate := false
         local input_target
         local code := 0
-        local previous_critical, commit_text := ""
-        Loop 4 {
+        local previous_critical, rime_mask, commit_text := ""
+        Loop 5 {
             local key_map
             switch A_Index {
                 case 1:
@@ -468,6 +473,8 @@ class RabbitInputController {
                     key_map := KeyDef.shifted_keycode
                 case 4:
                     key_map := KeyDef.other_keycode
+                case 5:
+                    key_map := KeyDef.lock_keycode
                 default:
                     return
             }
@@ -520,7 +527,8 @@ class RabbitInputController {
         try {
             this.CancelCompositionIfFocusChanged(foreground_hwnd)
             candidate_revision := ++this.candidate_revision
-            if (caps := GetKeyState("CapsLock", "T")) {
+            caps := GetKeyState("CapsLock", "T")
+            if caps {
                 if StrLen(key) == 1 && Ord(key) >= Ord("a") && Ord(key) <= Ord("z") { ; small case letters
                     code += (Ord("A") - Ord("a"))
                 }
@@ -537,7 +545,11 @@ class RabbitInputController {
                 }
             }
 
-            processed := this.rime.process_key(this.session_id, code, mask)
+            good_old_caps_lock := this.config.input_hotkeys
+                && this.config.input_hotkeys.UsesGoodOldCapsLock(old_schema_id)
+            rime_mask := this.BuildRimeMask(key, mask, caps, old_ascii_mode, good_old_caps_lock)
+
+            processed := this.rime.process_key(this.session_id, code, rime_mask)
 
             status := this.rime.get_status(this.session_id)
             if status {
@@ -671,6 +683,20 @@ class RabbitInputController {
                 this.ReplayInput(key, mask)
             }
         }
+    }
+
+    BuildRimeMask(key, mask, caps_lock_on, ascii_mode, good_old_caps_lock) {
+        local rime_mask := mask
+        local lock_on := caps_lock_on
+        if key = "CapsLock" && !(mask & KeyDef.mask["Up"]) && !good_old_caps_lock {
+            ; A suppressed AutoHotkey Caps Lock event does not change the Windows lock state.
+            ; Use Rime's current mode as the logical pre-press state so each press toggles it.
+            lock_on := ascii_mode
+        }
+        if lock_on {
+            rime_mask |= KeyDef.mask["Lock"]
+        }
+        return rime_mask
     }
 
     ResolveSwitcherStatus(old_schema_id, old_ascii_mode, old_full_shape, old_ascii_punct, new_schema_id) {

@@ -23,15 +23,29 @@ class RabbitInputHotkeys {
         this._registrations := []
         this._registration_map := Map()
         this._standalone_sources := Map()
+        this._default_good_old_caps_lock := false
+        this._schema_good_old_caps_lock := Map()
     }
 
-    AddConfig(rime_api, config) {
+    AddConfig(rime_api, config, schema_id := "") {
+        local good_old_caps_lock
         if !rime_api || !config {
             return
         }
         this.AddSwitcherHotkeys(rime_api, config)
         this.AddKeyBinderBindings(rime_api, config)
         this.AddAsciiComposerSwitchKeys(rime_api, config)
+        if rime_api.config_test_get_bool(
+            config,
+            "ascii_composer/good_old_caps_lock",
+            &good_old_caps_lock
+        ) {
+            if schema_id {
+                this._schema_good_old_caps_lock[schema_id] := !!good_old_caps_lock
+            } else {
+                this._default_good_old_caps_lock := !!good_old_caps_lock
+            }
+        }
     }
 
     Finalize() {
@@ -49,6 +63,12 @@ class RabbitInputHotkeys {
 
     GetRegistrations() {
         return this._registrations.Clone()
+    }
+
+    UsesGoodOldCapsLock(schema_id) {
+        return this._schema_good_old_caps_lock.Has(schema_id)
+            ? this._schema_good_old_caps_lock[schema_id]
+            : this._default_good_old_caps_lock
     }
 
     AddSwitcherHotkeys(rime_api, config) {
@@ -97,7 +117,12 @@ class RabbitInputHotkeys {
                 switch_action := rime_api.config_get_string(config, iter.path)
                 ; librime treats noop as a disabled switch key; do not intercept it as an ASCII source.
                 if switch_action != "noop" {
-                    this.AddBinding(iter.key, "ascii")
+                    if iter.key = "Caps_Lock" {
+                        this.AddRegistration("CapsLock", 0, false, "", false)
+                        this.AddRegistration("CapsLock", 0, true, "", false)
+                    } else {
+                        this.AddBinding(iter.key, "ascii")
+                    }
                 }
             }
         } finally {

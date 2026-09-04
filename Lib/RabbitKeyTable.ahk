@@ -21,6 +21,7 @@ class KeyDef {
         "Shift",        1 <<  0,
         "LShift",       1 <<  0,
         "RShift",       1 <<  0,
+        "Lock",         1 <<  1,
         "Ctrl",         1 <<  2,
         "LCtrl",        1 <<  2,
         "RCtrl",        1 <<  2,
@@ -148,7 +149,6 @@ class KeyDef {
         "Tab",          0x00ff09,
         "Enter",        0x00ff0d, ; Return
         ; "Pause",        0x00ff13,
-        ; "ScrollLock",   0x00ff14,
         "Escape",       0x00ff1b,
         "Home",         0x00ff50,
         "Left",         0x00ff51,
@@ -161,7 +161,6 @@ class KeyDef {
         ; "Insert",       0x00ff63,
         ; "AppsKey",      0x00ff67, ; Menu
         ; "Help",         0x00ff6a,
-        ; "NumLock",      0x00ff7f,
         "NumpadEnter",  0x00ff8d,
         "NumpadHome",   0x00ff95,
         "NumpadLeft",   0x00ff96,
@@ -212,8 +211,13 @@ class KeyDef {
         "F22",          0x00ffd3,
         "F23",          0x00ffd4,
         "F24",          0x00ffd5,
-        ; "CapsLock",     0x00ffe5,
         "Delete",       0x00ffff,
+    )
+
+    static lock_keycode := Map(
+        ; "ScrollLock",   0x00ff14,
+        ; "NumLock",      0x00ff7f,
+        "CapsLock",     0x00ffe5,
     )
 
     static rime_to_ahk := Map(

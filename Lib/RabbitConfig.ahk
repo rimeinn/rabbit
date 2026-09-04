@@ -100,7 +100,7 @@ class RabbitConfigLoader {
                 if !(schema := rime_api.schema_open(item.schema_id)) {
                     continue
                 }
-                values["input_hotkeys"].AddConfig(rime_api, schema)
+                values["input_hotkeys"].AddConfig(rime_api, schema, item.schema_id)
                 if rime_api.config_test_get_string(schema, "schema/icon", &icon) {
                     icon_path := RabbitUserDataPath() . "\" . LTrim(icon, "\")
                     if !FileExist(icon_path) {

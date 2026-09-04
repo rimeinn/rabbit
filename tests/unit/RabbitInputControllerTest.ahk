@@ -28,6 +28,8 @@ if A_Args.Length && A_Args[1] = "floating-preedit-placement" {
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
 RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.Bind())
 RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind())
+RunTest("Caps Lock ASCII switch registration", TestCapsLockAsciiSwitchRegistration.Bind())
+RunTest("Caps Lock forwards its lock state", TestCapsLockRimeMask.Bind())
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
 RunTest("up replay pairs with a replayed down", TestUpReplayPairsWithReplayedDown.Bind())
 RunTest("up is not replayed when down was handled", TestUpNotReplayedWhenDownHandled.Bind())
@@ -231,6 +233,7 @@ TestConfiguredInputHotkeySelection() {
 TestNoopAsciiSwitchKeyIsIgnored() {
     local hotkeys := RabbitInputHotkeys()
     local rime := RabbitInputHotkeysConfigProbe(Map(
+        "Caps_Lock", "noop",
         "Control_L", "noop",
         "Shift_L", "inline_ascii"
     ))
@@ -244,6 +247,144 @@ TestNoopAsciiSwitchKeyIsIgnored() {
     AssertTrue(
         FindInputRegistration(hotkeys.GetRegistrations(), "LShift"),
         "A non-noop ascii_composer switch key was not registered."
+    )
+    AssertTrue(
+        !FindInputRegistration(hotkeys.GetRegistrations(), "CapsLock"),
+        "Caps Lock was registered when its ascii_composer switch action was noop."
+    )
+}
+
+TestCapsLockAsciiSwitchRegistration() {
+    local hotkeys := RabbitInputHotkeys()
+    local rime := RabbitInputHotkeysConfigProbe(Map("Caps_Lock", "noop"))
+    hotkeys.AddAsciiComposerSwitchKeys(rime, {})
+    hotkeys.Finalize()
+    local noop_input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(Map("input_hotkeys", hotkeys)),
+        {},
+        {}
+    )
+    noop_input.RegisterHotKeys()
+    AssertTrue(
+        !ArrayContains(noop_input.registered_hotkeys, "$CapsLock")
+            && !ArrayContains(noop_input.registered_hotkeys, "$CapsLock Up"),
+        "Caps Lock was installed when its ascii_composer switch action was noop."
+    )
+    noop_input.Dispose()
+
+    local caps_hotkeys := RabbitInputHotkeys()
+    local caps_rime := RabbitInputHotkeysConfigProbe(Map(
+        "Caps_Lock", "clear",
+        "Shift_L", "inline_ascii"
+    ))
+    caps_hotkeys.AddAsciiComposerSwitchKeys(caps_rime, {})
+    caps_hotkeys.AddBinding("Control+Caps_Lock", "key_binder")
+    caps_hotkeys.Finalize()
+
+    local caps_registrations := caps_hotkeys.GetRegistrations()
+    AssertTrue(
+        FindInputRegistration(caps_registrations, "CapsLock"),
+        "Caps Lock was not registered when its ascii_composer switch action was enabled."
+    )
+    AssertTrue(
+        FindInputRegistration(caps_registrations, "CapsLock Up"),
+        "The enabled Caps Lock switch did not register its key-up event."
+    )
+    AssertTrue(
+        !FindInputRegistration(caps_registrations, "^CapsLock"),
+        "A configured Caps Lock combination was registered."
+    )
+
+    local input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(Map(
+            "input_hotkeys", caps_hotkeys,
+            "suspend_hotkey", "Control+Caps_Lock"
+        )),
+        {},
+        {}
+    )
+    input.RegisterHotKeys()
+    AssertTrue(
+        ArrayContains(input.registered_hotkeys, "$CapsLock"),
+        "The enabled Caps Lock switch was not installed as an input hotkey."
+    )
+    AssertTrue(
+        ArrayContains(input.registered_hotkeys, "$CapsLock Up"),
+        "The enabled Caps Lock key-up event was not installed as an input hotkey."
+    )
+    local registered_name
+    for registered_name in input.registered_hotkeys {
+        AssertTrue(
+            !InStr(registered_name, "CapsLock")
+                || registered_name = "$CapsLock"
+                || registered_name = "$CapsLock Up",
+            "A Caps Lock combination was installed: " . registered_name
+        )
+    }
+    input.Dispose()
+
+    local behavior_hotkeys := RabbitInputHotkeys()
+    behavior_hotkeys.AddConfig(
+        RabbitInputHotkeysConfigProbe(Map("Caps_Lock", "commit_code"), true),
+        {}
+    )
+    behavior_hotkeys.AddConfig(
+        RabbitInputHotkeysConfigProbe(Map("Caps_Lock", "commit_code"), false),
+        {},
+        "modern"
+    )
+    AssertTrue(
+        behavior_hotkeys.UsesGoodOldCapsLock("legacy"),
+        "A schema without an override did not inherit good-old Caps Lock."
+    )
+    AssertTrue(
+        !behavior_hotkeys.UsesGoodOldCapsLock("modern"),
+        "A schema did not override the default good-old Caps Lock setting."
+    )
+}
+
+TestCapsLockRimeMask() {
+    local input := RabbitInputController(
+        {},
+        1,
+        {},
+        RabbitConfigSnapshot(),
+        {},
+        {}
+    )
+    local lock := KeyDef.mask["Lock"]
+    local up := KeyDef.mask["Up"]
+
+    AssertEqual(
+        0,
+        input.BuildRimeMask("CapsLock", 0, false, false, false),
+        "The Chinese-to-ASCII Caps Lock press did not forward an unlocked state."
+    )
+    AssertEqual(
+        lock,
+        input.BuildRimeMask("CapsLock", 0, false, true, false),
+        "The ASCII-to-Chinese Caps Lock press did not forward a locked state."
+    )
+    AssertEqual(
+        0,
+        input.BuildRimeMask("CapsLock", 0, false, true, true),
+        "Good-old Caps Lock did not forward the physical pre-press state."
+    )
+    AssertEqual(
+        up,
+        input.BuildRimeMask("CapsLock", up, false, true, false),
+        "The Caps Lock key-up event did not preserve the physical lock state."
+    )
+    AssertEqual(
+        lock,
+        input.BuildRimeMask("a", 0, true, false, false),
+        "An ordinary key did not forward the current Caps Lock state."
     )
 }
 
@@ -728,8 +869,13 @@ class RabbitInputPlacementCandidateProbe {
 }
 
 class RabbitInputHotkeysConfigProbe {
-    __New(values) {
+    __New(values, good_old_caps_lock := -1) {
         this.values := values
+        this.good_old_caps_lock := good_old_caps_lock
+    }
+
+    config_begin_list(config, path) {
+        return 0
     }
 
     config_begin_map(config, path) {
@@ -743,6 +889,14 @@ class RabbitInputHotkeysConfigProbe {
     config_get_string(config, path) {
         local parts := StrSplit(path, "/")
         return this.values[parts[parts.Length]]
+    }
+
+    config_test_get_bool(config, path, &value) {
+        if this.good_old_caps_lock = -1 {
+            return false
+        }
+        value := this.good_old_caps_lock
+        return true
     }
 
     config_end(iter) {
