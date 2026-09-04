@@ -16,6 +16,8 @@
  *
  */
 
+#Include RabbitCommon.ahk
+
 class RabbitBehaviorSettingsModel {
     static SWITCH_KEYS := ["Shift_L", "Shift_R", "Control_L", "Control_R", "Caps_Lock", "Eisu_toggle"]
     static SWITCH_KEY_DEFAULTS := Map(
@@ -35,8 +37,8 @@ class RabbitBehaviorSettingsModel {
         this.disposed := false
 
         try {
-            this.settings := this.api.custom_settings_init("rabbit", "Rabbit.BehaviorSettings")
-            this.default_settings := this.api.custom_settings_init("default", "Rabbit.DefaultBehaviorSettings")
+            this.settings := this.api.custom_settings_init("rabbit", RABBIT_CUSTOMIZATION_GENERATOR_ID)
+            this.default_settings := this.api.custom_settings_init("default", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             if !this.settings || !this.default_settings || !this.Load() {
                 throw Error("未能读取输入与行为设置。")
             }

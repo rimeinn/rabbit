@@ -16,6 +16,8 @@
  *
  */
 
+#Include RabbitCommon.ahk
+
 class RabbitApplicationSettingsModel {
     __New(levers_api, rime_api) {
         this.api := levers_api
@@ -25,7 +27,7 @@ class RabbitApplicationSettingsModel {
         this.disposed := false
 
         try {
-            this.settings := this.api.custom_settings_init("rabbit", "Rabbit.ApplicationSettings")
+            this.settings := this.api.custom_settings_init("rabbit", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             if !this.settings || !this.Load() {
                 throw Error("未能读取应用适配设置。")
             }

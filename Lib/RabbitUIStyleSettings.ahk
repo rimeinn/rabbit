@@ -36,7 +36,7 @@ class UIStyleSettings {
     __New(rime_api, levers_api := 0) {
         this.rime := rime_api
         this.api := levers_api ? levers_api : RimeLeversApi(rime_api)
-        this.settings := this.api.custom_settings_init("rabbit", "Rabbit.UIStyleSettings")
+        this.settings := this.api.custom_settings_init("rabbit", RABBIT_CUSTOMIZATION_GENERATOR_ID)
     }
 
     Load() {

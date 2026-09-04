@@ -64,7 +64,7 @@ class RabbitDeployerWorkflow {
             throw Error("Failed to initialize Rime settings API.")
         }
         try {
-            settings := api.custom_settings_init("default", "Rabbit.CandidateLabels")
+            settings := api.custom_settings_init("default", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             if !settings || !api.load_settings(settings) {
                 throw Error("Failed to load candidate labels.")
             }
