@@ -777,7 +777,7 @@ class RabbitInputController {
         )) {
             return "{Blind}{" . key . " Down}"
         }
-        return shift . ctrl . alt . win . "{" . key . "}"
+        return "{Blind}" . shift . ctrl . alt . win . "{" . key . "}"
     }
 
     GetForegroundWindow() {

@@ -418,9 +418,14 @@ TestReleaseFallbackReplaysKeyUp() {
         "An unprocessed Space release was not replayed as a key-up event."
     )
     AssertEqual(
-        "+{A}",
+        "{Blind}+{A}",
         input.BuildFallbackInput("A", KeyDef.mask["Shift"]),
         "A normal shifted key fallback changed unexpectedly."
+    )
+    AssertEqual(
+        "{Blind}{a}",
+        input.BuildFallbackInput("a", 0),
+        "An unmodified letter fallback did not preserve the Caps Lock state."
     )
 }
 
