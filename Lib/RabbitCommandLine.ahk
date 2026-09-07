@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitI18n.ahk
 
 class RabbitApplicationOptions {
     __New() {
@@ -43,7 +44,7 @@ class RabbitApplicationOptions {
                         RabbitRequireOptionValue(args, &index, argument)
                     )
                 default:
-                    throw ValueError("未知的 Rabbit 参数：" . argument)
+                    throw ValueError(RabbitI18n.Text("frontend.cli_rabbit", Map("value", argument)))
             }
             index++
         }
@@ -84,7 +85,7 @@ class RabbitDeployerOptions {
                     options.keyboard_layout_provided := true
                 default:
                     if SubStr(argument, 1, 2) = "--" {
-                        throw ValueError("未知的 RabbitDeployer 参数：" . argument)
+                        throw ValueError(RabbitI18n.Text("frontend.cli_deployer", Map("value", argument)))
                     }
                     positionals.Push(argument)
             }
@@ -92,7 +93,7 @@ class RabbitDeployerOptions {
         }
 
         if positionals.Length > 2 {
-            throw ValueError("RabbitDeployer 收到了过多的位置参数。")
+            throw ValueError(RabbitI18n.Text("frontend.cli_too_many"))
         }
         if positionals.Length >= 1 {
             options.command := positionals[1]
@@ -109,43 +110,43 @@ class RabbitDeployerOptions {
             case "settings":
             case "legacy-settings":
                 if this.target && this.target != "dictionary" {
-                    throw ValueError("legacy-settings 仅支持 dictionary 子命令。")
+                    throw ValueError(RabbitI18n.Text("frontend.cli_dictionary_only"))
                 }
             case "deploy", "sync":
                 if this.target {
-                    throw ValueError(this.command . " 命令不接受目标参数。")
+                    throw ValueError(RabbitI18n.Text("frontend.cli_target", Map("value", this.command)))
                 }
             default:
-                throw ValueError("未知的 RabbitDeployer 命令：" . this.command)
+                throw ValueError(RabbitI18n.Text("frontend.cli_command", Map("value", this.command)))
         }
 
         if this.installing {
             if this.command = "settings" && this.target != "input-schemes" {
-                throw ValueError("首次安装必须打开 settings input-schemes。")
+                throw ValueError(RabbitI18n.Text("frontend.cli_install_page"))
             }
             if this.command = "legacy-settings" && this.target {
-                throw ValueError("旧版首次安装不接受子命令。")
+                throw ValueError(RabbitI18n.Text("frontend.cli_legacy_install"))
             }
             if this.command != "settings" && this.command != "legacy-settings" {
-                throw ValueError("--install 仅适用于设置命令。")
+                throw ValueError(RabbitI18n.Text("frontend.cli_install_only"))
             }
         }
         if this.return_to_rabbit && !this.keyboard_layout_provided {
-            throw ValueError("--return-to-rabbit 要求同时提供 --keyboard-layout。")
+            throw ValueError(RabbitI18n.Text("frontend.cli_return_layout"))
         }
     }
 }
 
 RabbitRequireUniqueOption(seen, option) {
     if seen.Has(option) {
-        throw ValueError("参数重复：" . option)
+        throw ValueError(RabbitI18n.Text("frontend.cli_duplicate", Map("value", option)))
     }
     seen[option] := true
 }
 
 RabbitRequireOptionValue(args, &index, option) {
     if index >= args.Length || SubStr(args[index + 1], 1, 2) = "--" {
-        throw ValueError(option . " 缺少参数值。")
+        throw ValueError(RabbitI18n.Text("frontend.cli_missing", Map("value", option)))
     }
     index++
     return args[index]
@@ -160,7 +161,7 @@ RabbitParseMaintenanceMode(value) {
         case "full":
             return RABBIT_FULL_MAINTENANCE
         default:
-            throw ValueError("未知的维护模式：" . value)
+            throw ValueError(RabbitI18n.Text("frontend.cli_maintenance", Map("value", value)))
     }
 }
 
@@ -173,7 +174,7 @@ RabbitMaintenanceModeName(value) {
         case RABBIT_FULL_MAINTENANCE:
             return "full"
         default:
-            throw ValueError("无效的维护模式：" . value)
+            throw ValueError(RabbitI18n.Text("frontend.cli_invalid_maintenance", Map("value", value)))
     }
 }
 
@@ -182,10 +183,10 @@ RabbitParseKeyboardLayout(value) {
     try {
         layout := Number(value)
     } catch {
-        throw ValueError("无效的键盘布局：" . value)
+        throw ValueError(RabbitI18n.Text("frontend.cli_layout", Map("value", value)))
     }
     if Type(layout) != "Integer" || layout <= 0 {
-        throw ValueError("无效的键盘布局：" . value)
+        throw ValueError(RabbitI18n.Text("frontend.cli_layout", Map("value", value)))
     }
     return layout
 }

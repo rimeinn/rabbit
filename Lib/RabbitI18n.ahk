@@ -25,6 +25,32 @@ class RabbitI18n {
     static diagnostics := []
     static directory := ""
 
+    static LoadStartupConfig(rime_api, path, directory := A_ScriptDir . "\locales") {
+        local config := 0, preference := "auto", diagnostic := ""
+        ; Read only the deployed YAML before Rime starts maintenance or command-line validation.
+        try {
+            if FileExist(path) {
+                config := rime_api.config_load_string(FileRead(path, "UTF-8"))
+                if config {
+                    preference := rime_api.config_get_string(config, "language")
+                    if !preference {
+                        preference := "auto"
+                    }
+                }
+            }
+        } catch as err {
+            diagnostic := err.Message
+        } finally {
+            if config {
+                rime_api.config_close(config)
+            }
+        }
+        this.Initialize(directory, preference)
+        if diagnostic {
+            this.diagnostics.Push(diagnostic)
+        }
+    }
+
     static LoadConfig(rime_api, directory := A_ScriptDir . "\locales") {
         this.Initialize(directory, this.ReadPreference(rime_api))
     }

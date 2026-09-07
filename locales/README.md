@@ -100,7 +100,7 @@ The embedded catalog is included in compiled executables and source distribution
 After changing `locales/zh-CN.ini`, regenerate its checked-in fallback:
 
 ```powershell
-python scripts/generate_locale_fallback.py
+AutoHotkey.exe /ErrorStdOut scripts/generate_locale_fallback.ahk
 ```
 
 The unit suite verifies exact key and value parity with the Chinese source.

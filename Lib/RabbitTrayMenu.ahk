@@ -22,8 +22,6 @@
 #Include RabbitConfigSnapshot.ahk
 #Include RabbitAbout.ahk
 
-A_IconTip := "玉兔毫（维护中）"
-
 RabbitSetupMaintenanceTray() {
     A_IconTip := RabbitI18n.Text("tray.maintenance")
     A_TrayMenu.Delete()
@@ -221,7 +219,8 @@ class RabbitTrayController {
         this.UpdateTip()
         this.UpdateIcon()
         if this.config.show_tips {
-            this.ShowStatusTip(A_IsSuspended ? "禁用" : "启用")
+            this.ShowStatusTip(RabbitI18n.Text(
+                A_IsSuspended ? "frontend.status_disabled" : "frontend.status_enabled"))
         }
         this.SetupMenu()
     }
@@ -269,21 +268,20 @@ class RabbitTrayController {
         this.ascii_mode := !!ascii_mode
         this.full_shape := !!full_shape
         this.ascii_punct := !!ascii_punct
-        local suspended := A_IsSuspended ? "（已禁用）" : ""
-        A_IconTip := Format(
-            "玉兔毫 {} {}`n左键切换模式，右键打开菜单`n{} | {} | {}",
-            suspended,
-            this.schema_name,
-            this.ascii_mode
+        local suspended := A_IsSuspended ? RabbitI18n.Text("frontend.suspended") : ""
+        A_IconTip := RabbitI18n.Text("frontend.icon_tip", Map(
+            "suspended", suspended,
+            "schema", this.schema_name,
+            "ascii", this.ascii_mode
                 ? this.runtime_state.ascii_mode_true_label
                 : this.runtime_state.ascii_mode_false_label,
-            this.full_shape
+            "shape", this.full_shape
                 ? this.runtime_state.full_shape_true_label
                 : this.runtime_state.full_shape_false_label,
-            this.ascii_punct
+            "punct", this.ascii_punct
                 ? this.runtime_state.ascii_punct_true_label
                 : this.runtime_state.ascii_punct_false_label
-        )
+        ))
     }
 
     UpdateSchemaIcon(schema_id) {
@@ -354,7 +352,7 @@ class RabbitTrayController {
     CheckNewVersion() {
         local http, url, status, response_text, match, down, arch
         if !IsDigit(SubStr(RABBIT_VERSION, 1, 1)) {
-            MsgBox("非正式版本，请前往仓库检查新版本", RabbitI18n.Text("tray.product"))
+            MsgBox(RabbitI18n.Text("frontend.update_unofficial"), RabbitI18n.Text("tray.product"))
             return
         }
         http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -369,24 +367,24 @@ class RabbitTrayController {
             http.WaitForResponse()
             status := http.Status
             if status != 200 {
-                MsgBox("无法获取最新版本信息，请检查网络连接", RabbitI18n.Text("tray.product"))
+                MsgBox(RabbitI18n.Text("frontend.update_network"), RabbitI18n.Text("tray.product"))
                 return
             }
             response_text := http.ResponseText
             if RegExMatch(response_text, '"name"\s*:\s*"(.*?)"', &match) {
                 version := SubStr(match[1], 1, 1) == "v" ? SubStr(match[1], 2) : match[1]
             } else {
-                MsgBox("无法解析版本字段，请稍后再试", RabbitI18n.Text("tray.product"))
+                MsgBox(RabbitI18n.Text("frontend.update_parse"), RabbitI18n.Text("tray.product"))
                 return
             }
         }
         if version == "" {
-            MsgBox("无法获取最新版本号，请稍后再试", RabbitI18n.Text("tray.product"))
+            MsgBox(RabbitI18n.Text("frontend.update_missing"), RabbitI18n.Text("tray.product"))
             return
         }
         if VerCompare(version, RABBIT_VERSION) > 0 {
             down := MsgBox(
-                Format("发现新版本：{}`r`n是否前往下载？", version),
+                RabbitI18n.Text("frontend.update_new", Map("version", version)),
                 RabbitI18n.Text("tray.product"),
                 "YesNo"
             )
@@ -399,7 +397,7 @@ class RabbitTrayController {
                 ))
             }
         } else {
-            MsgBox("当前已是最新版本", RabbitI18n.Text("tray.product"))
+            MsgBox(RabbitI18n.Text("frontend.update_current"), RabbitI18n.Text("tray.product"))
         }
     }
 }

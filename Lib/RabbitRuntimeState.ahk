@@ -18,6 +18,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitConfigSnapshot.ahk
+#Include RabbitI18n.ahk
 
 class RabbitRuntimeState {
     __New(rime_api, session_id, config) {
@@ -41,14 +42,14 @@ class RabbitRuntimeState {
         this.tray_tip_process := ""
         this.tray_tip_ascii := false
 
-        this.ascii_mode_false_label := "中文"
-        this.ascii_mode_true_label := "西文"
-        this.ascii_mode_false_label_abbr := "中"
-        this.ascii_mode_true_label_abbr := "西"
-        this.full_shape_false_label := "半角"
-        this.full_shape_true_label := "全角"
-        this.full_shape_false_label_abbr := "半"
-        this.full_shape_true_label_abbr := "全"
+        this.ascii_mode_false_label := RabbitI18n.Text("frontend.chinese")
+        this.ascii_mode_true_label := RabbitI18n.Text("frontend.latin")
+        this.ascii_mode_false_label_abbr := RabbitI18n.Text("frontend.chinese_abbr")
+        this.ascii_mode_true_label_abbr := RabbitI18n.Text("frontend.latin_abbr")
+        this.full_shape_false_label := RabbitI18n.Text("frontend.half")
+        this.full_shape_true_label := RabbitI18n.Text("frontend.full")
+        this.full_shape_false_label_abbr := RabbitI18n.Text("frontend.half_abbr")
+        this.full_shape_true_label_abbr := RabbitI18n.Text("frontend.full_abbr")
         this.ascii_punct_false_label := "。，"
         this.ascii_punct_true_label := ". ,"
         this.ascii_punct_false_label_abbr := "。"
@@ -113,21 +114,21 @@ class RabbitRuntimeState {
             return
         }
         str := this.rime.get_state_label(this.session_id, "ascii_mode", false)
-        this.ascii_mode_false_label := str ? str : "中文"
+        this.ascii_mode_false_label := str ? str : RabbitI18n.Text("frontend.chinese")
         str := this.rime.get_state_label(this.session_id, "ascii_mode", true)
-        this.ascii_mode_true_label := str ? str : "西文"
+        this.ascii_mode_true_label := str ? str : RabbitI18n.Text("frontend.latin")
         slice := this.rime.get_state_label_abbreviated(this.session_id, "ascii_mode", false, true)
-        this.ascii_mode_false_label_abbr := (slice && slice.slice !== "") ? slice.slice : "中"
+        this.ascii_mode_false_label_abbr := (slice && slice.slice !== "") ? slice.slice : RabbitI18n.Text("frontend.chinese_abbr")
         slice := this.rime.get_state_label_abbreviated(this.session_id, "ascii_mode", true, true)
-        this.ascii_mode_true_label_abbr := (slice && slice.slice !== "") ? slice.slice : "西"
+        this.ascii_mode_true_label_abbr := (slice && slice.slice !== "") ? slice.slice : RabbitI18n.Text("frontend.latin_abbr")
         str := this.rime.get_state_label(this.session_id, "full_shape", false)
-        this.full_shape_false_label := str ? str : "半角"
+        this.full_shape_false_label := str ? str : RabbitI18n.Text("frontend.half")
         str := this.rime.get_state_label(this.session_id, "full_shape", true)
-        this.full_shape_true_label := str ? str : "全角"
+        this.full_shape_true_label := str ? str : RabbitI18n.Text("frontend.full")
         slice := this.rime.get_state_label_abbreviated(this.session_id, "full_shape", false, true)
-        this.full_shape_false_label_abbr := (slice && slice.slice !== "") ? slice.slice : "半"
+        this.full_shape_false_label_abbr := (slice && slice.slice !== "") ? slice.slice : RabbitI18n.Text("frontend.half_abbr")
         slice := this.rime.get_state_label_abbreviated(this.session_id, "full_shape", true, true)
-        this.full_shape_true_label_abbr := (slice && slice.slice !== "") ? slice.slice : "全"
+        this.full_shape_true_label_abbr := (slice && slice.slice !== "") ? slice.slice : RabbitI18n.Text("frontend.full_abbr")
         str := this.rime.get_state_label(this.session_id, "ascii_punct", false)
         this.ascii_punct_false_label := str ? str : "。，"
         str := this.rime.get_state_label(this.session_id, "ascii_punct", true)

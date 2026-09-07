@@ -33,12 +33,14 @@ class RabbitDeployerApplication {
     }
 
     Run(args) {
+        RabbitI18n.LoadStartupConfig(this.context.rime, RabbitUserDataPath() . "\build\rabbit.yaml")
+        A_IconTip := RabbitI18n.Text("tray.maintenance")
         local options := this.ParseOptions(args)
         this.context.command := options.command
         this.context.keyboard_layout := options.keyboard_layout
 
         TrayTip()
-        TrayTip("维护中", RABBIT_IME_NAME)
+        TrayTip(RabbitI18n.Text("frontend.maintenance"), RabbitI18n.Text("settings.product"))
 
         OnExit(this.exit_callback)
         this.context.Initialize()
@@ -78,7 +80,7 @@ class RabbitDeployerApplication {
         local options := RabbitDeployerOptions.Parse(args)
         if options.command = "settings" && options.target
             && !RabbitSettingsWindow.PageIndex(options.target) {
-            throw ValueError("未知的设置页面：" . options.target)
+            throw ValueError(RabbitI18n.Text("messages.unknown_page", Map("page", options.target)))
         }
         return options
     }

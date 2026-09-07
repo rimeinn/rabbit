@@ -41,6 +41,8 @@ class RabbitApplication {
     }
 
     Run(args) {
+        RabbitI18n.LoadStartupConfig(this.context.rime, RabbitUserDataPath() . "\build\rabbit.yaml")
+        A_IconTip := RabbitI18n.Text("tray.maintenance")
         local fail_count, options, status
         options := RabbitApplicationOptions.Parse(args)
         this.context.keyboard_layout := this.ResolveKeyboardLayout(options.keyboard_layout)
@@ -54,7 +56,7 @@ class RabbitApplication {
             fail_count++
             if fail_count > 500 {
                 TrayTip()
-                TrayTip("有其他进程正在使用 RIME，启动失败")
+                TrayTip(RabbitI18n.Text("frontend.startup_busy"))
                 Sleep(2000)
                 ExitApp()
             }
@@ -92,14 +94,14 @@ class RabbitApplication {
             }
         } else {
             TrayTip()
-            TrayTip("维护完成", RABBIT_IME_NAME)
+            TrayTip(RabbitI18n.Text("frontend.maintenance_done"), RabbitI18n.Text("settings.product"))
             SetTimer(TrayTip, -2000)
         }
 
         this.context.session_id := this.context.rime.create_session()
         if !this.context.session_id {
             this.SetDefaultKeyboard(this.context.keyboard_layout)
-            throw Error("未能成功创建 RIME 会话。")
+            throw Error(RabbitI18n.Text("frontend.session_error"))
         }
         RabbitDebug(
             Format("startup: rime session created (id={})", this.context.session_id),
@@ -238,15 +240,15 @@ class RabbitApplication {
         if msg_type = "deploy" {
             if msg_value = "start" {
                 TrayTip()
-                TrayTip("维护中", RABBIT_IME_NAME)
+                TrayTip(RabbitI18n.Text("frontend.maintenance"), RabbitI18n.Text("settings.product"))
             } else if msg_value = "success" {
                 TrayTip()
-                TrayTip("维护完成", RABBIT_IME_NAME)
+                TrayTip(RabbitI18n.Text("frontend.maintenance_done"), RabbitI18n.Text("settings.product"))
                 SetTimer(TrayTip, -2000)
             } else {
                 TrayTip(
-                    msg_type . ": " . msg_value . " (" . session_id . ")",
-                    RABBIT_IME_NAME
+                    RabbitI18n.Text("frontend.maintenance_failed", Map("detail", msg_value, "session", session_id)),
+                    RabbitI18n.Text("settings.product")
                 )
             }
         }

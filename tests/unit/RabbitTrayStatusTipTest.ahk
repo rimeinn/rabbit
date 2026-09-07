@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 #Include ..\support\TestCommon.ahk
 #Include ..\..\Lib\RabbitTrayMenu.ahk
+#Include ..\..\Lib\RabbitRuntimeState.ahk
 
 RunTest("status tip follows current tray icon", TestStatusTipFollowsTrayIcon.Bind())
 RunTest("tray about opens a standalone window", TestTrayAboutOpensStandaloneWindow.Bind())
@@ -81,5 +82,29 @@ class RabbitTrayAboutDialogProbe {
 
     Show(options := "") {
         this.owner.about_shown := true
+    }
+}
+
+RunTest("tray tooltip localizes defaults and preserves schema labels", TestTranslatedTrayTip.Bind())
+
+TestTranslatedTrayTip() {
+    local directory := A_LineFile . "\..\..\..\locales"
+    local old_tip := A_IconTip, runtime, tray
+    try {
+        RabbitI18n.Initialize(directory, "en-US")
+        runtime := RabbitRuntimeState(0, 0, RabbitConfigSnapshot())
+        tray := RabbitTrayController(0, 0, 0, 0, runtime, 0, (*) => 0)
+        tray.UpdateTip("Test", false, false, false)
+        AssertTrue(InStr(A_IconTip, "Left-click"), "Tray instructions were not translated.")
+        AssertTrue(InStr(A_IconTip, "Chinese | Half-width"), "Default status labels were not translated.")
+        runtime.ascii_mode_false_label := "自定义"
+        tray.UpdateTip()
+        AssertTrue(InStr(A_IconTip, "自定义"), "Schema labels were replaced by translations.")
+        RabbitI18n.Initialize(directory, "ja-JP")
+        tray.UpdateTip()
+        AssertTrue(InStr(A_IconTip, "左クリック"), "Tray instructions retained the previous language.")
+    } finally {
+        A_IconTip := old_tip
+        RabbitI18n.Initialize(directory, "zh-CN")
     }
 }

@@ -123,20 +123,10 @@ rabbit/
 
 使用配置、方案或日常操作方面的问题，可以在 [Discussions](https://github.com/rimeinn/rabbit/discussions) 讨论，也欢迎加入 [Telegram 群聊](https://t.me/rime_rabbit)。
 
-### 界面语言（初步支持）
+### 界面语言
 
-托盘菜单、现代设置窗口、快捷键／配色／高级字体对话框及“关于”页面支持简体中文、英文、繁体中文（香港）、繁体中文（台湾）和日语，默认跟随 Windows 用户区域语言。
-可在控制面板的“输入与行为 → 界面”中选择语言，再点击“应用并重新部署”。
-也可以在 Rime 用户文件夹的 `rabbit.custom.yaml` 中，将语言选项合并到已有的 `patch` 下，然后重新部署：
+支持简体中文、繁体中文（香港／台湾）、英文和日语，默认跟随系统语言。在控制面板的“输入与行为 → 界面”中选择语言，然后点击“应用并重新部署”即可生效。
 
-```yaml
-patch:
-  language: en-US
-```
+也可以在 `rabbit.custom.yaml` 的 `patch` 下设置 `language`，可选值为 `auto`、`zh-CN`、`zh-HK`、`zh-TW`、`en-US` 或 `ja-JP`，修改后重新部署。
 
-可选值为 `auto`、`zh-CN`、`en-US`、`zh-HK` 和 `zh-TW`。语言从部署后的配置读取，修改后重新部署生效。
-部署成功且界面语言变化时，控制面板会自动重建，并恢复当前页面、子标签和窗口位置；其他修改不会触发重建。旧版部署对话框和部分前端通知尚未迁移；方案名称、用户内容及 Rime 提供的状态标签保留原文。
-官方语言也支持 `zh`、`zh-Hans`、`zh-Hant`、`en` 别名。交付的完整日语翻译 `ja-JP` 通过 `locales/ja-JP.ini` 的元信息自动发现。
-在 `locales` 放入带有 `meta.locale` 和 `meta.language_name` 的 `<lang-code>.ini`，重新打开控制面板即可发现额外语言；允许只翻译部分文案。
-翻译文件缺失或损坏时，界面会回退到内嵌简体中文，不影响打开设置。
-翻译格式、回退规则及检查方法见 [翻译说明](locales/README.md)。
+欢迎完善现有翻译或添加新语言，具体方法见 [翻译说明](locales/README.md)。

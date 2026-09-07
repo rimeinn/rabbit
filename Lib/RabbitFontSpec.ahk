@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#Include RabbitI18n.ahk
 
 class RabbitFontSpec {
     static MAX_CODE_POINT := 0x10ffff
@@ -80,13 +81,13 @@ class RabbitFontSpec {
         local has_style := false
         local source := Trim(String(value))
         if !source {
-            throw ValueError("Font setting cannot be empty.")
+            throw ValueError(RabbitI18n.Text("frontend.font_empty"))
         }
 
         for index, unit in StrSplit(source, ",") {
             unit := Trim(unit)
             if !unit {
-                throw ValueError("Font setting contains an empty fallback entry.")
+                throw ValueError(RabbitI18n.Text("frontend.font_entry_empty"))
             }
             entries.Push(this.ParseEntry(
                 unit,
@@ -105,7 +106,7 @@ class RabbitFontSpec {
         local family := Trim(fields.RemoveAt(1))
         local range_fields := []
         if !family {
-            throw ValueError("Font family name cannot be empty.")
+            throw ValueError(RabbitI18n.Text("frontend.font_family_empty"))
         }
 
         for field in fields {
@@ -115,14 +116,14 @@ class RabbitFontSpec {
             local is_style := normalized && this.FONT_STYLES.Has(normalized)
             if is_weight || is_style {
                 if index != 1 {
-                    throw ValueError("Font weight and style are only allowed in the first fallback entry.")
+                    throw ValueError(RabbitI18n.Text("frontend.font_first"))
                 }
                 ; "normal" names both default weight and style. Treat it as
                 ; the first still-unspecified attribute; the result is the
                 ; same when neither attribute was explicitly set.
                 if is_weight && (!is_style || !has_weight) {
                     if has_weight {
-                        throw ValueError("Font weight is specified more than once.")
+                        throw ValueError(RabbitI18n.Text("frontend.font_weight_duplicate"))
                     }
                     font_weight := this.FONT_WEIGHTS[normalized]
                     has_weight := true
@@ -130,7 +131,7 @@ class RabbitFontSpec {
                 }
                 if is_style {
                     if has_style {
-                        throw ValueError("Font style is specified more than once.")
+                        throw ValueError(RabbitI18n.Text("frontend.font_style_duplicate"))
                     }
                     font_style := this.FONT_STYLES[normalized]
                     has_style := true
@@ -141,7 +142,7 @@ class RabbitFontSpec {
         }
 
         if range_fields.Length > 2 {
-            throw ValueError("Font fallback entry has more than two Unicode range fields.")
+            throw ValueError(RabbitI18n.Text("frontend.font_range_fields"))
         }
         local start_code_point := range_fields.Length >= 1 && range_fields[1] != ""
             ? this.ParseCodePoint(range_fields[1])
@@ -150,7 +151,7 @@ class RabbitFontSpec {
             ? this.ParseCodePoint(range_fields[2])
             : this.MAX_CODE_POINT
         if start_code_point > end_code_point {
-            throw ValueError("Font fallback range start cannot exceed its end.")
+            throw ValueError(RabbitI18n.Text("frontend.font_range_order"))
         }
         return {
             family: family,
@@ -161,11 +162,11 @@ class RabbitFontSpec {
 
     static ParseCodePoint(value) {
         if !RegExMatch(value, "i)^[0-9a-f]{1,6}$") {
-            throw ValueError("Unicode code point must be an unprefixed hexadecimal value.")
+            throw ValueError(RabbitI18n.Text("frontend.font_codepoint"))
         }
         local code_point := Integer("0x" . value)
         if code_point > this.MAX_CODE_POINT {
-            throw ValueError("Unicode code point cannot exceed 10FFFF.")
+            throw ValueError(RabbitI18n.Text("frontend.font_codepoint_max"))
         }
         return code_point
     }
@@ -205,14 +206,14 @@ class RabbitFontSpec {
 
     static GetFontWeightName(font_weight) {
         if !this.FONT_WEIGHT_NAMES.Has(font_weight) {
-            throw ValueError("Unsupported DirectWrite font weight: " . font_weight)
+            throw ValueError(RabbitI18n.Text("frontend.font_weight", Map("value", font_weight)))
         }
         return this.FONT_WEIGHT_NAMES[font_weight]
     }
 
     static GetFontStyleName(font_style) {
         if !this.FONT_STYLE_NAMES.Has(font_style) {
-            throw ValueError("Unsupported DirectWrite font style: " . font_style)
+            throw ValueError(RabbitI18n.Text("frontend.font_style", Map("value", font_style)))
         }
         return this.FONT_STYLE_NAMES[font_style]
     }

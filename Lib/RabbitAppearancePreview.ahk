@@ -17,6 +17,7 @@
 
 #Include RabbitCandidateBox.ahk
 #Include RabbitPopupPlacement.ahk
+#Include RabbitI18n.ahk
 
 class RabbitAppearancePreview {
     static REFRESH_INTERVAL := 100
@@ -112,7 +113,7 @@ class RabbitAppearancePreview {
         } catch as err {
             this.HideWindows()
             if this.owner && HasProp(this.owner, "appearance_status") {
-                this.owner.appearance_status.Value := "无法显示预览：" . err.Message
+                this.owner.appearance_status.Value := RabbitI18n.Text("messages.preview_error", Map("reason", err.Message))
             }
         }
     }

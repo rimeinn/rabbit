@@ -251,3 +251,45 @@ TestLanguageDiscovery() {
         RabbitI18n.Initialize(repository, "zh-CN")
     }
 }
+
+RunTest("startup language uses deployed YAML before Rime initialization", TestStartupLanguage.Bind())
+
+TestStartupLanguage() {
+    local directory := A_LineFile . "\..\..\..\locales"
+    local path := A_Temp . "\rabbit-startup-language-" . DllCall("GetCurrentProcessId") . ".yaml"
+    local api := RabbitStartupLanguageFake()
+    try {
+        FileAppend("language: en-US`n", path, "UTF-8-RAW")
+        RabbitI18n.LoadStartupConfig(api, path, directory)
+        AssertEqual("en-US", RabbitI18n.locale, "Startup ignored the deployed language.")
+        AssertTrue(api.closed, "Startup configuration handle leaked.")
+        AssertEqual("Maintenance in progress", RabbitI18n.Text("frontend.maintenance"),
+            "Startup notification was not translated.")
+        api.fail := true
+        RabbitI18n.LoadStartupConfig(api, path, directory)
+        AssertEqual(1, RabbitI18n.diagnostics.Length, "Damaged startup config was not diagnosed.")
+        AssertTrue(RabbitI18n.Text("frontend.maintenance") != "frontend.maintenance",
+            "Damaged startup config lost fallback translations.")
+        FileDelete(path)
+        RabbitI18n.LoadStartupConfig(api, path, directory)
+        AssertEqual(0, RabbitI18n.diagnostics.Length, "Missing startup config should use auto.")
+    } finally {
+        if FileExist(path) {
+            FileDelete(path)
+        }
+        RabbitI18n.Initialize(directory, "zh-CN")
+    }
+}
+
+class RabbitStartupLanguageFake extends RabbitI18nConfigFake {
+    fail := false
+
+    config_load_string(yaml) {
+        AssertEqual("language: en-US`n", yaml, "Startup did not read the deployed YAML.")
+        if this.fail {
+            throw Error("Invalid YAML")
+        }
+        this.closed := false
+        return 42
+    }
+}

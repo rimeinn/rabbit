@@ -2285,9 +2285,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     UpdateSwitcherPreview() {
-        local labels := this.switcher_abbreviate_options.Value
-            ? ["中", "半", "简"]
-            : ["中文", "半角", "简体"]
+        local suffix := this.switcher_abbreviate_options.Value ? "_abbr" : ""
+        local labels := [
+            RabbitI18n.Text("frontend.chinese" . suffix),
+            RabbitI18n.Text("frontend.half" . suffix),
+            RabbitI18n.Text("frontend.simplified" . suffix)
+        ]
         this.switcher_preview.Value := RabbitI18n.Text("messages.summary", Map("summary", this.switcher_prefix.Value
             . labels[1] . this.switcher_separator.Value . labels[2]
             . this.switcher_separator.Value . labels[3] . this.switcher_suffix.Value))

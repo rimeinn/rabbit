@@ -25,6 +25,7 @@
 #Include RabbitSwitcherSettingsDialog.ahk
 #Include RabbitUIStyleSettings.ahk
 #Include RabbitUIStyleSettingsDialog.ahk
+#Include RabbitI18n.ahk
 
 class RabbitDeployerWorkflow {
     __New(rime_api) {
@@ -61,15 +62,15 @@ class RabbitDeployerWorkflow {
         local api := this.CreateLevers()
         local config, settings := 0
         if !api {
-            throw Error("Failed to initialize Rime settings API.")
+            throw Error(RabbitI18n.Text("frontend.settings_api"))
         }
         try {
             settings := api.custom_settings_init("default", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             if !settings || !api.load_settings(settings) {
-                throw Error("Failed to load candidate labels.")
+                throw Error(RabbitI18n.Text("frontend.labels_load"))
             }
             if !(config := api.settings_get_config(settings)) {
-                throw Error("Failed to read candidate label settings.")
+                throw Error(RabbitI18n.Text("frontend.labels_read"))
             }
             return RabbitBehaviorSettingsModel.ReadStringList(
                 this.rime,
@@ -99,7 +100,7 @@ class RabbitDeployerWorkflow {
         local settings := UIStyleSettings(this.rime, this.CreateLevers())
         try {
             if !settings.Load() {
-                throw Error("Failed to load UI style settings.")
+                throw Error(RabbitI18n.Text("frontend.style_load"))
             }
             return settings
         } catch {
@@ -220,8 +221,8 @@ class RabbitDeployerWorkflow {
                 ; TODO: log error
                 if report_errors {
                     MsgBox(
-                        "正在执行另一项部署任务，方才所做的修改将在输入法再次启动后生效。",
-                        "【玉兔毫】",
+                        RabbitI18n.Text("frontend.deploy_busy_deferred"),
+                        RabbitI18n.Text("about.message_title"),
                         "Ok Iconi"
                     )
                 }
@@ -278,7 +279,7 @@ class RabbitDeployerWorkflow {
         try {
             if mutex.lasterr == ERROR_ALREADY_EXISTS {
                 ; TODO: log error
-                MsgBox("正在执行另一项部署任务，请稍后再试。", "【玉兔毫】", "Ok Iconi")
+                MsgBox(RabbitI18n.Text("frontend.deploy_busy"), RabbitI18n.Text("about.message_title"), "Ok Iconi")
                 return 1
             }
 
