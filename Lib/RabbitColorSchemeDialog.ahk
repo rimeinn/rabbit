@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,6 +19,8 @@
 #Include RabbitDialogPlacement.ahk
 #Include RabbitWindowTheme.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitColorSchemeDialog extends Gui {
     __New(
         owner,
@@ -37,8 +39,8 @@ class RabbitColorSchemeDialog extends Gui {
         }
         super.__New(
             "+Owner" . owner.Hwnd . " -MinimizeBox -MaximizeBox",
-            mode = "new" ? "新建配色方案" : mode = "copy" ? "复制配色方案" :
-                mode = "view" ? "查看配色方案" : "编辑配色方案",
+            mode = "new" ? RabbitI18n.Text("appearance.color_new") : mode = "copy" ? RabbitI18n.Text("appearance.color_copy") :
+                mode = "view" ? RabbitI18n.Text("appearance.color_view") : RabbitI18n.Text("appearance.color_edit"),
             this
         )
         this.owner_window := owner
@@ -63,16 +65,16 @@ class RabbitColorSchemeDialog extends Gui {
             "Microsoft YaHei UI"
         )
 
-        this.AddText("x20 y24 w72 h22", "方案名称：")
+        this.AddText("x20 y24 w72 h22", RabbitI18n.Text("appearance.color_name"))
         this.name_edit := this.AddEdit("x94 y20 w208 r1 -Multi", color_scheme.name)
-        this.AddText("x326 y24 w72 h22", "方案标识：")
+        this.AddText("x326 y24 w72 h22", RabbitI18n.Text("appearance.color_id"))
         this.id_edit := this.AddEdit("x400 y20 w220 r1 -Multi", color_scheme.color_scheme_id)
         this.id_edit.Enabled := mode = "new" || mode = "copy"
-        this.AddText("x20 y62 w72 h22", "作者：")
+        this.AddText("x20 y62 w72 h22", RabbitI18n.Text("appearance.author"))
         this.author_edit := this.AddEdit("x94 y58 w526 r1 -Multi", color_scheme.author)
 
-        this.window_group := this.AddGroupBox("x16 y98 w296 h352", "窗口与编码")
-        this.candidate_group := this.AddGroupBox("x320 y98 w304 h352", "候选项")
+        this.window_group := this.AddGroupBox("x16 y98 w296 h352", RabbitI18n.Text("appearance.window_colors"))
+        this.candidate_group := this.AddGroupBox("x320 y98 w304 h352", RabbitI18n.Text("appearance.candidate_colors"))
         for index, field in RabbitColorScheme.EDITABLE_COLOR_FIELDS {
             if index <= 6 || field.key = "shadow_color" || field.key = "hilited_shadow_color" {
                 x := 28
@@ -86,13 +88,13 @@ class RabbitColorSchemeDialog extends Gui {
 
         this.status := this.AddText("x20 y458 w600 h24 cRed", "")
         if mode = "view" {
-            this.close_button := this.AddButton("x532 y490 w88 h32 Default", "关闭")
+            this.close_button := this.AddButton("x532 y490 w88 h32 Default +0x2000", RabbitI18n.Text("common.close"))
             this.close_button.OnEvent("Click", (*) => this.Dispose())
             this.SetEditable(false)
         } else {
-            this.save_button := this.AddButton("x436 y490 w88 h32 Default", "确定")
+            this.save_button := this.AddButton("x436 y490 w88 h32 Default +0x2000", RabbitI18n.Text("common.ok"))
             this.save_button.OnEvent("Click", (*) => this.SaveScheme())
-            this.cancel_button := this.AddButton("x532 y490 w88 h32", "取消")
+            this.cancel_button := this.AddButton("x532 y490 w88 h32 +0x2000", RabbitI18n.Text("common.cancel"))
             this.cancel_button.OnEvent("Click", (*) => this.Dispose())
         }
         this.OnEvent("Close", (*) => this.Dispose())
@@ -106,7 +108,7 @@ class RabbitColorSchemeDialog extends Gui {
 
     AddColorControl(field, x, y) {
         local argb := this.colors[field.key]
-        local label := this.AddText(Format("x{} y{} w116 h24 +0x200", x, y), field.label . "：")
+        local label := this.AddText(Format("x{} y{} w116 h24 +0x200", x, y), RabbitI18n.Text("messages.field_label", Map("label", field.label)))
         local swatch := this.AddText(
             Format("x{} y{} w28 h24 +Border +0x100 Background{}", x + 118, y, this.RgbHex(argb)),
             ""
@@ -183,7 +185,7 @@ class RabbitColorSchemeDialog extends Gui {
             )
             return true
         } catch as err {
-            this.status.Value := "无法显示预览：" . err.Message
+            this.status.Value := RabbitI18n.Text("messages.preview_error", Map("reason", err.Message))
             return false
         }
     }
@@ -194,7 +196,7 @@ class RabbitColorSchemeDialog extends Gui {
         local name := Trim(this.name_edit.Value)
         local colors := Map()
         if !name {
-            this.status.Value := "方案名称不能为空。"
+            this.status.Value := RabbitI18n.Text("appearance.color_name_required")
             return false
         }
         try {
@@ -204,7 +206,7 @@ class RabbitColorSchemeDialog extends Gui {
             return false
         }
         if this.id_validator && !this.id_validator.Call(color_scheme_id) {
-            this.status.Value := "方案标识已存在。"
+            this.status.Value := RabbitI18n.Text("appearance.color_id_exists")
             return false
         }
         try {

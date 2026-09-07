@@ -4,16 +4,18 @@
 
 The rules in this section bind every agent run of this repository's scripts and take precedence over convenience. Read them before running anything.
 
-### Catch every AutoHotkey exception at the top level
+### Catch AutoHotkey exceptions in agent runs and tests
 
 An uncaught AutoHotkey exception pops up a native error dialog on the machine running the script. No agent tool can see that dialog; it can leave the process hanging, exiting with a misleading status, or failing silently while the GUI waits for a click. Therefore:
 
-- When running or testing any AutoHotkey script, MUST wrap its top-level startup or test entry point in `try/catch` and print the exception details (message, location, stack) to standard output.
+- `Rabbit.ahk` and `RabbitDeployer.ahk` are the only exceptions: their shipped top-level startup MUST NOT catch exceptions. Preserve AutoHotkey's default error dialog so users can report complete error details.
+- For all other AutoHotkey scripts, MUST wrap the top-level startup or test entry point in `try/catch` and print the exception details (message, location, stack) to standard output.
+- When an agent needs to exercise either application entry point, use a separate test harness with an observable exception boundary; do not add a catch to either shipped entry script.
 - MUST NOT rely on the default error dialog as the record of a failure — the dialog is invisible to the agent, so the failure must be observable on stdout and in the exit status.
 - MUST NOT treat `/ErrorStdOut` as the exception boundary; it only covers startup and load diagnostics, and destructor or callback-thread errors can still surface as dialogs.
 - If a run hangs or ends with an unclear status, suspect an invisible dialog first and re-run through the wrapper below.
 
-Copy this wrapper around any top-level entry point — a `main()` call or the script's inline startup statements:
+Copy this wrapper around a test or non-exempt top-level entry point — a `main()` call or the script's inline startup statements:
 
 ```ahk
 try {
@@ -79,7 +81,7 @@ Match surrounding YAML indentation and comments. No formatter or linter is curre
 
 There is no CI-enforced coverage threshold. Run focused tests directly or use the unit test runner. Always use `/ErrorStdOut` for startup and load diagnostics, but do not treat it as an exception boundary: each test body must run through `RunTest`, which catches callback exceptions and prints the test name, error, location, and stack to standard output. Test scripts use explicit relative includes and must remain runnable without a root-level test launcher.
 
-AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. Always run through the top-level `try/catch` boundary required by Agent Operating Rules above; `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for that boundary.
+AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. Agent tests must run through the top-level `try/catch` boundary required by Agent Operating Rules above (use a separate harness for the two exempt application entry scripts); `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for that boundary.
 
 ```powershell
 AutoHotkey.exe /ErrorStdOut tests\unit\RabbitTests.ahk

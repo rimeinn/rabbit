@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 #Include RabbitDialogPlacement.ahk
 #Include RabbitWindowTheme.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitKeyBindingDialog extends Gui {
     static STANDARD_ACTIONS := ["send", "toggle", "select", "send_sequence"]
 
@@ -35,7 +37,7 @@ class RabbitKeyBindingDialog extends Gui {
         }
         super.__New(
             "+Owner" . owner.Hwnd . " -MinimizeBox -MaximizeBox",
-            binding ? "编辑快捷键规则" : "添加快捷键规则",
+            binding ? RabbitI18n.Text("controls.edit_binding") : RabbitI18n.Text("controls.add_binding"),
             this
         )
         this.owner_window := owner
@@ -59,24 +61,24 @@ class RabbitKeyBindingDialog extends Gui {
             "Microsoft YaHei UI"
         )
 
-        this.AddText("x20 y22 w86 h22", "接收按键：")
+        this.AddText("x20 y22 w86 h22", RabbitI18n.Text("controls.binding_key"))
         this.accept := this.AddEdit("x110 y18 w330 r1 -Multi", this.binding.Has("accept") ? this.binding["accept"] : "")
-        this.AddText("x20 y60 w86 h22", "生效条件：")
+        this.AddText("x20 y60 w86 h22", RabbitI18n.Text("controls.binding_when"))
         this.when := this.AddComboBox(
             "x110 y56 w330",
             ["composing", "has_menu", "paging", "always"]
         )
         this.when.Text := this.binding.Has("when") ? this.binding["when"] : "composing"
-        this.AddText("x20 y98 w86 h22", "动作字段：")
+        this.AddText("x20 y98 w86 h22", RabbitI18n.Text("controls.binding_action"))
         this.action_key := this.AddComboBox("x110 y94 w150", RabbitKeyBindingDialog.STANDARD_ACTIONS)
         this.action_key.Text := action_key
-        this.AddText("x274 y98 w48 h22", "值：")
+        this.AddText("x274 y98 w48 h22", RabbitI18n.Text("controls.binding_value"))
         this.action_value := this.AddEdit("x326 y94 w114 r1 -Multi", action_value)
 
         this.status := this.AddText("x20 y136 w420 h24 cRed", "")
-        this.save_button := this.AddButton("x272 y172 w80 h32 Default", "确定")
+        this.save_button := this.AddButton("x272 y172 w80 h32 Default +0x2000", RabbitI18n.Text("common.ok"))
         this.save_button.OnEvent("Click", (*) => this.SaveBinding())
-        this.cancel_button := this.AddButton("x360 y172 w80 h32", "取消")
+        this.cancel_button := this.AddButton("x360 y172 w80 h32 +0x2000", RabbitI18n.Text("common.cancel"))
         this.cancel_button.OnEvent("Click", (*) => this.Dispose())
         this.OnEvent("Close", (*) => this.Dispose())
         this.OnEvent("Escape", (*) => this.Dispose())
@@ -99,15 +101,15 @@ class RabbitKeyBindingDialog extends Gui {
         local action_value := Trim(this.action_value.Value)
         local when := Trim(this.when.Text)
         if !accept {
-            this.status.Value := "接收按键不能为空。"
+            this.status.Value := RabbitI18n.Text("controls.binding_key_required")
             return false
         }
         if !action_key || action_key = "accept" || action_key = "when" {
-            this.status.Value := "动作字段无效。"
+            this.status.Value := RabbitI18n.Text("controls.binding_action_invalid")
             return false
         }
         if !action_value {
-            this.status.Value := "动作值不能为空。"
+            this.status.Value := RabbitI18n.Text("controls.binding_value_required")
             return false
         }
 

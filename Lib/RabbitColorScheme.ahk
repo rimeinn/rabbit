@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,26 +17,28 @@
 
 #Include RabbitUIStyleSnapshot.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitColorScheme {
-    static EDITABLE_COLOR_FIELDS := [
-        { key: "back_color", label: "窗口背景" },
-        { key: "border_color", label: "窗口边框" },
-        { key: "text_color", label: "编码文字" },
-        { key: "preedit_back_color", label: "编码背景" },
-        { key: "hilited_text_color", label: "高亮编码文字" },
-        { key: "hilited_back_color", label: "高亮编码背景" },
-        { key: "candidate_text_color", label: "候选文字" },
-        { key: "candidate_back_color", label: "候选背景" },
-        { key: "label_color", label: "候选序号" },
-        { key: "comment_text_color", label: "候选注释" },
-        { key: "hilited_candidate_text_color", label: "高亮候选文字" },
-        { key: "hilited_candidate_back_color", label: "高亮候选背景" },
-        { key: "hilited_label_color", label: "高亮候选序号" },
-        { key: "hilited_comment_text_color", label: "高亮候选注释" },
-        { key: "shadow_color", label: "窗口阴影" },
-        { key: "hilited_shadow_color", label: "编码高亮阴影" },
-        { key: "hilited_candidate_shadow_color", label: "高亮候选阴影" },
-        { key: "candidate_shadow_color", label: "普通候选阴影" },
+    static EDITABLE_COLOR_FIELDS => [
+        { key: "back_color", label: RabbitI18n.Text("appearance.window_background") },
+        { key: "border_color", label: RabbitI18n.Text("appearance.window_border") },
+        { key: "text_color", label: RabbitI18n.Text("appearance.preedit_text") },
+        { key: "preedit_back_color", label: RabbitI18n.Text("appearance.preedit_background") },
+        { key: "hilited_text_color", label: RabbitI18n.Text("appearance.highlight_preedit_text") },
+        { key: "hilited_back_color", label: RabbitI18n.Text("appearance.highlight_preedit_background") },
+        { key: "candidate_text_color", label: RabbitI18n.Text("appearance.font_text") },
+        { key: "candidate_back_color", label: RabbitI18n.Text("appearance.candidate_background") },
+        { key: "label_color", label: RabbitI18n.Text("appearance.font_label") },
+        { key: "comment_text_color", label: RabbitI18n.Text("appearance.font_comment") },
+        { key: "hilited_candidate_text_color", label: RabbitI18n.Text("appearance.highlight_text") },
+        { key: "hilited_candidate_back_color", label: RabbitI18n.Text("appearance.highlight_background") },
+        { key: "hilited_label_color", label: RabbitI18n.Text("appearance.highlight_label") },
+        { key: "hilited_comment_text_color", label: RabbitI18n.Text("appearance.highlight_comment") },
+        { key: "shadow_color", label: RabbitI18n.Text("appearance.window_shadow") },
+        { key: "hilited_shadow_color", label: RabbitI18n.Text("appearance.preedit_shadow") },
+        { key: "hilited_candidate_shadow_color", label: RabbitI18n.Text("appearance.highlight_shadow") },
+        { key: "candidate_shadow_color", label: RabbitI18n.Text("appearance.candidate_shadow") },
     ]
 
     __New(color_scheme_id, values, origin := "builtin", style := 0) {
@@ -88,7 +90,7 @@ class RabbitColorScheme {
         for key, value in values {
             if RegExMatch(key, "i)_color$") {
                 if !RabbitColorScheme.TryParseConfigColor(value, this.color_format, &argb) {
-                    throw Error("无法转换颜色字段：" . key)
+                    throw Error(RabbitI18n.Text("messages.color_conversion", Map("key", key)))
                 }
                 values[key] := RabbitColorScheme.FormatConfigColor(argb, "argb")
             }
@@ -150,7 +152,7 @@ class RabbitColorScheme {
 
     static ValidateId(color_scheme_id) {
         if !RegExMatch(color_scheme_id, "^[a-z0-9][a-z0-9_-]*$") {
-            throw ValueError("配色标识只能包含小写字母、数字、下划线和连字符。")
+            throw ValueError(RabbitI18n.Text("appearance.color_id_invalid"))
         }
         return color_scheme_id
     }
@@ -161,7 +163,7 @@ class RabbitColorScheme {
             normalized := "#FF" . SubStr(normalized, 2)
         }
         if !RegExMatch(normalized, "^#[0-9A-F]{8}$") {
-            throw ValueError("颜色必须使用 #RRGGBB 或 #AARRGGBB 格式。")
+            throw ValueError(RabbitI18n.Text("appearance.color_format"))
         }
         return Integer("0x" . SubStr(normalized, 2)) & 0xffffffff
     }

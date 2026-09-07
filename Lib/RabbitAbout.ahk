@@ -16,6 +16,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitI18n.ahk
 #Include RabbitWindowTheme.ahk
 
 class RabbitAboutPage {
@@ -88,56 +89,65 @@ class RabbitAboutPage {
 
     CreateControls() {
         local index, inner_x, license_x, project, project_link, license_link, row_y
+        local text_height, links_y, credits_y, rows_y, copyright_y
         inner_x := this.x + 24
         license_x := this.x + this.width - 288
 
         this.about_group := this.owner.AddGroupBox(
             Format("x{} y{} w{} h166 Hidden", this.x, this.y, this.width),
-            "关于玉兔毫"
+            RabbitI18n.Text("about.group")
         )
         this.owner.SetFont("s14 w600")
         this.about_name := this.owner.AddText(
             Format("x{} y{} w{} h28 Hidden", inner_x, this.y + 24, this.width - 48),
-            "玉兔毫"
+            RabbitI18n.Text("about.product")
         )
         this.owner.SetFont("s10 w400")
         this.about_version := this.owner.AddText(
             Format("x{} y{} w{} h22 Hidden", inner_x, this.y + 56, this.width - 48),
-            "版本：" . RABBIT_VERSION . (A_IsCompiled ? "（已编译）" : "（源代码运行）")
+            RabbitI18n.Text("about.version", Map("version", RABBIT_VERSION,
+                "build", RabbitI18n.Text(A_IsCompiled ? "about.compiled" : "about.source")))
         )
         this.about_description := this.owner.AddText(
-            Format("x{} y{} w{} h24 Hidden", inner_x, this.y + 88, this.width - 48),
-            "由 AutoHotkey 实现的 Rime 输入法引擎 Windows 前端。"
+            Format("x{} y{} w{} Hidden", inner_x, this.y + 88, this.width - 48),
+            RabbitI18n.Text("about.description")
         )
+        this.about_description.GetPos(, , , &text_height)
+        links_y := this.y + 88 + text_height + 10
         this.about_project_link := this.AddLink(
             inner_x,
-            this.y + 122,
+            links_y,
             160,
-            '<a href="https://github.com/rimeinn/rabbit">访问项目主页</a>'
+            Format('<a href="https://github.com/rimeinn/rabbit">{}</a>', RabbitI18n.Text("about.homepage"))
         )
         this.about_license_link := this.AddLink(
             inner_x + 176,
-            this.y + 122,
+            links_y,
             160,
-            '<a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0 许可证</a>'
+            Format('<a href="https://www.gnu.org/licenses/gpl-3.0.html">{}</a>', RabbitI18n.Text("about.license"))
         )
+        copyright_y := links_y + 24
         this.about_copyright := this.owner.AddText(
-            Format("x{} y{} w{} h18 Hidden cGray", inner_x, this.y + 146, this.width - 48),
+            Format("x{} y{} w{} h18 Hidden cGray", inner_x, copyright_y, this.width - 48),
             "Copyright © 2023 - 2026 Xuesong Peng"
         )
 
+        this.about_group.Move(, , , copyright_y + 24 - this.y)
+        credits_y := copyright_y + 36
         this.about_open_source_group := this.owner.AddGroupBox(
-            Format("x{} y{} w{} h278 Hidden", this.x, this.y + 178, this.width),
-            "使用的开源项目"
+            Format("x{} y{} w{} h278 Hidden", this.x, credits_y, this.width),
+            RabbitI18n.Text("about.credits")
         )
         this.about_open_source_description := this.owner.AddText(
-            Format("x{} y{} w{} h22 Hidden cGray", inner_x, this.y + 202, this.width - 48),
-            "点击项目名或许可证查看详情。东风破安装的词库和方案可能有独立许可证。"
+            Format("x{} y{} w{} Hidden cGray", inner_x, credits_y + 24, this.width - 48),
+            RabbitI18n.Text("about.credits_description")
         )
+        this.about_open_source_description.GetPos(, , , &text_height)
+        rows_y := credits_y + 24 + text_height + 8
         this.about_open_source_project_links := []
         this.about_open_source_license_links := []
         for index, project in RabbitAboutPage.OPEN_SOURCE_PROJECTS {
-            row_y := this.y + 228 + (index - 1) * 24
+            row_y := rows_y + (index - 1) * 24
             project_link := this.AddLink(
                 inner_x,
                 row_y,
@@ -153,6 +163,8 @@ class RabbitAboutPage {
             this.about_open_source_project_links.Push(project_link)
             this.about_open_source_license_links.Push(license_link)
         }
+        this.height := row_y + 28 - this.y
+        this.about_open_source_group.Move(, , , this.y + this.height - credits_y)
     }
 
     AddLink(x, y, width, value) {
@@ -205,12 +217,12 @@ class RabbitAboutPage {
         } catch as err {
             if this.show_message_callback {
                 this.show_message_callback.Call(
-                    "无法打开链接：`n" . err.Message,
-                    "【玉兔毫】",
+                    RabbitI18n.Text("about.link_error", Map("reason", err.Message)),
+                    RabbitI18n.Text("about.message_title"),
                     "Ok Iconx"
                 )
             } else {
-                MsgBox("无法打开链接：`n" . err.Message, "【玉兔毫】", "Ok Iconx")
+                MsgBox(RabbitI18n.Text("about.link_error", Map("reason", err.Message)), RabbitI18n.Text("about.message_title"), "Ok Iconx")
             }
             return false
         }
@@ -223,7 +235,7 @@ class RabbitAboutDialog extends Gui {
 
     __New() {
         local dark_mode := !!RabbitWindowThemeController.Prepare()
-        super.__New("-MaximizeBox -MinimizeBox", "【玉兔毫】关于", this)
+        super.__New("-MaximizeBox -MinimizeBox", RabbitI18n.Text("about.title"), this)
         this.disposed := false
         this.SetFont("s10" . (dark_mode ? " c" . RabbitWindowThemeController.DARK_TEXT : ""), "Microsoft YaHei UI")
         if dark_mode {
@@ -244,7 +256,7 @@ class RabbitAboutDialog extends Gui {
         super.Show(Trim(options . Format(
             " w{} h{}",
             RabbitAboutDialog.WINDOW_WIDTH,
-            RabbitAboutDialog.WINDOW_HEIGHT
+            Max(RabbitAboutDialog.WINDOW_HEIGHT, this.about_page.height + 40)
         )))
     }
 

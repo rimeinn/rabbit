@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitI18n.ahk
 #Include RabbitCommandLine.ahk
 #Include RabbitDeployerContext.ahk
 #Include RabbitDeployerWorkflow.ahk
@@ -38,10 +39,11 @@ class RabbitDeployerApplication {
 
         TrayTip()
         TrayTip("维护中", RABBIT_IME_NAME)
-        RabbitSetupMaintenanceTray()
 
         OnExit(this.exit_callback)
         this.context.Initialize()
+        RabbitI18n.LoadConfig(this.context.rime)
+        RabbitSetupMaintenanceTray()
         this.workflow := RabbitDeployerWorkflow(this.context.rime)
 
         switch options.command {

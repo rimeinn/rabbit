@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -23,7 +23,11 @@
 #Include RabbitFontSpec.ahk
 #Include RabbitUIStyleSnapshot.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitAppearanceSettingsPage {
+    preview_error := ""
+
     static CBN_DROPDOWN := 7
     static CB_INITSTORAGE := 0x0161
 
@@ -80,18 +84,19 @@ class RabbitAppearanceSettingsPage {
             return true
         }
         if !this.workflow || !HasMethod(this.workflow, "CreateUIStyleSettings") {
-            owner.appearance_status.Value := "当前环境无法读取外观设置。"
+            owner.appearance_status.Value := RabbitI18n.Text("appearance.appearance_unavailable")
             return false
         }
         try {
             this.settings := this.workflow.CreateUIStyleSettings()
             this.PopulateSettings()
             if this.old_windows {
-                owner.appearance_status.Value := "旧版 Windows 暂不支持预览。"
+                owner.appearance_status.Value := RabbitI18n.Text("appearance.legacy_preview")
             } else try {
                 this.CreatePreview()
             } catch as err {
-                owner.appearance_status.Value := "无法显示预览：" . err.Message
+                this.preview_error := RabbitI18n.Text("messages.preview_error", Map("reason", err.Message))
+                owner.appearance_status.Value := this.preview_error
             }
             return true
         } catch as err {
@@ -131,7 +136,7 @@ class RabbitAppearanceSettingsPage {
             this.selection_dirty := false
             owner.appearance_status.Value := this.presets.Length
                 ? ""
-                : "没有找到可用的配色。"
+                : RabbitI18n.Text("appearance.no_colors")
         } finally {
             this.loading := false
         }
@@ -165,7 +170,7 @@ class RabbitAppearanceSettingsPage {
                 i = active_index ? "●" : "",
                 info.name,
                 info.color_scheme_id,
-                this.IsCustomScheme(info) ? "自定义" : "内置"
+                this.IsCustomScheme(info) ? RabbitI18n.Text("controls.custom") : RabbitI18n.Text("appearance.builtin")
             )
         }
         owner.appearance_list.ModifyCol(1, 54)
@@ -179,7 +184,7 @@ class RabbitAppearanceSettingsPage {
             owner.appearance_list.Modify(selected_index, "Select Focus Vis")
             this.ShowDetails(selected_index)
         } else if owner.appearance_target.Value = 2 && !this.dark_scheme {
-            owner.appearance_details.Value := "深色模式当前跟随浅色配色。"
+            owner.appearance_details.Value := RabbitI18n.Text("appearance.following_light")
         }
         owner.appearance_follow_light.Value := owner.appearance_target.Value = 2 && !this.dark_scheme
         this.UpdateColorButtons()
@@ -432,9 +437,9 @@ class RabbitAppearanceSettingsPage {
             return
         }
         local info := this.presets[index]
-        this.owner.appearance_details.Value := "标识：" . info.color_scheme_id
-            . (info.author ? "    作者：" . info.author : "")
-            . (this.IsCustomScheme(info) ? "" : "`n内置方案只读；可以复制后修改。")
+        this.owner.appearance_details.Value := RabbitI18n.Text("messages.color_id", Map("id", info.color_scheme_id))
+            . (info.author ? RabbitI18n.Text("messages.color_author", Map("author", info.author)) : "")
+            . (this.IsCustomScheme(info) ? "" : RabbitI18n.Text("messages.color_readonly"))
     }
 
     SelectedSchemeIndex() {
@@ -515,7 +520,7 @@ class RabbitAppearanceSettingsPage {
         local color_scheme_id := this.SuggestColorSchemeId("custom")
         local style_values := this.GetPreviewStyleValues()
         local base_style := style_values ? this.style.With(style_values) : this.style
-        local draft := RabbitColorScheme.CreateDefault(color_scheme_id, "新配色", "", base_style)
+        local draft := RabbitColorScheme.CreateDefault(color_scheme_id, RabbitI18n.Text("appearance.new_color"), "", base_style)
         return this.ShowColorSchemeDialog(draft, "new")
     }
 
@@ -525,7 +530,7 @@ class RabbitAppearanceSettingsPage {
             return false
         }
         local color_scheme_id := this.SuggestColorSchemeId(source.color_scheme_id . "_copy")
-        local draft := source.CopyAs(color_scheme_id, source.name . " 副本", source.author)
+        local draft := source.CopyAs(color_scheme_id, RabbitI18n.Text("messages.color_copy", Map("name", source.name)), source.author)
         return this.ShowColorSchemeDialog(draft, "copy")
     }
 
@@ -553,12 +558,12 @@ class RabbitAppearanceSettingsPage {
             return false
         }
         if color_scheme.color_scheme_id = this.light_scheme || color_scheme.color_scheme_id = this.dark_scheme {
-            this.owner.appearance_status.Value := "请先将浅色和深色模式切换到其他配色。"
+            this.owner.appearance_status.Value := RabbitI18n.Text("appearance.color_in_use")
             return false
         }
         if this.owner.ShowMessage(
-            "确定删除配色方案“" . color_scheme.name . "”吗？",
-            "【玉兔毫】",
+            RabbitI18n.Text("messages.color_delete", Map("name", color_scheme.name)),
+            RabbitI18n.Text("about.message_title"),
             "YesNo Icon!"
         ) != "Yes" {
             return false
@@ -670,7 +675,7 @@ class RabbitAppearanceSettingsPage {
 
     MarkDirty() {
         this.dirty := true
-        this.owner.footer_status.Value := "外观设置尚未保存。"
+        this.owner.footer_status.Value := RabbitI18n.Text("appearance.appearance_dirty")
         this.owner.UpdateApplyButton()
     }
 
@@ -685,55 +690,55 @@ class RabbitAppearanceSettingsPage {
         local comment_font_face := Trim(owner.appearance_comment_font.Text)
         local label_format := owner.appearance_label_format.Value
         if !font_face || !preedit_font_face || !label_font_face || !comment_font_face {
-            throw Error("字体名称不能为空。")
+            throw Error(RabbitI18n.Text("appearance.font_required"))
         }
-        this.ValidateFontSetting(font_face, "候选文字")
-        this.ValidateFontSetting(preedit_font_face, "预编辑文字")
-        this.ValidateFontSetting(label_font_face, "候选序号")
-        this.ValidateFontSetting(comment_font_face, "候选注释")
+        this.ValidateFontSetting(font_face, RabbitI18n.Text("appearance.font_text"))
+        this.ValidateFontSetting(preedit_font_face, RabbitI18n.Text("appearance.font_preedit"))
+        this.ValidateFontSetting(label_font_face, RabbitI18n.Text("appearance.font_label"))
+        this.ValidateFontSetting(comment_font_face, RabbitI18n.Text("appearance.font_comment"))
         if !label_format {
-            throw Error("候选序号格式不能为空。")
+            throw Error(RabbitI18n.Text("appearance.label_format_required"))
         }
         try {
             Format(label_format, "1")
         } catch {
-            throw Error("候选序号格式无效。")
+            throw Error(RabbitI18n.Text("appearance.label_format_invalid"))
         }
         return Map(
             "font_face", font_face,
             "preedit_font_face", preedit_font_face,
             "label_font_face", label_font_face,
             "comment_font_face", comment_font_face,
-            "font_point", this.ReadNumber(owner.appearance_font_point, "候选字号", 6, 72),
+            "font_point", this.ReadNumber(owner.appearance_font_point, RabbitI18n.Text("appearance.text_size"), 6, 72),
             "label_font_point", this.ReadNumber(
-                owner.appearance_label_font_point, "候选序号字号", 6, 72),
+                owner.appearance_label_font_point, RabbitI18n.Text("appearance.label_size"), 6, 72),
             "comment_font_point", this.ReadNumber(
-                owner.appearance_comment_font_point, "候选注释字号", 6, 72),
+                owner.appearance_comment_font_point, RabbitI18n.Text("appearance.comment_size"), 6, 72),
             "label_format", label_format,
             "layout_type", ["stacked", "flow", "vertical_text"][owner.appearance_layout_type.Value],
             "align_type", ["top", "center", "bottom"][owner.appearance_align_type.Value],
-            "margin_x", this.ReadNumber(owner.appearance_margin_x, "窗口水平边距", 0, 500),
-            "margin_y", this.ReadNumber(owner.appearance_margin_y, "窗口垂直边距", 0, 500),
+            "margin_x", this.ReadNumber(owner.appearance_margin_x, RabbitI18n.Text("appearance.margin_x"), 0, 500),
+            "margin_y", this.ReadNumber(owner.appearance_margin_y, RabbitI18n.Text("appearance.margin_y"), 0, 500),
             "candidate_padding_x", this.ReadNumber(
-                owner.appearance_candidate_padding_x, "候选水平内边距", 0, 500),
+                owner.appearance_candidate_padding_x, RabbitI18n.Text("appearance.padding_x"), 0, 500),
             "candidate_padding_y", this.ReadNumber(
-                owner.appearance_candidate_padding_y, "候选垂直内边距", 0, 500),
-            "candidate_spacing", this.ReadNumber(owner.appearance_candidate_spacing, "候选间距", 0, 500),
-            "shadow_radius", this.ReadNumber(owner.appearance_shadow_radius, "阴影半径", 0, RabbitUIStyleSnapshot.MAX_SHADOW_RADIUS),
-            "shadow_offset_x", this.ReadNumber(owner.appearance_shadow_offset_x, "水平偏移", -RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET),
-            "shadow_offset_y", this.ReadNumber(owner.appearance_shadow_offset_y, "垂直偏移", -RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET),
-            "border_width", this.ReadNumber(owner.appearance_border_width, "边框宽度", 0, 500),
-            "corner_radius", this.ReadNumber(owner.appearance_corner_radius, "窗口圆角", 0, 500),
-            "round_corner", this.ReadNumber(owner.appearance_round_corner, "候选及高亮圆角", 0, 500),
-            "min_width", this.ReadNumber(owner.appearance_min_width, "堆叠最小宽度", 0, 2000),
-            "min_height", this.ReadNumber(owner.appearance_min_height, "竖排最小高度", 0, 2000),
-            "flow_rows", this.ReadNumber(owner.appearance_flow_rows, "展开页数", 1, 9),
+                owner.appearance_candidate_padding_y, RabbitI18n.Text("appearance.padding_y"), 0, 500),
+            "candidate_spacing", this.ReadNumber(owner.appearance_candidate_spacing, RabbitI18n.Text("appearance.spacing"), 0, 500),
+            "shadow_radius", this.ReadNumber(owner.appearance_shadow_radius, RabbitI18n.Text("appearance.shadow_radius"), 0, RabbitUIStyleSnapshot.MAX_SHADOW_RADIUS),
+            "shadow_offset_x", this.ReadNumber(owner.appearance_shadow_offset_x, RabbitI18n.Text("appearance.shadow_x"), -RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET),
+            "shadow_offset_y", this.ReadNumber(owner.appearance_shadow_offset_y, RabbitI18n.Text("appearance.shadow_y"), -RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET),
+            "border_width", this.ReadNumber(owner.appearance_border_width, RabbitI18n.Text("appearance.border"), 0, 500),
+            "corner_radius", this.ReadNumber(owner.appearance_corner_radius, RabbitI18n.Text("appearance.corner"), 0, 500),
+            "round_corner", this.ReadNumber(owner.appearance_round_corner, RabbitI18n.Text("appearance.round_corner"), 0, 500),
+            "min_width", this.ReadNumber(owner.appearance_min_width, RabbitI18n.Text("appearance.min_width"), 0, 2000),
+            "min_height", this.ReadNumber(owner.appearance_min_height, RabbitI18n.Text("appearance.min_height"), 0, 2000),
+            "flow_rows", this.ReadNumber(owner.appearance_flow_rows, RabbitI18n.Text("appearance.pages"), 1, 9),
             "vertical_text_left_to_right", !!owner.appearance_vertical_direction.Value,
             "floating_preedit", !!owner.appearance_floating_preedit.Value,
             "floating_preedit_opacity", this.ReadNumber(
-                owner.appearance_floating_opacity, "浮动预编辑不透明度", 0, 100) / 100,
+                owner.appearance_floating_opacity, RabbitI18n.Text("appearance.opacity"), 0, 100) / 100,
             "floating_preedit_min_height", this.ReadNumber(
-                owner.appearance_floating_height, "浮动预编辑最小高度", 0, 500)
+                owner.appearance_floating_height, RabbitI18n.Text("appearance.floating_height"), 0, 500)
         )
     }
 
@@ -741,21 +746,21 @@ class RabbitAppearanceSettingsPage {
         try {
             RabbitFontSpec.Parse(value)
         } catch as err {
-            throw Error(label . "字体设置无效：" . err.Message)
+            throw Error(RabbitI18n.Text("messages.font_invalid", Map("label", label, "reason", err.Message)))
         }
     }
 
     ReadNumber(ctrl, name, minimum, maximum) {
         local text := Trim(ctrl.Value)
         if text = "" || !IsNumber(text) {
-            throw Error(name . "必须是数字。")
+            throw Error(RabbitI18n.Text("messages.number_required", Map("name", name)))
         }
         local value := Number(text)
         if value != Integer(value) {
-            throw Error(name . "必须是整数。")
+            throw Error(RabbitI18n.Text("messages.integer_required", Map("name", name)))
         }
         if value < minimum || value > maximum {
-            throw Error(Format("{}必须在 {} 到 {} 之间。", name, minimum, maximum))
+            throw Error(RabbitI18n.Text("messages.number_range", Map("name", name, "minimum", minimum, "maximum", maximum)))
         }
         return Integer(value)
     }
@@ -800,12 +805,14 @@ class RabbitAppearanceSettingsPage {
             values := this.GetPreviewStyleValues(values)
             style := info.BuildPreviewStyle(values)
             this.preview.Render(style, owner.GetAppearancePreviewLabels())
-            if InStr(owner.appearance_status.Value, "无法显示预览：") = 1 {
+            if this.preview_error && owner.appearance_status.Value == this.preview_error {
                 owner.appearance_status.Value := ""
+                this.preview_error := ""
             }
             return true
         } catch as err {
-            owner.appearance_status.Value := "无法显示预览：" . err.Message
+            this.preview_error := RabbitI18n.Text("messages.preview_error", Map("reason", err.Message))
+            owner.appearance_status.Value := this.preview_error
             return false
         }
     }
@@ -824,25 +831,25 @@ class RabbitAppearanceSettingsPage {
             return false
         }
         owner.Opt("+Disabled")
-        owner.appearance_status.Value := "正在保存…"
+        owner.appearance_status.Value := RabbitI18n.Text("controls.saving")
         try {
             if !this.settings.Save() {
-                owner.appearance_status.Value := "未能保存外观设置。"
+                owner.appearance_status.Value := RabbitI18n.Text("controls.appearance_save_error")
                 return false
             }
             deploy_result := this.workflow.UpdateWorkspace(true)
             if deploy_result != 0 {
-                owner.appearance_status.Value := "设置已保存，但重新部署失败。"
+                owner.appearance_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
             }
             this.dirty := false
             this.selection_dirty := false
-            owner.appearance_status.Value := "外观设置已保存。"
-            owner.footer_status.Value := "设置内容将在确认后统一保存和部署。"
+            owner.appearance_status.Value := RabbitI18n.Text("controls.appearance_saved")
+            owner.footer_status.Value := RabbitI18n.Text("controls.save_hint")
             owner.UpdateApplyButton()
             return true
         } catch as err {
-            owner.appearance_status.Value := "保存失败：" . err.Message
+            owner.appearance_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
             return false
         } finally {
             owner.Opt("-Disabled")

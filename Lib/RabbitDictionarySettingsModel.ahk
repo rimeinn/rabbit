@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@
 
 #Include RabbitCommon.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitDictionarySettingsModel {
     __New(rime_api, levers_api, mutex_factory) {
         this.rime := rime_api
@@ -26,7 +28,7 @@ class RabbitDictionarySettingsModel {
         this.dictionaries := []
         this.disposed := false
         if !this.Load() {
-            throw Error("未能读取用户词典列表。")
+            throw Error(RabbitI18n.Text("models.dictionary_read"))
         }
     }
 
@@ -76,11 +78,11 @@ class RabbitDictionarySettingsModel {
     RunLocked(action) {
         local mutex := this.mutex_factory.Call()
         if !mutex.Create() {
-            throw Error("未能启动用户词典操作。")
+            throw Error(RabbitI18n.Text("models.dictionary_start"))
         }
         try {
             if mutex.lasterr == ERROR_ALREADY_EXISTS {
-                throw Error("正在执行另一项维护任务，请稍后再试。")
+                throw Error(RabbitI18n.Text("models.maintenance_busy"))
             }
             return action.Call()
         } finally {

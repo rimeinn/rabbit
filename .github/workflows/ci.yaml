@@ -187,6 +187,7 @@ jobs:
             !*Tests.ahk
             LICENSE
             README.md
+            locales/*.ini
             docs/images/candidate-layouts/*.png
             rime-install.bat
 
@@ -211,6 +212,7 @@ jobs:
             !*Tests.ahk
             LICENSE
             README.md
+            locales/*.ini
             docs/images/candidate-layouts/*.png
             rime-install.bat
 

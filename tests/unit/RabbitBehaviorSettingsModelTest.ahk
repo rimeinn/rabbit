@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -350,5 +350,26 @@ class RabbitBehaviorConfigIterator {
         this.key := this.items[this.index][1]
         this.path := this.items[this.index][2]
         return true
+    }
+}
+
+RunTest("language preference saves only to rabbit customization", TestBehaviorLanguagePreference.Bind())
+
+TestBehaviorLanguagePreference() {
+    local calls := [], model := CreateBehaviorModel(calls), values
+    try {
+        AssertEqual("auto", model.language, "Missing language did not default to auto.")
+        values := model.GetCurrentValues()
+        values.language := "en-US"
+        calls.Length := 0
+        AssertTrue(model.Save(values), "Language preference was not saved.")
+        AssertTrue(BehaviorCallsHave(calls, "set_string:rabbit:language:en-US"), "Wrong language patch.")
+        AssertTrue(!BehaviorCallsHave(calls, "save:default"), "Language modified default.custom.yaml.")
+        AssertEqual("en-US", model.GetCurrentValues().language, "Saved preference was not retained.")
+        calls.Length := 0
+        AssertTrue(model.Save(values), "Unchanged preference failed to save.")
+        AssertTrue(!BehaviorCallsHave(calls, "save:rabbit"), "Unchanged language was written again.")
+    } finally {
+        model.Dispose()
     }
 }

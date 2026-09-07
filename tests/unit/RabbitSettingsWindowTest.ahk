@@ -721,10 +721,17 @@ TestSettingsWindowSavesBehaviorSettings() {
     local window := RabbitSettingsWindow(workflow)
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        window.behavior_tabs.Choose(3)
+        window.OnBehaviorTabChanged()
+        AssertTrue(window.language_choice.Visible, "Language control is hidden on the interface tab.")
+        AssertEqual(1, window.language_choice.Value, "Language did not default to follow system.")
+        window.language_choice.Choose(3)
+        AssertEqual("en-US", window.GetBehaviorValues().language, "Language selection used the wrong code.")
         window.show_tips.Value := false
         window.global_ascii.Value := true
         window.OnBehaviorChanged()
         AssertTrue(window.ApplyBehaviorSettings(), "The behavior page failed to save valid settings.")
+        AssertEqual("en-US", window.behavior_model.saved_language, "Language did not reach the save model.")
     } finally {
         window.Dispose()
     }
@@ -1148,6 +1155,7 @@ class RabbitSettingsApplicationModelProbe {
 class RabbitSettingsBehaviorModelProbe {
     __New(calls) {
         this.calls := calls
+        this.language := "auto"
         this.show_tips := true
         this.show_tips_time := 1200
         this.suspend_hotkey := ""
@@ -1175,6 +1183,7 @@ class RabbitSettingsBehaviorModelProbe {
     }
 
     Save(values) {
+        this.saved_language := values.language
         this.calls.Push("save_behavior:" . values.show_tips . ":" . values.global_ascii)
         return true
     }

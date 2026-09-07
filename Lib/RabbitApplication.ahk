@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitI18n.ahk
 #Include RabbitAppContext.ahk
 #Include RabbitCandidateBoxFactory.ahk
 #Include RabbitCommandLine.ahk
@@ -107,6 +108,7 @@ class RabbitApplication {
 
         RabbitCleanOldLogs()
         RabbitCleanMisplacedConfigs()
+        RabbitI18n.LoadConfig(this.context.rime)
         local loaded := RabbitConfigLoader.Load(this.context.rime)
         this.context.config := loaded.config
         if loaded.dark_mode {

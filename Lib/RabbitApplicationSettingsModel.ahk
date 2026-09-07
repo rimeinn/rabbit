@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,6 +18,8 @@
 
 #Include RabbitCommon.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitApplicationSettingsModel {
     __New(levers_api, rime_api) {
         this.api := levers_api
@@ -29,7 +31,7 @@ class RabbitApplicationSettingsModel {
         try {
             this.settings := this.api.custom_settings_init("rabbit", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             if !this.settings || !this.Load() {
-                throw Error("未能读取应用适配设置。")
+                throw Error(RabbitI18n.Text("models.application_read"))
             }
         } catch {
             this.Dispose()

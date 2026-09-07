@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitI18n.ahk
 #Include RabbitCommandLine.ahk
 #Include RabbitConfigSnapshot.ahk
 #Include RabbitAbout.ahk
@@ -24,8 +25,9 @@
 A_IconTip := "玉兔毫（维护中）"
 
 RabbitSetupMaintenanceTray() {
+    A_IconTip := RabbitI18n.Text("tray.maintenance")
     A_TrayMenu.Delete()
-    A_TrayMenu.Add("退出玉兔毫", (*) => ExitApp())
+    A_TrayMenu.Add(RabbitI18n.Text("tray.exit"), (*) => ExitApp())
     RabbitUpdateMaintenanceTrayIcon()
 }
 
@@ -90,38 +92,41 @@ class RabbitTrayController {
         static rabbit_ico := Format("{}\Lib\rabbit.ico", A_ScriptDir)
         A_TrayMenu.Delete()
         A_TrayMenu.Add(
-            "输入法设定",
+            RabbitI18n.Text("tray.settings"),
             (*) => this.StartSettings()
         )
         A_TrayMenu.Add(
-            "用户词典管理",
+            RabbitI18n.Text("tray.dictionary"),
             (*) => this.StartSettings("dictionary")
         )
         A_TrayMenu.Add(
-            "用户资料同步",
+            RabbitI18n.Text("tray.sync"),
             (*) => this.StartSettings("maintenance")
         )
         A_TrayMenu.Add()
-        A_TrayMenu.Add("用户文件夹", (*) => Run(RabbitUserDataPath()))
-        A_TrayMenu.Add(A_IsCompiled ? "程序文件夹" : "脚本文件夹", (*) => Run(A_ScriptDir))
-        A_TrayMenu.Add("日志文件夹", (*) => Run(RabbitLogPath()))
+        A_TrayMenu.Add(RabbitI18n.Text("tray.user_folder"), (*) => Run(RabbitUserDataPath()))
+        A_TrayMenu.Add(
+            RabbitI18n.Text(A_IsCompiled ? "tray.program_folder" : "tray.script_folder"),
+            (*) => Run(A_ScriptDir)
+        )
+        A_TrayMenu.Add(RabbitI18n.Text("tray.log_folder"), (*) => Run(RabbitLogPath()))
         A_TrayMenu.Add()
 
         if FileExist(A_Startup . "\Rabbit.lnk") {
             A_TrayMenu.Add(
-                "从开机启动删除",
+                RabbitI18n.Text("tray.remove_startup"),
                 (*) => (FileDelete(A_Startup . "\Rabbit.lnk"), this.SetupMenu())
             )
         } else {
             A_TrayMenu.Add(
-                "添加到开机启动",
+                RabbitI18n.Text("tray.add_startup"),
                 (*) => (
                     FileCreateShortcut(
                         A_AhkPath,
                         A_Startup . "\Rabbit.lnk",
                         A_ScriptDir,
                         rabbit_script,
-                        "玉兔毫输入法",
+                        RabbitI18n.Text("tray.product"),
                         rabbit_ico
                     ),
                     this.SetupMenu()
@@ -129,32 +134,32 @@ class RabbitTrayController {
             )
         }
         A_TrayMenu.Add(
-            "添加到桌面快捷方式",
+            RabbitI18n.Text("tray.desktop_shortcut"),
             (*) => FileCreateShortcut(
                 A_AhkPath,
                 A_Desktop . "\Rabbit.lnk",
                 A_ScriptDir,
                 rabbit_script,
-                "玉兔毫输入法",
+                RabbitI18n.Text("tray.product"),
                 rabbit_ico
             )
         )
         A_TrayMenu.Add()
-        A_TrayMenu.Add("仓库主页", (*) => Run("https://github.com/rimeinn/rabbit"))
-        A_TrayMenu.Add("参加讨论", (*) => Run("https://github.com/rimeinn/rabbit/discussions"))
-        A_TrayMenu.Add("关于", (*) => this.StartAbout())
+        A_TrayMenu.Add(RabbitI18n.Text("tray.homepage"), (*) => Run("https://github.com/rimeinn/rabbit"))
+        A_TrayMenu.Add(RabbitI18n.Text("tray.discussions"), (*) => Run("https://github.com/rimeinn/rabbit/discussions"))
+        A_TrayMenu.Add(RabbitI18n.Text("tray.about"), (*) => this.StartAbout())
         A_TrayMenu.Add()
-        A_TrayMenu.Add("检查新版本", (*) => this.CheckNewVersion())
+        A_TrayMenu.Add(RabbitI18n.Text("tray.updates"), (*) => this.CheckNewVersion())
         A_TrayMenu.Add(
-            "重新部署",
+            RabbitI18n.Text("tray.deploy"),
             (*) => this.StartDeployer("deploy")
         )
         A_TrayMenu.Add()
         A_TrayMenu.Add(
-            A_IsSuspended ? "启用玉兔毫" : "禁用玉兔毫",
+            A_IsSuspended ? RabbitI18n.Text("tray.enable") : RabbitI18n.Text("tray.disable"),
             (*) => this.ToggleSuspend()
         )
-        A_TrayMenu.Add("退出玉兔毫", (*) => ExitApp())
+        A_TrayMenu.Add(RabbitI18n.Text("tray.exit"), (*) => ExitApp())
     }
 
     UseLegacySettings() {
@@ -349,7 +354,7 @@ class RabbitTrayController {
     CheckNewVersion() {
         local http, url, status, response_text, match, down, arch
         if !IsDigit(SubStr(RABBIT_VERSION, 1, 1)) {
-            MsgBox("非正式版本，请前往仓库检查新版本", "玉兔毫输入法")
+            MsgBox("非正式版本，请前往仓库检查新版本", RabbitI18n.Text("tray.product"))
             return
         }
         http := ComObject("WinHttp.WinHttpRequest.5.1")
@@ -364,25 +369,25 @@ class RabbitTrayController {
             http.WaitForResponse()
             status := http.Status
             if status != 200 {
-                MsgBox("无法获取最新版本信息，请检查网络连接", "玉兔毫输入法")
+                MsgBox("无法获取最新版本信息，请检查网络连接", RabbitI18n.Text("tray.product"))
                 return
             }
             response_text := http.ResponseText
             if RegExMatch(response_text, '"name"\s*:\s*"(.*?)"', &match) {
                 version := SubStr(match[1], 1, 1) == "v" ? SubStr(match[1], 2) : match[1]
             } else {
-                MsgBox("无法解析版本字段，请稍后再试", "玉兔毫输入法")
+                MsgBox("无法解析版本字段，请稍后再试", RabbitI18n.Text("tray.product"))
                 return
             }
         }
         if version == "" {
-            MsgBox("无法获取最新版本号，请稍后再试", "玉兔毫输入法")
+            MsgBox("无法获取最新版本号，请稍后再试", RabbitI18n.Text("tray.product"))
             return
         }
         if VerCompare(version, RABBIT_VERSION) > 0 {
             down := MsgBox(
                 Format("发现新版本：{}`r`n是否前往下载？", version),
-                "玉兔毫输入法",
+                RabbitI18n.Text("tray.product"),
                 "YesNo"
             )
             if down == "Yes" {
@@ -394,7 +399,7 @@ class RabbitTrayController {
                 ))
             }
         } else {
-            MsgBox("当前已是最新版本", "玉兔毫输入法")
+            MsgBox("当前已是最新版本", RabbitI18n.Text("tray.product"))
         }
     }
 }

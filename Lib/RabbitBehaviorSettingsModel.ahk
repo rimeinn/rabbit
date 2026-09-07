@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,8 @@
  */
 
 #Include RabbitCommon.ahk
+
+#Include RabbitI18n.ahk
 
 class RabbitBehaviorSettingsModel {
     static SWITCH_KEYS := ["Shift_L", "Shift_R", "Control_L", "Control_R", "Caps_Lock", "Eisu_toggle"]
@@ -40,7 +42,7 @@ class RabbitBehaviorSettingsModel {
             this.settings := this.api.custom_settings_init("rabbit", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             this.default_settings := this.api.custom_settings_init("default", RABBIT_CUSTOMIZATION_GENERATOR_ID)
             if !this.settings || !this.default_settings || !this.Load() {
-                throw Error("未能读取输入与行为设置。")
+                throw Error(RabbitI18n.Text("models.behavior_read"))
             }
         } catch {
             this.Dispose()
@@ -60,6 +62,7 @@ class RabbitBehaviorSettingsModel {
             return false
         }
 
+        this.language := this.GetString(config, "language", "auto")
         this.show_tips := this.GetBool(config, "show_tips", true)
         this.show_tips_time := this.GetInt(config, "show_tips_time", 1200)
         this.suspend_hotkey := this.GetString(config, "suspend_hotkey", "")
@@ -209,6 +212,7 @@ class RabbitBehaviorSettingsModel {
 
     GetCurrentValues() {
         return {
+            language: this.language,
             show_tips: this.show_tips,
             show_tips_time: this.show_tips_time,
             suspend_hotkey: this.suspend_hotkey,
@@ -248,7 +252,8 @@ class RabbitBehaviorSettingsModel {
 
     HasRabbitChanges(values) {
         local original := this.original_values
-        return values.show_tips != original.show_tips
+        return values.language != original.language
+            || values.show_tips != original.show_tips
             || values.show_tips_time != original.show_tips_time
             || values.suspend_hotkey != original.suspend_hotkey
             || values.send_by_clipboard_length != original.send_by_clipboard_length
@@ -272,6 +277,10 @@ class RabbitBehaviorSettingsModel {
 
     SaveRabbitSettings(values) {
         if !this.api.load_settings(this.settings) {
+            return false
+        }
+        if values.language != this.original_values.language
+            && !this.api.customize_string(this.settings, "language", values.language) {
             return false
         }
         if !this.api.customize_bool(this.settings, "show_tips", values.show_tips) {
@@ -390,6 +399,7 @@ class RabbitBehaviorSettingsModel {
     }
 
     SetCurrentValues(values) {
+        this.language := values.language
         this.show_tips := values.show_tips
         this.show_tips_time := values.show_tips_time
         this.suspend_hotkey := values.suspend_hotkey

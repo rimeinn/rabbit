@@ -18,6 +18,8 @@
 
 #Include RabbitCommon.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitSwitcherSettingsModel {
     __New(levers_api, rime_api) {
         this.api := levers_api
@@ -39,7 +41,7 @@ class RabbitSwitcherSettingsModel {
         try {
             this.settings := this.api.switcher_settings_init()
             if !this.settings || !this.Load() {
-                throw Error("未能读取输入方案与方案选单设置。")
+                throw Error(RabbitI18n.Text("models.switcher_read"))
             }
         } catch {
             this.Dispose()
@@ -213,7 +215,7 @@ class RabbitSwitcherSettingsModel {
             if !discovered.Has(option_name) {
                 item := {
                     name: option_name,
-                    source: "当前配置",
+                    source: RabbitI18n.Text("models.current_config"),
                     custom: true,
                     selected: true,
                 }

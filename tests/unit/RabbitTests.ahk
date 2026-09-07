@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,6 +20,8 @@
 
 #Include RabbitAppContextTest.ahk
 #Include RabbitAboutTest.ahk
+#Include RabbitI18nTest.ahk
+#Include RabbitLocalizationTest.ahk
 #Include RabbitApplicationTest.ahk
 #Include RabbitApplicationSettingsModelTest.ahk
 #Include RabbitAdvancedFontSettingsModelTest.ahk

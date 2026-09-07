@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +17,14 @@
 
 #Include RabbitFontSpec.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitAdvancedFontSettingsModel {
-    static ROLES := [
-        { key: "font_face", label: "候选文字" },
-        { key: "preedit_font_face", label: "预编辑文字" },
-        { key: "label_font_face", label: "候选序号" },
-        { key: "comment_font_face", label: "候选注释" }
+    static ROLES => [
+        { key: "font_face", label: RabbitI18n.Text("appearance.font_text") },
+        { key: "preedit_font_face", label: RabbitI18n.Text("appearance.font_preedit") },
+        { key: "label_font_face", label: RabbitI18n.Text("appearance.font_label") },
+        { key: "comment_font_face", label: RabbitI18n.Text("appearance.font_comment") }
     ]
 
     __New(values) {
@@ -72,7 +74,7 @@ class RabbitAdvancedFontSettingsModel {
             throw IndexError("Font fallback entry index is out of range.")
         }
         if !family {
-            throw ValueError("字体名称不能为空。")
+            throw ValueError(RabbitI18n.Text("appearance.font_required"))
         }
         this.ValidateRange(start_code_point, end_code_point)
         entries[index] := {
@@ -87,7 +89,7 @@ class RabbitAdvancedFontSettingsModel {
         local spec := this.GetSpec(key)
         local entries := this.CloneEntries(spec.entries)
         if entries.Length = 1 {
-            throw ValueError("每类文字至少需要保留一个字体。")
+            throw ValueError(RabbitI18n.Text("appearance.font_keep_one"))
         }
         if index < 1 || index > entries.Length {
             throw IndexError("Font fallback entry index is out of range.")
@@ -158,10 +160,10 @@ class RabbitAdvancedFontSettingsModel {
 
     ValidateRange(start_code_point, end_code_point) {
         if start_code_point < 0 || end_code_point > RabbitFontSpec.MAX_CODE_POINT {
-            throw ValueError("Unicode 码位必须在 0 到 10FFFF 之间。")
+            throw ValueError(RabbitI18n.Text("appearance.codepoint_range"))
         }
         if start_code_point > end_code_point {
-            throw ValueError("Unicode 范围起点不能大于终点。")
+            throw ValueError(RabbitI18n.Text("appearance.range_order"))
         }
     }
 

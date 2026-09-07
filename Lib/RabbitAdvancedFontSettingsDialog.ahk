@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,34 +19,36 @@
 #Include RabbitDialogPlacement.ahk
 #Include RabbitWindowTheme.ahk
 
+#Include RabbitI18n.ahk
+
 class RabbitAdvancedFontSettingsDialog extends Gui {
-    static FONT_WEIGHTS := [
-        { label: "细体", value: 100 },
-        { label: "特细", value: 200 },
-        { label: "轻体", value: 300 },
-        { label: "半轻", value: 350 },
-        { label: "常规", value: 400 },
-        { label: "中等", value: 500 },
-        { label: "半粗", value: 600 },
-        { label: "粗体", value: 700 },
-        { label: "特粗", value: 800 },
-        { label: "黑体", value: 900 },
-        { label: "特黑", value: 950 }
+    static FONT_WEIGHTS => [
+        { label: RabbitI18n.Text("appearance.weight_thin"), value: 100 },
+        { label: RabbitI18n.Text("appearance.weight_extra_light"), value: 200 },
+        { label: RabbitI18n.Text("appearance.weight_light"), value: 300 },
+        { label: RabbitI18n.Text("appearance.weight_semi_light"), value: 350 },
+        { label: RabbitI18n.Text("appearance.weight_regular"), value: 400 },
+        { label: RabbitI18n.Text("appearance.weight_medium"), value: 500 },
+        { label: RabbitI18n.Text("appearance.weight_semi_bold"), value: 600 },
+        { label: RabbitI18n.Text("appearance.weight_bold"), value: 700 },
+        { label: RabbitI18n.Text("appearance.weight_extra_bold"), value: 800 },
+        { label: RabbitI18n.Text("appearance.weight_black"), value: 900 },
+        { label: RabbitI18n.Text("appearance.weight_extra_black"), value: 950 }
     ]
-    static FONT_STYLES := [
-        { label: "正常", value: 0 },
-        { label: "倾斜", value: 1 },
-        { label: "斜体", value: 2 }
+    static FONT_STYLES => [
+        { label: RabbitI18n.Text("appearance.style_normal"), value: 0 },
+        { label: RabbitI18n.Text("appearance.style_oblique"), value: 1 },
+        { label: RabbitI18n.Text("appearance.style_italic"), value: 2 }
     ]
-    static RANGE_PRESETS := [
-        { label: "全部字符", start: 0, end: RabbitFontSpec.MAX_CODE_POINT },
-        { label: "基本拉丁（0020–007E）", start: 0x20, end: 0x7e },
-        { label: "CJK 部首补充（2E80–2EFF）", start: 0x2e80, end: 0x2eff },
-        { label: "康熙部首（2F00–2FDF）", start: 0x2f00, end: 0x2fdf },
-        { label: "CJK 符号和标点（3000–303F）", start: 0x3000, end: 0x303f },
-        { label: "CJK 笔画（31C0–31EF）", start: 0x31c0, end: 0x31ef },
+    static RANGE_PRESETS => [
+        { label: RabbitI18n.Text("appearance.all_characters"), start: 0, end: RabbitFontSpec.MAX_CODE_POINT },
+        { label: RabbitI18n.Text("appearance.latin"), start: 0x20, end: 0x7e },
+        { label: RabbitI18n.Text("appearance.radicals"), start: 0x2e80, end: 0x2eff },
+        { label: RabbitI18n.Text("appearance.kangxi"), start: 0x2f00, end: 0x2fdf },
+        { label: RabbitI18n.Text("appearance.punctuation"), start: 0x3000, end: 0x303f },
+        { label: RabbitI18n.Text("appearance.strokes"), start: 0x31c0, end: 0x31ef },
         { label: "CJK Ext A（3400–4DBF）", start: 0x3400, end: 0x4dbf },
-        { label: "中日韩统一表意文字（4E00–9FFF）", start: 0x4e00, end: 0x9fff },
+        { label: RabbitI18n.Text("appearance.ideographs"), start: 0x4e00, end: 0x9fff },
         { label: "CJK Ext B（20000–2A6DF）", start: 0x20000, end: 0x2a6df },
         { label: "CJK Ext C（2A700–2B73F）", start: 0x2a700, end: 0x2b73f },
         { label: "CJK Ext D（2B740–2B81F）", start: 0x2b740, end: 0x2b81f },
@@ -56,8 +58,8 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
         { label: "CJK Ext H（31350–323AF）", start: 0x31350, end: 0x323af },
         { label: "CJK Ext I（2EBF0–2EE5F）", start: 0x2ebf0, end: 0x2ee5f },
         { label: "CJK Ext J（323B0–3347F）", start: 0x323b0, end: 0x3347f },
-        { label: "Emoji 补充区（1F300–1FAFF）", start: 0x1f300, end: 0x1faff },
-        { label: "自定义范围", custom: true }
+        { label: RabbitI18n.Text("appearance.emoji"), start: 0x1f300, end: 0x1faff },
+        { label: RabbitI18n.Text("appearance.custom_range"), custom: true }
     ]
 
     __New(
@@ -74,7 +76,7 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
         }
         super.__New(
             "+Owner" . owner.Hwnd . " -MinimizeBox -MaximizeBox",
-            "高级字体设置",
+            RabbitI18n.Text("appearance.advanced_fonts"),
             this
         )
         this.owner_window := owner
@@ -105,14 +107,14 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
         this.role_tabs.OnEvent("Change", (*) => this.OnRoleChanged())
         this.role_tabs.UseTab()
 
-        this.format_group := this.AddGroupBox("x20 y68 w720 h58", "全局字重与字形")
-        this.AddText("x36 y92 w54 h22", "字重：")
+        this.format_group := this.AddGroupBox("x20 y68 w720 h58", RabbitI18n.Text("appearance.global_font_style"))
+        this.AddText("x36 y92 w54 h22", RabbitI18n.Text("appearance.weight"))
         this.font_weight := this.AddDropDownList(
             "x92 y88 w150",
             this.ChoiceLabels(RabbitAdvancedFontSettingsDialog.FONT_WEIGHTS)
         )
         this.font_weight.OnEvent("Change", (*) => this.OnAttributesChanged())
-        this.AddText("x264 y92 w54 h22", "字形：")
+        this.AddText("x264 y92 w54 h22", RabbitI18n.Text("appearance.style"))
         this.font_style := this.AddDropDownList(
             "x320 y88 w150",
             this.ChoiceLabels(RabbitAdvancedFontSettingsDialog.FONT_STYLES)
@@ -121,22 +123,22 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
         surface_options := initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
         this.order_header := this.AddText(
             "x20 y140 w54 h24 Center +0x200" . surface_options,
-            "顺序"
+            RabbitI18n.Text("appearance.order")
         )
         this.family_header := this.AddText(
             "x74 y140 w286 h24 +0x200" . surface_options,
-            "  字体"
+            "  " . RabbitI18n.Text("controls.fonts")
         )
         this.range_header := this.AddText(
             "x360 y140 w230 h24 +0x200" . surface_options,
-            "  Unicode 范围"
+            "  " . RabbitI18n.Text("appearance.unicode_range")
         )
         list_options := initial_dark_mode
             ? "x20 y164 w570 h166 -Hdr"
             : "x20 y140 w570 h190"
         this.fallback_list := this.AddListView(
             list_options . " -Multi NoSort",
-            ["顺序", "字体", "Unicode 范围"]
+            [RabbitI18n.Text("appearance.order"), RabbitI18n.Text("controls.fonts"), RabbitI18n.Text("appearance.unicode_range")]
         )
         this.fallback_list.ModifyCol(1, 54)
         this.fallback_list.ModifyCol(2, 286)
@@ -145,38 +147,39 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
             "ItemSelect",
             (ctrl, row, selected) => selected ? this.OnEntrySelected(row) : 0
         )
-        this.add_button := this.AddButton("x608 y140 w114 h30", "添加字体")
+        this.add_button := this.AddButton("x608 y140 w114 h30 +0x2000", RabbitI18n.Text("appearance.add_font"))
         this.add_button.OnEvent("Click", (*) => this.AddEntry())
-        this.delete_button := this.AddButton("x608 y178 w114 h30", "删除")
+        this.delete_button := this.AddButton("x608 y178 w114 h30 +0x2000", RabbitI18n.Text("controls.delete"))
         this.delete_button.OnEvent("Click", (*) => this.DeleteEntry())
-        this.move_up_button := this.AddButton("x608 y216 w114 h30", "上移")
+        this.move_up_button := this.AddButton("x608 y216 w114 h30 +0x2000", RabbitI18n.Text("controls.move_up"))
         this.move_up_button.OnEvent("Click", (*) => this.MoveEntry(-1))
-        this.move_down_button := this.AddButton("x608 y254 w114 h30", "下移")
+        this.move_down_button := this.AddButton("x608 y254 w114 h30 +0x2000", RabbitI18n.Text("controls.move_down"))
         this.move_down_button.OnEvent("Click", (*) => this.MoveEntry(1))
-        this.entry_group := this.AddGroupBox("x20 y344 w720 h126", "编辑所选字体")
-        this.AddText("x36 y370 w54 h22", "字体：")
+        this.entry_group := this.AddGroupBox("x20 y344 w720 h126", RabbitI18n.Text("appearance.edit_font"))
+        this.AddText("x36 y370 w54 h22", RabbitI18n.Text("appearance.font"))
         this.family := this.AddComboBox("x92 y366 w286", this.installed_fonts)
-        this.AddText("x396 y370 w54 h22", "范围：")
+        this.AddText("x396 y370 w54 h22", RabbitI18n.Text("appearance.range"))
         this.range_preset := this.AddDropDownList(
             "x452 y366 w270",
             this.ChoiceLabels(RabbitAdvancedFontSettingsDialog.RANGE_PRESETS)
         )
         this.range_preset.OnEvent("Change", (*) => this.OnRangePresetChanged())
-        this.AddText("x36 y410 w78 h22", "起始码位：")
+        this.AddText("x36 y410 w78 h22", RabbitI18n.Text("appearance.start"))
         this.range_start := this.AddEdit("x116 y406 w118 r1 -Multi")
-        this.AddText("x258 y410 w78 h22", "结束码位：")
+        this.AddText("x258 y410 w78 h22", RabbitI18n.Text("appearance.end"))
         this.range_end := this.AddEdit("x338 y406 w118 r1 -Multi")
-        this.update_button := this.AddButton("x608 y402 w114 h32", "更新所选项")
+        this.update_button := this.AddButton("x608 y402 w114 h32 +0x2000",
+            RabbitI18n.Text("appearance.update_selected"))
         this.update_button.OnEvent("Click", (*) => this.ApplyEntry())
 
-        this.AddText("x20 y490 w92 h22", "配置字符串：")
+        this.AddText("x20 y490 w92 h22", RabbitI18n.Text("appearance.config_string"))
         this.raw_source := this.AddEdit("x114 y486 w500 r1 -Multi")
-        this.parse_button := this.AddButton("x624 y484 w116 h30", "从字符串更新")
+        this.parse_button := this.AddButton("x624 y484 w116 h30 +0x2000", RabbitI18n.Text("appearance.parse_string"))
         this.parse_button.OnEvent("Click", (*) => this.ParseRawSource())
         this.status := this.AddText("x20 y526 w720 h24 cRed", "")
-        this.save_button := this.AddButton("x552 y558 w88 h32 Default", "确定")
+        this.save_button := this.AddButton("x552 y558 w88 h32 Default +0x2000", RabbitI18n.Text("common.ok"))
         this.save_button.OnEvent("Click", (*) => this.SaveSettings())
-        this.cancel_button := this.AddButton("x652 y558 w88 h32", "取消")
+        this.cancel_button := this.AddButton("x652 y558 w88 h32 +0x2000", RabbitI18n.Text("common.cancel"))
         this.cancel_button.OnEvent("Click", (*) => this.Dispose())
         this.OnEvent("Close", (*) => this.Dispose())
         this.OnEvent("Escape", (*) => this.Dispose())
@@ -346,7 +349,7 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
     DeleteEntry() {
         local row := this.fallback_list.GetNext(0)
         if !row {
-            this.status.Value := "请先选择一个字体。"
+            this.status.Value := RabbitI18n.Text("appearance.select_font")
             return false
         }
         try {
@@ -406,7 +409,7 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
 
     RangeText(entry) {
         if entry.start_code_point = 0 && entry.end_code_point = RabbitFontSpec.MAX_CODE_POINT {
-            return "全部字符"
+            return RabbitI18n.Text("appearance.all_characters")
         }
         return "U+" . Format("{:04X}", entry.start_code_point)
             . " – U+" . Format("{:04X}", entry.end_code_point)
@@ -426,12 +429,12 @@ class RabbitAdvancedFontSettingsDialog extends Gui {
     ParseCodePointInput(value) {
         value := Trim(value)
         if !value {
-            throw ValueError("Unicode 起始和结束码位不能为空。")
+            throw ValueError(RabbitI18n.Text("appearance.codepoints_required"))
         }
         try {
             return RabbitFontSpec.ParseCodePoint(value)
         } catch as err {
-            throw ValueError("Unicode 码位无效：" . err.Message)
+            throw ValueError(RabbitI18n.Text("messages.codepoint_invalid", Map("reason", err.Message)))
         }
     }
 

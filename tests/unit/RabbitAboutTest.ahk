@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 
 #Include ..\support\TestCommon.ahk
 #Include ..\..\Lib\RabbitAbout.ahk
+#Include ..\..\Lib\RabbitI18n.ahk
 
 RunTest("standalone about dialog uses the shared about page", TestStandaloneAboutDialogUsesSharedPage.Bind())
 
@@ -36,5 +37,31 @@ TestStandaloneAboutDialogUsesSharedPage() {
             "The standalone about dialog did not show every open source project.")
     } finally {
         dialog.Dispose()
+    }
+}
+
+RunTest("localized about page grows for wrapped text", TestLocalizedAboutLayout.Bind())
+
+TestLocalizedAboutLayout() {
+    local directory := A_LineFile . "\..\..\..\locales", dialog := 0
+    local description_y, description_height, first_row_y, normal_height
+    try {
+        RabbitI18n.Initialize(directory, "en-US")
+        dialog := RabbitAboutDialog()
+        AssertEqual("About Rabbit", dialog.Title, "About title did not use the active language.")
+        normal_height := dialog.about_page.height
+        dialog.Dispose()
+        RabbitI18n.messages["about.credits_description"] :=
+            RabbitI18n.Text("about.credits_description") . "`nExtra translated line.`nAnother translated line."
+        dialog := RabbitAboutDialog()
+        AssertTrue(dialog.about_page.height > normal_height, "Wrapped text did not grow the page.")
+        dialog.about_page.about_open_source_description.GetPos(, &description_y, , &description_height)
+        dialog.about_page.about_open_source_project_links[1].GetPos(, &first_row_y)
+        AssertTrue(first_row_y >= description_y + description_height, "Project links overlap translated text.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        RabbitI18n.Initialize(directory, "zh-CN")
     }
 }

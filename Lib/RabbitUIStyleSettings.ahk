@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -215,7 +215,7 @@ class UIStyleSettings {
 
     UpsertColorScheme(color_scheme) {
         if !(color_scheme is RabbitColorScheme) || !color_scheme.IsCustom() {
-            throw TypeError("只能保存自定义配色方案。")
+            throw TypeError(RabbitI18n.Text("models.custom_color_only"))
         }
         RabbitColorScheme.ValidateId(color_scheme.color_scheme_id)
         this.color_scheme_changes[color_scheme.color_scheme_id] := color_scheme
