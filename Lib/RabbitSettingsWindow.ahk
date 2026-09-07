@@ -689,9 +689,8 @@ class RabbitSettingsWindow extends Gui {
         )
         this.behavior_tabs.UseTab(3)
         this.language_label := this.AddText("x260 y190 w506 Hidden", RabbitI18n.Text("language.label"))
-        this.language_values := ["auto", "zh-CN", "en-US"]
-        this.language_choice := this.AddDropDownList("x260 y222 w300 Choose1 Hidden",
-            [RabbitI18n.Text("language.auto"), "简体中文", "English"])
+        this.language_choice := this.AddDropDownList("x260 y222 w300 Hidden")
+        this.PopulateLanguageChoices()
         this.language_choice.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.language_help := this.AddText("x260 y268 w506 Hidden cGray", RabbitI18n.Text("language.hint"))
         this.behavior_interface_controls := [this.language_label, this.language_choice, this.language_help]
@@ -1741,25 +1740,44 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    PopulateLanguageChoices(preference := "auto") {
+        local language, index, selected := 0
+        local alias := RabbitI18n.OfficialAlias(preference)
+        local names := [RabbitI18n.Text("language.auto")]
+        this.language_values := ["auto"]
+        for language in RabbitI18n.GetLanguages() {
+            this.language_values.Push(language.code)
+            names.Push(language.name)
+        }
+        for index, language in this.language_values {
+            if preference = language || (alias && alias = language) {
+                selected := index
+                ; Preserve an existing alias unless the user selects a different language.
+                this.language_values[index] := preference
+                break
+            }
+        }
+        if !selected {
+            ; Show the effective fallback without adding a metadata-less catalog to the picker.
+            ; Preserve the saved preference when the user only edits unrelated settings.
+            for index, language in this.language_values {
+                if language = RabbitI18n.ResolveLocale(preference) {
+                    selected := index
+                    this.language_values[index] := preference
+                    break
+                }
+            }
+        }
+        this.language_choice.Delete()
+        this.language_choice.Add(names)
+        this.language_choice.Choose(selected)
+    }
+
     PopulateBehaviorSettings() {
         local controls, key
         this.behavior_loading := true
         try {
-            this.language_values := ["auto", "zh-CN", "en-US"]
-            this.language_choice.Delete()
-            this.language_choice.Add([RabbitI18n.Text("language.auto"), "简体中文", "English"])
-            local language_index := 0, index, language
-            for index, language in this.language_values {
-                if language = this.behavior_model.language {
-                    language_index := index
-                }
-            }
-            if !language_index {
-                this.language_values.Push(this.behavior_model.language)
-                this.language_choice.Add([this.behavior_model.language])
-                language_index := this.language_values.Length
-            }
-            this.language_choice.Choose(language_index)
+            this.PopulateLanguageChoices(this.behavior_model.language)
             this.show_tips.Value := this.behavior_model.show_tips
             this.show_tips_time.Value := this.behavior_model.show_tips_time
             this.suspend_hotkey.Value := this.behavior_model.suspend_hotkey

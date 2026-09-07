@@ -26,7 +26,7 @@ RunTest("translation parser rejects invalid catalogs", TestRabbitI18nParser.Bind
 RunTest("language reads deployed Rime config", TestRabbitI18nConfig.Bind())
 
 TestRabbitI18n() {
-    local directory := A_LineFile . "\..\..\..\locales", reference, translated
+    local directory := A_LineFile . "\..\..\..\locales", reference, translated, locale
     try {
         RabbitI18n.Initialize(directory, "en-US")
         AssertEqual("Input settings", RabbitI18n.Text("tray.settings"), "English catalog was not loaded.")
@@ -39,8 +39,10 @@ TestRabbitI18n() {
         AssertEqual("zh-CN", RabbitI18n.locale, "Invalid preference did not fall back.")
         reference := RabbitI18n.ReadCatalog(directory . "\zh-CN.ini")
         AssertTrue(reference.Count > 20, "Reference catalog is empty.")
-        translated := RabbitI18n.ReadCatalog(directory . "\en-US.ini")
-        AssertEqual(0, RabbitI18n.Validate(reference, translated).Length, "English catalog is inconsistent.")
+        for locale in ["en-US", "zh-HK", "zh-TW"] {
+            translated := RabbitI18n.ReadCatalog(directory . "\" . locale . ".ini")
+            AssertEqual(0, RabbitI18n.Validate(reference, translated).Length, locale . " catalog is inconsistent.")
+        }
     } finally {
         RabbitI18n.Initialize(directory, "zh-CN")
     }
@@ -163,5 +165,84 @@ TestMissingLocaleFallback() {
             DirDelete(directory)
         }
         RabbitI18n.Initialize(repository_catalogs, "zh-CN")
+    }
+}
+
+RunTest("Traditional Chinese locales resolve and load independently", TestTraditionalChineseLocales.Bind())
+
+TestTraditionalChineseLocales() {
+    local directory := A_LineFile . "\..\..\..\locales", locale, expected
+    local cases := Map("zh-HK", "zh-HK", "zh-MO", "zh-HK", "zh-Hant-HK", "zh-HK",
+        "zh-Hant-MO", "zh-HK", "zh-TW", "zh-TW", "zh-Hant-TW", "zh-TW", "zh-Hant", "zh-TW",
+        "zh-CN", "zh-CN", "zh-SG", "zh-CN", "zh-Hans", "zh-CN", "zh-Hans-HK", "zh-CN")
+    try {
+        for locale, expected in cases {
+            AssertEqual(expected, RabbitI18n.ResolveLocale("auto", locale), "Wrong system locale mapping: " . locale)
+            AssertEqual(expected, RabbitI18n.ResolveLocale(locale, "en-US"), "Explicit locale ignored: " . locale)
+        }
+        RabbitI18n.Initialize(directory, "zh-HK")
+        AssertEqual("用戶詞典管理", RabbitI18n.Text("tray.dictionary"), "Hong Kong terminology was not loaded.")
+        AssertEqual("方案功能表", RabbitI18n.Text("controls.scheme_menu"), "Hong Kong menu terminology was lost.")
+        RabbitI18n.Initialize(directory, "zh-TW")
+        AssertEqual("使用者詞典管理", RabbitI18n.Text("tray.dictionary"), "Taiwan terminology was not loaded.")
+        AssertEqual("控制台", RabbitI18n.Text("settings.subtitle"), "Taiwan control panel terminology was lost.")
+        RabbitI18n.messages.Delete("common.cancel")
+        AssertEqual("取消", RabbitI18n.Text("common.cancel"), "Traditional locale fallback failed.")
+    } finally {
+        RabbitI18n.Initialize(directory, "zh-CN")
+    }
+}
+
+RunTest("language discovery accepts partial catalogs with matching metadata", TestLanguageDiscovery.Bind())
+
+TestLanguageDiscovery() {
+    local directory := A_Temp . "\rabbit-discovery-" . DllCall("GetCurrentProcessId")
+    local repository := A_LineFile . "\..\..\..\locales", catalogs, name, content, languages, language
+    local found := Map()
+    catalogs := Map(
+        "ja-JP", "[meta]`nlocale=ja-JP`nlanguage_name=日本語`n[common]`ncancel=キャンセル",
+        "fr-FR", "[meta]`nlocale=fr-FR`nlanguage_name=Français",
+        "en-GB", "[meta]`nlocale=en-GB`nlanguage_name=British English`n[common]`ncancel=Cancel UK",
+        "de-DE", "[common]`ncancel=Abbrechen",
+        "es-ES", "[meta]`nlocale=es-ES`nlanguage_name=  ",
+        "it-IT", "[meta]`nlocale=fr-FR`nlanguage_name=Italiano",
+        "ko-KR", "[meta]`nlanguage_name=한국어",
+        "auto", "[meta]`nlocale=auto`nlanguage_name=Not a locale",
+        "zh-Hans", "[meta]`nlocale=zh-Hans`nlanguage_name=Duplicate official alias"
+    )
+    try {
+        AssertEqual(4, RabbitI18n.GetLanguages(directory).Length, "Official languages require external files.")
+        DirCreate(directory)
+        for name, content in catalogs {
+            FileAppend(content, directory . "\" . name . ".ini", "UTF-8-RAW")
+        }
+        languages := RabbitI18n.GetLanguages(directory)
+        AssertEqual(7, languages.Length, "Discovery accepted invalid metadata or rejected partial catalogs.")
+        for language in languages {
+            found[language.code] := language.name
+        }
+        AssertEqual("日本語", found["ja-JP"], "Language name was not read as UTF-8 metadata.")
+        AssertEqual("Français", found["fr-FR"], "Metadata-only catalogs should be discoverable.")
+        RabbitI18n.Initialize(directory, "ja-JP")
+        AssertEqual("ja-JP", RabbitI18n.locale, "Discovered language did not resolve.")
+        AssertEqual("キャンセル", RabbitI18n.Text("common.cancel"), "Partial translation was not loaded.")
+        AssertEqual("确定", RabbitI18n.Text("common.ok"), "Untranslated keys did not fall back.")
+        AssertEqual("ja-JP", RabbitI18n.ResolveLocale("auto", "ja-JP"), "System language ignored discovery.")
+        AssertEqual("en-GB", RabbitI18n.ResolveLocale("en-GB"), "Exact discovered variant lost to family fallback.")
+        AssertEqual("en-US", RabbitI18n.ResolveLocale("en"), "Official English alias stopped working.")
+        AssertEqual("zh-CN", RabbitI18n.ResolveLocale("zh-Hans"), "Official Chinese alias was overridden.")
+        AssertEqual("zh-CN", RabbitI18n.ResolveLocale("zh"), "Generic Chinese alias stopped working.")
+        AssertEqual("zh-TW", RabbitI18n.ResolveLocale("zh-Hant"), "Traditional Chinese alias stopped working.")
+        AssertEqual("zh-CN", RabbitI18n.ResolveLocale("../ja-JP"), "Preference was used as a filesystem path.")
+    } finally {
+        for name in catalogs {
+            if FileExist(directory . "\" . name . ".ini") {
+                FileDelete(directory . "\" . name . ".ini")
+            }
+        }
+        if DirExist(directory) {
+            DirDelete(directory)
+        }
+        RabbitI18n.Initialize(repository, "zh-CN")
     }
 }

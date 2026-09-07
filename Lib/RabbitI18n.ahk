@@ -23,6 +23,7 @@ class RabbitI18n {
     static fallback := Map()
     static messages := Map()
     static diagnostics := []
+    static directory := ""
 
     static LoadConfig(rime_api, directory := A_ScriptDir . "\locales") {
         this.Initialize(directory, this.ReadPreference(rime_api))
@@ -45,6 +46,7 @@ class RabbitI18n {
 
     static Initialize(directory, preference := "auto", system_locale := "") {
         local key, value
+        this.directory := directory
         this.diagnostics := []
         this.fallback := RabbitLocaleFallback.Create()
         for key, value in this.ReadOptionalCatalog(directory . "\zh-CN.ini") {
@@ -58,7 +60,7 @@ class RabbitI18n {
     }
 
     static ResolveLocale(preference, system_locale := "") {
-        local selected
+        local selected, alias, language
         if !system_locale {
             local locale_buffer := Buffer(170, 0)
             if DllCall("GetUserDefaultLocaleName", "Ptr", locale_buffer, "Int", 85) {
@@ -66,8 +68,99 @@ class RabbitI18n {
             }
         }
         selected := preference = "auto" ? system_locale : preference
-        ; Only catalog names are accepted, never paths supplied by configuration.
-        return RegExMatch(selected, "i)^en(?:-|$)") ? "en-US" : "zh-CN"
+        if (alias := this.OfficialAlias(selected)) {
+            return alias
+        }
+        for language in this.GetLanguages() {
+            if selected = language.code {
+                return language.code
+            }
+        }
+        ; Unavailable regional variants can still use an official language family.
+        ; Never construct a path directly from an unrecognized preference.
+        if RegExMatch(selected, "i)^en(?:-|$)") {
+            return "en-US"
+        }
+        if RegExMatch(selected, "i)^zh-(?:Hant-)?(?:HK|MO)(?:-|$)") {
+            return "zh-HK"
+        }
+        if RegExMatch(selected, "i)^zh-(?:TW|Hant)(?:-|$)") {
+            return "zh-TW"
+        }
+        return "zh-CN"
+    }
+
+    static OfficialAlias(code) {
+        switch StrLower(code) {
+            case "zh", "zh-hans", "zh-cn": return "zh-CN"
+            case "zh-hant", "zh-tw": return "zh-TW"
+            case "zh-hk": return "zh-HK"
+            case "en", "en-us": return "en-US"
+        }
+        return ""
+    }
+
+    static GetLanguages(directory := "") {
+        local languages := [
+            {code: "zh-CN", name: "简体中文"},
+            {code: "en-US", name: "English"},
+            {code: "zh-HK", name: "繁體中文（香港）"},
+            {code: "zh-TW", name: "繁體中文（台灣）"}
+        ]
+        local files := "", path, code, metadata, name, language, seen := Map()
+        seen.CaseSense := "Off"
+        for language in languages {
+            seen[language.code] := true
+        }
+        if !directory {
+            directory := this.directory ? this.directory
+                : (A_IsCompiled ? A_ScriptDir . "\locales" : A_LineFile . "\..\..\locales")
+        }
+        Loop Files directory . "\*.ini", "F" {
+            files .= A_LoopFileName . "`n"
+        }
+        ; Stable ordering keeps the language picker predictable across filesystem changes.
+        for name in StrSplit(Sort(files), "`n") {
+            if !name {
+                continue
+            }
+            code := SubStr(name, 1, -4)
+            if !RegExMatch(code, "i)^[a-z]{2,8}(?:-[a-z0-9]{1,8})*$")
+                || this.OfficialAlias(code) || code = "auto" || seen.Has(code) {
+                continue
+            }
+            path := directory . "\" . name
+            metadata := this.ReadMetadata(path)
+            if !metadata.Has("locale") || !metadata.Has("language_name")
+                || metadata["locale"] != code || !Trim(metadata["language_name"]) {
+                continue
+            }
+            seen[code] := true
+            languages.Push({code: metadata["locale"], name: metadata["language_name"]})
+        }
+        return languages
+    }
+
+    static ReadMetadata(path) {
+        local metadata := Map(), section := "", line, match
+        try {
+            ; Discovery reads metadata only; partial translations need no completeness validation.
+            for line in StrSplit(FileRead(path, "UTF-8"), "`n", "`r") {
+                line := Trim(line)
+                if RegExMatch(line, "^\[([^]]+)\]$", &match) {
+                    section := match[1]
+                } else if section == "meta"
+                    && RegExMatch(line, "^(locale|language_name)=(.*)$", &match) {
+                    if metadata.Has(match[1]) {
+                        return Map()
+                    }
+                    metadata[match[1]] := Trim(match[2])
+                }
+            }
+        } catch {
+            return Map()
+        }
+        return metadata
     }
 
     static ReadOptionalCatalog(path) {

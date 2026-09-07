@@ -27,9 +27,48 @@ the existing window. Failed deployments do not trigger reconstruction. If other
 settings still have unsaved changes, reconstruction waits until they are resolved;
 closing the panel still closes the session instead of reopening it.
 
-Supported values are `auto` (default), `zh-CN`, and `en-US`. `auto` uses the
-Windows user locale: English locales use en-US; other locales currently fall
-back to zh-CN. Unsupported preferences also fall back to zh-CN.
+Official values are `auto` (default), `zh-CN`, `en-US`, `zh-HK`, and `zh-TW`.
+Aliases `zh`/`zh-Hans`, `zh-Hant`, and `en` select zh-CN, zh-TW, and en-US.
+The picker also discovers additional catalogs as described below. `auto` uses the Windows
+user locale. English locales map to en-US; zh-HK/zh-MO (including zh-Hant-HK/MO)
+map to zh-HK; zh-TW and other zh-Hant locales map to zh-TW. Simplified Chinese
+locales and unsupported preferences fall back to zh-CN. An explicit zh-Hans
+script remains Simplified Chinese even if its region is HK.
+
+The Hong Kong and Taiwan catalogs are maintained independently to preserve
+regional terminology (for example 用戶/使用者 and 快捷鍵/快速鍵). Catalog checks
+verify both against the default Chinese catalog, including placeholder names.
+
+## Additional languages
+
+Place `<lang-code>.ini` in `locales`, for example `ja-JP.ini`:
+
+```ini
+[meta]
+locale=ja-JP
+language_name=日本語
+
+[common]
+cancel=キャンセル
+```
+
+Both metadata values must be present and nonempty. `meta.locale` must match the
+filename (case-insensitively); codes use letters and digits separated by hyphens,
+with a 2–8-letter initial language subtag and 1–8-character subsequent subtags.
+The language picker displays `meta.language_name`. Missing metadata, mismatched
+codes and duplicate metadata keys are skipped. Discovery reads only metadata and
+does not check translation completeness; even a metadata-only catalog is allowed.
+Missing messages use the normal Chinese fallback. Runtime loading still handles
+malformed catalog syntax with the existing fallback and diagnostics.
+
+Official choices and their reserved aliases remain available without files and
+cannot be duplicated by alias-named files. Extra languages appear after official
+choices in filename order. An exact discovered locale (such as en-GB) takes
+precedence over regional fallback; reserved aliases such as en still select the
+official language. A configured but unavailable extra language displays its
+fallback without adding an invalid catalog entry, and its saved code is retained
+when only unrelated settings are edited. Reopen the panel to refresh its list
+after adding catalogs, then apply and redeploy to change language.
 
 ## Catalog format
 

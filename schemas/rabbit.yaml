@@ -3,7 +3,7 @@
 
 config_version: "0.1"
 
-# UI language: auto, zh-CN, or en-US; applied after deployment.
+# UI language: auto, zh-CN, en-US, zh-HK, or zh-TW; applied after deployment.
 language: auto
 
 # 暂停或恢复玉兔毫的快捷键；设为 null 表示不启用

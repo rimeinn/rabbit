@@ -111,3 +111,64 @@ TestTranslationReferences() {
         }
     }
 }
+
+RunTest("Traditional Chinese settings expose both regional language choices", TestTraditionalSettingsChoices.Bind())
+
+TestTraditionalSettingsChoices() {
+    local directory := A_LineFile . "\..\..\..\locales", locale, window := 0
+    try {
+        for locale in ["zh-HK", "zh-TW"] {
+            RabbitI18n.Initialize(directory, locale)
+            window := RabbitSettingsWindow()
+            AssertEqual("【玉兔毫】設定", window.Title, "Traditional settings title was not loaded.")
+            window.SelectPage(3)
+            AssertEqual("zh-HK", window.language_values[4], "Hong Kong language is not selectable.")
+            AssertEqual("zh-TW", window.language_values[5], "Taiwan language is not selectable.")
+            window.behavior_tabs.Choose(3)
+            window.OnBehaviorTabChanged()
+            AssertTrue(window.language_choice.Visible, "Regional language picker is hidden.")
+            AssertEqual("介面語言：", window.language_label.Text, "Regional language label is not translated.")
+            window.Dispose()
+            window := 0
+        }
+    } finally {
+        if window {
+            window.Dispose()
+        }
+        RabbitI18n.Initialize(directory, "zh-CN")
+    }
+}
+
+RunTest("settings discover language names and preserve configured aliases", TestDiscoveredLanguageChoices.Bind())
+
+TestDiscoveredLanguageChoices() {
+    local directory := A_Temp . "\rabbit-picker-" . DllCall("GetCurrentProcessId")
+    local repository := A_LineFile . "\..\..\..\locales", window := 0
+    try {
+        DirCreate(directory)
+        FileAppend("[meta]`nlocale=ja-JP`nlanguage_name=日本語", directory . "\ja-JP.ini", "UTF-8-RAW")
+        RabbitI18n.Initialize(directory, "zh-CN")
+        window := RabbitSettingsWindow()
+        window.SelectPage(3)
+        window.PopulateLanguageChoices("ja-JP")
+        AssertEqual("日本語", window.language_choice.Text, "Picker did not use the discovered name.")
+        AssertEqual("ja-JP", window.language_values[window.language_choice.Value], "Picker lost the language code.")
+        window.PopulateLanguageChoices("de-DE")
+        AssertEqual(6, window.language_values.Length, "Unavailable catalog added a metadata-less picker entry.")
+        AssertEqual("简体中文", window.language_choice.Text, "Unavailable preference did not show its fallback.")
+        window.PopulateLanguageChoices("zh-Hant")
+        AssertEqual("繁體中文（台灣）", window.language_choice.Text, "Official alias created a duplicate picker item.")
+        AssertEqual("zh-Hant", window.language_values[window.language_choice.Value], "Saved alias was normalized.")
+    } finally {
+        if window {
+            window.Dispose()
+        }
+        if FileExist(directory . "\ja-JP.ini") {
+            FileDelete(directory . "\ja-JP.ini")
+        }
+        if DirExist(directory) {
+            DirDelete(directory)
+        }
+        RabbitI18n.Initialize(repository, "zh-CN")
+    }
+}
