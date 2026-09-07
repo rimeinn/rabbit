@@ -20,8 +20,12 @@ patch:
 Merge this into the existing `patch` mapping, then redeploy Rabbit. Both
 executables read the deployed `rabbit` configuration after initializing Rime;
 editing the custom file alone does not change the active language. The frontend
-loads the new language when it resumes after deployment. An already open deployer
-keeps its language until reopened.
+loads the new language when it resumes after deployment. After a successful deployment, the open control panel is rebuilt only if the
+resolved UI language changes. Its page, selected subtab and screen position are
+restored (position is clamped to the available work area). Other deployments keep
+the existing window. Failed deployments do not trigger reconstruction. If other
+settings still have unsaved changes, reconstruction waits until they are resolved;
+closing the panel still closes the session instead of reopening it.
 
 Supported values are `auto` (default), `zh-CN`, and `en-US`. `auto` uses the
 Windows user locale: English locales use en-US; other locales currently fall

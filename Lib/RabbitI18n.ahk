@@ -25,6 +25,10 @@ class RabbitI18n {
     static diagnostics := []
 
     static LoadConfig(rime_api, directory := A_ScriptDir . "\locales") {
+        this.Initialize(directory, this.ReadPreference(rime_api))
+    }
+
+    static ReadPreference(rime_api) {
         local config := rime_api.config_open("rabbit"), preference := "auto"
         if config {
             try {
@@ -36,11 +40,11 @@ class RabbitI18n {
                 rime_api.config_close(config)
             }
         }
-        this.Initialize(directory, preference)
+        return preference
     }
 
     static Initialize(directory, preference := "auto", system_locale := "") {
-        local selected, key, value
+        local key, value
         this.diagnostics := []
         this.fallback := RabbitLocaleFallback.Create()
         for key, value in this.ReadOptionalCatalog(directory . "\zh-CN.ini") {
@@ -48,6 +52,13 @@ class RabbitI18n {
                 this.fallback[key] := value
             }
         }
+        this.locale := this.ResolveLocale(preference, system_locale)
+        this.messages := this.locale = "zh-CN" ? this.fallback.Clone()
+            : this.ReadOptionalCatalog(directory . "\" . this.locale . ".ini")
+    }
+
+    static ResolveLocale(preference, system_locale := "") {
+        local selected
         if !system_locale {
             local locale_buffer := Buffer(170, 0)
             if DllCall("GetUserDefaultLocaleName", "Ptr", locale_buffer, "Int", 85) {
@@ -56,9 +67,7 @@ class RabbitI18n {
         }
         selected := preference = "auto" ? system_locale : preference
         ; Only catalog names are accepted, never paths supplied by configuration.
-        this.locale := RegExMatch(selected, "i)^en(?:-|$)") ? "en-US" : "zh-CN"
-        this.messages := this.locale = "zh-CN" ? this.fallback.Clone()
-            : this.ReadOptionalCatalog(directory . "\" . this.locale . ".ini")
+        return RegExMatch(selected, "i)^en(?:-|$)") ? "en-US" : "zh-CN"
     }
 
     static ReadOptionalCatalog(path) {

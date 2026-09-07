@@ -1525,3 +1525,64 @@ class RabbitSettingsDarkThemeProbe {
     Dispose() {
     }
 }
+
+RunTest("failed deployment cancels pending language refresh", TestFailedLanguageDeployment.Bind())
+
+TestFailedLanguageDeployment() {
+    local window := RabbitSettingsWindow()
+    try {
+        window.workflow := RabbitLanguageDeployProbe()
+        AssertEqual(0, window.UpdateWorkspace(), "Successful deployment result changed.")
+        AssertTrue(window.deployment_pending, "Successful deployment did not request a locale check.")
+        window.workflow.result := 1
+        AssertEqual(1, window.UpdateWorkspace(), "Deployment failure result changed.")
+        AssertTrue(!window.deployment_pending, "Failed deployment retained a locale refresh request.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+class RabbitLanguageDeployProbe {
+    result := 0
+    UpdateWorkspace(*) {
+        return this.result
+    }
+}
+
+RunTest("language refresh waits for the save callback to finish", TestLanguageRefreshAfterCallback.Bind())
+
+TestLanguageRefreshAfterCallback() {
+    local window := RabbitSettingsWindow(), completed := false, refreshed := false
+    local hidden_windows := A_DetectHiddenWindows
+    DetectHiddenWindows(true)
+    local deploy_callback := DeployForTest
+    local timeout_callback := window.Dispose.Bind(window)
+    try {
+        window.workflow := RabbitLanguageDeployProbe()
+        window.language_reload_callback := RefreshForTest
+        SetTimer(deploy_callback, -1)
+        SetTimer(timeout_callback, -2000)
+        window.WaitClose()
+        AssertTrue(refreshed, "The waiting settings session did not process a successful deployment.")
+    } finally {
+        SetTimer(deploy_callback, 0)
+        SetTimer(timeout_callback, 0)
+        window.Dispose()
+        DetectHiddenWindows(hidden_windows)
+    }
+
+    DeployForTest() {
+        window.UpdateWorkspace()
+        Sleep(150)
+        completed := true
+    }
+
+    RefreshForTest(current) {
+        try {
+            AssertTrue(completed, "Language refresh interrupted an active save callback.")
+            refreshed := true
+        } finally {
+            current.Dispose()
+        }
+    }
+}

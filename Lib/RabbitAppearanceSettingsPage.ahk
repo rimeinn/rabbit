@@ -837,7 +837,7 @@ class RabbitAppearanceSettingsPage {
                 owner.appearance_status.Value := RabbitI18n.Text("controls.appearance_save_error")
                 return false
             }
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := owner.UpdateWorkspace()
             if deploy_result != 0 {
                 owner.appearance_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false

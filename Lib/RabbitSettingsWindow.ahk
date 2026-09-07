@@ -25,6 +25,10 @@
 #Include RabbitWindowTheme.ahk
 
 class RabbitSettingsWindow extends Gui {
+    language_reload_callback := 0
+    language_reload_state := 0
+    deployment_pending := false
+
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 724
     static BEHAVIOR_HEIGHT := 692
@@ -1621,7 +1625,7 @@ class RabbitSettingsWindow extends Gui {
                 }
             }
 
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
                 this.footer_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -1680,7 +1684,7 @@ class RabbitSettingsWindow extends Gui {
                 return false
             }
             this.DisposeSwitcherSettings()
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
                 this.EnsureSwitcherSettings()
                 this.footer_status.Value := RabbitI18n.Text("controls.install_error")
@@ -1882,7 +1886,7 @@ class RabbitSettingsWindow extends Gui {
                 this.behavior_status.Value := RabbitI18n.Text("controls.behavior_save_error")
                 return false
             }
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
                 this.behavior_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -2040,7 +2044,7 @@ class RabbitSettingsWindow extends Gui {
                 this.application_status.Value := RabbitI18n.Text("controls.applications_save_error")
                 return false
             }
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
                 this.application_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -2449,7 +2453,7 @@ class RabbitSettingsWindow extends Gui {
                 this.switcher_status.Value := RabbitI18n.Text("controls.schemes_save_error")
                 return false
             }
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
                 this.switcher_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -2638,7 +2642,7 @@ class RabbitSettingsWindow extends Gui {
             return this.CompleteInstallation()
         }
         return this.RunMaintenanceAction(
-            (*) => this.workflow.UpdateWorkspace(true),
+            (*) => this.UpdateWorkspace(),
             RabbitI18n.Text("controls.deploy_done"),
             RabbitI18n.Text("controls.deploy_error")
         )
@@ -2825,9 +2829,56 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    UpdateWorkspace() {
+        this.deployment_pending := false
+        local result := this.workflow.UpdateWorkspace(true)
+        this.deployment_pending := result = 0
+        return result
+    }
+
     WaitClose() {
         local hwnd := this.Hwnd
-        WinWaitClose("ahk_id " . hwnd)
+        if !this.language_reload_callback {
+            WinWaitClose("ahk_id " . hwnd)
+            return
+        }
+        ; This waiting thread resumes only after the GUI event callback has returned,
+        ; so saving, dirty-state cleanup and finally blocks finish before reconstruction.
+        while !WinWaitClose("ahk_id " . hwnd, , 0.1) {
+            if this.deployment_pending && !this.HasUnsavedSettings() {
+                this.deployment_pending := false
+                this.language_reload_callback.Call(this)
+            }
+        }
+    }
+
+    CaptureLanguageReloadState() {
+        local x, y, tab := 0
+        WinGetPos(&x, &y, , , "ahk_id " . this.Hwnd)
+        switch this.selected_page {
+            case 1: tab := this.appearance_tabs.Value
+            case 2: tab := this.switcher_tabs.Value
+            case 3: tab := this.behavior_tabs.Value
+        }
+        return {page_id: RabbitSettingsWindow.pages[this.selected_page].id,
+            installing: this.installing, x: x, y: y, tab: tab}
+    }
+
+    RestoreLanguageReloadState(state) {
+        if !state.tab {
+            return
+        }
+        switch this.selected_page {
+            case 1:
+                this.appearance_tabs.Choose(state.tab)
+                this.OnAppearanceTabChanged()
+            case 2:
+                this.switcher_tabs.Choose(state.tab)
+                this.OnSwitcherTabChanged()
+            case 3:
+                this.behavior_tabs.Choose(state.tab)
+                this.OnBehaviorTabChanged()
+        }
     }
 
     OnClose(*) {
@@ -2863,7 +2914,7 @@ class RabbitSettingsWindow extends Gui {
         this.Opt("+Disabled")
         this.footer_status.Value := RabbitI18n.Text("controls.install_without_save")
         try {
-            deploy_result := this.workflow.UpdateWorkspace(true)
+            deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
                 this.footer_status.Value := RabbitI18n.Text("controls.install_error")
                 return false

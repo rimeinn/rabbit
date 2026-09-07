@@ -146,6 +146,7 @@ class RabbitLegacySettingsWorkflowProbe {
 }
 
 class RabbitSettingsWindowProbe {
+    language_reload_state := 0
     __New(calls) {
         this.calls := calls
     }
@@ -158,6 +159,95 @@ class RabbitSettingsWindowProbe {
         this.calls.Push("wait")
     }
 
+    Dispose() {
+        this.calls.Push("dispose")
+    }
+}
+
+RunTest("settings rebuild only for a resolved language change", TestSettingsLanguageChange.Bind())
+RunTest("settings session continues after language reconstruction", TestSettingsLanguageSession.Bind())
+
+TestSettingsLanguageChange() {
+    local application := RabbitLanguageApplicationProbe([])
+    local window := RabbitLanguageWindowProbe([], 0), previous := RabbitI18n.locale
+    try {
+        RabbitI18n.locale := "en-US"
+        application.context.rime.value := "en-GB"
+        AssertTrue(!application.ReloadSettingsLanguage(window), "Equivalent language triggered reconstruction.")
+        AssertTrue(!window.language_reload_state, "Unchanged language disposed the window.")
+        application.context.rime.value := "zh-CN"
+        AssertTrue(application.ReloadSettingsLanguage(window), "Changed language did not request reconstruction.")
+        AssertEqual("behavior", window.language_reload_state.page_id, "Current page was lost.")
+        AssertEqual(3, window.language_reload_state.tab, "Interface tab was lost.")
+        AssertEqual(125, window.language_reload_state.x, "Window position was lost.")
+        AssertEqual("zh-CN", RabbitI18n.locale, "New locale was not activated.")
+    } finally {
+        RabbitI18n.locale := previous
+    }
+}
+
+TestSettingsLanguageSession() {
+    local calls := [], application := RabbitLanguageApplicationProbe(calls)
+    application.ShowSettings("behavior")
+    AssertEqual("create:behavior,show,wait,dispose,create:behavior,restore:3,show,wait,dispose",
+        JoinSettingsWindowCalls(calls), "The application exited or lost state during reconstruction.")
+}
+
+class RabbitLanguageApplicationProbe extends RabbitDeployerApplication {
+    __New(calls) {
+        super.__New(RabbitLanguageConfigProbe())
+        this.calls := calls
+        this.created := 0
+    }
+
+    UseLegacySettings() {
+        return false
+    }
+
+    CreateSettingsWindow(page_id := "", installing := false) {
+        this.created += 1
+        this.calls.Push("create:" . page_id)
+        return RabbitLanguageWindowProbe(this.calls, this.created = 1)
+    }
+
+    ActivateSettingsLanguage(preference) {
+        RabbitI18n.locale := RabbitI18n.ResolveLocale(preference)
+    }
+}
+
+class RabbitLanguageConfigProbe {
+    value := "en-US"
+    config_open(*) {
+        return 1
+    }
+    config_get_string(*) {
+        return this.value
+    }
+    config_close(*) {
+    }
+}
+
+class RabbitLanguageWindowProbe {
+    language_reload_state := 0
+    __New(calls, reload) {
+        this.calls := calls
+        this.reload := reload
+    }
+    CaptureLanguageReloadState() {
+        return {page_id: "behavior", installing: false, tab: 3, x: 125, y: 150}
+    }
+    RestoreLanguageReloadState(state) {
+        this.calls.Push("restore:" . state.tab)
+    }
+    Show(*) {
+        this.calls.Push("show")
+    }
+    WaitClose() {
+        this.calls.Push("wait")
+        if this.reload {
+            this.language_reload_state := this.CaptureLanguageReloadState()
+        }
+    }
     Dispose() {
         this.calls.Push("dispose")
     }

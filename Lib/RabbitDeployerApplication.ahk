@@ -108,14 +108,44 @@ class RabbitDeployerApplication {
             return this.workflow.Run(installing)
         }
 
-        local window := this.CreateSettingsWindow(page_id, installing)
-        try {
-            window.Show("Center")
-            window.WaitClose()
-        } finally {
-            window.Dispose()
+        local window, state := 0
+        loop {
+            window := this.CreateSettingsWindow(page_id, installing)
+            window.language_reload_callback := this.ReloadSettingsLanguage.Bind(this)
+            try {
+                if state {
+                    window.RestoreLanguageReloadState(state)
+                }
+                window.Show(state ? Format("x{} y{}", state.x, state.y) : "Center")
+                window.WaitClose()
+                state := window.language_reload_state
+            } finally {
+                window.Dispose()
+            }
+            if !state {
+                break
+            }
+            page_id := state.page_id
+            installing := state.installing
         }
         return 0
+    }
+
+    ReloadSettingsLanguage(window) {
+        local preference := RabbitI18n.ReadPreference(this.context.rime)
+        if RabbitI18n.ResolveLocale(preference) = RabbitI18n.locale {
+            return false
+        }
+        local state := window.CaptureLanguageReloadState()
+        this.ActivateSettingsLanguage(preference)
+        window.language_reload_state := state
+        window.Dispose()
+        return true
+    }
+
+    ActivateSettingsLanguage(preference) {
+        RabbitI18n.Initialize(A_ScriptDir . "\locales", preference)
+        RabbitSetupMaintenanceTray()
     }
 
     RestartRabbit(maintenance_mode) {

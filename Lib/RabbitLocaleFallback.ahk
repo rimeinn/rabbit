@@ -426,7 +426,7 @@ class RabbitLocaleFallback {
         catalog["language.tab"] := "界面"
         catalog["language.label"] := "界面语言："
         catalog["language.auto"] := "跟随系统"
-        catalog["language.hint"] := "语言更改将在应用并重新部署后生效。已打开的控制面板需关闭后重新打开。"
+        catalog["language.hint"] := "语言更改将在应用并重新部署后生效；语言变化时控制面板将自动重新打开。"
         return catalog
     }
 }
