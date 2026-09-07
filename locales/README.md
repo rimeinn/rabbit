@@ -39,6 +39,10 @@ The Hong Kong and Taiwan catalogs are maintained independently to preserve
 regional terminology (for example 用戶/使用者 and 快捷鍵/快速鍵). Catalog checks
 verify both against the default Chinese catalog, including placeholder names.
 
+The bundled `ja-JP.ini` provides a complete Japanese translation and is discovered
+through its metadata. It is included in the catalog completeness tests without
+being added to the hard-coded official language choices.
+
 ## Additional languages
 
 Place `<lang-code>.ini` in `locales`, for example `ja-JP.ini`:

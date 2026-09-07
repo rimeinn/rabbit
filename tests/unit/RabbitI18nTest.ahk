@@ -39,10 +39,15 @@ TestRabbitI18n() {
         AssertEqual("zh-CN", RabbitI18n.locale, "Invalid preference did not fall back.")
         reference := RabbitI18n.ReadCatalog(directory . "\zh-CN.ini")
         AssertTrue(reference.Count > 20, "Reference catalog is empty.")
-        for locale in ["en-US", "zh-HK", "zh-TW"] {
+        for locale in ["en-US", "zh-HK", "zh-TW", "ja-JP"] {
             translated := RabbitI18n.ReadCatalog(directory . "\" . locale . ".ini")
             AssertEqual(0, RabbitI18n.Validate(reference, translated).Length, locale . " catalog is inconsistent.")
         }
+        RabbitI18n.Initialize(directory, "ja-JP")
+        AssertEqual("ja-JP", RabbitI18n.locale, "Bundled Japanese catalog was not discovered.")
+        AssertEqual("入力と動作", RabbitI18n.Text("pages.behavior"), "Japanese settings labels were not loaded.")
+        AssertEqual("2 件のレコードをエクスポートしました。",
+            RabbitI18n.Text("messages.exported", Map("count", 2)), "Japanese placeholder substitution failed.")
     } finally {
         RabbitI18n.Initialize(directory, "zh-CN")
     }
