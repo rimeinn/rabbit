@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -130,6 +130,9 @@ TestSharedRabbitSettingsPersistence() {
             "candidate_padding_y", current_style.candidate_padding_y + 1,
             "candidate_spacing", current_style.candidate_spacing + 1,
             "floating_preedit", !current_style.floating_preedit,
+            "shadow_radius", 8,
+            "shadow_offset_x", -4,
+            "shadow_offset_y", 3,
             "floating_preedit_opacity", 0.65
         ))
         local source_scheme := style.GetPresetColorSchemes()[1]
@@ -137,7 +140,8 @@ TestSharedRabbitSettingsPersistence() {
             "settings_test",
             "Settings Test",
             "Rabbit Integration Test"
-        ))
+        ).WithEdits("Settings Test", "Rabbit Integration Test", Map(
+            "shadow_color", 0x80402010, "candidate_shadow_color", 0x00000000)))
         AssertTrue(style.Save(), "The integration test could not save UI style settings.")
         local color_saved := FileRead(test_dir . "\rabbit.custom.yaml", "UTF-8")
         AssertTrue(
@@ -152,6 +156,18 @@ TestSharedRabbitSettingsPersistence() {
             style.GetCustomColorSchemeIds().Has("settings_test"),
             "The saved path was not recognized as a custom color scheme."
         )
+        AssertTrue(rime.deploy_config_file("rabbit.yaml", "config_version"), "Shadow test configuration failed to deploy.")
+        AssertTrue(style.Load(), "The saved shadow settings could not be reloaded.")
+        local reloaded_scheme := 0, preset
+        for preset in style.GetPresetColorSchemes() {
+            if preset.color_scheme_id = "settings_test" {
+                reloaded_scheme := preset
+            }
+        }
+        AssertTrue(reloaded_scheme, "The saved shadow scheme disappeared after reloading.")
+        AssertEqual(0x80402010, reloaded_scheme.colors["shadow_color"], "Reloading changed shadow alpha.")
+        AssertEqual(0, reloaded_scheme.colors["candidate_shadow_color"], "Reloading made transparent shadows opaque.")
+        AssertEqual(-4, style.GetCurrentStyle().shadow_offset_x, "Reloading lost the signed shadow offset.")
         local behavior_values := behavior.GetCurrentValues()
         behavior_values.show_tips := !behavior.show_tips
         AssertTrue(

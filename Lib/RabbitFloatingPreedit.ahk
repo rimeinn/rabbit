@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,9 +19,11 @@
 #Include RabbitCommon.ahk
 #Include RabbitCandidatePresentation.ahk
 #Include RabbitDirect2D.ahk
+#Include RabbitShadowSurface.ahk
 #Include RabbitLayeredWindow.ahk
 
 class RabbitFloatingPreedit {
+    shadow_surface := 0
     static FONT_HEIGHT_CALIBRATION_TEXT := "中M"
     static DEBUG_OUTPUT := true
     ; Track render target recreations: the preedit box resizes with the text,
@@ -65,6 +67,10 @@ class RabbitFloatingPreedit {
             return
         }
         this.Hide()
+        if this.shadow_surface {
+            this.shadow_surface.Dispose()
+            this.shadow_surface := 0
+        }
         this.layered_window := 0
         this.d2d := 0
         if this.gui {
@@ -76,6 +82,15 @@ class RabbitFloatingPreedit {
 
     UpdateStyle(style) {
         this.AssertNotDisposed()
+        if !HasProp(this, "style") || RabbitShadowRenderer.StyleKey(this.style) != RabbitShadowRenderer.StyleKey(style) {
+            if this.d2d && HasProp(this.d2d, "shadow_renderer") {
+                this.d2d.shadow_renderer := 0
+            }
+            if this.shadow_surface {
+                this.shadow_surface.Dispose()
+                this.shadow_surface := 0
+            }
+        }
         this.style := style
         this.font_face := style.preedit_font_face
         this.base_font_size := style.font_point * (96.0 / 72.0) * this.dpi_scale
@@ -185,11 +200,15 @@ class RabbitFloatingPreedit {
             return
         }
         this.gui.Hide()
+        if this.shadow_surface {
+            this.shadow_surface.Hide()
+        }
         this.visible := false
     }
 
     Render() {
         local segment, color, inner_x, inner_y, inner_width, inner_height, inner_radius
+        local shadow_shapes := []
         this.EnsureRenderTarget()
         this.d2d.BeginDraw()
         try {
@@ -229,6 +248,12 @@ class RabbitFloatingPreedit {
                     this.draw_corner_radius,
                     this.background_color
                 )
+            }
+            if this.selected_box && RabbitShadowRenderer.Enabled(this.style, this.style.hilited_shadow_color) {
+                shadow_shapes.Push({ rect: this.selected_box, corner: this.draw_highlighted_corner_radius,
+                    color: this.style.hilited_shadow_color })
+                this.d2d.DrawShadow(this.selected_box, this.draw_highlighted_corner_radius,
+                    this.style, this.style.hilited_shadow_color)
             }
             this.d2d.PushAxisAlignedClip(
                 this.content_x,
@@ -271,6 +296,15 @@ class RabbitFloatingPreedit {
             0,
             this.opacity
         )
+        if this.style.shadow_radius && (this.style.shadow_color || shadow_shapes.Length) {
+            if !this.shadow_surface {
+                this.shadow_surface := RabbitShadowSurface(this.gui.Hwnd)
+            }
+            this.shadow_surface.Update(this.box_width, this.box_height, this.x, this.y, 0,
+                this.style, this.draw_corner_radius, shadow_shapes, this.opacity)
+        } else if this.shadow_surface {
+            this.shadow_surface.Hide()
+        }
     }
 
     EnsureRenderTarget() {

@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +17,26 @@
 
 #Include RabbitFontSpec.ahk
 #Include Direct2D/Direct2D.ahk
+#Include RabbitShadowRenderer.ahk
 
 class RabbitDirect2D extends Direct2D {
+    shadow_renderer := 0
+
+    DrawShadow(rect, corner, style, color) {
+        if !RabbitShadowRenderer.Enabled(style, color) {
+            return
+        }
+        if !this.shadow_renderer {
+            this.shadow_renderer := RabbitShadowRenderer()
+        }
+        this.shadow_renderer.Draw(this, rect, corner, style, color)
+    }
+
+    __Delete() {
+        this.shadow_renderer := 0
+        super.__Delete()
+    }
+
     static INVALID_FALLBACK_FAMILY := "_RabbitInvalidFallbackFont_"
 
     __New(target?) {

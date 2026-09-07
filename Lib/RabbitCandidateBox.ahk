@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  * Copyright (c) 2005 Tim <zerxmega@foxmail.com>
  *
@@ -24,8 +24,12 @@
 #Include RabbitFloatingPreedit.ahk
 #Include RabbitLayeredWindow.ahk
 #Include RabbitDirect2D.ahk
+#Include RabbitShadowSurface.ahk
 
 class CandidateBox {
+    shadow_surface := 0
+    render_shadow_shapes := []
+    render_style := 0
     gui := 0
     static FLOW_ANIMATION_DURATION := 160
     static FLOW_ANIMATION_INTERVAL := 15
@@ -96,6 +100,10 @@ class CandidateBox {
         }
         this.Hide()
         this.floating_preedit := 0
+        if this.shadow_surface {
+            this.shadow_surface.Dispose()
+            this.shadow_surface := 0
+        }
         this.layered_window := 0
         this.d2d := 0
         if this.gui {
@@ -108,6 +116,15 @@ class CandidateBox {
 
     UpdateStyle(style) {
         this.AssertNotDisposed()
+        if !HasProp(this, "style") || RabbitShadowRenderer.StyleKey(this.style) != RabbitShadowRenderer.StyleKey(style) {
+            if this.d2d && HasProp(this.d2d, "shadow_renderer") {
+                this.d2d.shadow_renderer := 0
+            }
+            if this.shadow_surface {
+                this.shadow_surface.Dispose()
+                this.shadow_surface := 0
+            }
+        }
         this.style := style
         this.borderWidth := style.border_width
         this.borderColor := style.border_color
@@ -771,6 +788,9 @@ class CandidateBox {
             this.render_pending := false
             if this.visible {
                 this.gui.Hide()
+                if this.shadow_surface {
+                    this.shadow_surface.Hide()
+                }
                 this.visible := false
             }
             return
@@ -877,6 +897,8 @@ class CandidateBox {
                 display_y,
                 source_y
             )
+            this.UpdateShadowSurface(
+                this.render_width, height, this.display_x, display_y, source_y)
             this.display_height := height
             this.display_render_y := display_y
             this.display_anchor_bottom := this.flow_animation_anchor_bottom
@@ -885,12 +907,13 @@ class CandidateBox {
         }
     }
 
-    RenderFrame(height) {
+    RenderFrame(height, present := true) {
         local background_x, background_y, background_width, background_height, background_radius
         local row_rect, row_width, row_background
         local label_color, candidate_color, comment_color, label, cand, comment
         local segment, selected_box, source_y, display_y
         local num_candidates, preedit_layout, candidates_layout, candidate_highlights
+        local shadow_shapes, shape, frame_style
         if !this.BeginRender() {
             return
         }
@@ -901,6 +924,8 @@ class CandidateBox {
             preedit_layout := this.preeditLayout
             candidates_layout := this.candidatesLayout
             candidate_highlights := this.candidateHighlights
+            frame_style := this.style
+            shadow_shapes := this.GetShadowShapes(preedit_layout, candidates_layout, candidate_highlights, frame_style)
             height := Min(this.boxHeight, Max(1, height))
             source_y := this.flow_animation_anchor_bottom ? this.boxHeight - height : 0
             if this.flow_animation_active && this.flow_animation_anchor_bottom {
@@ -923,6 +948,19 @@ class CandidateBox {
                 this.d2d.FillRoundedRectangle(background_x, background_y, background_width, background_height, background_radius, background_radius, this.backgroundColor)
             } else {
                 this.d2d.FillRoundedRectangle(0, 0, this.boxWidth, this.boxHeight, this.boxCornerR, this.boxCornerR, this.backgroundColor)
+            }
+
+            ; Paint all internal shadows and backgrounds before any text.
+            for shape in shadow_shapes {
+                this.d2d.DrawShadow(shape.rect, shape.corner, frame_style, shape.color)
+            }
+            if shadow_shapes.Length {
+                Loop num_candidates {
+                    row_rect := candidates_layout.rows[A_Index]
+                    this.d2d.FillRoundedRectangle(row_rect.x, row_rect.y, row_rect.w, row_rect.h,
+                        this.hlCornerR, this.hlCornerR,
+                        candidate_highlights[A_Index] ? this.hlCandBgColor : this.candBgColor)
+                }
             }
 
             ; Draw preedit
@@ -951,15 +989,17 @@ class CandidateBox {
                     candidate_color := this.hlCandTxtColor
                     comment_color := this.hlCommentTxtColor
                 }
-                this.d2d.FillRoundedRectangle(
-                    row_rect.x,
-                    row_rect.y,
-                    row_width,
-                    row_rect.h,
-                    this.hlCornerR,
-                    this.hlCornerR,
-                    row_background
-                )
+                if !shadow_shapes.Length {
+                    this.d2d.FillRoundedRectangle(
+                        row_rect.x,
+                        row_rect.y,
+                        row_width,
+                        row_rect.h,
+                        this.hlCornerR,
+                        this.hlCornerR,
+                        row_background
+                    )
+                }
 
                 label := candidates_layout.labels[A_Index]
                 this.DrawLayoutText(label, this.labFont, label_color)
@@ -975,6 +1015,11 @@ class CandidateBox {
 
             this.d2d.PopAxisAlignedClip()
             this.d2d.EndDraw()
+            this.render_shadow_shapes := shadow_shapes
+            this.render_style := frame_style
+            if !present {
+                return
+            }
             if !this.visible {
                 this.gui.Show(Format("NA x{} y{} w{} h{}", this.display_x, display_y, this.boxWidth, height))
                 this.visible := true
@@ -987,12 +1032,46 @@ class CandidateBox {
                 display_y,
                 source_y
             )
+            this.UpdateShadowSurface(
+                this.render_width, height, this.display_x, display_y, source_y)
             this.display_height := height
             this.display_render_y := display_y
             this.display_anchor_bottom := this.flow_animation_anchor_bottom
         } finally {
             this.EndRender()
         }
+    }
+
+    GetShadowShapes(preedit_layout, candidates_layout, highlights, style) {
+        local result := [], rect, index, color
+        if !style.shadow_radius {
+            return result
+        }
+        if (rect := preedit_layout.selectedBox) && RabbitShadowRenderer.Enabled(style, style.hilited_shadow_color) {
+            result.Push({ rect: rect, corner: this.hlCornerR, color: style.hilited_shadow_color })
+        }
+        for index, rect in candidates_layout.rows {
+            color := highlights[index] ? style.hilited_candidate_shadow_color : style.candidate_shadow_color
+            if RabbitShadowRenderer.Enabled(style, color) {
+                result.Push({ rect: rect, corner: this.hlCornerR, color: color })
+            }
+        }
+        return result
+    }
+
+    UpdateShadowSurface(width, height, x, y, source_y) {
+        local style := this.render_style
+        if !style || !style.shadow_radius || (!style.shadow_color && !this.render_shadow_shapes.Length) {
+            if this.shadow_surface {
+                this.shadow_surface.Hide()
+            }
+            return
+        }
+        if !this.shadow_surface {
+            this.shadow_surface := RabbitShadowSurface(this.gui.Hwnd)
+        }
+        this.shadow_surface.Update(width, height, x, y, source_y, style,
+            style.corner_radius, this.render_shadow_shapes)
     }
 
     BeginRender() {
@@ -1033,6 +1112,9 @@ class CandidateBox {
         this.render_pending := false
         if this.floating_preedit {
             this.floating_preedit.Hide()
+        }
+        if this.shadow_surface {
+            this.shadow_surface.Hide()
         }
         if this.visible {
             this.gui.Hide()

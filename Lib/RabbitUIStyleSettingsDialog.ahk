@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -109,6 +109,10 @@ class UIStyleSettingsDialog extends Gui {
             return
         }
         local info := this.preset[index]
+        if HasMethod(this.candidate_box, "SetBounds") {
+            this.candidate_box.SetBounds((this.preview_width - 20) * this.candidate_box.dpiScale,
+                (this.list_height - 20) * this.candidate_box.dpiScale)
+        }
         this.candidate_box.Build(info.style, &box_width, &box_height)
         box_width := box_width / this.candidate_box.dpiScale
         box_height := box_height / this.candidate_box.dpiScale

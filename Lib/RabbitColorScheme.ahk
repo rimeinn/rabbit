@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,6 +33,10 @@ class RabbitColorScheme {
         { key: "hilited_candidate_back_color", label: "高亮候选背景" },
         { key: "hilited_label_color", label: "高亮候选序号" },
         { key: "hilited_comment_text_color", label: "高亮候选注释" },
+        { key: "shadow_color", label: "窗口阴影" },
+        { key: "hilited_shadow_color", label: "编码高亮阴影" },
+        { key: "hilited_candidate_shadow_color", label: "高亮候选阴影" },
+        { key: "candidate_shadow_color", label: "普通候选阴影" },
     ]
 
     __New(color_scheme_id, values, origin := "builtin", style := 0) {

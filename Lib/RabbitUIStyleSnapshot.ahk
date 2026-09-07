@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,11 @@
  */
 
 class RabbitUIStyleSnapshot {
+    static MAX_SHADOW_RADIUS := 64
+    static MAX_SHADOW_OFFSET := 128
+
     __New(values := 0, overrides := 0) {
+        local key, limit, value
         ; Copy supported scalar values so published snapshots do not retain mutable input containers.
         this.use_dark := this.GetValue(overrides, "use_dark", this.GetValue(values, "use_dark", false))
         this.font_face := this.GetValue(
@@ -39,6 +43,15 @@ class RabbitUIStyleSnapshot {
         this.label_format := this.GetValue(overrides, "label_format", this.GetValue(values, "label_format", "{}. "))
 
         this.border_width := this.GetValue(overrides, "border_width", this.GetValue(values, "border_width", 2))
+        for key, limit in Map("shadow_radius", RabbitUIStyleSnapshot.MAX_SHADOW_RADIUS,
+            "shadow_offset_x", RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, "shadow_offset_y", RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET) {
+            value := this.GetValue(overrides, key, this.GetValue(values, key, 0))
+            this.%key% := IsInteger(value) && value >= (key = "shadow_radius" ? 0 : -limit)
+                && value <= limit ? Integer(value) : 0
+        }
+        for key in ["shadow_color", "hilited_shadow_color", "hilited_candidate_shadow_color", "candidate_shadow_color"] {
+            this.%key% := this.GetValue(overrides, key, this.GetValue(values, key, 0x00000000))
+        }
         this.corner_radius := this.GetValue(overrides, "corner_radius", this.GetValue(values, "corner_radius", 6))
         this.round_corner := this.GetValue(overrides, "round_corner", this.GetValue(values, "round_corner", 4))
         this.margin_x := this.GetValue(overrides, "margin_x", this.GetValue(values, "margin_x", 6))
@@ -140,6 +153,7 @@ class RabbitUIStyleSnapshot {
         local flow_rows, layout_type, align_type
         local selected_color_scheme, dark_color_scheme
         local values := Map()
+        local key, shadow_value
 
         if !rime_api || !config {
             return RabbitUIStyleSnapshot()
@@ -192,6 +206,11 @@ class RabbitUIStyleSnapshot {
         }
         if rime_api.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0 {
             values["margin_y"] := my
+        }
+        for key in ["shadow_radius", "shadow_offset_x", "shadow_offset_y"] {
+            if rime_api.config_test_get_int(config, "style/layout/" . key, &shadow_value) {
+                values[key] := shadow_value
+            }
         }
         if rime_api.config_test_get_int(
             config,
@@ -289,6 +308,10 @@ class RabbitUIStyleSnapshot {
 
         values["border_color"] := this.GetColor(
             rime_api, config, prefix . "/border_color", fmt, 0xffe0e0e0)
+        local key
+        for key in ["shadow_color", "hilited_shadow_color", "hilited_candidate_shadow_color", "candidate_shadow_color"] {
+            values[key] := this.GetColor(rime_api, config, prefix . "/" . key, fmt, 0x00000000)
+        }
         values["text_color"] := this.GetColor(
             rime_api, config, prefix . "/text_color", fmt, 0xff000000)
         values["back_color"] := this.GetColor(
@@ -405,10 +428,7 @@ class RabbitUIStyleSnapshot {
                     | ((color_value & 0x000000ff) << 16)
                     | (color_value & 0xff000000)
             } else if format = "rgba" {
-                return ((color_value & 0x00ff00) << 8)
-                    | (color_value & 0xff0000)
-                    | ((color_value & 0x0000ff) >> 8)
-                    | (color_value & 0xff000000)
+                return ((color_value >> 8) | ((color_value & 0xff) << 24)) & 0xffffffff
             } else {
                 return color_value & 0xffffffff
             }

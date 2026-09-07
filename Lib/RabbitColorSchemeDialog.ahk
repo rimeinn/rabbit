@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ class RabbitColorSchemeDialog extends Gui {
         dark_mode_reader := RabbitIsUserDarkMode,
         theme_factory := RabbitWindowThemeController
     ) {
-        local factory, field, index, initial_dark_mode := false, x, y
+        local factory, field, index, initial_dark_mode := false, x, y, left_index := 0, right_index := 0
         if HasMethod(theme_factory, "Prepare") {
             initial_dark_mode := !!theme_factory.Prepare()
         }
@@ -71,15 +71,15 @@ class RabbitColorSchemeDialog extends Gui {
         this.AddText("x20 y62 w72 h22", "作者：")
         this.author_edit := this.AddEdit("x94 y58 w526 r1 -Multi", color_scheme.author)
 
-        this.window_group := this.AddGroupBox("x16 y98 w296 h276", "窗口与编码")
+        this.window_group := this.AddGroupBox("x16 y98 w296 h352", "窗口与编码")
         this.candidate_group := this.AddGroupBox("x320 y98 w304 h352", "候选项")
         for index, field in RabbitColorScheme.EDITABLE_COLOR_FIELDS {
-            if index <= 6 {
+            if index <= 6 || field.key = "shadow_color" || field.key = "hilited_shadow_color" {
                 x := 28
-                y := 126 + (index - 1) * 38
+                y := 126 + left_index++ * 32
             } else {
                 x := 332
-                y := 126 + (index - 7) * 38
+                y := 126 + right_index++ * 32
             }
             this.AddColorControl(field, x, y)
         }

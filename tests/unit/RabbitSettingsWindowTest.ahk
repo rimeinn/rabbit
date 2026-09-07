@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -263,6 +263,17 @@ TestSettingsWindowExposesAppearanceControls() {
         window.appearance_floating_height_label.GetPos(, , &height_label_width)
         AssertTrue(opacity_label_width >= 72, "The floating opacity label remained too narrow.")
         AssertTrue(height_label_width >= 72, "The floating height label remained too narrow.")
+        window.appearance_shadow_radius.Value := 8
+        window.appearance_shadow_offset_x.Value := -4
+        window.appearance_shadow_offset_y.Value := 3
+        local shadow_values := window.GetAppearanceValues()
+        AssertEqual(8, shadow_values["shadow_radius"], "The radius control was not read.")
+        AssertEqual(-4, shadow_values["shadow_offset_x"], "The offset control rejected negative values.")
+        local shadow_y, shadow_h, group_y, group_h
+        window.appearance_shadow_radius.GetPos(, &shadow_y, , &shadow_h)
+        window.appearance_layout_group.GetPos(, &group_y, , &group_h)
+        AssertTrue(shadow_y + shadow_h <= group_y + group_h, "Shadow controls overflowed the layout group.")
+
         AssertEqual(
             "候选及高亮圆角：",
             window.appearance_round_corner_label.Text,

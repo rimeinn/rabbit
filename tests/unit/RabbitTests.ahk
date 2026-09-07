@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -42,6 +42,7 @@
 #Include RabbitIconTest.ahk
 #Include RabbitPopupPlacementTest.ahk
 #Include RabbitShutdownTest.ahk
+#Include RabbitShadowTest.ahk
 #Include RabbitStatusTipTest.ahk
 #Include RabbitSettingsWindowTest.ahk
 #Include RabbitSwitcherSettingsModelTest.ahk

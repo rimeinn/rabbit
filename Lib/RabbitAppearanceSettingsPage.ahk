@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -208,6 +208,9 @@ class RabbitAppearanceSettingsPage {
         owner.appearance_candidate_padding_x.Value := style.candidate_padding_x
         owner.appearance_candidate_padding_y.Value := style.candidate_padding_y
         owner.appearance_candidate_spacing.Value := style.candidate_spacing
+        owner.appearance_shadow_radius.Value := style.shadow_radius
+        owner.appearance_shadow_offset_x.Value := style.shadow_offset_x
+        owner.appearance_shadow_offset_y.Value := style.shadow_offset_y
         owner.appearance_border_width.Value := style.border_width
         owner.appearance_corner_radius.Value := style.corner_radius
         owner.appearance_round_corner.Value := style.round_corner
@@ -716,6 +719,9 @@ class RabbitAppearanceSettingsPage {
             "candidate_padding_y", this.ReadNumber(
                 owner.appearance_candidate_padding_y, "候选垂直内边距", 0, 500),
             "candidate_spacing", this.ReadNumber(owner.appearance_candidate_spacing, "候选间距", 0, 500),
+            "shadow_radius", this.ReadNumber(owner.appearance_shadow_radius, "阴影半径", 0, RabbitUIStyleSnapshot.MAX_SHADOW_RADIUS),
+            "shadow_offset_x", this.ReadNumber(owner.appearance_shadow_offset_x, "水平偏移", -RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET),
+            "shadow_offset_y", this.ReadNumber(owner.appearance_shadow_offset_y, "垂直偏移", -RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET),
             "border_width", this.ReadNumber(owner.appearance_border_width, "边框宽度", 0, 500),
             "corner_radius", this.ReadNumber(owner.appearance_corner_radius, "窗口圆角", 0, 500),
             "round_corner", this.ReadNumber(owner.appearance_round_corner, "候选及高亮圆角", 0, 500),

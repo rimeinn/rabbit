@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
+﻿/*
+ * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,6 +38,9 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
             "candidate_padding_x", 3,
             "candidate_padding_y", 4,
             "candidate_spacing", 7,
+            "shadow_radius", 8,
+            "shadow_offset_x", -12,
+            "shadow_offset_y", 3,
             "floating_preedit", true,
             "floating_preedit_opacity", 0.65,
             "floating_preedit_min_height", 24
@@ -56,6 +59,9 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
         "int:style/layout/candidate_padding_x:3",
         "int:style/layout/candidate_padding_y:4",
         "int:style/layout/candidate_spacing:7",
+        "int:style/layout/shadow_radius:8",
+        "int:style/layout/shadow_offset_x:-12",
+        "int:style/layout/shadow_offset_y:3",
         "int:style/floating_preedit_min_height:24",
         "bool:style/floating_preedit:1",
         "double:style/floating_preedit_opacity:0.65",

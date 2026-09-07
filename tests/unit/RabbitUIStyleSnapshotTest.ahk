@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,6 +24,25 @@ RunTest("style snapshot parses active and dark styles", TestStyleSnapshotParsing
 RunTest("style preview snapshot is independent", TestStylePreviewSnapshotIndependence.Bind())
 RunTest("style snapshot blends transparent colors safely", TestStyleSnapshotBlendsTransparentColorsSafely.Bind())
 RunTest("style snapshot loads transparent highlights", TestStyleSnapshotLoadsTransparentHighlights.Bind())
+RunTest("style snapshot reloads shadows and clears missing dark colors", TestStyleSnapshotShadows)
+
+TestStyleSnapshotShadows() {
+    local format, color, values, style, dark
+    for format, color in Map("argb", "0x80402010", "abgr", "0x80102040", "rgba", "0x40201080") {
+        values := Map("style/color_scheme", "light", "style/color_scheme_dark", "dark",
+            "style/layout/shadow_radius", 8, "style/layout/shadow_offset_x", -4,
+            "preset_color_schemes/light/color_format", format,
+            "preset_color_schemes/light/shadow_color", color,
+            "preset_color_schemes/light/candidate_shadow_color", "0x00000000")
+        style := RabbitUIStyleSnapshot.FromConfig(RabbitUIStyleRimeProbe(values), {})
+        AssertEqual(8, style.shadow_radius, "The configured shadow radius was lost.")
+        AssertEqual(-4, style.shadow_offset_x, "Negative configured offsets were lost.")
+        AssertEqual(0x80402010, style.shadow_color, "The configured shadow color changed.")
+        AssertEqual(0, style.candidate_shadow_color, "Transparent configured shadows became opaque.")
+        dark := style.WithColorSchemeFromConfig(RabbitUIStyleRimeProbe(values), {}, "dark")
+        AssertEqual(0, dark.shadow_color, "Switching schemes retained a previous shadow color.")
+    }
+}
 
 TestStyleSnapshotCopiesValues() {
     local values := Map(

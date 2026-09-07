@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -241,6 +241,9 @@ class UIStyleSettings {
             "layout_type",
             "align_type",
             "border_width",
+            "shadow_radius",
+            "shadow_offset_x",
+            "shadow_offset_y",
             "corner_radius",
             "round_corner",
             "margin_x",
@@ -290,6 +293,9 @@ class UIStyleSettings {
             "label_font_point", "style/label_font_point",
             "comment_font_point", "style/comment_font_point",
             "border_width", "style/layout/border_width",
+            "shadow_radius", "style/layout/shadow_radius",
+            "shadow_offset_x", "style/layout/shadow_offset_x",
+            "shadow_offset_y", "style/layout/shadow_offset_y",
             "corner_radius", "style/layout/corner_radius",
             "round_corner", "style/layout/round_corner",
             "margin_x", "style/layout/margin_x",
