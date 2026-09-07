@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -24,8 +24,11 @@
 
 #Include <RabbitApplication>
 #Include <RabbitCommon>
+#Include <RabbitCommandLine>
+#Include <RabbitDeployerApplication>
 
-global rabbit_application := RabbitApplication(
-    RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll")
-)
-rabbit_application.Run(A_Args)
+global rabbit_entry_options := RabbitEntryOptions.Parse(A_Args)
+global rabbit_application := rabbit_entry_options.is_deployer
+    ? RabbitDeployerApplication(RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll"))
+    : RabbitApplication(RimeApi(A_ScriptDir . "\Lib\librime-ahk\rime.dll"))
+rabbit_application.Run(rabbit_entry_options.application_args)

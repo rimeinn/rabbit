@@ -90,9 +90,8 @@ rabbit/
 |  └─ images/
 |     └─ candidate-layouts/
 ├─ LICENSE              开源许可，可删除
-├─ Rabbit.ahk           玉兔毫主程序脚本
+├─ Rabbit.ahk           玉兔毫启动脚本（含部署器模式）
 ├─ Rabbit.exe           AutoHotkey 可执行文件，若本机已安装 AutoHotkey 或已编译，可删除
-├─ RabbitDeployer.ahk   玉兔毫部署应用脚本
 ├─ README.md            本文件，可删除
 ├─ rime-install.bat     东风破批处理脚本，删除后无法从设定中调用东风破
 ```

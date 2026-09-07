@@ -19,6 +19,27 @@
 #Include RabbitCommon.ahk
 #Include RabbitI18n.ahk
 
+class RabbitEntryOptions {
+    __New() {
+        this.is_deployer := false
+        this.application_args := []
+    }
+
+    static Parse(args) {
+        local options := RabbitEntryOptions()
+        if !args.Length || args[1] != "--deployer" {
+            options.application_args := args
+            return options
+        }
+
+        options.is_deployer := true
+        Loop args.Length - 1 {
+            options.application_args.Push(args[A_Index + 1])
+        }
+        return options
+    }
+}
+
 class RabbitApplicationOptions {
     __New() {
         this.maintenance := RABBIT_PARTIAL_MAINTENANCE

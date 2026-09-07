@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitCommandLine.ahk
 
 RunTest("Rabbit named command line options", TestRabbitCommandLineOptions.Bind())
+RunTest("entry point routes deployment mode", TestRabbitEntryOptions.Bind())
 RunTest("deployer named command line options", TestDeployerCommandLineOptions.Bind())
 RunTest("command line rejects invalid forms", TestCommandLineRejectsInvalidForms.Bind())
 RunTest("keyboard layout handle round trip", TestKeyboardLayoutHandleRoundTrip.Bind())
@@ -38,6 +39,43 @@ TestRabbitCommandLineOptions() {
     ])
     AssertEqual(RABBIT_NO_MAINTENANCE, options.maintenance, "Rabbit parsed the wrong maintenance mode.")
     AssertEqual(0x0409, options.keyboard_layout, "Rabbit parsed the wrong keyboard layout.")
+}
+
+TestRabbitEntryOptions() {
+    local options := RabbitEntryOptions.Parse([
+        "--maintenance",
+        "none",
+        "--keyboard-layout",
+        "0x0409",
+    ])
+    AssertTrue(!options.is_deployer, "The Rabbit entry point misrouted frontend arguments.")
+    AssertEqual(4, options.application_args.Length, "The Rabbit entry point changed frontend arguments.")
+    AssertEqual("--maintenance", options.application_args[1], "The Rabbit entry point dropped a frontend option.")
+
+    options := RabbitEntryOptions.Parse([
+        "--deployer",
+        "settings",
+        "input-schemes",
+        "--install",
+    ])
+    AssertTrue(options.is_deployer, "The Rabbit entry point did not select deployment mode.")
+    AssertEqual(3, options.application_args.Length, "The Rabbit entry point retained its deployment selector.")
+    AssertEqual("settings", options.application_args[1], "The Rabbit entry point changed the deployment command.")
+    AssertEqual("input-schemes", options.application_args[2], "The Rabbit entry point changed the deployment target.")
+    AssertEqual("--install", options.application_args[3], "The Rabbit entry point changed deployment options.")
+
+    options := RabbitEntryOptions.Parse(["--maintenance", "none", "--deployer"])
+    AssertTrue(!options.is_deployer, "The deployment selector was accepted outside the first argument.")
+    AssertThrows(
+        RabbitApplicationOptions.Parse.Bind(options.application_args),
+        "Rabbit accepted a deployment selector outside the first argument."
+    )
+
+    options := RabbitEntryOptions.Parse(["--deployer", "--deployer"])
+    AssertThrows(
+        RabbitDeployerOptions.Parse.Bind(options.application_args),
+        "Rabbit accepted a duplicate deployment selector."
+    )
 }
 
 TestDeployerCommandLineOptions() {

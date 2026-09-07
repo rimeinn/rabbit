@@ -153,9 +153,9 @@ class RabbitDeployerApplication {
     RestartRabbit(maintenance_mode) {
         local command_line := []
         if A_IsCompiled {
-            command_line.Push(A_ScriptDir . "\Rabbit.exe")
+            command_line.Push(A_ScriptFullPath)
         } else {
-            command_line.Push(A_AhkPath, A_ScriptDir . "\Rabbit.ahk")
+            command_line.Push(A_AhkPath, A_ScriptFullPath)
         }
         command_line.Push(
             "--maintenance",

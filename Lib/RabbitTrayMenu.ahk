@@ -41,10 +41,11 @@ RabbitLaunchDeployer(command, args*) {
     local argument
     local command_line := []
     if A_IsCompiled {
-        command_line.Push(A_ScriptDir . "\RabbitDeployer.exe")
+        command_line.Push(A_ScriptFullPath)
     } else {
-        command_line.Push(A_AhkPath, A_ScriptDir . "\RabbitDeployer.ahk")
+        command_line.Push(A_AhkPath, A_ScriptFullPath)
     }
+    command_line.Push("--deployer")
     if command {
         command_line.Push(command)
     }
