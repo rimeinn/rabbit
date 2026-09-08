@@ -30,7 +30,7 @@ class RabbitSettingsWindow extends Gui {
     deployment_pending := false
 
     static WINDOW_WIDTH := 820
-    static APPEARANCE_HEIGHT := 780
+    static APPEARANCE_HEIGHT := 580
     static BEHAVIOR_HEIGHT := 692
     static SWITCHER_HEIGHT := 660
     static ABOUT_HEIGHT := 660
@@ -201,7 +201,8 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_tabs := this.AddTab3(
             Format("x230 y136 w570 h{} Hidden", appearance_layout.tabs_height)
                 . (initial_dark_mode ? " cF0F0F0 Background202020" : ""),
-            [RabbitI18n.Text("controls.colors"), RabbitI18n.Text("controls.typesetting")]
+            [RabbitI18n.Text("controls.colors"), RabbitI18n.Text("controls.fonts"), RabbitI18n.Text("controls.layout"),
+                RabbitI18n.Text("controls.preedit_group")]
         )
         this.appearance_tabs.OnEvent("Change", (*) => this.OnAppearanceTabChanged())
         this.appearance_tabs.UseTab(1)
@@ -275,6 +276,8 @@ class RabbitSettingsWindow extends Gui {
         )
 
         this.appearance_typesetting_controls := []
+        this.appearance_font_controls := []
+        this.appearance_preedit_controls := []
         this.appearance_typesetting_created := false
         this.appearance_tabs.UseTab()
 
@@ -832,7 +835,6 @@ class RabbitSettingsWindow extends Gui {
         }
         appearance_layout := RabbitSettingsWindow.CalculateAppearanceLayout(this.initial_dark_mode)
         this.appearance_tabs.UseTab(2)
-        this.appearance_font_group := this.AddGroupBox("x246 y170 w538 h180 Hidden", RabbitI18n.Text("controls.fonts"))
         this.appearance_font_label := this.AddText("x260 y196 w72 h22 Hidden",
             RabbitI18n.Text("controls.candidate_font"))
         this.appearance_font := this.AddComboBox("x334 y192 w320 r10 Hidden", [])
@@ -860,6 +862,8 @@ class RabbitSettingsWindow extends Gui {
             RabbitAppearanceSettingsPage.CBN_DROPDOWN,
             (*) => this.appearance_page.LoadFontChoices(this.appearance_label_font)
         )
+        this.appearance_label_font_point_label := this.AddText("x664 y268 w42 h22 Hidden",
+            RabbitI18n.Text("controls.font_size"))
         this.appearance_label_font_point := this.AddEdit("x708 y252 w58 r1 Number -Multi Hidden")
         this.appearance_label_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_comment_font_label := this.AddText("x260 y286 w72 h22 Hidden",
@@ -870,6 +874,8 @@ class RabbitSettingsWindow extends Gui {
             RabbitAppearanceSettingsPage.CBN_DROPDOWN,
             (*) => this.appearance_page.LoadFontChoices(this.appearance_comment_font)
         )
+        this.appearance_comment_font_point_label := this.AddText("x664 y304 w42 h22 Hidden",
+            RabbitI18n.Text("controls.font_size"))
         this.appearance_comment_font_point := this.AddEdit("x708 y282 w58 r1 Number -Multi Hidden")
         this.appearance_comment_font_point.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_label_format_label := this.AddText("x260 y316 w72 h22 Hidden",
@@ -882,10 +888,7 @@ class RabbitSettingsWindow extends Gui {
         )
         this.appearance_advanced_font.OnEvent("Click", (*) => this.OpenAdvancedFontSettings())
 
-        this.appearance_layout_group := this.AddGroupBox(
-            Format("x246 y356 w538 h{} Hidden", appearance_layout.typesetting_layout_height),
-            RabbitI18n.Text("controls.layout")
-        )
+        this.appearance_tabs.UseTab(3)
         this.appearance_layout_type_label := this.AddText("x260 y382 w72 h22 Hidden",
             RabbitI18n.Text("controls.candidate_layout"))
         this.appearance_layout_type := this.AddDropDownList(
@@ -908,6 +911,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.margin_y"))
         this.appearance_margin_y := this.AddEdit("x592 y406 w80 r1 Number -Multi Hidden")
         this.appearance_margin_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_tabs.UseTab(4)
         this.appearance_preedit_margin_x_label := this.AddText("x260 y438 w112 h22 Hidden",
             RabbitI18n.Text("controls.preedit_margin_x"))
         this.appearance_preedit_margin_x := this.AddEdit("x374 y434 w80 r1 Number -Multi Hidden")
@@ -916,8 +920,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.preedit_margin_y"))
         this.appearance_preedit_margin_y := this.AddEdit("x592 y434 w80 r1 Number -Multi Hidden")
         this.appearance_preedit_margin_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.SetEditCue(this.appearance_preedit_margin_x, RabbitI18n.Text("controls.follow_common"))
-        this.SetEditCue(this.appearance_preedit_margin_y, RabbitI18n.Text("controls.follow_common"))
+        this.appearance_tabs.UseTab(3)
         this.appearance_candidate_padding_x_label := this.AddText(
             "x260 y466 w112 h22 Hidden",
             RabbitI18n.Text("controls.padding_x")
@@ -946,6 +949,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.round_corner"))
         this.appearance_round_corner := this.AddEdit("x592 y518 w80 r1 Number -Multi Hidden")
         this.appearance_round_corner.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_tabs.UseTab(4)
         this.appearance_preedit_border_width_label := this.AddText("x260 y550 w92 h22 Hidden",
             RabbitI18n.Text("controls.preedit_border_width"))
         this.appearance_preedit_border_width := this.AddEdit("x356 y546 w58 r1 Number -Multi Hidden")
@@ -958,9 +962,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.preedit_round_corner"))
         this.appearance_preedit_round_corner := this.AddEdit("x692 y546 w58 r1 Number -Multi Hidden")
         this.appearance_preedit_round_corner.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.SetEditCue(this.appearance_preedit_border_width, RabbitI18n.Text("controls.follow_common"))
-        this.SetEditCue(this.appearance_preedit_corner_radius, RabbitI18n.Text("controls.follow_common"))
-        this.SetEditCue(this.appearance_preedit_round_corner, RabbitI18n.Text("controls.follow_common"))
+        this.appearance_tabs.UseTab(3)
         this.appearance_min_width_label := this.AddText("x260 y578 w112 h22 Hidden",
             RabbitI18n.Text("controls.min_width"))
         this.appearance_min_width := this.AddEdit("x374 y574 w80 r1 Number -Multi Hidden")
@@ -978,6 +980,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.vertical_ltr")
         )
         this.appearance_vertical_direction.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_tabs.UseTab(4)
         this.appearance_floating_preedit := this.AddCheckbox(
             "x260 y634 w190 h24 Hidden",
             RabbitI18n.Text("controls.floating_preedit")
@@ -991,6 +994,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.floating_height"))
         this.appearance_floating_height := this.AddEdit("x702 y632 w64 r1 Number -Multi Hidden")
         this.appearance_floating_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_tabs.UseTab(3)
         this.appearance_shadow_radius_label := this.AddText("x260 y662 w72 h22 Hidden",
             RabbitI18n.Text("controls.shadow_radius"))
         this.appearance_shadow_radius := this.AddEdit("x334 y658 w80 r1 -Multi Hidden")
@@ -1005,7 +1009,6 @@ class RabbitSettingsWindow extends Gui {
         this.appearance_shadow_offset_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_tabs.UseTab()
         this.appearance_typesetting_controls := [
-            this.appearance_font_group,
             this.appearance_font_label,
             this.appearance_font,
             this.appearance_font_point_label,
@@ -1014,14 +1017,15 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_preedit_font,
             this.appearance_label_font_label,
             this.appearance_label_font,
+            this.appearance_label_font_point_label,
             this.appearance_label_font_point,
             this.appearance_comment_font_label,
             this.appearance_comment_font,
+            this.appearance_comment_font_point_label,
             this.appearance_comment_font_point,
             this.appearance_label_format_label,
             this.appearance_label_format,
             this.appearance_advanced_font,
-            this.appearance_layout_group,
             this.appearance_layout_type_label,
             this.appearance_layout_type,
             this.appearance_align_type_label,
@@ -1071,6 +1075,7 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_floating_height_label,
             this.appearance_floating_height,
         ]
+        this.LayoutPreeditControls()
         controls_elapsed := A_TickCount - controls_started_at
         this.appearance_typesetting_created := true
         populate_started_at := A_TickCount
@@ -1102,6 +1107,146 @@ class RabbitSettingsWindow extends Gui {
             1
         )
         return true
+    }
+
+    LayoutPreeditControls() {
+        local name, pair, row, col, label, edit, width, measured, label_width := 112
+        local ctrl, y, preedit_handles := Map(), common_controls := []
+        for ctrl in this.appearance_typesetting_controls {
+            if ctrl.Type = "Edit" {
+                ctrl.Move(, , , 24)
+            }
+        }
+        local common_rows := [
+            ["margin_x", "margin_y"],
+            ["candidate_padding_x", "candidate_padding_y"],
+            ["candidate_spacing", "border_width"],
+            ["corner_radius", "round_corner"],
+            ["min_width", "min_height"]
+        ]
+        for name, y in Map("preedit_font", 232, "label_font", 268, "comment_font", 304, "label_format", 340) {
+            this.%"appearance_" . name . "_label"%.Move(, y)
+            this.%"appearance_" . name%.Move(, y - 4)
+        }
+        this.appearance_label_font_point.Move(, 264)
+        this.appearance_comment_font_point.Move(, 300)
+        this.appearance_advanced_font.Move(, 334)
+        this.LayoutFontControls()
+        this.appearance_layout_type_label.Move(, 196)
+        this.appearance_layout_type.Move(, 192)
+        this.appearance_align_type_label.Move(, 196)
+        this.appearance_align_type.Move(, 192)
+        for row, pair in common_rows {
+            for col, name in pair {
+                label := this.%"appearance_" . name . "_label"%
+                edit := this.%"appearance_" . name%
+                label.Move(, 232 + (row - 1) * 32)
+                edit.Move(, 228 + (row - 1) * 32)
+            }
+        }
+        for pair in common_rows {
+            for name in pair {
+                label := this.%"appearance_" . name . "_label"%
+                measured := this.AddText("Hidden", label.Text)
+                measured.GetPos(, , &width)
+                label_width := Max(label_width, width + 8)
+            }
+        }
+        for row, pair in common_rows {
+            for col, name in pair {
+                this.%"appearance_" . name . "_label"%.Move(260 + (col - 1) * 254, , label_width)
+                this.%"appearance_" . name%.Move(260 + (col - 1) * 254 + label_width, ,
+                    Max(48, 244 - label_width))
+            }
+        }
+        label_width := 112
+        this.appearance_flow_rows_label.Move(, 392)
+        this.appearance_flow_rows.Move(, 388)
+        this.appearance_vertical_direction.Move(, 390)
+        for name in ["shadow_radius", "shadow_offset_x", "shadow_offset_y"] {
+            this.%"appearance_" . name . "_label"%.Move(, 428)
+            this.%"appearance_" . name%.Move(, 424)
+        }
+        this.appearance_preedit_controls := [this.appearance_floating_preedit]
+        this.appearance_floating_preedit.Move(260, 196, 506)
+        local pairs := [
+            ["floating_opacity", "floating_height"],
+            ["preedit_margin_x", "preedit_margin_y"],
+            ["preedit_border_width", "preedit_corner_radius"],
+            ["preedit_round_corner"]
+        ]
+        for pair in pairs {
+            for name in pair {
+                label := this.%"appearance_" . name . "_label"%
+                measured := this.AddText("Hidden", label.Text)
+                measured.GetPos(, , &width)
+                label_width := Max(label_width, width + 8)
+            }
+        }
+        for row, pair in pairs {
+            for col, name in pair {
+                label := this.%"appearance_" . name . "_label"%
+                edit := this.%"appearance_" . name%
+                label.Move(260 + (col - 1) * 254, 230 + (row - 1) * 28, label_width, 22)
+                edit.Move(260 + (col - 1) * 254 + label_width, 226 + (row - 1) * 28,
+                    Max(48, 244 - label_width))
+                this.appearance_preedit_controls.Push(label, edit)
+            }
+        }
+        this.appearance_tabs.UseTab(4)
+        this.appearance_preedit_hint := this.AddText("x260 y350 w510 h32 Hidden",
+            RabbitI18n.Text("controls.preedit_hint"))
+        this.appearance_tabs.UseTab()
+        this.appearance_preedit_controls.Push(this.appearance_preedit_hint)
+        for ctrl in this.appearance_preedit_controls {
+            preedit_handles[ctrl.Hwnd] := true
+        }
+        for ctrl in this.appearance_typesetting_controls {
+            if !preedit_handles.Has(ctrl.Hwnd) {
+                common_controls.Push(ctrl)
+            }
+        }
+        ; Font controls precede the first layout label in creation order.
+        local collecting_fonts := true
+        this.appearance_typesetting_controls := []
+        for ctrl in common_controls {
+            if ctrl = this.appearance_layout_type_label {
+                collecting_fonts := false
+            }
+            if collecting_fonts {
+                this.appearance_font_controls.Push(ctrl)
+            } else {
+                this.appearance_typesetting_controls.Push(ctrl)
+            }
+        }
+    }
+
+    LayoutFontControls() {
+        local name, label, measured, width, label_width := 72, size_width, button_width, input_x
+        ; Measure localized text with the dialog font rather than assuming Chinese label lengths.
+        for name in ["font", "preedit_font", "label_font", "comment_font", "label_format"] {
+            label := this.%"appearance_" . name . "_label"%
+            measured := this.AddText("Hidden", label.Text)
+            measured.GetPos(, , &width)
+            label_width := Max(label_width, width + 8)
+        }
+        input_x := 260 + label_width
+        measured := this.AddText("Hidden", this.appearance_font_point_label.Text)
+        measured.GetPos(, , &width)
+        size_width := Max(42, width + 8)
+        for name in ["font_point", "label_font_point", "comment_font_point"] {
+            this.%"appearance_" . name . "_label"%.Move(708 - size_width, , size_width)
+        }
+        for name in ["font", "preedit_font", "label_font", "comment_font", "label_format"] {
+            this.%"appearance_" . name . "_label"%.Move(260, , label_width)
+            this.%"appearance_" . name%.Move(input_x, ,
+                (name = "preedit_font" ? 766 : 698 - size_width) - input_x)
+        }
+        measured := this.AddText("Hidden", this.appearance_advanced_font.Text)
+        measured.GetPos(, , &width)
+        button_width := Max(180, width + 32)
+        this.appearance_advanced_font.Move(766 - button_width, , button_width)
+        this.appearance_label_format.Move(input_x, , 754 - button_width - input_x)
     }
 
     AddAsciiSwitchControl(key, label, x, y) {
@@ -1286,7 +1431,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     OnAppearanceTabChanged() {
-        if this.appearance_tabs.Value = 2 {
+        if this.appearance_tabs.Value >= 2 {
             this.EnsureAppearanceTypesettingControls()
         }
         this.appearance_page.OnTabChanged()

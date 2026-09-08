@@ -73,31 +73,43 @@ class RabbitColorSchemeDialog extends Gui {
         this.AddText("x20 y62 w72 h22", RabbitI18n.Text("appearance.author"))
         this.author_edit := this.AddEdit("x94 y58 w526 r1 -Multi", color_scheme.author)
 
-        this.window_group := this.AddGroupBox("x16 y98 w296 h352", RabbitI18n.Text("appearance.window_colors"))
-        this.candidate_group := this.AddGroupBox("x320 y98 w304 h352", RabbitI18n.Text("appearance.candidate_colors"))
+        local measure, label_width, column_width, group_height, status_y, buttons_y
+        this.color_label_width := 116
+        for field in RabbitColorScheme.EDITABLE_COLOR_FIELDS {
+            measure := this.AddText("Hidden", RabbitI18n.Text("messages.field_label", Map("label", field.label)))
+            measure.GetPos(, , &label_width)
+            this.color_label_width := Max(this.color_label_width, label_width + 6)
+        }
+        column_width := this.color_label_width + 188
+        this.dialog_width := column_width * 2 + 32
+        this.window_group := this.AddGroupBox(Format("x16 y98 w{} h352", column_width - 8), RabbitI18n.Text("appearance.window_colors"))
+        this.candidate_group := this.AddGroupBox(Format("x{} y98 w{} h352", column_width + 16, column_width), RabbitI18n.Text("appearance.candidate_colors"))
         for index, field in RabbitColorScheme.EDITABLE_COLOR_FIELDS {
-            if index <= 6
-                || field.key = "preedit_border_color"
-                || field.key = "shadow_color"
-                || field.key = "hilited_shadow_color" {
+            if field.group = "window" {
                 x := 28
                 y := 126 + left_index++ * 32
             } else {
-                x := 332
+                x := column_width + 28
                 y := 126 + right_index++ * 32
             }
             this.AddColorControl(field, x, y)
         }
 
-        this.status := this.AddText("x20 y458 w600 h24 cRed", "")
+        group_height := 32 + Max(left_index, right_index) * 32
+        this.window_group.Move(, , , group_height)
+        this.candidate_group.Move(, , , group_height)
+        status_y := 98 + group_height + 8
+        buttons_y := status_y + 32
+        this.dialog_height := buttons_y + 52
+        this.status := this.AddText(Format("x20 y{} w{} h24 cRed", status_y, this.dialog_width - 40), "")
         if mode = "view" {
-            this.close_button := this.AddButton("x532 y490 w88 h32 Default +0x2000", RabbitI18n.Text("common.close"))
+            this.close_button := this.AddButton(Format("x{} y{} w88 h32 Default +0x2000", this.dialog_width - 108, buttons_y), RabbitI18n.Text("common.close"))
             this.close_button.OnEvent("Click", (*) => this.Dispose())
             this.SetEditable(false)
         } else {
-            this.save_button := this.AddButton("x436 y490 w88 h32 Default +0x2000", RabbitI18n.Text("common.ok"))
+            this.save_button := this.AddButton(Format("x{} y{} w88 h32 Default +0x2000", this.dialog_width - 204, buttons_y), RabbitI18n.Text("common.ok"))
             this.save_button.OnEvent("Click", (*) => this.SaveScheme())
-            this.cancel_button := this.AddButton("x532 y490 w88 h32 +0x2000", RabbitI18n.Text("common.cancel"))
+            this.cancel_button := this.AddButton(Format("x{} y{} w88 h32 +0x2000", this.dialog_width - 108, buttons_y), RabbitI18n.Text("common.cancel"))
             this.cancel_button.OnEvent("Click", (*) => this.Dispose())
         }
         this.OnEvent("Close", (*) => this.Dispose())
@@ -111,13 +123,13 @@ class RabbitColorSchemeDialog extends Gui {
 
     AddColorControl(field, x, y) {
         local argb := this.colors[field.key]
-        local label := this.AddText(Format("x{} y{} w116 h24 +0x200", x, y), RabbitI18n.Text("messages.field_label", Map("label", field.label)))
+        local label := this.AddText(Format("x{} y{} w{} h24 +0x200", x, y, this.color_label_width), RabbitI18n.Text("messages.field_label", Map("label", field.label)))
         local swatch := this.AddText(
-            Format("x{} y{} w28 h24 +Border +0x100 Background{}", x + 118, y, this.RgbHex(argb)),
+            Format("x{} y{} w28 h24 +Border +0x100 Background{}", x + this.color_label_width + 2, y, this.RgbHex(argb)),
             ""
         )
         local edit := this.AddEdit(
-            Format("x{} y{} w126 h24 r1 -Multi", x + 152, y),
+            Format("x{} y{} w126 h24 r1 -Multi", x + this.color_label_width + 36, y),
             RabbitColorScheme.FormatArgbText(argb)
         )
         swatch.OnEvent("Click", (*) => this.PickColor(field.key))
@@ -137,7 +149,7 @@ class RabbitColorSchemeDialog extends Gui {
 
     ShowModal() {
         local hwnd := this.Hwnd
-        RabbitDialogPlacement.ShowOnOwnerMonitor(this, this.owner_window.Hwnd, "w640 h542")
+        RabbitDialogPlacement.ShowOnOwnerMonitor(this, this.owner_window.Hwnd, Format("w{} h{}", this.dialog_width, this.dialog_height))
         if this.preview && HasMethod(this.preview, "SetOwner") {
             this.preview.SetOwner(this)
             this.preview_attached := true

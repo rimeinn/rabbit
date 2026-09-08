@@ -110,7 +110,7 @@ MeasureTypesettingLoad(window) {
     typesetting_started_at := A_TickCount
     window.OnAppearanceTabChanged()
     typesetting_elapsed := A_TickCount - typesetting_started_at
-    AssertTrue(window.appearance_font_group.Visible,
+    AssertTrue(window.appearance_font.Visible,
         "The GUI smoke test did not show the lazy typesetting controls.")
     return typesetting_elapsed
 }

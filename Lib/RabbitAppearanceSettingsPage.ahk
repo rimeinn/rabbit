@@ -64,14 +64,21 @@ class RabbitAppearanceSettingsPage {
     SetTabControlsVisible(visible) {
         local owner := this.owner
         local color_visible := visible && owner.appearance_tabs.Value = 1
-        local typesetting_visible := visible && owner.appearance_tabs.Value = 2
+        local typesetting_visible := visible && owner.appearance_tabs.Value = 3
+        for ctrl in owner.appearance_font_controls {
+            ctrl.Visible := visible && owner.appearance_tabs.Value = 2
+        }
         for ctrl in owner.appearance_color_controls {
             ctrl.Visible := color_visible
         }
         for ctrl in owner.appearance_typesetting_controls {
             ctrl.Visible := typesetting_visible
         }
+        for ctrl in owner.appearance_preedit_controls {
+            ctrl.Visible := visible && owner.appearance_tabs.Value = 4
+        }
         owner.appearance_follow_light.Visible := color_visible && owner.appearance_target.Value = 2
+        this.UpdateConditionalControls()
     }
 
     OnTabChanged() {

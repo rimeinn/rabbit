@@ -78,16 +78,16 @@ TestSettingsWindowUsesPageSpecificHeights() {
     local apply_y, divider_height, footer_y, navigation_height, navigation_y, tabs_height
     local window := RabbitSettingsWindow(0, true)
     try {
-        AssertEqual(780, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
+        AssertEqual(580, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
         window.apply_button.GetPos(, &apply_y)
         window.navigation.GetPos(, &navigation_y, , &navigation_height)
         window.sidebar_divider.GetPos(, , , &divider_height)
         window.footer_status.GetPos(, &footer_y)
-        AssertEqual(610, navigation_height, "The tall layout used the wrong navigation height.")
+        AssertEqual(410, navigation_height, "The tall layout used the wrong navigation height.")
         AssertEqual(16, apply_y - navigation_y - navigation_height, "The tall navigation used the wrong bottom gap.")
-        AssertEqual(714, apply_y, "The tall layout misplaced the global apply button.")
-        AssertEqual(718, divider_height, "The tall layout used the wrong sidebar divider height.")
-        AssertEqual(732, footer_y, "The tall layout misplaced the footer status.")
+        AssertEqual(514, apply_y, "The tall layout misplaced the global apply button.")
+        AssertEqual(518, divider_height, "The tall layout used the wrong sidebar divider height.")
+        AssertEqual(532, footer_y, "The tall layout misplaced the footer status.")
 
         window.SelectPage(2)
         AssertEqual(660, window.GetPageWindowHeight(), "The switcher page used the wrong window height.")
@@ -120,7 +120,7 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(482, tabs_height, "The behavior tab did not grow with its page.")
 
         window.SelectPage(1)
-        AssertEqual(780, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
+        AssertEqual(580, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
     } finally {
         window.Dispose()
     }
@@ -245,7 +245,7 @@ TestSettingsWindowExposesAppearanceControls() {
         window.OnAppearanceTabChanged()
         AssertTrue(window.appearance_typesetting_created,
             "The typesetting controls were not created when their tab was opened.")
-        AssertTrue(window.appearance_font_group.Visible, "The typography tab did not show font controls.")
+        AssertTrue(window.appearance_font.Visible, "The typography tab did not show font controls.")
         AssertTrue(!window.appearance_list.Visible, "The typography tab left color controls visible.")
         AssertEqual(0, GetComboBoxItemCount(window.appearance_font),
             "The typography tab eagerly populated the candidate font list.")
@@ -255,14 +255,16 @@ TestSettingsWindowExposesAppearanceControls() {
             "The typography tab eagerly populated the label font list.")
         AssertEqual(0, GetComboBoxItemCount(window.appearance_comment_font),
             "The typography tab eagerly populated the comment font list.")
-        window.appearance_font_group.GetPos(, , &font_group_width)
-        window.appearance_layout_group.GetPos(, , &layout_group_width)
+        window.appearance_tabs.GetPos(, , &font_group_width)
+        window.appearance_tabs.GetPos(, , &layout_group_width)
         AssertTrue(font_group_width >= 530, "The font group did not fill the appearance tab.")
         AssertTrue(layout_group_width >= 530, "The layout group did not fill the appearance tab.")
         window.appearance_floating_opacity_label.GetPos(, , &opacity_label_width)
         window.appearance_floating_height_label.GetPos(, , &height_label_width)
         AssertTrue(opacity_label_width >= 72, "The floating opacity label remained too narrow.")
         AssertTrue(height_label_width >= 72, "The floating height label remained too narrow.")
+        window.appearance_tabs.Choose(3)
+        window.OnAppearanceTabChanged()
         window.appearance_shadow_radius.Value := 8
         window.appearance_shadow_offset_x.Value := -4
         window.appearance_shadow_offset_y.Value := 3
@@ -271,7 +273,7 @@ TestSettingsWindowExposesAppearanceControls() {
         AssertEqual(-4, shadow_values["shadow_offset_x"], "The offset control rejected negative values.")
         local shadow_y, shadow_h, group_y, group_h
         window.appearance_shadow_radius.GetPos(, &shadow_y, , &shadow_h)
-        window.appearance_layout_group.GetPos(, &group_y, , &group_h)
+        window.appearance_tabs.GetPos(, &group_y, , &group_h)
         AssertTrue(shadow_y + shadow_h <= group_y + group_h, "Shadow controls overflowed the layout group.")
 
         AssertEqual(
@@ -283,15 +285,15 @@ TestSettingsWindowExposesAppearanceControls() {
             "The horizontal margin label is unclear.")
         AssertEqual("窗口垂直边距：", window.appearance_margin_y_label.Text,
             "The vertical margin label is unclear.")
-        AssertEqual("预编辑水平边距：", window.appearance_preedit_margin_x_label.Text,
+        AssertEqual("水平边距：", window.appearance_preedit_margin_x_label.Text,
             "The preedit horizontal margin control is missing.")
-        AssertEqual("预编辑垂直边距：", window.appearance_preedit_margin_y_label.Text,
+        AssertEqual("垂直边距：", window.appearance_preedit_margin_y_label.Text,
             "The preedit vertical margin control is missing.")
-        AssertEqual("预编辑边框：", window.appearance_preedit_border_width_label.Text,
+        AssertEqual("边框宽度：", window.appearance_preedit_border_width_label.Text,
             "The preedit border control is missing.")
-        AssertEqual("预编辑窗口圆角：", window.appearance_preedit_corner_radius_label.Text,
+        AssertEqual("窗口圆角：", window.appearance_preedit_corner_radius_label.Text,
             "The preedit corner control is missing.")
-        AssertEqual("预编辑高亮圆角：", window.appearance_preedit_round_corner_label.Text,
+        AssertEqual("高亮圆角：", window.appearance_preedit_round_corner_label.Text,
             "The preedit highlight corner control is missing.")
         AssertEqual("候选水平内边距：", window.appearance_candidate_padding_x_label.Text,
             "The horizontal candidate padding control is missing.")
@@ -323,6 +325,8 @@ TestSettingsWindowExposesAppearanceControls() {
         window.appearance_layout_type.Choose(2)
         window.OnAppearanceControlsChanged()
 
+        window.appearance_tabs.Choose(4)
+        window.OnAppearanceTabChanged()
         window.appearance_floating_preedit.Value := true
         window.OnAppearanceControlsChanged()
         AssertTrue(

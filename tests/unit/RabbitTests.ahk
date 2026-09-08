@@ -26,6 +26,7 @@
 #Include RabbitApplicationSettingsModelTest.ahk
 #Include RabbitAdvancedFontSettingsModelTest.ahk
 #Include RabbitAppearancePreviewTest.ahk
+#Include RabbitAppearanceLayoutTest.ahk
 #Include RabbitBehaviorSettingsModelTest.ahk
 #Include RabbitCandidatePresentationTest.ahk
 #Include RabbitCandidateViewportTest.ahk
