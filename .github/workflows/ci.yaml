@@ -331,6 +331,7 @@ jobs:
           Copy-Item "docs\images\candidate-layouts\*.png" `
               (Join-Path $package "docs\images\candidate-layouts")
           Copy-Item "deps\Rime\${{ matrix.rime }}" (Join-Path $package "rime.dll")
+          Copy-Item "plum\rime-install.bat" (Join-Path $package "rime-install.bat")
           Copy-Item "LICENSE" $package
           Copy-Item "README.md" $package
           Compress-Archive -Path (Join-Path $package "*") `
@@ -385,6 +386,11 @@ jobs:
           name: Rabbit-Compiled-x86
           path: compiled-x86
 
+      - name: Rename compiled nightly packages
+        run: |
+          cp compiled-x64/rabbit-compiled-x64.zip rabbit-nightly-compiled-x64.zip
+          cp compiled-x86/rabbit-compiled-x86.zip rabbit-nightly-compiled-x86.zip
+
       - name: Upload Nightly
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -395,8 +401,8 @@ jobs:
           files: |
             rabbit-nightly-x64.zip
             rabbit-nightly-x86.zip
-            compiled-x64/rabbit-compiled-x64.zip
-            compiled-x86/rabbit-compiled-x86.zip
+            rabbit-nightly-compiled-x64.zip
+            rabbit-nightly-compiled-x86.zip
 
   # Keep development builds separate from the public "latest" nightly channel.
   create-dev-nightly:
@@ -442,6 +448,11 @@ jobs:
           name: Rabbit-Compiled-x86
           path: compiled-x86
 
+      - name: Rename compiled dev nightly packages
+        run: |
+          cp compiled-x64/rabbit-compiled-x64.zip rabbit-dev-nightly-compiled-x64.zip
+          cp compiled-x86/rabbit-compiled-x86.zip rabbit-dev-nightly-compiled-x86.zip
+
       - name: Upload Dev Nightly
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -452,8 +463,8 @@ jobs:
           files: |
             rabbit-dev-nightly-x64.zip
             rabbit-dev-nightly-x86.zip
-            compiled-x64/rabbit-compiled-x64.zip
-            compiled-x86/rabbit-compiled-x86.zip
+            rabbit-dev-nightly-compiled-x64.zip
+            rabbit-dev-nightly-compiled-x86.zip
 
   create-release:
     name: Create Release
