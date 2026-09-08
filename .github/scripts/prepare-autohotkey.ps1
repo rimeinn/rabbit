@@ -81,7 +81,13 @@ try {
     Copy-Item (Join-Path $autoHotkeyDirectory "AutoHotkey64.exe") $preparedDirectory
     $compilerDirectory = Join-Path $preparedDirectory "Compiler"
     New-Item -ItemType Directory -Path $compilerDirectory | Out-Null
-    Copy-Item (Join-Path $ahk2ExeDirectory "*") $compilerDirectory -Recurse -Force
+    $ahk2ExePath = Get-ChildItem -LiteralPath $ahk2ExeDirectory -Recurse -File -Filter "Ahk2Exe.exe" |
+        Select-Object -First 1
+    if (!$ahk2ExePath) {
+        throw "Ahk2Exe.exe was not found in the extracted compiler package."
+    }
+    Copy-Item -LiteralPath $ahk2ExePath.FullName `
+        -Destination (Join-Path $compilerDirectory "Ahk2Exe.exe") -Force
 
     $iconDefinitions = @(
         @{

@@ -291,11 +291,17 @@ jobs:
         run: |
           $outputDirectory = Join-Path $env:GITHUB_WORKSPACE "compiled"
           New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
-          $compiler = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\Compiler\Ahk2Exe.exe"
+          $compiler = Get-ChildItem -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey") `
+              -Recurse -File -Filter "Ahk2Exe.exe" | Select-Object -First 1
+          if (!$compiler) {
+            Get-ChildItem -LiteralPath (Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey") `
+                -Recurse -Force | Select-Object FullName
+            throw "Ahk2Exe.exe was not found in the downloaded AutoHotkey artifact."
+          }
           $base = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\${{ matrix.ahk }}"
           $input = Join-Path $env:GITHUB_WORKSPACE "Rabbit.ahk"
           $output = Join-Path $outputDirectory "Rabbit.exe"
-          & $compiler /in $input /out $output /base $base /silent verbose
+          & $compiler.FullName /in $input /out $output /base $base /silent verbose
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
