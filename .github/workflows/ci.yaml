@@ -52,6 +52,7 @@ jobs:
           path: |
             AutoHotkey32.exe
             AutoHotkey64.exe
+            Compiler/**
 
   prepare-dependency:
     name: Prepare Dependency
@@ -216,11 +217,117 @@ jobs:
             docs/images/candidate-layouts/*.png
             rime-install.bat
 
+  build-rabbit-compiled:
+    strategy:
+      matrix:
+        target: [ x86, x64 ]
+        include:
+          - { target: x86, base: "Unicode 32-bit.bin", rime: rime-x86.dll }
+          - { target: x64, base: "Unicode 64-bit.bin", rime: rime-x64.dll }
+    name: Build compiled Rabbit for ${{ matrix.target }}
+    runs-on: windows-latest
+    needs: [ prepare-dependency, prepare-autohotkey-binaries ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+
+      - name: Download AutoHotkey compiler
+        uses: actions/download-artifact@v8
+        with:
+          name: AutoHotkey
+          path: deps/AutoHotkey
+
+      - name: Download icons
+        uses: actions/download-artifact@v8
+        with:
+          name: Icon
+          path: deps/Icon
+
+      - name: Download Rime library
+        uses: actions/download-artifact@v8
+        with:
+          name: Rime
+          path: deps/Rime
+
+      - name: Download shared data
+        uses: actions/download-artifact@v8
+        with:
+          name: Data
+          path: Data
+
+      - name: Prepare source and version
+        shell: pwsh
+        env:
+          RABBIT_REF_NAME: ${{ github.ref_name }}
+          RABBIT_SHA: ${{ github.sha }}
+        run: |
+          Copy-Item "deps/Icon/*" Lib -Force
+
+          if ($env:RABBIT_REF_NAME.StartsWith("v")) {
+            $version = $env:RABBIT_REF_NAME.Substring(1)
+          } else {
+            $shortSha = (git rev-parse --short $env:RABBIT_SHA)
+            $version = "$($env:RABBIT_REF_NAME)-$shortSha"
+          }
+          $version = [regex]::Replace($version, '[^A-Za-z0-9._-]', '-')
+          $path = Join-Path $env:GITHUB_WORKSPACE "Lib\RabbitCommon.ahk"
+          $source = [System.IO.File]::ReadAllText($path)
+          $source = [regex]::Replace(
+              $source,
+              'global RABBIT_VERSION := .+',
+              "global RABBIT_VERSION := `"$version`""
+          )
+          [System.IO.File]::WriteAllText(
+              $path,
+              $source,
+              [System.Text.UTF8Encoding]::new($false)
+          )
+          Write-Host "Rabbit version: $version"
+
+      - name: Compile Rabbit
+        shell: pwsh
+        run: |
+          $outputDirectory = Join-Path $env:GITHUB_WORKSPACE "compiled"
+          New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+          $compiler = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\Compiler\Ahk2Exe.exe"
+          $base = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\Compiler\${{ matrix.base }}"
+          $input = Join-Path $env:GITHUB_WORKSPACE "Rabbit.ahk"
+          $output = Join-Path $outputDirectory "Rabbit.exe"
+          & $compiler /in $input /out $output /base $base /silent verbose
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Assemble compiled package
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:GITHUB_WORKSPACE "package"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+          Copy-Item "compiled\Rabbit.exe" $package
+          Copy-Item "locales" $package -Recurse
+          Copy-Item "Data" $package -Recurse
+          New-Item -ItemType Directory -Force -Path (Join-Path $package "docs\images\candidate-layouts") | Out-Null
+          Copy-Item "docs\images\candidate-layouts\*.png" `
+              (Join-Path $package "docs\images\candidate-layouts")
+          Copy-Item "deps\Rime\${{ matrix.rime }}" (Join-Path $package "rime.dll")
+          Copy-Item "LICENSE" $package
+          Copy-Item "README.md" $package
+          Compress-Archive -Path (Join-Path $package "*") `
+              -DestinationPath "rabbit-compiled-${{ matrix.target }}.zip" -Force
+
+      - name: Upload compiled package
+        uses: actions/upload-artifact@v7
+        with:
+          name: Rabbit-Compiled-${{ matrix.target }}
+          path: rabbit-compiled-${{ matrix.target }}.zip
+
   create-nightly:
     name: Create Nightly release
     if: ${{ github.ref == 'refs/heads/master' }}
     runs-on: ubuntu-latest
-    needs: build-rabbit
+    needs: [ build-rabbit, build-rabbit-compiled ]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -247,6 +354,18 @@ jobs:
         run: |
           mkdir Rime && zip -r -q ../rabbit-nightly-x86.zip *
 
+      - name: Download compiled x64
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Compiled-x64
+          path: compiled-x64
+
+      - name: Download compiled x86
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Compiled-x86
+          path: compiled-x86
+
       - name: Upload Nightly
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -257,13 +376,15 @@ jobs:
           files: |
             rabbit-nightly-x64.zip
             rabbit-nightly-x86.zip
+            compiled-x64/rabbit-compiled-x64.zip
+            compiled-x86/rabbit-compiled-x86.zip
 
   # Keep development builds separate from the public "latest" nightly channel.
   create-dev-nightly:
     name: Create Dev Nightly release
     if: ${{ github.ref == 'refs/heads/dev' }}
     runs-on: ubuntu-latest
-    needs: build-rabbit
+    needs: [ build-rabbit, build-rabbit-compiled ]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -290,6 +411,18 @@ jobs:
         run: |
           mkdir Rime && zip -r -q ../rabbit-dev-nightly-x86.zip *
 
+      - name: Download compiled x64
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Compiled-x64
+          path: compiled-x64
+
+      - name: Download compiled x86
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Compiled-x86
+          path: compiled-x86
+
       - name: Upload Dev Nightly
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -300,12 +433,14 @@ jobs:
           files: |
             rabbit-dev-nightly-x64.zip
             rabbit-dev-nightly-x86.zip
+            compiled-x64/rabbit-compiled-x64.zip
+            compiled-x86/rabbit-compiled-x86.zip
 
   create-release:
     name: Create Release
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: build-rabbit
+    needs: [ build-rabbit, build-rabbit-compiled ]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -341,3 +476,26 @@ jobs:
           prerelease: true
           files: |
             rabbit-${{ github.ref_name }}-${{ matrix.target }}.zip
+
+  upload-compiled-release:
+    strategy:
+      matrix:
+        target: [ x86, x64 ]
+    name: Upload Compiled Release for ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - name: Download Compiled Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: Rabbit-Compiled-${{ matrix.target }}
+          path: compiled
+
+      - name: Rename Compiled Asset
+        run: cp compiled/rabbit-compiled-${{ matrix.target }}.zip rabbit-${{ github.ref_name }}-compiled-${{ matrix.target }}.zip
+
+      - name: Publish Compiled Asset
+        uses: softprops/action-gh-release@v3
+        with:
+          prerelease: true
+          files: rabbit-${{ github.ref_name }}-compiled-${{ matrix.target }}.zip

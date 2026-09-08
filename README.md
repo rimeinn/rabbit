@@ -89,6 +89,7 @@ rabbit/
 ├─ docs/                文档资源，包含 README 使用的截图
 |  └─ images/
 |     └─ candidate-layouts/
+├─ locales/             多语言翻译，删除后回退到脚本内置的简体中文
 ├─ LICENSE              开源许可，可删除
 ├─ Rabbit.ahk           玉兔毫启动脚本（含部署器模式）
 ├─ Rabbit.exe           AutoHotkey 可执行文件，若本机已安装 AutoHotkey 或已编译，可删除

@@ -71,6 +71,7 @@ try {
     New-Item -ItemType Directory -Path $preparedDirectory | Out-Null
     Copy-Item (Join-Path $autoHotkeyDirectory "AutoHotkey32.exe") $preparedDirectory
     Copy-Item (Join-Path $autoHotkeyDirectory "AutoHotkey64.exe") $preparedDirectory
+    Copy-Item (Join-Path $autoHotkeyDirectory "Compiler") $preparedDirectory -Recurse
 
     $iconDefinitions = @(
         @{
