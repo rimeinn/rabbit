@@ -8,6 +8,8 @@ $ProgressPreference = "SilentlyContinue"
 
 $autoHotkeyUrl = "https://github.com/AutoHotkey/AutoHotkey/releases/download/v2.0.19/AutoHotkey_2.0.19.zip"
 $autoHotkeySha256 = "4e0d0e65655066a646a210951320feaef0729a3597177131adaec4066bef5869"
+$ahk2ExeUrl = "https://github.com/AutoHotkey/Ahk2Exe/releases/download/Ahk2Exe1.1.37.02a2/Ahk2Exe.zip"
+$ahk2ExeSha256 = "c29b8c3a5124850d79fc9e66e2ca79677c377d7f31631ad3022ba159c5d9e3be"
 $rcEditUrl = "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
 $rcEditSha256 = "3e7801db1a5edbec91b49a24a094aad776cb4515488ea5a4ca2289c400eade2a"
 
@@ -58,6 +60,8 @@ New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
 try {
     $autoHotkeyArchive = Join-Path $temporaryDirectory "AutoHotkey_2.0.19.zip"
     $autoHotkeyDirectory = Join-Path $temporaryDirectory "autohotkey"
+    $ahk2ExeArchive = Join-Path $temporaryDirectory "Ahk2Exe.zip"
+    $ahk2ExeDirectory = Join-Path $temporaryDirectory "ahk2exe"
     $rcEditPath = Join-Path $temporaryDirectory "rcedit.exe"
     $preparedDirectory = Join-Path $temporaryDirectory "prepared"
 
@@ -65,13 +69,19 @@ try {
     Assert-FileHash -Path $autoHotkeyArchive -ExpectedSha256 $autoHotkeySha256
     Expand-Archive -LiteralPath $autoHotkeyArchive -DestinationPath $autoHotkeyDirectory
 
+    Invoke-WebRequest -Uri $ahk2ExeUrl -OutFile $ahk2ExeArchive
+    Assert-FileHash -Path $ahk2ExeArchive -ExpectedSha256 $ahk2ExeSha256
+    Expand-Archive -LiteralPath $ahk2ExeArchive -DestinationPath $ahk2ExeDirectory
+
     Invoke-WebRequest -Uri $rcEditUrl -OutFile $rcEditPath
     Assert-FileHash -Path $rcEditPath -ExpectedSha256 $rcEditSha256
 
     New-Item -ItemType Directory -Path $preparedDirectory | Out-Null
     Copy-Item (Join-Path $autoHotkeyDirectory "AutoHotkey32.exe") $preparedDirectory
     Copy-Item (Join-Path $autoHotkeyDirectory "AutoHotkey64.exe") $preparedDirectory
-    Copy-Item (Join-Path $autoHotkeyDirectory "Compiler") $preparedDirectory -Recurse
+    $compilerDirectory = Join-Path $preparedDirectory "Compiler"
+    New-Item -ItemType Directory -Path $compilerDirectory | Out-Null
+    Copy-Item (Join-Path $ahk2ExeDirectory "*") $compilerDirectory -Recurse -Force
 
     $iconDefinitions = @(
         @{
