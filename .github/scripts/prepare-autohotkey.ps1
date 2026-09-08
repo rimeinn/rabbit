@@ -127,7 +127,7 @@ try {
     )
 
     New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force | Out-Null
-    Copy-Item (Join-Path $preparedDirectory "*") $resolvedOutputDirectory -Force
+    Copy-Item (Join-Path $preparedDirectory "*") $resolvedOutputDirectory -Recurse -Force
 } finally {
     if (Test-Path -LiteralPath $temporaryDirectory) {
         Remove-Item -LiteralPath $temporaryDirectory -Recurse -Force

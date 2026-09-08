@@ -21,7 +21,7 @@ jobs:
         with:
           path: ${{ runner.temp }}/rabbit-autohotkey
           key: >-
-            ${{ runner.os }}-rabbit-autohotkey-v1-${{
+            ${{ runner.os }}-rabbit-autohotkey-v2-${{
             hashFiles('.github/scripts/prepare-autohotkey.ps1', 'assets/*.svg') }}
 
       - name: Prepare AutoHotkey
@@ -30,6 +30,14 @@ jobs:
         run: |
           .github/scripts/prepare-autohotkey.ps1 `
             -OutputDirectory "$env:RUNNER_TEMP/rabbit-autohotkey"
+
+      - name: Repair prepared AutoHotkey cache
+        shell: pwsh
+        run: |
+          if (!(Test-Path -LiteralPath "$env:RUNNER_TEMP/rabbit-autohotkey\Compiler\Ahk2Exe.exe")) {
+            .github/scripts/prepare-autohotkey.ps1 `
+              -OutputDirectory "$env:RUNNER_TEMP/rabbit-autohotkey"
+          }
 
       - name: Copy prepared AutoHotkey
         shell: pwsh
