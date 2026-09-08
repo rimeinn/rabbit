@@ -78,16 +78,16 @@ TestSettingsWindowUsesPageSpecificHeights() {
     local apply_y, divider_height, footer_y, navigation_height, navigation_y, tabs_height
     local window := RabbitSettingsWindow(0, true)
     try {
-        AssertEqual(724, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
+        AssertEqual(780, window.GetPageWindowHeight(), "The appearance page used the wrong window height.")
         window.apply_button.GetPos(, &apply_y)
         window.navigation.GetPos(, &navigation_y, , &navigation_height)
         window.sidebar_divider.GetPos(, , , &divider_height)
         window.footer_status.GetPos(, &footer_y)
-        AssertEqual(554, navigation_height, "The tall layout used the wrong navigation height.")
+        AssertEqual(610, navigation_height, "The tall layout used the wrong navigation height.")
         AssertEqual(16, apply_y - navigation_y - navigation_height, "The tall navigation used the wrong bottom gap.")
-        AssertEqual(658, apply_y, "The tall layout misplaced the global apply button.")
-        AssertEqual(662, divider_height, "The tall layout used the wrong sidebar divider height.")
-        AssertEqual(676, footer_y, "The tall layout misplaced the footer status.")
+        AssertEqual(714, apply_y, "The tall layout misplaced the global apply button.")
+        AssertEqual(718, divider_height, "The tall layout used the wrong sidebar divider height.")
+        AssertEqual(732, footer_y, "The tall layout misplaced the footer status.")
 
         window.SelectPage(2)
         AssertEqual(660, window.GetPageWindowHeight(), "The switcher page used the wrong window height.")
@@ -120,7 +120,7 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(482, tabs_height, "The behavior tab did not grow with its page.")
 
         window.SelectPage(1)
-        AssertEqual(724, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
+        AssertEqual(780, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
     } finally {
         window.Dispose()
     }
@@ -283,6 +283,16 @@ TestSettingsWindowExposesAppearanceControls() {
             "The horizontal margin label is unclear.")
         AssertEqual("窗口垂直边距：", window.appearance_margin_y_label.Text,
             "The vertical margin label is unclear.")
+        AssertEqual("预编辑水平边距：", window.appearance_preedit_margin_x_label.Text,
+            "The preedit horizontal margin control is missing.")
+        AssertEqual("预编辑垂直边距：", window.appearance_preedit_margin_y_label.Text,
+            "The preedit vertical margin control is missing.")
+        AssertEqual("预编辑边框：", window.appearance_preedit_border_width_label.Text,
+            "The preedit border control is missing.")
+        AssertEqual("预编辑窗口圆角：", window.appearance_preedit_corner_radius_label.Text,
+            "The preedit corner control is missing.")
+        AssertEqual("预编辑高亮圆角：", window.appearance_preedit_round_corner_label.Text,
+            "The preedit highlight corner control is missing.")
         AssertEqual("候选水平内边距：", window.appearance_candidate_padding_x_label.Text,
             "The horizontal candidate padding control is missing.")
         AssertEqual("候选垂直内边距：", window.appearance_candidate_padding_y_label.Text,

@@ -76,7 +76,10 @@ class RabbitColorSchemeDialog extends Gui {
         this.window_group := this.AddGroupBox("x16 y98 w296 h352", RabbitI18n.Text("appearance.window_colors"))
         this.candidate_group := this.AddGroupBox("x320 y98 w304 h352", RabbitI18n.Text("appearance.candidate_colors"))
         for index, field in RabbitColorScheme.EDITABLE_COLOR_FIELDS {
-            if index <= 6 || field.key = "shadow_color" || field.key = "hilited_shadow_color" {
+            if index <= 6
+                || field.key = "preedit_border_color"
+                || field.key = "shadow_color"
+                || field.key = "hilited_shadow_color" {
                 x := 28
                 y := 126 + left_index++ * 32
             } else {

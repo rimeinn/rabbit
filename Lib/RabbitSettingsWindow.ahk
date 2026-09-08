@@ -30,7 +30,7 @@ class RabbitSettingsWindow extends Gui {
     deployment_pending := false
 
     static WINDOW_WIDTH := 820
-    static APPEARANCE_HEIGHT := 724
+    static APPEARANCE_HEIGHT := 780
     static BEHAVIOR_HEIGHT := 692
     static SWITCHER_HEIGHT := 660
     static ABOUT_HEIGHT := 660
@@ -908,75 +908,100 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.margin_y"))
         this.appearance_margin_y := this.AddEdit("x592 y406 w80 r1 Number -Multi Hidden")
         this.appearance_margin_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_preedit_margin_x_label := this.AddText("x260 y438 w112 h22 Hidden",
+            RabbitI18n.Text("controls.preedit_margin_x"))
+        this.appearance_preedit_margin_x := this.AddEdit("x374 y434 w80 r1 Number -Multi Hidden")
+        this.appearance_preedit_margin_x.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_preedit_margin_y_label := this.AddText("x478 y438 w112 h22 Hidden",
+            RabbitI18n.Text("controls.preedit_margin_y"))
+        this.appearance_preedit_margin_y := this.AddEdit("x592 y434 w80 r1 Number -Multi Hidden")
+        this.appearance_preedit_margin_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.SetEditCue(this.appearance_preedit_margin_x, RabbitI18n.Text("controls.follow_common"))
+        this.SetEditCue(this.appearance_preedit_margin_y, RabbitI18n.Text("controls.follow_common"))
         this.appearance_candidate_padding_x_label := this.AddText(
-            "x260 y438 w112 h22 Hidden",
+            "x260 y466 w112 h22 Hidden",
             RabbitI18n.Text("controls.padding_x")
         )
-        this.appearance_candidate_padding_x := this.AddEdit("x374 y434 w80 r1 Number -Multi Hidden")
+        this.appearance_candidate_padding_x := this.AddEdit("x374 y462 w80 r1 Number -Multi Hidden")
         this.appearance_candidate_padding_x.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_candidate_padding_y_label := this.AddText(
-            "x478 y438 w112 h22 Hidden",
+            "x478 y466 w112 h22 Hidden",
             RabbitI18n.Text("controls.padding_y")
         )
-        this.appearance_candidate_padding_y := this.AddEdit("x592 y434 w80 r1 Number -Multi Hidden")
+        this.appearance_candidate_padding_y := this.AddEdit("x592 y462 w80 r1 Number -Multi Hidden")
         this.appearance_candidate_padding_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_candidate_spacing_label := this.AddText("x260 y466 w72 h22 Hidden",
+        this.appearance_candidate_spacing_label := this.AddText("x260 y494 w72 h22 Hidden",
             RabbitI18n.Text("controls.spacing"))
-        this.appearance_candidate_spacing := this.AddEdit("x334 y462 w120 r1 Number -Multi Hidden")
+        this.appearance_candidate_spacing := this.AddEdit("x334 y490 w120 r1 Number -Multi Hidden")
         this.appearance_candidate_spacing.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_border_width_label := this.AddText("x478 y466 w72 h22 Hidden",
+        this.appearance_border_width_label := this.AddText("x478 y494 w72 h22 Hidden",
             RabbitI18n.Text("controls.border"))
-        this.appearance_border_width := this.AddEdit("x552 y462 w120 r1 Number -Multi Hidden")
+        this.appearance_border_width := this.AddEdit("x552 y490 w120 r1 Number -Multi Hidden")
         this.appearance_border_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_corner_radius_label := this.AddText("x260 y494 w72 h22 Hidden",
+        this.appearance_corner_radius_label := this.AddText("x260 y522 w72 h22 Hidden",
             RabbitI18n.Text("controls.corner"))
-        this.appearance_corner_radius := this.AddEdit("x334 y490 w120 r1 Number -Multi Hidden")
+        this.appearance_corner_radius := this.AddEdit("x334 y518 w120 r1 Number -Multi Hidden")
         this.appearance_corner_radius.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_round_corner_label := this.AddText("x478 y494 w112 h22 Hidden",
+        this.appearance_round_corner_label := this.AddText("x478 y522 w112 h22 Hidden",
             RabbitI18n.Text("controls.round_corner"))
-        this.appearance_round_corner := this.AddEdit("x592 y490 w80 r1 Number -Multi Hidden")
+        this.appearance_round_corner := this.AddEdit("x592 y518 w80 r1 Number -Multi Hidden")
         this.appearance_round_corner.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_min_width_label := this.AddText("x260 y522 w112 h22 Hidden",
+        this.appearance_preedit_border_width_label := this.AddText("x260 y550 w92 h22 Hidden",
+            RabbitI18n.Text("controls.preedit_border_width"))
+        this.appearance_preedit_border_width := this.AddEdit("x356 y546 w58 r1 Number -Multi Hidden")
+        this.appearance_preedit_border_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_preedit_corner_radius_label := this.AddText("x428 y550 w92 h22 Hidden",
+            RabbitI18n.Text("controls.preedit_corner_radius"))
+        this.appearance_preedit_corner_radius := this.AddEdit("x524 y546 w58 r1 Number -Multi Hidden")
+        this.appearance_preedit_corner_radius.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.appearance_preedit_round_corner_label := this.AddText("x596 y550 w92 h22 Hidden",
+            RabbitI18n.Text("controls.preedit_round_corner"))
+        this.appearance_preedit_round_corner := this.AddEdit("x692 y546 w58 r1 Number -Multi Hidden")
+        this.appearance_preedit_round_corner.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
+        this.SetEditCue(this.appearance_preedit_border_width, RabbitI18n.Text("controls.follow_common"))
+        this.SetEditCue(this.appearance_preedit_corner_radius, RabbitI18n.Text("controls.follow_common"))
+        this.SetEditCue(this.appearance_preedit_round_corner, RabbitI18n.Text("controls.follow_common"))
+        this.appearance_min_width_label := this.AddText("x260 y578 w112 h22 Hidden",
             RabbitI18n.Text("controls.min_width"))
-        this.appearance_min_width := this.AddEdit("x374 y518 w80 r1 Number -Multi Hidden")
+        this.appearance_min_width := this.AddEdit("x374 y574 w80 r1 Number -Multi Hidden")
         this.appearance_min_width.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_min_height_label := this.AddText("x478 y522 w112 h22 Hidden",
+        this.appearance_min_height_label := this.AddText("x478 y578 w112 h22 Hidden",
             RabbitI18n.Text("controls.min_height"))
-        this.appearance_min_height := this.AddEdit("x592 y518 w80 r1 Number -Multi Hidden")
+        this.appearance_min_height := this.AddEdit("x592 y574 w80 r1 Number -Multi Hidden")
         this.appearance_min_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_flow_rows_label := this.AddText("x260 y550 w72 h22 Hidden",
+        this.appearance_flow_rows_label := this.AddText("x260 y606 w72 h22 Hidden",
             RabbitI18n.Text("controls.flow_rows"))
-        this.appearance_flow_rows := this.AddEdit("x334 y546 w120 r1 Number -Multi Hidden")
+        this.appearance_flow_rows := this.AddEdit("x334 y602 w120 r1 Number -Multi Hidden")
         this.appearance_flow_rows.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_vertical_direction := this.AddCheckbox(
-            "x478 y548 w288 h24 Hidden",
+            "x478 y604 w288 h24 Hidden",
             RabbitI18n.Text("controls.vertical_ltr")
         )
         this.appearance_vertical_direction.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
         this.appearance_floating_preedit := this.AddCheckbox(
-            "x260 y576 w190 h24 Hidden",
+            "x260 y634 w190 h24 Hidden",
             RabbitI18n.Text("controls.floating_preedit")
         )
         this.appearance_floating_preedit.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_floating_opacity_label := this.AddText("x478 y578 w72 h22 Hidden",
+        this.appearance_floating_opacity_label := this.AddText("x478 y636 w72 h22 Hidden",
             RabbitI18n.Text("controls.opacity"))
-        this.appearance_floating_opacity := this.AddEdit("x552 y574 w60 r1 Number -Multi Hidden")
+        this.appearance_floating_opacity := this.AddEdit("x552 y632 w60 r1 Number -Multi Hidden")
         this.appearance_floating_opacity.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_floating_height_label := this.AddText("x628 y578 w72 h22 Hidden",
+        this.appearance_floating_height_label := this.AddText("x628 y636 w72 h22 Hidden",
             RabbitI18n.Text("controls.floating_height"))
-        this.appearance_floating_height := this.AddEdit("x702 y574 w64 r1 Number -Multi Hidden")
+        this.appearance_floating_height := this.AddEdit("x702 y632 w64 r1 Number -Multi Hidden")
         this.appearance_floating_height.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_shadow_radius_label := this.AddText("x260 y610 w72 h22 Hidden",
+        this.appearance_shadow_radius_label := this.AddText("x260 y662 w72 h22 Hidden",
             RabbitI18n.Text("controls.shadow_radius"))
-        this.appearance_shadow_radius := this.AddEdit("x334 y606 w80 r1 -Multi Hidden")
+        this.appearance_shadow_radius := this.AddEdit("x334 y658 w80 r1 -Multi Hidden")
         this.appearance_shadow_radius.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_shadow_offset_x_label := this.AddText("x424 y610 w72 h22 Hidden",
+        this.appearance_shadow_offset_x_label := this.AddText("x424 y662 w72 h22 Hidden",
             RabbitI18n.Text("controls.shadow_x"))
-        this.appearance_shadow_offset_x := this.AddEdit("x498 y606 w80 r1 -Multi Hidden")
+        this.appearance_shadow_offset_x := this.AddEdit("x498 y658 w80 r1 -Multi Hidden")
         this.appearance_shadow_offset_x.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
-        this.appearance_shadow_offset_y_label := this.AddText("x588 y610 w72 h22 Hidden",
+        this.appearance_shadow_offset_y_label := this.AddText("x588 y662 w72 h22 Hidden",
             RabbitI18n.Text("controls.shadow_y"))
-        this.appearance_shadow_offset_y := this.AddEdit("x662 y606 w80 r1 -Multi Hidden")
+        this.appearance_shadow_offset_y := this.AddEdit("x662 y658 w80 r1 -Multi Hidden")
         this.appearance_shadow_offset_y.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_tabs.UseTab()
         this.appearance_typesetting_controls := [
@@ -1005,6 +1030,10 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_margin_x,
             this.appearance_margin_y_label,
             this.appearance_margin_y,
+            this.appearance_preedit_margin_x_label,
+            this.appearance_preedit_margin_x,
+            this.appearance_preedit_margin_y_label,
+            this.appearance_preedit_margin_y,
             this.appearance_candidate_padding_x_label,
             this.appearance_candidate_padding_x,
             this.appearance_candidate_padding_y_label,
@@ -1023,6 +1052,12 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_corner_radius,
             this.appearance_round_corner_label,
             this.appearance_round_corner,
+            this.appearance_preedit_border_width_label,
+            this.appearance_preedit_border_width,
+            this.appearance_preedit_corner_radius_label,
+            this.appearance_preedit_corner_radius,
+            this.appearance_preedit_round_corner_label,
+            this.appearance_preedit_round_corner,
             this.appearance_min_width_label,
             this.appearance_min_width,
             this.appearance_min_height_label,

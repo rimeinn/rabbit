@@ -22,6 +22,7 @@ RunTest("UI style settings save typography and layout", TestUIStyleSettingsSaveT
 RunTest("UI style settings patch individual color schemes", TestUIStyleSettingsPatchColorSchemes.Bind())
 RunTest("UI style settings restore dark scheme following", TestUIStyleSettingsRestoreDarkFollowing.Bind())
 RunTest("UI style settings reuse common style fields across color schemes", TestUIStyleSettingsReuseBaseStyle.Bind())
+RunTest("UI style settings clear preedit fallback overrides", TestUIStyleSettingsClearPreeditFallbacks.Bind())
 
 TestUIStyleSettingsSaveTypographyAndLayout() {
     local calls := []
@@ -43,7 +44,12 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
             "shadow_offset_y", 3,
             "floating_preedit", true,
             "floating_preedit_opacity", 0.65,
-            "floating_preedit_min_height", 24
+            "floating_preedit_min_height", 24,
+            "preedit_border_width", 2,
+            "preedit_corner_radius", 4,
+            "preedit_round_corner", 2,
+            "preedit_margin_x", 2,
+            "preedit_margin_y", 2
         ))
         AssertTrue(settings.Save(), "The settings model failed to save appearance values.")
     } finally {
@@ -63,6 +69,11 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
         "int:style/layout/shadow_offset_x:-12",
         "int:style/layout/shadow_offset_y:3",
         "int:style/floating_preedit_min_height:24",
+        "int:style/layout/preedit_border_width:2",
+        "int:style/layout/preedit_corner_radius:4",
+        "int:style/layout/preedit_round_corner:2",
+        "int:style/layout/preedit_margin_x:2",
+        "int:style/layout/preedit_margin_y:2",
         "bool:style/floating_preedit:1",
         "double:style/floating_preedit_opacity:0.65",
     ] {
@@ -115,6 +126,37 @@ TestUIStyleSettingsRestoreDarkFollowing() {
         InStr(joined, "item:style/color_scheme_dark:0"),
         "Dark-mode following did not remove the explicit dark scheme."
     )
+}
+
+TestUIStyleSettingsClearPreeditFallbacks() {
+    local calls := []
+    local settings := UIStyleSettings(0, RabbitUIStyleSettingsLeversProbe(calls))
+    try {
+        settings.SelectColorScheme("aqua")
+        settings.SetStyleValues(Map(
+            "preedit_border_width", "",
+            "preedit_corner_radius", "",
+            "preedit_round_corner", "",
+            "preedit_margin_x", "",
+            "preedit_margin_y", ""
+        ))
+        AssertTrue(settings.Save(), "The settings model failed to clear preedit fallback values.")
+    } finally {
+        settings.Dispose()
+    }
+    local joined := JoinUIStyleSettingsCalls(calls)
+    for key in [
+        "preedit_border_width",
+        "preedit_corner_radius",
+        "preedit_round_corner",
+        "preedit_margin_x",
+        "preedit_margin_y"
+    ] {
+        AssertTrue(
+            InStr(joined, "item:style/layout/" . key . ":0"),
+            "The settings model did not remove " . key . " when it was left blank."
+        )
+    }
 }
 
 TestUIStyleSettingsReuseBaseStyle() {

@@ -210,6 +210,8 @@ class RabbitAppearanceSettingsPage {
             style.align_type = "center" ? 2 : style.align_type = "bottom" ? 3 : 1)
         owner.appearance_margin_x.Value := style.margin_x
         owner.appearance_margin_y.Value := style.margin_y
+        owner.appearance_preedit_margin_x.Value := style.preedit_margin_x_explicit ? style.preedit_margin_x : ""
+        owner.appearance_preedit_margin_y.Value := style.preedit_margin_y_explicit ? style.preedit_margin_y : ""
         owner.appearance_candidate_padding_x.Value := style.candidate_padding_x
         owner.appearance_candidate_padding_y.Value := style.candidate_padding_y
         owner.appearance_candidate_spacing.Value := style.candidate_spacing
@@ -219,6 +221,15 @@ class RabbitAppearanceSettingsPage {
         owner.appearance_border_width.Value := style.border_width
         owner.appearance_corner_radius.Value := style.corner_radius
         owner.appearance_round_corner.Value := style.round_corner
+        owner.appearance_preedit_border_width.Value := style.preedit_border_width_explicit
+            ? style.preedit_border_width
+            : ""
+        owner.appearance_preedit_corner_radius.Value := style.preedit_corner_radius_explicit
+            ? style.preedit_corner_radius
+            : ""
+        owner.appearance_preedit_round_corner.Value := style.preedit_round_corner_explicit
+            ? style.preedit_round_corner
+            : ""
         owner.appearance_min_width.Value := style.min_width
         owner.appearance_min_height.Value := style.min_height
         owner.appearance_flow_rows.Value := style.flow_rows
@@ -719,6 +730,10 @@ class RabbitAppearanceSettingsPage {
             "align_type", ["top", "center", "bottom"][owner.appearance_align_type.Value],
             "margin_x", this.ReadNumber(owner.appearance_margin_x, RabbitI18n.Text("appearance.margin_x"), 0, 500),
             "margin_y", this.ReadNumber(owner.appearance_margin_y, RabbitI18n.Text("appearance.margin_y"), 0, 500),
+            "preedit_margin_x", this.ReadOptionalNumber(
+                owner.appearance_preedit_margin_x, RabbitI18n.Text("appearance.preedit_margin_x"), 0, 500),
+            "preedit_margin_y", this.ReadOptionalNumber(
+                owner.appearance_preedit_margin_y, RabbitI18n.Text("appearance.preedit_margin_y"), 0, 500),
             "candidate_padding_x", this.ReadNumber(
                 owner.appearance_candidate_padding_x, RabbitI18n.Text("appearance.padding_x"), 0, 500),
             "candidate_padding_y", this.ReadNumber(
@@ -730,6 +745,24 @@ class RabbitAppearanceSettingsPage {
             "border_width", this.ReadNumber(owner.appearance_border_width, RabbitI18n.Text("appearance.border"), 0, 500),
             "corner_radius", this.ReadNumber(owner.appearance_corner_radius, RabbitI18n.Text("appearance.corner"), 0, 500),
             "round_corner", this.ReadNumber(owner.appearance_round_corner, RabbitI18n.Text("appearance.round_corner"), 0, 500),
+            "preedit_border_width", this.ReadOptionalNumber(
+                owner.appearance_preedit_border_width,
+                RabbitI18n.Text("appearance.preedit_border_width"),
+                0,
+                500
+            ),
+            "preedit_corner_radius", this.ReadOptionalNumber(
+                owner.appearance_preedit_corner_radius,
+                RabbitI18n.Text("appearance.preedit_corner_radius"),
+                0,
+                500
+            ),
+            "preedit_round_corner", this.ReadOptionalNumber(
+                owner.appearance_preedit_round_corner,
+                RabbitI18n.Text("appearance.preedit_round_corner"),
+                0,
+                500
+            ),
             "min_width", this.ReadNumber(owner.appearance_min_width, RabbitI18n.Text("appearance.min_width"), 0, 2000),
             "min_height", this.ReadNumber(owner.appearance_min_height, RabbitI18n.Text("appearance.min_height"), 0, 2000),
             "flow_rows", this.ReadNumber(owner.appearance_flow_rows, RabbitI18n.Text("appearance.pages"), 1, 9),
@@ -763,6 +796,10 @@ class RabbitAppearanceSettingsPage {
             throw Error(RabbitI18n.Text("messages.number_range", Map("name", name, "minimum", minimum, "maximum", maximum)))
         }
         return Integer(value)
+    }
+
+    ReadOptionalNumber(ctrl, name, minimum, maximum) {
+        return Trim(ctrl.Value) = "" ? "" : this.ReadNumber(ctrl, name, minimum, maximum)
     }
 
     FindPreset(color_scheme_id) {

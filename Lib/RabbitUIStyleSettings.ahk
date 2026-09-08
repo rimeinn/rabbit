@@ -246,8 +246,13 @@ class UIStyleSettings {
             "shadow_offset_y",
             "corner_radius",
             "round_corner",
+            "preedit_border_width",
+            "preedit_corner_radius",
+            "preedit_round_corner",
             "margin_x",
             "margin_y",
+            "preedit_margin_x",
+            "preedit_margin_y",
             "candidate_padding_x",
             "candidate_padding_y",
             "candidate_spacing",
@@ -298,8 +303,13 @@ class UIStyleSettings {
             "shadow_offset_y", "style/layout/shadow_offset_y",
             "corner_radius", "style/layout/corner_radius",
             "round_corner", "style/layout/round_corner",
+            "preedit_border_width", "style/layout/preedit_border_width",
+            "preedit_corner_radius", "style/layout/preedit_corner_radius",
+            "preedit_round_corner", "style/layout/preedit_round_corner",
             "margin_x", "style/layout/margin_x",
             "margin_y", "style/layout/margin_y",
+            "preedit_margin_x", "style/layout/preedit_margin_x",
+            "preedit_margin_y", "style/layout/preedit_margin_y",
             "candidate_padding_x", "style/layout/candidate_padding_x",
             "candidate_padding_y", "style/layout/candidate_padding_y",
             "candidate_spacing", "style/layout/candidate_spacing",
@@ -308,9 +318,15 @@ class UIStyleSettings {
             "flow_rows", "style/layout/flow_rows",
             "floating_preedit_min_height", "style/floating_preedit_min_height"
         ) {
-            if this.style_values.Has(name)
-                && !this.api.customize_int(this.settings, key, this.style_values[name]) {
-                return false
+            if this.style_values.Has(name) {
+                if this.style_values[name] = "" {
+                    if !RegExMatch(name, "^preedit_")
+                        || !this.api.customize_item(this.settings, key, 0) {
+                        return false
+                    }
+                } else if !this.api.customize_int(this.settings, key, this.style_values[name]) {
+                    return false
+                }
             }
         }
         for name, key in Map(

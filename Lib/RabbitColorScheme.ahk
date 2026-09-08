@@ -23,6 +23,7 @@ class RabbitColorScheme {
     static EDITABLE_COLOR_FIELDS => [
         { key: "back_color", label: RabbitI18n.Text("appearance.window_background") },
         { key: "border_color", label: RabbitI18n.Text("appearance.window_border") },
+        { key: "preedit_border_color", label: RabbitI18n.Text("appearance.preedit_border") },
         { key: "text_color", label: RabbitI18n.Text("appearance.preedit_text") },
         { key: "preedit_back_color", label: RabbitI18n.Text("appearance.preedit_background") },
         { key: "hilited_text_color", label: RabbitI18n.Text("appearance.highlight_preedit_text") },
