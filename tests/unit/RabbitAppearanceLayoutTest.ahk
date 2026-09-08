@@ -3,6 +3,40 @@
 #Include ..\..\Lib\RabbitSettingsWindow.ahk
 
 RunTest("appearance groups contain their localized controls", TestAppearanceGroupBounds)
+RunTest("floating preedit controls follow the enable switch", TestFloatingPreeditControlState)
+
+TestFloatingPreeditControlState() {
+    local window := RabbitSettingsWindow(0, true), name, enabled, index
+    local names := ["floating_opacity", "floating_height", "preedit_margin_x", "preedit_margin_y",
+        "preedit_border_width", "preedit_corner_radius", "preedit_round_corner"]
+    try {
+        window.appearance_tabs.Choose(4)
+        window.OnAppearanceTabChanged()
+        for index, name in names {
+            window.%"appearance_" . name%.Value := index = 3 ? "" : index + 10
+        }
+        for enabled in [true, false, true] {
+            window.appearance_floating_preedit.Value := enabled
+            window.appearance_page.UpdateConditionalControls()
+            window.appearance_tabs.Choose(2)
+            window.OnAppearanceTabChanged()
+            AssertTrue(window.appearance_preedit_font.Enabled, "Shared preedit font was disabled.")
+            window.appearance_tabs.Choose(4)
+            window.OnAppearanceTabChanged()
+            AssertTrue(window.appearance_floating_preedit.Enabled, "The enable switch disabled itself.")
+            for index, name in names {
+                AssertEqual(enabled, window.%"appearance_" . name%.Enabled, "Wrong input state: " . name)
+                AssertEqual(enabled, window.%"appearance_" . name . "_label"%.Enabled,
+                    "Wrong label state: " . name)
+                AssertEqual(index = 3 ? "" : index + 10, window.%"appearance_" . name%.Value,
+                    "Toggling floating preedit changed a stored value: " . name)
+            }
+            AssertEqual(enabled, window.appearance_preedit_hint.Enabled, "Wrong fallback hint state.")
+        }
+    } finally {
+        window.Dispose()
+    }
+}
 
 TestAppearanceGroupBounds() {
     local locale, window := 0, dialog := 0, field, controls, group, name, measure

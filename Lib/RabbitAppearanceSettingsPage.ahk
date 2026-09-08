@@ -687,8 +687,13 @@ class RabbitAppearanceSettingsPage {
         owner.appearance_min_width.Enabled := stacked
         owner.appearance_min_height_label.Enabled := vertical
         owner.appearance_min_height.Enabled := vertical
-        owner.appearance_floating_opacity.Enabled := floating
-        owner.appearance_floating_height.Enabled := floating
+        local name
+        for name in ["floating_opacity", "floating_height", "preedit_margin_x", "preedit_margin_y",
+            "preedit_border_width", "preedit_corner_radius", "preedit_round_corner"] {
+            owner.%"appearance_" . name%.Enabled := floating
+            owner.%"appearance_" . name . "_label"%.Enabled := floating
+        }
+        owner.appearance_preedit_hint.Enabled := floating
     }
 
     MarkDirty() {
