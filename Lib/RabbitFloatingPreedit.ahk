@@ -98,10 +98,12 @@ class RabbitFloatingPreedit {
         this.highlighted_text_color := style.hilited_text_color
         this.background_color := style.preedit_back_color
         this.highlighted_background_color := style.floating_preedit_hilited_back_color
-        this.border_width := style.border_width
-        this.border_color := style.border_color
-        this.corner_radius := style.corner_radius
-        this.highlighted_corner_radius := style.round_corner
+        this.border_width := style.preedit_border_width
+        this.border_color := style.preedit_border_color
+        this.corner_radius := style.preedit_corner_radius
+        this.highlighted_corner_radius := style.preedit_round_corner
+        this.margin_x := style.preedit_margin_x
+        this.margin_y := style.preedit_margin_y
         this.opacity := Round(style.floating_preedit_opacity * 255)
         this.min_height := style.floating_preedit_min_height
     }
@@ -117,9 +119,12 @@ class RabbitFloatingPreedit {
         this.box_height := Max(caret_h, this.min_height)
         this.draw_border_width := Min(this.border_width, Floor(this.box_height / 4))
         this.draw_corner_radius := Min(this.corner_radius, this.box_height / 4)
-        this.content_x := this.draw_border_width
-        this.content_y := this.draw_border_width
-        this.content_height := Max(1, this.box_height - this.draw_border_width * 2)
+        this.content_x := this.draw_border_width + this.margin_x
+        this.content_y := this.draw_border_width + this.margin_y
+        this.content_height := Max(
+            1,
+            this.box_height - this.draw_border_width * 2 - this.margin_y * 2
+        )
         calibration_metrics := this.d2d.GetMetrics(
             RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT,
             this.font_face,
@@ -168,8 +173,8 @@ class RabbitFloatingPreedit {
             w: selected_width,
             h: selected_height
         } : 0
-        this.box_width := Max(1, Ceil(x) + this.draw_border_width)
-        this.content_width := this.box_width - this.draw_border_width * 2
+        this.box_width := Max(1, Ceil(x) + this.draw_border_width + this.margin_x)
+        this.content_width := this.box_width - this.draw_border_width * 2 - this.margin_x * 2
         this.draw_highlighted_corner_radius := Min(
             this.highlighted_corner_radius,
             selected_height ? selected_height / 4 : 0

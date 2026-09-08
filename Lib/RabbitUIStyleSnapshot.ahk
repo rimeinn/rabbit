@@ -21,7 +21,7 @@ class RabbitUIStyleSnapshot {
     static MAX_SHADOW_OFFSET := 128
 
     __New(values := 0, overrides := 0) {
-        local key, limit, value
+        local key, limit, value, explicit
         ; Copy supported scalar values so published snapshots do not retain mutable input containers.
         this.use_dark := this.GetValue(overrides, "use_dark", this.GetValue(values, "use_dark", false))
         this.font_face := this.GetValue(
@@ -43,6 +43,9 @@ class RabbitUIStyleSnapshot {
         this.label_format := this.GetValue(overrides, "label_format", this.GetValue(values, "label_format", "{}. "))
 
         this.border_width := this.GetValue(overrides, "border_width", this.GetValue(values, "border_width", 2))
+        this.preedit_border_width := this.ResolveFallbackValue(
+            overrides, values, "preedit_border_width", this.border_width, &explicit)
+        this.preedit_border_width_explicit := explicit
         for key, limit in Map("shadow_radius", RabbitUIStyleSnapshot.MAX_SHADOW_RADIUS,
             "shadow_offset_x", RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET, "shadow_offset_y", RabbitUIStyleSnapshot.MAX_SHADOW_OFFSET) {
             value := this.GetValue(overrides, key, this.GetValue(values, key, 0))
@@ -54,8 +57,20 @@ class RabbitUIStyleSnapshot {
         }
         this.corner_radius := this.GetValue(overrides, "corner_radius", this.GetValue(values, "corner_radius", 6))
         this.round_corner := this.GetValue(overrides, "round_corner", this.GetValue(values, "round_corner", 4))
+        this.preedit_corner_radius := this.ResolveFallbackValue(
+            overrides, values, "preedit_corner_radius", this.corner_radius, &explicit)
+        this.preedit_corner_radius_explicit := explicit
+        this.preedit_round_corner := this.ResolveFallbackValue(
+            overrides, values, "preedit_round_corner", this.round_corner, &explicit)
+        this.preedit_round_corner_explicit := explicit
         this.margin_x := this.GetValue(overrides, "margin_x", this.GetValue(values, "margin_x", 6))
         this.margin_y := this.GetValue(overrides, "margin_y", this.GetValue(values, "margin_y", 6))
+        this.preedit_margin_x := this.ResolveFallbackValue(
+            overrides, values, "preedit_margin_x", this.margin_x, &explicit)
+        this.preedit_margin_x_explicit := explicit
+        this.preedit_margin_y := this.ResolveFallbackValue(
+            overrides, values, "preedit_margin_y", this.margin_y, &explicit)
+        this.preedit_margin_y_explicit := explicit
         this.candidate_padding_x := this.GetValue(
             overrides, "candidate_padding_x", this.GetValue(values, "candidate_padding_x", 0))
         this.candidate_padding_y := this.GetValue(
@@ -90,6 +105,9 @@ class RabbitUIStyleSnapshot {
 
         this.border_color := this.GetValue(
             overrides, "border_color", this.GetValue(values, "border_color", 0xffe0e0e0))
+        this.preedit_border_color := this.ResolveFallbackValue(
+            overrides, values, "preedit_border_color", this.border_color, &explicit)
+        this.preedit_border_color_explicit := explicit
         this.text_color := this.GetValue(
             overrides, "text_color", this.GetValue(values, "text_color", 0xff000000))
         this.back_color := this.GetValue(
@@ -146,7 +164,8 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, bw, cr, r, mx, my, candidate_padding_x, candidate_padding_y, candidate_spacing
+        local fmt, bw, preedit_bw, cr, preedit_cr, r, preedit_r, mx, my
+        local preedit_mx, preedit_my, candidate_padding_x, candidate_padding_y, candidate_spacing
         local w, h, vertical_text_left_to_right, floating_preedit
         local floating_preedit_opacity
         local floating_preedit_min_height
@@ -195,17 +214,37 @@ class RabbitUIStyleSnapshot {
         if rime_api.config_test_get_int(config, "style/layout/border_width", &bw) && bw >= 0 {
             values["border_width"] := bw
         }
+        if rime_api.config_test_get_int(config, "style/layout/preedit_border_width", &preedit_bw)
+            && preedit_bw >= 0 {
+            values["preedit_border_width"] := preedit_bw
+        }
         if rime_api.config_test_get_int(config, "style/layout/corner_radius", &cr) && cr >= 0 {
             values["corner_radius"] := cr
+        }
+        if rime_api.config_test_get_int(config, "style/layout/preedit_corner_radius", &preedit_cr)
+            && preedit_cr >= 0 {
+            values["preedit_corner_radius"] := preedit_cr
         }
         if rime_api.config_test_get_int(config, "style/layout/round_corner", &r) && r >= 0 {
             values["round_corner"] := r
         }
+        if rime_api.config_test_get_int(config, "style/layout/preedit_round_corner", &preedit_r)
+            && preedit_r >= 0 {
+            values["preedit_round_corner"] := preedit_r
+        }
         if rime_api.config_test_get_int(config, "style/layout/margin_x", &mx) && mx >= 0 {
             values["margin_x"] := mx
         }
+        if rime_api.config_test_get_int(config, "style/layout/preedit_margin_x", &preedit_mx)
+            && preedit_mx >= 0 {
+            values["preedit_margin_x"] := preedit_mx
+        }
         if rime_api.config_test_get_int(config, "style/layout/margin_y", &my) && my >= 0 {
             values["margin_y"] := my
+        }
+        if rime_api.config_test_get_int(config, "style/layout/preedit_margin_y", &preedit_my)
+            && preedit_my >= 0 {
+            values["preedit_margin_y"] := preedit_my
         }
         for key in ["shadow_radius", "shadow_offset_x", "shadow_offset_y"] {
             if rime_api.config_test_get_int(config, "style/layout/" . key, &shadow_value) {
@@ -297,7 +336,7 @@ class RabbitUIStyleSnapshot {
     }
 
     static ApplyColorScheme(rime_api, config, color_scheme, values) {
-        local cfmt
+        local cfmt, preedit_border_color
         local prefix := "preset_color_schemes/" . color_scheme
         local fmt := "argb" ; different from Weasel
         if (cfmt := rime_api.config_get_string(config, prefix . "/color_format")) {
@@ -308,6 +347,17 @@ class RabbitUIStyleSnapshot {
 
         values["border_color"] := this.GetColor(
             rime_api, config, prefix . "/border_color", fmt, 0xffe0e0e0)
+        if values.Has("preedit_border_color") {
+            values.Delete("preedit_border_color")
+        }
+        if rime_api.config_test_get_string(
+            config,
+            prefix . "/preedit_border_color",
+            &preedit_border_color
+        ) && preedit_border_color != "" {
+            values["preedit_border_color"] := this.GetColor(
+                rime_api, config, prefix . "/preedit_border_color", fmt, values["border_color"])
+        }
         local key
         for key in ["shadow_color", "hilited_shadow_color", "hilited_candidate_shadow_color", "candidate_shadow_color"] {
             values[key] := this.GetColor(rime_api, config, prefix . "/" . key, fmt, 0x00000000)
@@ -482,5 +532,59 @@ class RabbitUIStyleSnapshot {
             return values.Has(name) ? values[name] : fallback
         }
         return HasProp(values, name) ? values.%name% : fallback
+    }
+
+    GetFallbackValue(values, name, fallback) {
+        local value
+        if !values {
+            return fallback
+        }
+        if values is Map {
+            if !values.Has(name) {
+                return fallback
+            }
+            value := values[name]
+        } else {
+            if !HasProp(values, name) {
+                return fallback
+            }
+            value := values.%name%
+        }
+        return value is String && Trim(value) = "" ? fallback : value
+    }
+
+    ResolveFallbackValue(overrides, values, name, fallback, &explicit) {
+        if this.HasValue(overrides, name) {
+            explicit := !this.IsEmptyValue(this.GetValue(overrides, name, ""))
+            return this.GetFallbackValue(overrides, name, fallback)
+        }
+        explicit := this.IsExplicitValue(values, name)
+        return explicit ? this.GetFallbackValue(values, name, fallback) : fallback
+    }
+
+    IsExplicitValue(values, name) {
+        local marker
+        if !values {
+            return false
+        }
+        marker := name . "_explicit"
+        if values is Map {
+            return values.Has(name) && !this.IsEmptyValue(values[name])
+        }
+        if HasProp(values, marker) {
+            return values.%marker%
+        }
+        return HasProp(values, name) && !this.IsEmptyValue(values.%name%)
+    }
+
+    HasValue(values, name) {
+        if !values {
+            return false
+        }
+        return values is Map ? values.Has(name) : HasProp(values, name)
+    }
+
+    IsEmptyValue(value) {
+        return value is String && Trim(value) = ""
     }
 }

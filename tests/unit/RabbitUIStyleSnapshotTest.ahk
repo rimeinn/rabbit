@@ -25,6 +25,7 @@ RunTest("style preview snapshot is independent", TestStylePreviewSnapshotIndepen
 RunTest("style snapshot blends transparent colors safely", TestStyleSnapshotBlendsTransparentColorsSafely.Bind())
 RunTest("style snapshot loads transparent highlights", TestStyleSnapshotLoadsTransparentHighlights.Bind())
 RunTest("style snapshot reloads shadows and clears missing dark colors", TestStyleSnapshotShadows)
+RunTest("style snapshot falls back independent preedit layout", TestStyleSnapshotPreeditFallback)
 
 TestStyleSnapshotShadows() {
     local format, color, values, style, dark
@@ -96,8 +97,13 @@ TestStyleSnapshotParsing() {
     AssertEqual("Configured Preedit Font", light_style.preedit_font_face, "The preedit font was not parsed.")
     AssertEqual(18, light_style.font_point, "The active font size was not parsed.")
     AssertEqual(5, light_style.border_width, "The active border width was not parsed.")
+    AssertEqual(3, light_style.preedit_border_width, "The preedit border width was not parsed.")
     AssertEqual(9, light_style.margin_x, "The active horizontal margin was not parsed.")
     AssertEqual(11, light_style.margin_y, "The active vertical margin was not parsed.")
+    AssertEqual(2, light_style.preedit_margin_x, "The preedit horizontal margin was not parsed.")
+    AssertEqual(4, light_style.preedit_margin_y, "The preedit vertical margin was not parsed.")
+    AssertEqual(4, light_style.preedit_corner_radius, "The preedit corner radius was not parsed.")
+    AssertEqual(2, light_style.preedit_round_corner, "The preedit round corner was not parsed.")
     AssertEqual(3, light_style.candidate_padding_x, "The horizontal candidate padding was not parsed.")
     AssertEqual(4, light_style.candidate_padding_y, "The vertical candidate padding was not parsed.")
     AssertEqual(7, light_style.candidate_spacing, "The candidate spacing was not parsed.")
@@ -112,6 +118,7 @@ TestStyleSnapshotParsing() {
     AssertEqual("center", light_style.align_type, "Candidate alignment was not parsed.")
     AssertEqual(0xff112233, light_style.text_color, "The active color scheme was not parsed.")
     AssertEqual(0xff778899, light_style.preedit_back_color, "The preedit background was not parsed.")
+    AssertEqual(0xff998877, light_style.preedit_border_color, "The preedit border color was not parsed.")
     AssertEqual(
         0xff445566,
         light_style.hilited_back_color,
@@ -134,6 +141,11 @@ TestStyleSnapshotParsing() {
         0xff010203,
         dark_style.floating_preedit_hilited_back_color,
         "A missing dark preedit highlight did not inherit the dark preedit background."
+    )
+    AssertEqual(
+        0xffe0e0e0,
+        dark_style.preedit_border_color,
+        "A missing dark preedit border color did not inherit the dark border color."
     )
     AssertEqual(0xffddeeff, dark_style.text_color, "The dark color scheme was not parsed.")
     AssertEqual(true, dark_style.use_dark, "The dark snapshot was not marked as dark.")
@@ -186,6 +198,11 @@ CreateStyleConfigValues() {
         "style/layout/candidate_padding_y", 4,
         "style/layout/candidate_spacing", 7,
         "style/layout/border_width", 5,
+        "style/layout/preedit_border_width", 3,
+        "style/layout/preedit_corner_radius", 4,
+        "style/layout/preedit_round_corner", 2,
+        "style/layout/preedit_margin_x", 2,
+        "style/layout/preedit_margin_y", 4,
         "style/layout/min_width", 180,
         "style/layout/min_height", 240,
         "style/layout/type", "flow",
@@ -200,9 +217,60 @@ CreateStyleConfigValues() {
         "preset_color_schemes/light/text_color", "0x112233",
         "preset_color_schemes/light/back_color", "0x445566",
         "preset_color_schemes/light/preedit_back_color", "0x778899",
+        "preset_color_schemes/light/preedit_border_color", "0x998877",
         "preset_color_schemes/dark/text_color", "0xddeeff",
         "preset_color_schemes/dark/back_color", "0x010203"
     )
+}
+
+TestStyleSnapshotPreeditFallback() {
+    local style := RabbitUIStyleSnapshot(Map(
+        "border_width", 7,
+        "corner_radius", 9,
+        "round_corner", 5,
+        "margin_x", 8,
+        "margin_y", 10,
+        "border_color", 0xff123456
+    ))
+    AssertEqual(7, style.preedit_border_width, "A missing preedit border width did not follow border width.")
+    AssertEqual(9, style.preedit_corner_radius, "A missing preedit corner radius did not follow corner radius.")
+    AssertEqual(5, style.preedit_round_corner, "A missing preedit round corner did not follow round corner.")
+    AssertEqual(8, style.preedit_margin_x, "A missing preedit horizontal margin did not follow margin_x.")
+    AssertEqual(10, style.preedit_margin_y, "A missing preedit vertical margin did not follow margin_y.")
+    AssertEqual(0xff123456, style.preedit_border_color,
+        "A missing preedit border color did not follow border color.")
+
+    local updated := style.With(Map(
+        "border_width", 11,
+        "corner_radius", 13,
+        "round_corner", 7,
+        "margin_x", 12,
+        "margin_y", 14,
+        "border_color", 0xffabcdef
+    ))
+    AssertEqual(11, updated.preedit_border_width, "A fallback preedit border width stopped following border_width.")
+    AssertEqual(13, updated.preedit_corner_radius, "A fallback preedit corner radius stopped following corner_radius.")
+    AssertEqual(7, updated.preedit_round_corner, "A fallback preedit round corner stopped following round_corner.")
+    AssertEqual(12, updated.preedit_margin_x, "A fallback preedit horizontal margin stopped following margin_x.")
+    AssertEqual(14, updated.preedit_margin_y, "A fallback preedit vertical margin stopped following margin_y.")
+    AssertEqual(0xffabcdef, updated.preedit_border_color,
+        "A fallback preedit border color stopped following border_color.")
+
+    local cleared := style.With(Map(
+        "preedit_border_width", "",
+        "preedit_corner_radius", "",
+        "preedit_round_corner", "",
+        "preedit_margin_x", "",
+        "preedit_margin_y", "",
+        "preedit_border_color", ""
+    ))
+    AssertEqual(7, cleared.preedit_border_width, "An empty preedit border width did not follow border width.")
+    AssertEqual(9, cleared.preedit_corner_radius, "An empty preedit corner radius did not follow corner radius.")
+    AssertEqual(5, cleared.preedit_round_corner, "An empty preedit round corner did not follow round corner.")
+    AssertEqual(8, cleared.preedit_margin_x, "An empty preedit horizontal margin did not follow margin_x.")
+    AssertEqual(10, cleared.preedit_margin_y, "An empty preedit vertical margin did not follow margin_y.")
+    AssertEqual(0xff123456, cleared.preedit_border_color,
+        "An empty preedit border color did not follow border color.")
 }
 
 class RabbitUIStyleRimeProbe {

@@ -20,7 +20,7 @@
 #Include ..\..\Lib\RabbitCandidateBoxFactory.ahk
 
 candidate_context := CreateCandidateContext()
-candidate_style := RabbitUIStyleSnapshot()
+candidate_style := RabbitUIStyleSnapshot(0, Map("preedit_margin_x", 0, "preedit_margin_y", 0))
 candidate_golden := LoadCandidateBoxGolden()
 
 if A_Args.Length {
@@ -106,6 +106,7 @@ RunTest(
 RunTest("horizontal preedit text stays unconstrained", TestHorizontalPreeditTextDraw.Bind(candidate_style))
 RunTest("modern preedit uses its independent font", TestModernPreeditFont.Bind(candidate_style))
 RunTest("floating preedit uses its independent style", TestFloatingPreeditStyle.Bind(candidate_style))
+RunTest("floating preedit uses independent frame geometry", TestFloatingPreeditFrameStyle.Bind(candidate_style))
 RunTest(
     "legacy candidate lifecycle",
     TestBackendLifecycle.Bind(
@@ -1280,9 +1281,9 @@ TestFloatingPreeditCornerRadius(style) {
     local candidate_box := CandidateBox(style.With(Map(
         "floating_preedit", true,
         "floating_preedit_min_height", 0,
-        "corner_radius", 10,
-        "round_corner", 8,
-        "border_width", 4
+        "preedit_corner_radius", 10,
+        "preedit_round_corner", 8,
+        "preedit_border_width", 4
     )))
     local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
     local width, height
@@ -1519,6 +1520,49 @@ TestFloatingPreeditStyle(style) {
         )
         AssertEqual(style.back_color, candidate_box.backgroundColor, "Candidate background used preedit color.")
         AssertEqual(style.hilited_back_color, candidate_box.hlBgColor, "Candidate highlight used preedit color.")
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
+TestFloatingPreeditFrameStyle(style) {
+    local configured_style := style.With(Map(
+        "floating_preedit", true,
+        "preedit_border_width", 1,
+        "preedit_border_color", 0xff123456,
+        "preedit_corner_radius", 4,
+        "preedit_round_corner", 2,
+        "preedit_margin_x", 3,
+        "preedit_margin_y", 2
+    ))
+    local candidate_box := CandidateBox(configured_style, RabbitTextMetricsProbe)
+    local context := CreateCandidateContext()
+    context.composition.sel_start := 1
+    context.composition.sel_end := 3
+    local presentation := RabbitCandidatePresentation(context, "{}")
+    local width, height
+
+    try {
+        candidate_box.BuildFloatingPresentation(presentation, 100, 200, 2, 24, &width, &height)
+        AssertEqual(1, candidate_box.floating_preedit.draw_border_width,
+            "Floating preedit did not use its border width.")
+        AssertEqual(0xff123456, candidate_box.floating_preedit.border_color,
+            "Floating preedit did not use its border color.")
+        AssertEqual(4, candidate_box.floating_preedit.draw_corner_radius,
+            "Floating preedit did not use its outer corner radius.")
+        AssertEqual(2, candidate_box.floating_preedit.draw_highlighted_corner_radius,
+            "Floating preedit did not use its highlighted corner radius.")
+        AssertEqual(4, candidate_box.floating_preedit.content_x,
+            "Floating preedit did not apply its horizontal margin.")
+        AssertEqual(3, candidate_box.floating_preedit.content_y,
+            "Floating preedit did not apply its vertical margin.")
+        AssertEqual(18, candidate_box.floating_preedit.content_height,
+            "Floating preedit did not reserve its vertical margin.")
+        AssertEqual(
+            candidate_box.floating_preedit.box_width - 2 - 6,
+            candidate_box.floating_preedit.content_width,
+            "Floating preedit did not reserve its horizontal margin."
+        )
     } finally {
         candidate_box.Dispose()
     }
