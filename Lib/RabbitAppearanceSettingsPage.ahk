@@ -868,7 +868,7 @@ class RabbitAppearanceSettingsPage {
 
     ApplySettings() {
         local owner := this.owner
-        local deploy_result, values
+        local deploy_result, values, uses_parent_lock := false
         if !this.settings || !this.dirty {
             return false
         }
@@ -879,7 +879,14 @@ class RabbitAppearanceSettingsPage {
             owner.appearance_status.Value := err.Message
             return false
         }
-        owner.Opt("+Disabled")
+        if HasMethod(owner, "TryBeginParentOperation") {
+            if !owner.TryBeginParentOperation() {
+                return false
+            }
+            uses_parent_lock := true
+        } else {
+            owner.Opt("+Disabled")
+        }
         owner.appearance_status.Value := RabbitI18n.Text("controls.saving")
         try {
             if !this.settings.Save() {
@@ -901,7 +908,11 @@ class RabbitAppearanceSettingsPage {
             owner.appearance_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
             return false
         } finally {
-            owner.Opt("-Disabled")
+            if uses_parent_lock {
+                owner.EndParentOperation()
+            } else {
+                owner.Opt("-Disabled")
+            }
         }
     }
 

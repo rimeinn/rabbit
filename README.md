@@ -83,6 +83,7 @@ rabbit/
 |  ├─ librime-ahk       Rime 引擎的 AutoHotkey 绑定，编译后可删除
 |  |  ├─ rime.dll       Rime 引擎的动态库，若本机已安装小狼毫，可删除；若没有安装小狼毫，需要 a. 保留在此，或 b. 放到主目录，或 c. 放到环境变量 "LIBRIME_LIB_DIR" 指定的目录
 |  |  ├─ ...            librime-ahk 库的其他脚本，编译后可删除
+|  ├─ RimeDepot         Rime 方案下载与安装库，编译后可删除
 |  ├─ ...               其他依赖，编译后可删除
 ├─ plum/                若使用东风破，将被安装到此路径
 ├─ Rime/                Rime 用户文件夹，运行后会自动生成；可修改注册表 "HKEY_CURRENT_USER\Software\Rime\Rabbit" 中的 "RimeUserDir" 来指定不同的用户文件夹
@@ -103,6 +104,7 @@ rabbit/
 
 - [librime](https://github.com/rime/librime)
 - [librime-ahk](https://github.com/rimeinn/librime-ahk)
+- [RimeDepot](https://github.com/rimeinn/RimeDepot)
 - [AHK-Direct2D](https://github.com/rawbx/AHK-Direct2D)
 - [OpenCC](https://github.com/BYVoid/OpenCC)
 - [GetCaretPos](https://github.com/Descolada/AHK-v2-libraries)

@@ -194,6 +194,7 @@ jobs:
             Lib/librime-ahk/LICENSE
             Lib/GetCaretPosEx/*.ahk
             Lib/GetCaretPosEx/LICENSE.txt
+            Lib/RimeDepot/**
             Lib/*.ahk
             Lib/*.ico
             Rabbit.exe
@@ -219,6 +220,7 @@ jobs:
             Lib/librime-ahk/LICENSE
             Lib/GetCaretPosEx/*.ahk
             Lib/GetCaretPosEx/LICENSE.txt
+            Lib/RimeDepot/**
             Lib/*.ahk
             Lib/*.ico
             Rabbit.exe
@@ -229,6 +231,41 @@ jobs:
             locales/*.ini
             docs/images/candidate-layouts/*.png
             rime-install.bat
+
+  test-rabbit:
+    name: Test Rabbit
+    runs-on: windows-latest
+    needs: [ prepare-autohotkey-binaries ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+
+      - name: Download AutoHotkey
+        uses: actions/download-artifact@v8
+        with:
+          name: AutoHotkey
+          path: deps/AutoHotkey
+
+      - name: Run unit tests
+        shell: pwsh
+        run: |
+          $ahk = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\AutoHotkey64.exe"
+          $tests = @(
+            "tests\unit\RabbitTests.ahk",
+            "tests\unit\RabbitRimeDepotSettingsTest.ahk",
+            "tests\unit\RabbitRimeDepotWindowTest.ahk",
+            "tests\unit\RabbitSettingsRimeDepotTest.ahk",
+            "Lib\RimeDepot\tests\RimeDepotCoreProbe.ahk",
+            "Lib\RimeDepot\tests\integration\RimeDepotGuiSmokeTest.ahk"
+          )
+          foreach ($test in $tests) {
+            & $ahk /ErrorStdOut $test
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
 
   build-rabbit-compiled:
     strategy:

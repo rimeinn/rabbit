@@ -26,6 +26,7 @@
 #Include RabbitUIStyleSettings.ahk
 #Include RabbitUIStyleSettingsDialog.ahk
 #Include RabbitI18n.ahk
+#Include RabbitRimeDepotSettings.ahk
 
 class RabbitDeployerWorkflow {
     __New(rime_api) {
@@ -48,6 +49,14 @@ class RabbitDeployerWorkflow {
 
     CreateLevers() {
         return RimeLeversApi(this.rime)
+    }
+
+    CreateRimeDepotSettings() {
+        return RabbitRimeDepotSettings.Load(this.rime)
+    }
+
+    SaveRimeDepotSettings(values) {
+        return RabbitRimeDepotSettings.Save(this.rime, values)
     }
 
     CreateSwitcherSettingsModel() {

@@ -3,8 +3,16 @@
 
 config_version: "0.1"
 
-# UI language: auto, zh-CN, en-US, zh-HK, or zh-TW; applied after deployment.
+# 界面语言：auto、zh-CN、en-US、zh-HK 或 zh-TW；重新部署后生效
 language: auto
+
+# 方案下载器的来源设置；用户自定义内容应使用下列斜线路径，
+# 写入 rabbit.custom.yaml 的 patch 节点
+rime_depot:
+  rppi_url: https://raw.githubusercontent.com/rime/rppi/HEAD/index.json
+  proxy: ""
+  use_git: false
+  git_path: ""
 
 # 暂停或恢复玉兔毫的快捷键；设为 null 表示不启用
 # 示例：Control+Shift+F12
@@ -661,3 +669,27 @@ preset_color_schemes:
     hilited_candidate_back_color: 0xd8bf00
     comment_text_color: 0x808080
     hilited_comment_text_color: 0x444444
+
+  tokyo_night:
+    name: "东京夜色／Tokyo Night"
+    author: "amorphobia <me@xuesong.eu.org>, based on Enkia's Tokyo Night color theme"
+    color_format: argb
+    back_color: 0xff16161e
+    border_color: 0xff363b54
+    candidate_back_color: 0xff16161e
+    candidate_shadow_color: 0x00000000
+    candidate_text_color: 0xffacb0d0
+    comment_text_color: 0xff787c99
+    hilited_back_color: 0xff16161e
+    hilited_candidate_back_color: 0xff363b54
+    hilited_candidate_shadow_color: 0x00000000
+    hilited_candidate_text_color: 0xff7aa2f7
+    hilited_comment_text_color: 0xffacb0d0
+    hilited_label_color: 0xffacb0d0
+    hilited_shadow_color: 0x00000000
+    hilited_text_color: 0xff7aa2f7
+    label_color: 0xff787c99
+    preedit_back_color: 0xff16161e
+    preedit_border_color: 0xff363b54
+    shadow_color: 0x50000000
+    text_color: 0xff787c99

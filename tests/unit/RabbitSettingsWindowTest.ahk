@@ -90,7 +90,7 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(532, footer_y, "The tall layout misplaced the footer status.")
 
         window.SelectPage(2)
-        AssertEqual(660, window.GetPageWindowHeight(), "The switcher page used the wrong window height.")
+        AssertEqual(700, window.GetPageWindowHeight(), "The switcher page used the wrong window height.")
         AssertTrue(window.switcher_tabs.Visible, "The switcher page did not show its tabs.")
         AssertEqual(1, window.switcher_tabs.Value, "The switcher page did not select the schema tab.")
         window.switcher_tabs.GetPos(, , , &tabs_height)

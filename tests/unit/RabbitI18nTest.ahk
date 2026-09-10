@@ -48,6 +48,12 @@ TestRabbitI18n() {
         AssertEqual("入力と動作", RabbitI18n.Text("pages.behavior"), "Japanese settings labels were not loaded.")
         AssertEqual("2 件のレコードをエクスポートしました。",
             RabbitI18n.Text("messages.exported", Map("count", 2)), "Japanese placeholder substitution failed.")
+        AssertEqual("スキーマ", RabbitI18n.Text("depot.scheme"),
+            "Japanese Depot scheme terminology did not use the established schema term.")
+        AssertTrue(!InStr(RabbitI18n.Text("depot.details"), "スキーム")
+            && !InStr(RabbitI18n.Text("depot.no_selection"), "スキーム")
+            && !InStr(RabbitI18n.Text("depot.catalog_loaded", Map("count", 1, "warnings", 0)), "スキーム"),
+            "Japanese Depot catalog/detail text still exposed the old scheme terminology.")
     } finally {
         RabbitI18n.Initialize(directory, "zh-CN")
     }

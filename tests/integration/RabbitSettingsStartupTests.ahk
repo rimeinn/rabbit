@@ -102,6 +102,16 @@ ExerciseLazySettingsPages(window) {
         AssertTrue(window.SelectPage(index), "The GUI smoke test could not open page " . index . ".")
         Sleep(20)
     }
+    AssertTrue(window.SelectPage(2), "The GUI smoke test could not reopen the input-schemes page.")
+    window.switcher_tabs.Choose(3)
+    window.OnSwitcherTabChanged()
+    AssertTrue(window.rime_depot_settings && window.rime_depot_url_edit.Visible
+        && window.rime_depot_open_button.Visible,
+        "The GUI smoke test did not reveal the lazy third downloader tab.")
+    window.switcher_tabs.Choose(1)
+    window.OnSwitcherTabChanged()
+    AssertTrue(!window.rime_depot_url_edit.Visible,
+        "The GUI smoke test left downloader controls visible on the schemes tab.")
 }
 
 MeasureTypesettingLoad(window) {
@@ -146,6 +156,10 @@ class RabbitSettingsStartupWorkflow {
     ReadCandidateLabels() {
         this.calls.Push("read_labels")
         return ["1", "2", "3", "4", "5"]
+    }
+
+    CreateRimeDepotSettings() {
+        return RabbitRimeDepotSettings()
     }
 }
 

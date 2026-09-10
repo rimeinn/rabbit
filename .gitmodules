@@ -4,3 +4,6 @@
 [submodule "plum"]
 	path = plum
 	url = https://github.com/rime/plum
+[submodule "Lib/RimeDepot"]
+	path = Lib/RimeDepot
+	url = https://github.com/rimeinn/RimeDepot.git

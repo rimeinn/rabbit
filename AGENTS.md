@@ -41,9 +41,9 @@ Release tags are part of the repository's release identity and must not be silen
 
 Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the main entry point; `RabbitDeployer.ahk` handles installation and maintenance workflows. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml` defines the bundled Rime schema, while `assets/` contains source SVG icons. `Data/` and `Rime/` are generated or runtime data and are intentionally ignored.
 
-Two directories are Git submodules: `Lib/librime-ahk` and `plum`. Avoid mixing upstream submodule changes with
-application changes. `Lib/Direct2D` and `Lib/GetCaretPosEx` are Rabbit-maintained copies of third-party modules; their
-README files record the upstream baseline and license.
+Three directories are Git submodules: `Lib/librime-ahk`, `Lib/RimeDepot`, and `plum`. Avoid mixing upstream submodule
+changes with application changes. `Lib/Direct2D` and `Lib/GetCaretPosEx` are Rabbit-maintained copies of third-party
+modules; their README files record the upstream baseline and license.
 
 Implement new candidate-window features only for the modern candidate box. The legacy candidate box needs regression protection, but does not need to support new functionality unless explicitly requested.
 

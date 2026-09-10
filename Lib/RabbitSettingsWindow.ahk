@@ -22,6 +22,8 @@
 #Include RabbitI18n.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
+#Include RabbitRimeDepotSettings.ahk
+#Include RabbitRimeDepotWindow.ahk
 #Include RabbitWindowTheme.ahk
 
 class RabbitSettingsWindow extends Gui {
@@ -32,7 +34,10 @@ class RabbitSettingsWindow extends Gui {
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 580
     static BEHAVIOR_HEIGHT := 692
-    static SWITCHER_HEIGHT := 660
+    ; Leave a padded action row below the switcher tab control.  The nested
+    ; downloader tab remains inside the existing input-schemes page so the
+    ; root navigation and its persisted page indices stay stable.
+    static SWITCHER_HEIGHT := 700
     static ABOUT_HEIGHT := 660
     static COMPACT_HEIGHT := 500
     static SWITCH_ACTION_VALUES := [
@@ -117,7 +122,8 @@ class RabbitSettingsWindow extends Gui {
         initial_page_id := "",
         installing := false,
         theme_factory := RabbitWindowThemeController,
-        load_after_show := false
+        load_after_show := false,
+        rime_depot_factory := 0
     ) {
         local appearance_layout, initial_dark_mode := false, initial_page, index, factory
         local surface_options := ""
@@ -160,12 +166,23 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_removed_options := Map()
         this.switcher_loading := false
         this.switcher_dirty := false
+        this.rime_depot_window := 0
+        this.rime_depot_settings := 0
+        this.rime_depot_loading := false
+        this.rime_depot_dirty := false
+        this.rime_depot_sync_pending := false
+        this.rime_depot_busy := false
+        this.parent_operation_busy := false
+        this.parent_operation_restore_enabled := true
         this.disposed := false
         this.selected_page := 0
         this.window_shown := false
         this.initial_page_load_pending := !!load_after_show
         this.initial_page_load_callback := this.LoadInitialPage.Bind(this)
         this.initial_dark_mode := initial_dark_mode
+        this.rime_depot_factory := rime_depot_factory
+            ? rime_depot_factory
+            : ObjBindMethod(RabbitRimeDepotWindow, "CreateForWorkflow")
 
         if initial_dark_mode {
             this.BackColor := RabbitWindowThemeController.DARK_BACKGROUND
@@ -378,7 +395,9 @@ class RabbitSettingsWindow extends Gui {
         this.page_controls_created[index] := true
         if HasProp(this, "window_theme") && this.window_theme {
             this.RegisterPageControlThemes(index)
-            this.window_theme.Apply()
+            if HasMethod(this.window_theme, "Apply") {
+                this.window_theme.Apply()
+            }
         }
         return true
     }
@@ -406,7 +425,9 @@ class RabbitSettingsWindow extends Gui {
                     this.switcher_order_help,
                     this.switcher_preview,
                     this.switcher_save_help,
-                    this.switcher_option_note
+                    this.switcher_option_note,
+                    this.rime_depot_git_path_hint,
+                    this.rime_depot_status
                 )
                 this.window_theme.RegisterSurface(this.switcher_list_header)
                 this.window_theme.RegisterSurface(
@@ -435,7 +456,8 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_tabs := this.AddTab3(
             "x230 y136 w570 h450 Hidden"
                 . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
-            [RabbitI18n.Text("controls.schemes"), RabbitI18n.Text("controls.scheme_menu")]
+            [RabbitI18n.Text("controls.schemes"), RabbitI18n.Text("controls.scheme_menu"),
+                RabbitI18n.Text("controls.more_schemes")]
         )
         this.switcher_tabs.OnEvent("Change", (*) => this.OnSwitcherTabChanged())
         this.switcher_group := this.switcher_tabs
@@ -577,8 +599,66 @@ class RabbitSettingsWindow extends Gui {
                 this.switcher_option_source_header
             )
         }
+
+        this.switcher_tabs.UseTab(3)
+        this.rime_depot_settings_group := this.AddGroupBox(
+            "x246 y174 w538 h294 Hidden",
+            RabbitI18n.Text("depot.settings")
+        )
+        this.rime_depot_url_label := this.AddText(
+            "x260 y202 w92 h24 Hidden",
+            RabbitI18n.Text("depot.rppi_url")
+        )
+        this.rime_depot_url_edit := this.AddEdit("x358 y198 w412 r1 -Multi Hidden")
+        this.rime_depot_proxy_label := this.AddText(
+            "x260 y238 w92 h24 Hidden",
+            RabbitI18n.Text("depot.proxy")
+        )
+        this.rime_depot_proxy_edit := this.AddEdit("x358 y234 w412 r1 -Multi Hidden")
+        this.rime_depot_use_git := this.AddCheckbox(
+            "x260 y270 w250 h24 Hidden",
+            RabbitI18n.Text("depot.use_git")
+        )
+        this.rime_depot_git_path_label := this.AddText(
+            "x260 y306 w58 h24 Hidden",
+            RabbitI18n.Text("depot.git_path")
+        )
+        this.rime_depot_git_path_edit := this.AddEdit("x324 y302 w354 r1 -Multi Hidden")
+        this.rime_depot_git_path_browse := this.AddButton(
+            "x688 y302 w82 h26 +0x2000 Hidden",
+            RabbitI18n.Text("depot.browse")
+        )
+        this.rime_depot_git_path_hint := this.AddText(
+            "x260 y336 w510 h22 cGray Hidden",
+            RabbitI18n.Text("depot.git_path_hint")
+        )
+        this.rime_depot_open_button := this.AddButton(
+            "x260 y374 w200 h30 +0x2000 Hidden",
+            RabbitI18n.Text("depot.open_downloader")
+        )
+        this.rime_depot_status := this.AddText("x260 y416 w510 h22 cGray Hidden", "")
+        this.rime_depot_controls := [
+            this.rime_depot_settings_group,
+            this.rime_depot_url_label,
+            this.rime_depot_url_edit,
+            this.rime_depot_proxy_label,
+            this.rime_depot_proxy_edit,
+            this.rime_depot_use_git,
+            this.rime_depot_git_path_label,
+            this.rime_depot_git_path_edit,
+            this.rime_depot_git_path_browse,
+            this.rime_depot_git_path_hint,
+            this.rime_depot_open_button,
+            this.rime_depot_status,
+        ]
+        this.rime_depot_url_edit.OnEvent("Change", (*) => this.OnRimeDepotSettingsChanged())
+        this.rime_depot_proxy_edit.OnEvent("Change", (*) => this.OnRimeDepotSettingsChanged())
+        this.rime_depot_use_git.OnEvent("Click", (*) => this.OnRimeDepotSettingsChanged())
+        this.rime_depot_git_path_edit.OnEvent("Change", (*) => this.OnRimeDepotSettingsChanged())
+        this.rime_depot_git_path_browse.OnEvent("Click", (*) => this.BrowseRimeDepotGitPath())
+        this.rime_depot_open_button.OnEvent("Click", (*) => this.OpenRimeDepot())
         this.switcher_tabs.UseTab()
-        this.switcher_status := this.AddText("x230 y590 w570 h18 Hidden", "")
+        this.switcher_status := this.AddText("x230 y628 w570 h18 Hidden", "")
     }
 
     CreateBehaviorControls() {
@@ -1340,6 +1420,9 @@ class RabbitSettingsWindow extends Gui {
             }
         } else if index = 2 {
             this.EnsureSwitcherSettings()
+            if this.switcher_tabs.Value = 3 {
+                this.EnsureRimeDepotSettings()
+            }
         } else if index = 3 {
             this.EnsureBehaviorSettings()
         } else if index = 4 {
@@ -1447,22 +1530,34 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_tabs.Visible := visible
         this.SetSwitcherTabControlsVisible(visible)
         this.switcher_status.Visible := visible
+        if visible && this.switcher_tabs.Value = 3 {
+            this.EnsureRimeDepotSettings()
+        }
     }
 
     SetSwitcherTabControlsVisible(visible) {
         local schema_visible := visible && this.switcher_tabs.Value = 1
         local menu_visible := visible && this.switcher_tabs.Value = 2
+        local depot_visible := visible && this.switcher_tabs.Value = 3
         for ctrl in this.switcher_schema_controls {
             ctrl.Visible := schema_visible && (ctrl != this.switcher_list_header || this.initial_dark_mode)
         }
         for ctrl in this.switcher_menu_controls {
             ctrl.Visible := menu_visible
         }
+        for ctrl in this.rime_depot_controls {
+            ctrl.Visible := depot_visible
+        }
+        if depot_visible {
+            this.UpdateRimeDepotGitPathState()
+        }
     }
 
     OnSwitcherTabChanged() {
         if this.switcher_tabs.Value = 2 {
             this.RefreshSwitcherOptions()
+        } else if this.switcher_tabs.Value = 3 {
+            this.EnsureRimeDepotSettings()
         }
         this.SetSwitcherTabControlsVisible(this.selected_page = 2)
     }
@@ -1680,6 +1775,12 @@ class RabbitSettingsWindow extends Gui {
     }
 
     ApplyAppearanceSettings() {
+        if this.IsRimeDepotBusy() || this.parent_operation_busy {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
+        ; RabbitAppearanceSettingsPage owns the save/deploy transaction and
+        ; acquires TryBeginParentOperation itself after validating controls.
         return this.appearance_page.ApplySettings()
     }
 
@@ -1699,7 +1800,7 @@ class RabbitSettingsWindow extends Gui {
 
     HasUnsavedSettings() {
         return this.appearance_page.dirty || this.switcher_dirty || this.behavior_dirty ||
-            this.application_dirty
+            this.application_dirty || this.rime_depot_dirty
     }
 
     PromptUnsavedSettings() {
@@ -1728,7 +1829,12 @@ class RabbitSettingsWindow extends Gui {
         local appearance_values := 0
         local behavior_values := 0
         local switcher_values := 0
+        local rime_depot_values := 0
         local deploy_result
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if this.installing {
             return this.CompleteInstallation()
         }
@@ -1768,8 +1874,21 @@ class RabbitSettingsWindow extends Gui {
                 return false
             }
         }
+        if this.rime_depot_dirty {
+            if !this.EnsureRimeDepotSettings() {
+                return false
+            }
+            try {
+                rime_depot_values := this.GetRimeDepotSettingsFromControls()
+            } catch as err {
+                this.ShowRimeDepotSettingsError(err.Message)
+                return false
+            }
+        }
 
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.footer_status.Value := RabbitI18n.Text("controls.saving_all")
         try {
             if this.appearance_page.dirty {
@@ -1803,6 +1922,10 @@ class RabbitSettingsWindow extends Gui {
                     return false
                 }
             }
+            if this.rime_depot_dirty && !this.PersistRimeDepotSettings(rime_depot_values) {
+                this.ShowRimeDepotSettingsError(RabbitI18n.Text("depot.settings_save_error"))
+                return false
+            }
 
             deploy_result := this.UpdateWorkspace()
             if deploy_result != 0 {
@@ -1828,6 +1951,13 @@ class RabbitSettingsWindow extends Gui {
                 this.application_changes := Map()
                 this.application_status.Value := RabbitI18n.Text("controls.applications_saved")
             }
+            if this.rime_depot_dirty {
+                this.AcceptRimeDepotSettings(rime_depot_values)
+                this.rime_depot_dirty := false
+                this.rime_depot_sync_pending := true
+                this.SetRimeDepotStatus(RabbitI18n.Text("depot.settings_saved"))
+            }
+            this.footer_status.Opt("cGray")
             this.footer_status.Value := RabbitI18n.Text("controls.all_saved")
             this.UpdateApplyButton()
             return true
@@ -1835,12 +1965,18 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
             return false
         } finally {
-            this.Opt("-Disabled")
+            if !this.EndParentOperation() {
+                this.SurfaceRimeDepotSyncWarning()
+            }
         }
     }
 
     CompleteInstallation() {
         local deploy_result, reloaded, values
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if !this.installing || !this.EnsureSwitcherSettings() {
             return false
         }
@@ -1855,7 +1991,9 @@ class RabbitSettingsWindow extends Gui {
             return false
         }
 
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.footer_status.Value := RabbitI18n.Text("controls.install_saving")
         try {
             if !this.switcher_model.Save(values, true) {
@@ -1887,18 +2025,19 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := RabbitI18n.Text("messages.install_error", Map("reason", err.Message))
             return false
         } finally {
-            this.Opt("-Disabled")
+            this.EndParentOperation()
         }
     }
 
     UpdateApplyButton() {
         if this.installing {
             this.apply_button.Text := RabbitI18n.Text("settings.install")
-            this.apply_button.Enabled := true
+            this.apply_button.Enabled := !this.IsRimeDepotBusy() && !this.parent_operation_busy
             return
         }
         this.apply_button.Text := RabbitI18n.Text("settings.apply")
         this.apply_button.Enabled := this.HasUnsavedSettings()
+            && !this.IsRimeDepotBusy() && !this.parent_operation_busy
     }
 
     EnsureBehaviorSettings() {
@@ -2077,7 +2216,9 @@ class RabbitSettingsWindow extends Gui {
             return false
         }
 
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.behavior_status.Value := RabbitI18n.Text("controls.saving")
         try {
             if !this.behavior_model.Save(values) {
@@ -2098,7 +2239,7 @@ class RabbitSettingsWindow extends Gui {
             this.behavior_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
             return false
         } finally {
-            this.Opt("-Disabled")
+            this.EndParentOperation()
         }
     }
 
@@ -2235,7 +2376,9 @@ class RabbitSettingsWindow extends Gui {
         if !this.application_model || !this.application_dirty {
             return false
         }
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.application_status.Value := RabbitI18n.Text("controls.saving")
         try {
             if !this.application_model.Save(this.application_changes) {
@@ -2259,7 +2402,517 @@ class RabbitSettingsWindow extends Gui {
             this.application_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
             return false
         } finally {
+            this.EndParentOperation()
+        }
+    }
+
+    EnsureRimeDepotSettings() {
+        if this.rime_depot_settings {
+            return true
+        }
+        if !this.page_controls_created.Has(2) {
+            this.EnsurePageControls(2)
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateRimeDepotSettings") {
+            this.SetRimeDepotStatus(RabbitI18n.Text("depot.unavailable"), true)
+            return false
+        }
+        try {
+            this.rime_depot_settings := this.workflow.CreateRimeDepotSettings()
+            this.rime_depot_settings := this.rime_depot_settings is RabbitRimeDepotSettings
+                ? RabbitRimeDepotSettings(this.rime_depot_settings.ToMap())
+                : RabbitRimeDepotSettings(this.rime_depot_settings)
+            this.PopulateRimeDepotSettings()
+            return true
+        } catch as err {
+            this.SetRimeDepotStatus(err.Message, true)
+            return false
+        }
+    }
+
+    PopulateRimeDepotSettings() {
+        if !this.rime_depot_settings || !HasProp(this, "rime_depot_url_edit") {
+            return false
+        }
+        this.rime_depot_loading := true
+        try {
+            this.rime_depot_url_edit.Value := this.rime_depot_settings.rppi_url
+            this.rime_depot_proxy_edit.Value := this.rime_depot_settings.proxy
+            this.rime_depot_use_git.Value := this.rime_depot_settings.use_git ? 1 : 0
+            this.rime_depot_git_path_edit.Value := this.rime_depot_settings.git_path
+            this.rime_depot_dirty := false
+            this.UpdateRimeDepotGitPathState()
+            this.UpdateRimeDepotOpenButton()
+        } finally {
+            this.rime_depot_loading := false
+        }
+        return true
+    }
+
+    GetRimeDepotSettingsFromControls() {
+        local values, rppi_url
+        if !this.EnsureRimeDepotSettings() {
+            throw Error(RabbitI18n.Text("depot.unavailable"))
+        }
+        rppi_url := Trim(this.rime_depot_url_edit.Value)
+        if rppi_url = "" {
+            throw ValueError(RabbitI18n.Text("depot.rppi_url_required"))
+        }
+        if !RegExMatch(rppi_url, "i)^https?://[^\s]+$") {
+            throw ValueError(RabbitI18n.Text("depot.rppi_url_invalid"))
+        }
+        values := RabbitRimeDepotSettings(Map(
+            "rppi_url", rppi_url,
+            "proxy", Trim(this.rime_depot_proxy_edit.Value),
+            "use_git", !!this.rime_depot_use_git.Value,
+            "git_path", Trim(this.rime_depot_git_path_edit.Value)
+        ))
+        return values
+    }
+
+    OnRimeDepotSettingsChanged(*) {
+        if this.disposed || this.rime_depot_loading {
+            return
+        }
+        this.rime_depot_dirty := this.RimeDepotSettingsDiffer()
+        this.SetRimeDepotStatus(RabbitI18n.Text(
+            this.rime_depot_dirty ? "depot.settings_dirty" : "depot.settings_saved"
+        ))
+        this.UpdateRimeDepotGitPathState()
+        this.UpdateRimeDepotOpenButton()
+        this.UpdateApplyButton()
+    }
+
+    RimeDepotSettingsDiffer() {
+        if !this.rime_depot_settings {
+            return true
+        }
+        return Trim(this.rime_depot_url_edit.Value) !== this.rime_depot_settings.rppi_url
+            || Trim(this.rime_depot_proxy_edit.Value) !== this.rime_depot_settings.proxy
+            || !!this.rime_depot_use_git.Value != !!this.rime_depot_settings.use_git
+            || Trim(this.rime_depot_git_path_edit.Value) !== this.rime_depot_settings.git_path
+    }
+
+    UpdateRimeDepotOpenButton() {
+        if !HasProp(this, "rime_depot_open_button") {
+            return false
+        }
+        this.rime_depot_open_button.Text := RabbitI18n.Text(
+            this.rime_depot_dirty ? "depot.save_and_open_downloader" : "depot.open_downloader"
+        )
+        return true
+    }
+
+    UpdateRimeDepotGitPathState() {
+        local enabled
+        if !HasProp(this, "rime_depot_git_path_edit") {
+            return false
+        }
+        enabled := !this.disposed && !this.parent_operation_busy && !this.rime_depot_busy
+            && !!this.rime_depot_use_git.Value
+        this.rime_depot_git_path_edit.Enabled := enabled
+        this.rime_depot_git_path_browse.Enabled := enabled
+        return true
+    }
+
+    BrowseRimeDepotGitPath(*) {
+        local selected
+        if this.disposed || this.parent_operation_busy || this.rime_depot_busy {
+            return false
+        }
+        try {
+            selected := FileSelect(3, A_WinDir, RabbitI18n.Text("depot.select_git"), "Executable (*.exe)")
+            if selected {
+                this.rime_depot_git_path_edit.Value := selected
+                this.OnRimeDepotSettingsChanged()
+            }
+            return true
+        } catch as err {
+            this.SetRimeDepotStatus(
+                RabbitI18n.Text("depot.browse_error", Map("reason", err.Message)),
+                true
+            )
+            return false
+        }
+    }
+
+    ShowRimeDepotSettingsError(message) {
+        this.SelectPage(2)
+        if this.switcher_tabs.Value != 3 {
+            this.switcher_tabs.Choose(3)
+            this.OnSwitcherTabChanged()
+        }
+        this.SetRimeDepotStatus(message, true)
+        return false
+    }
+
+    PersistRimeDepotSettings(values) {
+        if !this.workflow || !HasMethod(this.workflow, "SaveRimeDepotSettings") {
+            return false
+        }
+        return !!this.workflow.SaveRimeDepotSettings(values.ToMap())
+    }
+
+    AcceptRimeDepotSettings(values) {
+        this.rime_depot_settings := RabbitRimeDepotSettings(values.ToMap())
+        return this.PopulateRimeDepotSettings()
+    }
+
+    GetRimeDepotSettings() {
+        if !this.rime_depot_settings && !this.EnsureRimeDepotSettings() {
+            return 0
+        }
+        return RabbitRimeDepotSettings(this.rime_depot_settings.ToMap())
+    }
+
+    SyncRimeDepotWindowSettings() {
+        local child := this.rime_depot_window, message := ""
+        if !IsObject(child) || (HasProp(child, "disposed") && child.disposed) {
+            if child {
+                this.DisposeRimeDepotWindow()
+            }
+            return true
+        }
+        if !HasMethod(child, "SetSettings") || (HasMethod(child, "IsBusy") && child.IsBusy()) {
+            message := RabbitI18n.Text("depot.reconfigure_error")
+        } else {
+            try {
+                if child.SetSettings(this.rime_depot_settings) {
+                    return true
+                }
+                message := RabbitI18n.Text("depot.reconfigure_error")
+            } catch as err {
+                message := RabbitI18n.Text(
+                    "depot.reconfigure_error_reason",
+                    Map("reason", err.Message)
+                )
+            }
+        }
+        ; A child which rejected the accepted snapshot is stale.  Clear it
+        ; before returning so callers cannot activate it with old settings.
+        this.DisposeRimeDepotWindow()
+        this.SetRimeDepotStatus(message, true)
+        return false
+    }
+
+    DisposeRimeDepotWindow() {
+        local child := this.rime_depot_window, dispose_succeeded := true
+        this.rime_depot_window := 0
+        if IsObject(child) && HasMethod(child, "Dispose") {
+            try child.Dispose()
+            catch {
+                dispose_succeeded := false
+            }
+        }
+        ; A failed disposal must not strand the parent in the child-busy state
+        ; after the stale reference has been cleared.
+        this.SetRimeDepotBusy(false)
+        return dispose_succeeded
+    }
+
+    OpenRimeDepot(*) {
+        local values := 0, deploy_result, transaction_succeeded := false, sync_succeeded := true
+        if this.disposed || this.parent_operation_busy || this.IsRimeDepotBusy() {
+            if !this.disposed {
+                this.SetRimeDepotStatus(RabbitI18n.Text("depot.busy"), true)
+            }
+            return false
+        }
+        if !this.EnsureRimeDepotSettings() {
+            return false
+        }
+        if !this.rime_depot_dirty {
+            return this.StartRimeDepot()
+        }
+        try {
+            values := this.GetRimeDepotSettingsFromControls()
+        } catch as err {
+            return this.ShowRimeDepotSettingsError(err.Message)
+        }
+        if !this.TryBeginParentOperation() {
+            return false
+        }
+        this.footer_status.Value := RabbitI18n.Text("controls.saving")
+        try {
+            if !this.PersistRimeDepotSettings(values) {
+                this.ShowRimeDepotSettingsError(RabbitI18n.Text("depot.settings_save_error"))
+                return false
+            }
+            deploy_result := this.UpdateWorkspace()
+            if deploy_result != 0 {
+                this.footer_status.Value := RabbitI18n.Text("controls.redeploy_error")
+                return false
+            }
+            this.AcceptRimeDepotSettings(values)
+            this.rime_depot_dirty := false
+            this.rime_depot_sync_pending := true
+            this.SetRimeDepotStatus(RabbitI18n.Text("depot.settings_saved"))
+            this.footer_status.Opt("cGray")
+            this.footer_status.Value := this.HasUnsavedSettings()
+                ? RabbitI18n.Text("controls.save_hint")
+                : RabbitI18n.Text("controls.all_saved")
+            transaction_succeeded := true
+        } catch as err {
+            this.footer_status.Value := RabbitI18n.Text(
+                "messages.save_error",
+                Map("reason", err.Message)
+            )
+            return false
+        } finally {
+            sync_succeeded := this.EndParentOperation()
+        }
+        if !transaction_succeeded {
+            return false
+        }
+        ; EndParentOperation clears a child which rejected the accepted
+        ; snapshot.  A successful Open transaction must then create a fresh
+        ; child rather than activating that stale instance.
+        if !sync_succeeded && this.rime_depot_window {
+            this.DisposeRimeDepotWindow()
+        }
+        return this.StartRimeDepot()
+    }
+
+    StartRimeDepot() {
+        local window := 0, factory, window_height
+        if this.disposed || this.parent_operation_busy || this.IsRimeDepotBusy() {
+            if !this.disposed {
+                this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            }
+            return false
+        }
+        if this.rime_depot_window && (!HasProp(this.rime_depot_window, "disposed")
+            || !this.rime_depot_window.disposed) {
+            try {
+                if HasProp(this.rime_depot_window, "Hwnd") && this.rime_depot_window.Hwnd {
+                    if !WinExist("ahk_id " . this.rime_depot_window.Hwnd) {
+                        throw Error("The downloader window handle is no longer valid.")
+                    }
+                    WinActivate("ahk_id " . this.rime_depot_window.Hwnd)
+                } else if HasMethod(this.rime_depot_window, "Show") {
+                    this.rime_depot_window.Show()
+                } else {
+                    throw Error("The downloader window cannot be shown.")
+                }
+                return true
+            } catch {
+                ; Activation/display failure makes the existing instance
+                ; unusable.  Dispose it before falling through to recreation.
+                this.DisposeRimeDepotWindow()
+            }
+        }
+        if !this.workflow || !HasMethod(this.workflow, "CreateRimeDepotSettings") {
+            this.SetRimeDepotStatus(RabbitI18n.Text("depot.unavailable"), true)
+            return false
+        }
+        if !this.EnsureRimeDepotSettings() {
+            return false
+        }
+        try {
+            factory := this.rime_depot_factory
+            window := factory.Call(this, this.workflow)
+            if !window {
+                throw Error(RabbitI18n.Text("depot.unavailable"))
+            }
+            this.rime_depot_window := window
+            if HasMethod(window, "IsBusy") {
+                this.SetRimeDepotBusy(window.IsBusy())
+            }
+            if IsObject(window) && HasProp(window, "Hwnd") && window.Hwnd {
+                window_height := HasMethod(window, "ModeWindowHeight")
+                    ? window.ModeWindowHeight()
+                    : RabbitRimeDepotWindow.WINDOW_HEIGHT
+                RabbitDialogPlacement.ShowOnOwnerMonitor(
+                    window,
+                    this.Hwnd,
+                    Format("w{} h{}", RabbitRimeDepotWindow.WINDOW_WIDTH, window_height)
+                )
+            } else if HasMethod(window, "Show") {
+                window.Show()
+            }
+            return true
+        } catch as err {
+            if window && HasMethod(window, "Dispose") {
+                try window.Dispose()
+            }
+            this.rime_depot_window := 0
+            this.SetRimeDepotStatus(RabbitI18n.Text(
+                "depot.open_error",
+                Map("reason", err.Message)
+            ), true)
+            return false
+        }
+    }
+
+    SetRimeDepotStatus(value, error := false) {
+        if HasProp(this, "rime_depot_status") && this.rime_depot_status {
+            this.rime_depot_status.Value := value
+            this.rime_depot_status.Opt(error ? "cRed" : "cGray")
+            return true
+        }
+        if HasProp(this, "switcher_status") && this.switcher_status {
+            this.switcher_status.Value := value
+            this.switcher_status.Opt(error ? "cRed" : "cGray")
+            return true
+        }
+        if HasProp(this, "footer_status") && this.footer_status {
+            this.footer_status.Value := value
+            this.footer_status.Opt(error ? "cRed" : "cGray")
+            return true
+        }
+        return false
+    }
+
+    SurfaceRimeDepotSyncWarning() {
+        local message := RabbitI18n.Text("depot.reconfigure_error")
+        if HasProp(this, "rime_depot_status") && this.rime_depot_status.Value != "" {
+            message := this.rime_depot_status.Value
+        }
+        if HasProp(this, "footer_status") && this.footer_status {
+            this.footer_status.Value := message
+            this.footer_status.Opt("cRed")
+            return true
+        }
+        return false
+    }
+
+    IsRimeDepotBusy() {
+        return this.rime_depot_busy || (this.rime_depot_window
+            && (!HasProp(this.rime_depot_window, "disposed") || !this.rime_depot_window.disposed)
+            && HasMethod(this.rime_depot_window, "IsBusy")
+            && this.rime_depot_window.IsBusy())
+    }
+
+    IsParentOperationBusy() {
+        return this.parent_operation_busy
+    }
+
+    SetRimeDepotBusy(busy) {
+        this.rime_depot_busy := !!busy
+        if this.disposed {
+            return
+        }
+        this.SetRimeDepotOwnerBusy(this.parent_operation_busy || this.rime_depot_busy)
+        if this.parent_operation_busy || this.rime_depot_busy {
+            this.Opt("+Disabled")
+        } else {
             this.Opt("-Disabled")
+        }
+        this.UpdateRimeDepotGitPathState()
+        this.UpdateApplyButton()
+    }
+
+    SetRimeDepotOwnerBusy(busy) {
+        local child := this.rime_depot_window
+        if !IsObject(child) || (HasProp(child, "disposed") && child.disposed)
+            || !HasMethod(child, "SetOwnerBusy") {
+            return false
+        }
+        try {
+            child.SetOwnerBusy(!!busy)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    ParentWindowIsEnabled() {
+        return !!DllCall("IsWindowEnabled", "Ptr", this.Hwnd, "Int")
+    }
+
+    TryBeginParentOperation() {
+        if this.disposed || this.parent_operation_busy || this.IsRimeDepotBusy() {
+            if !this.disposed {
+                this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            }
+            return false
+        }
+        this.parent_operation_restore_enabled := this.ParentWindowIsEnabled()
+        this.parent_operation_busy := true
+        this.SetRimeDepotOwnerBusy(true)
+        this.Opt("+Disabled")
+        return true
+    }
+
+    EndParentOperation() {
+        local sync_succeeded := true
+        if !this.parent_operation_busy {
+            return false
+        }
+        this.parent_operation_busy := false
+        this.SetRimeDepotOwnerBusy(this.rime_depot_busy)
+        if !this.disposed && !this.rime_depot_busy && this.parent_operation_restore_enabled {
+            this.Opt("-Disabled")
+        }
+        if this.rime_depot_sync_pending {
+            this.rime_depot_sync_pending := false
+            sync_succeeded := this.SyncRimeDepotWindowSettings()
+        }
+        this.UpdateRimeDepotGitPathState()
+        this.UpdateApplyButton()
+        return sync_succeeded
+    }
+
+    RefreshSwitcherAfterRimeDepotInstall() {
+        local draft := 0, old_model := this.switcher_model, refreshed_model := 0
+        local was_dirty := this.switcher_dirty
+        if this.disposed || !this.workflow || !HasMethod(this.workflow, "CreateSwitcherSettingsModel") {
+            return false
+        }
+        if !this.page_controls_created.Has(2) {
+            this.EnsurePageControls(2)
+        }
+        if old_model && was_dirty {
+            draft := this.GetSwitcherValues(false)
+        }
+        try {
+            refreshed_model := this.workflow.CreateSwitcherSettingsModel()
+            if !refreshed_model {
+                return false
+            }
+            if draft && HasMethod(refreshed_model, "SetCurrentValues") {
+                refreshed_model.SetCurrentValues(draft)
+            } else if draft {
+                throw Error(RabbitI18n.Text("models.switcher_read"))
+            }
+            this.switcher_model := refreshed_model
+            this.PopulateSwitcherSettings()
+            if was_dirty {
+                this.switcher_dirty := true
+                this.switcher_status.Value := RabbitI18n.Text("controls.schemes_dirty")
+                this.footer_status.Value := RabbitI18n.Text("controls.schemes_dirty")
+                this.UpdateApplyButton()
+            }
+            if old_model && old_model !== refreshed_model && HasMethod(old_model, "Dispose") {
+                try old_model.Dispose()
+            }
+            return true
+        } catch {
+            this.switcher_model := old_model
+            this.switcher_dirty := was_dirty
+            if refreshed_model && refreshed_model !== old_model && HasMethod(refreshed_model, "Dispose") {
+                try refreshed_model.Dispose()
+            }
+            if old_model && draft && HasMethod(old_model, "SetCurrentValues") {
+                try {
+                    old_model.SetCurrentValues(draft)
+                    this.PopulateSwitcherSettings()
+                    this.switcher_dirty := true
+                    this.UpdateApplyButton()
+                }
+            }
+            return false
+        }
+    }
+
+    DeployRimeDepotSettings() {
+        if !this.TryBeginParentOperation() {
+            return 1
+        }
+        try {
+            return this.UpdateWorkspace()
+        } finally {
+            this.EndParentOperation()
         }
     }
 
@@ -2606,10 +3259,10 @@ class RabbitSettingsWindow extends Gui {
         return ids
     }
 
-    GetSwitcherValues() {
+    GetSwitcherValues(validate := true) {
         local save_options := []
         local row := 0
-        if !Trim(this.switcher_caption.Value) {
+        if validate && !Trim(this.switcher_caption.Value) {
             throw ValueError(RabbitI18n.Text("controls.caption_required"))
         }
         while (row := this.switcher_save_list.GetNext(row, "Checked")) {
@@ -2647,7 +3300,9 @@ class RabbitSettingsWindow extends Gui {
             return false
         }
 
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.switcher_status.Value := RabbitI18n.Text("controls.saving")
         try {
             if !this.switcher_model.Save(values) {
@@ -2668,7 +3323,7 @@ class RabbitSettingsWindow extends Gui {
             this.switcher_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
             return false
         } finally {
-            this.Opt("-Disabled")
+            this.EndParentOperation()
         }
     }
 
@@ -2725,6 +3380,10 @@ class RabbitSettingsWindow extends Gui {
 
     BackupSelectedDictionary() {
         local dict_name, file, path
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if !(dict_name := this.SelectedDictionaryName()) {
             return false
         }
@@ -2753,6 +3412,10 @@ class RabbitSettingsWindow extends Gui {
     RestoreDictionarySnapshot() {
         local selected_path
         local filter := RabbitI18n.Text("controls.snapshot_filter")
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if !this.dictionary_model {
             this.dictionary_status.Value := RabbitI18n.Text("controls.dictionary_access_error")
             return false
@@ -2776,6 +3439,10 @@ class RabbitSettingsWindow extends Gui {
     ExportSelectedDictionary() {
         local dict_name, result, selected_path
         local filter := RabbitI18n.Text("controls.text_filter")
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if !(dict_name := this.SelectedDictionaryName()) {
             return false
         }
@@ -2806,6 +3473,10 @@ class RabbitSettingsWindow extends Gui {
     ImportSelectedDictionary() {
         local dict_name, result, selected_path
         local filter := RabbitI18n.Text("controls.text_filter")
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if !(dict_name := this.SelectedDictionaryName()) {
             return false
         }
@@ -2827,6 +3498,10 @@ class RabbitSettingsWindow extends Gui {
     }
 
     RunDictionaryManagement() {
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if !this.workflow {
             return false
         }
@@ -2839,6 +3514,10 @@ class RabbitSettingsWindow extends Gui {
     }
 
     RunDeploy() {
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         if this.installing {
             return this.CompleteInstallation()
         }
@@ -2850,6 +3529,10 @@ class RabbitSettingsWindow extends Gui {
     }
 
     RunSync() {
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         return this.RunMaintenanceAction(
             (*) => this.workflow.SyncUserData(),
             RabbitI18n.Text("controls.sync_done"),
@@ -2859,11 +3542,17 @@ class RabbitSettingsWindow extends Gui {
 
     RunMaintenanceAction(action, success_message, failure_message) {
         local result
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
         this.EnsurePageControls(6)
         if !this.workflow {
             return false
         }
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.operation_status.Value := RabbitI18n.Text("controls.working")
         try {
             result := action.Call()
@@ -2873,7 +3562,7 @@ class RabbitSettingsWindow extends Gui {
             this.operation_status.Value := failure_message . " " . err.Message
             return false
         } finally {
-            this.Opt("-Disabled")
+            this.EndParentOperation()
         }
     }
 
@@ -3031,9 +3720,25 @@ class RabbitSettingsWindow extends Gui {
     }
 
     UpdateWorkspace() {
+        if this.IsRimeDepotBusy() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return 1
+        }
         this.deployment_pending := false
         local result := this.workflow.UpdateWorkspace(true)
         this.deployment_pending := result = 0
+        if result = 0 {
+            if IsObject(this.rime_depot_window)
+                && (!HasProp(this.rime_depot_window, "disposed") || !this.rime_depot_window.disposed) {
+                ; Parent settings operations hold the child host lock until
+                ; EndParentOperation, when the accepted snapshot is ready.
+                if this.parent_operation_busy {
+                    this.rime_depot_sync_pending := true
+                } else {
+                    this.SyncRimeDepotWindowSettings()
+                }
+            }
+        }
         return result
     }
 
@@ -3112,7 +3817,9 @@ class RabbitSettingsWindow extends Gui {
 
     DeployInstallationWithoutSaving() {
         local deploy_result
-        this.Opt("+Disabled")
+        if !this.TryBeginParentOperation() {
+            return false
+        }
         this.footer_status.Value := RabbitI18n.Text("controls.install_without_save")
         try {
             deploy_result := this.UpdateWorkspace()
@@ -3125,7 +3832,7 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := RabbitI18n.Text("messages.install_error", Map("reason", err.Message))
             return false
         } finally {
-            this.Opt("-Disabled")
+            this.EndParentOperation()
         }
     }
 
@@ -3135,6 +3842,10 @@ class RabbitSettingsWindow extends Gui {
         }
         this.disposed := true
         SetTimer(this.initial_page_load_callback, 0)
+        if this.rime_depot_window {
+            try this.rime_depot_window.Dispose()
+            this.rime_depot_window := 0
+        }
         try {
             if this.window_theme {
                 this.window_theme.Dispose()
