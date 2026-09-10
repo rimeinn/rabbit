@@ -31,7 +31,7 @@ RunTest("settings dialogs preserve config keys in English", TestLocalizedSetting
 RunTest("translation references exist in the default catalog", TestTranslationReferences.Bind())
 
 TestLocalizedSettingsControls() {
-    local directory := A_LineFile . "\..\..\..\locales", window := 0
+    local directory := A_LineFile . "\..\..\..\Locales", window := 0
     try {
         RabbitI18n.Initialize(directory, "en-US")
         window := RabbitSettingsWindow()
@@ -59,7 +59,7 @@ TestLocalizedSettingsControls() {
 }
 
 TestLocalizedSettingsDialogs() {
-    local directory := A_LineFile . "\..\..\..\locales", owner := Gui(), dialog := 0
+    local directory := A_LineFile . "\..\..\..\Locales", owner := Gui(), dialog := 0
     local color_scheme, values, error_message := ""
     try {
         RabbitI18n.Initialize(directory, "en-US")
@@ -101,7 +101,7 @@ TestLocalizedSettingsDialogs() {
 
 TestTranslationReferences() {
     local root := A_LineFile . "\..\..\..", catalog, source, position, found, match
-    catalog := RabbitI18n.ReadCatalog(root . "\locales\zh-CN.ini")
+    catalog := RabbitI18n.ReadCatalog(root . "\Locales\zh-CN.ini")
     Loop Files root . "\Lib\Rabbit*.ahk" {
         source := FileRead(A_LoopFileFullPath, "UTF-8")
         position := 1
@@ -115,7 +115,7 @@ TestTranslationReferences() {
 RunTest("Traditional Chinese settings expose both regional language choices", TestTraditionalSettingsChoices.Bind())
 
 TestTraditionalSettingsChoices() {
-    local directory := A_LineFile . "\..\..\..\locales", locale, window := 0
+    local directory := A_LineFile . "\..\..\..\Locales", locale, window := 0
     try {
         for locale in ["zh-HK", "zh-TW"] {
             RabbitI18n.Initialize(directory, locale)
@@ -143,7 +143,7 @@ RunTest("settings discover language names and preserve configured aliases", Test
 
 TestDiscoveredLanguageChoices() {
     local directory := A_Temp . "\rabbit-picker-" . DllCall("GetCurrentProcessId")
-    local repository := A_LineFile . "\..\..\..\locales", window := 0
+    local repository := A_LineFile . "\..\..\..\Locales", window := 0
     try {
         DirCreate(directory)
         FileAppend("[meta]`nlocale=ja-JP`nlanguage_name=日本語", directory . "\ja-JP.ini", "UTF-8-RAW")

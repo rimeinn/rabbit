@@ -26,7 +26,7 @@ RunTest("translation parser rejects invalid catalogs", TestRabbitI18nParser.Bind
 RunTest("language reads deployed Rime config", TestRabbitI18nConfig.Bind())
 
 TestRabbitI18n() {
-    local directory := A_LineFile . "\..\..\..\locales", reference, translated, locale
+    local directory := A_LineFile . "\..\..\..\Locales", reference, translated, locale
     try {
         RabbitI18n.Initialize(directory, "en-US")
         AssertEqual("Input settings", RabbitI18n.Text("tray.settings"), "English catalog was not loaded.")
@@ -101,7 +101,7 @@ TestRabbitI18nParser() {
 }
 
 TestRabbitI18nConfig() {
-    local directory := A_LineFile . "\..\..\..\locales"
+    local directory := A_LineFile . "\..\..\..\Locales"
     local api := RabbitI18nConfigFake()
     try {
         RabbitI18n.LoadConfig(api, directory)
@@ -141,7 +141,7 @@ RunTest("embedded catalog matches the Chinese source", TestEmbeddedCatalogMatche
 RunTest("missing and damaged catalogs retain a usable UI", TestMissingLocaleFallback.Bind())
 
 TestEmbeddedCatalogMatchesSource() {
-    local source := RabbitI18n.ReadCatalog(A_LineFile . "\..\..\..\locales\zh-CN.ini")
+    local source := RabbitI18n.ReadCatalog(A_LineFile . "\..\..\..\Locales\zh-CN.ini")
     local embedded := RabbitLocaleFallback.Create(), key, value
     AssertEqual(source.Count, embedded.Count, "Regenerate the embedded fallback after editing Chinese translations.")
     for key, value in source {
@@ -152,7 +152,7 @@ TestEmbeddedCatalogMatchesSource() {
 
 TestMissingLocaleFallback() {
     local directory := A_Temp . "\rabbit-missing-locales-" . DllCall("GetCurrentProcessId")
-    local repository_catalogs := A_LineFile . "\..\..\..\locales"
+    local repository_catalogs := A_LineFile . "\..\..\..\Locales"
     try {
         RabbitI18n.Initialize(directory, "en-US")
         AssertEqual("输入法设定", RabbitI18n.Text("tray.settings"), "Missing locale directory exposed keys.")
@@ -182,7 +182,7 @@ TestMissingLocaleFallback() {
 RunTest("Traditional Chinese locales resolve and load independently", TestTraditionalChineseLocales.Bind())
 
 TestTraditionalChineseLocales() {
-    local directory := A_LineFile . "\..\..\..\locales", locale, expected
+    local directory := A_LineFile . "\..\..\..\Locales", locale, expected
     local cases := Map("zh-HK", "zh-HK", "zh-MO", "zh-HK", "zh-Hant-HK", "zh-HK",
         "zh-Hant-MO", "zh-HK", "zh-TW", "zh-TW", "zh-Hant-TW", "zh-TW", "zh-Hant", "zh-TW",
         "zh-CN", "zh-CN", "zh-SG", "zh-CN", "zh-Hans", "zh-CN", "zh-Hans-HK", "zh-CN")
@@ -208,7 +208,7 @@ RunTest("language discovery accepts partial catalogs with matching metadata", Te
 
 TestLanguageDiscovery() {
     local directory := A_Temp . "\rabbit-discovery-" . DllCall("GetCurrentProcessId")
-    local repository := A_LineFile . "\..\..\..\locales", catalogs, name, content, languages, language
+    local repository := A_LineFile . "\..\..\..\Locales", catalogs, name, content, languages, language
     local found := Map()
     catalogs := Map(
         "ja-JP", "[meta]`nlocale=ja-JP`nlanguage_name=日本語`n[common]`ncancel=キャンセル",
@@ -261,7 +261,7 @@ TestLanguageDiscovery() {
 RunTest("startup language uses deployed YAML before Rime initialization", TestStartupLanguage.Bind())
 
 TestStartupLanguage() {
-    local directory := A_LineFile . "\..\..\..\locales"
+    local directory := A_LineFile . "\..\..\..\Locales"
     local path := A_Temp . "\rabbit-startup-language-" . DllCall("GetCurrentProcessId") . ".yaml"
     local api := RabbitStartupLanguageFake()
     try {

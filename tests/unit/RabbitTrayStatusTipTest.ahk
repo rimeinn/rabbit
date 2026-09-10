@@ -88,7 +88,7 @@ class RabbitTrayAboutDialogProbe {
 RunTest("tray tooltip localizes defaults and preserves schema labels", TestTranslatedTrayTip.Bind())
 
 TestTranslatedTrayTip() {
-    local directory := A_LineFile . "\..\..\..\locales"
+    local directory := A_LineFile . "\..\..\..\Locales"
     local old_tip := A_IconTip, runtime, tray
     try {
         RabbitI18n.Initialize(directory, "en-US")

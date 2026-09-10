@@ -39,23 +39,23 @@ scoop install siku/rabbit-nightly
 
 默认布局。候选逐行显示，适合一般的拼音、注音和形码输入。
 
-![堆叠布局](docs/images/candidate-layouts/stacked.png)
+![堆叠布局](Docs/images/candidate-layouts/stacked.png)
 
 ### 流式布局（`flow`）
 
 候选按行横向排列，可以在较宽的屏幕上同时看到更多候选。候选超过一行时，玉兔毫会以多行分页显示，并在展开和收起时使用平滑过渡。
 
-![流式布局](docs/images/candidate-layouts/flow.png)
+![流式布局](Docs/images/candidate-layouts/flow.png)
 
-![流式布局的多行分页](docs/images/candidate-layouts/flow_paging.png)
+![流式布局的多行分页](Docs/images/candidate-layouts/flow_paging.png)
 
 ### 竖排文字布局（`vertical_text`）
 
 候选文字从上到下排列，适合竖排文字输入。候选列可以设置为从左向右或从右向左排列，分别对应 `vertical_text_left_to_right` 的 `true` 和 `false`。
 
-![竖排文字布局：候选列从左向右](docs/images/candidate-layouts/vertical_text_left_to_right.png)
+![竖排文字布局：候选列从左向右](Docs/images/candidate-layouts/vertical_text_left_to_right.png)
 
-![竖排文字布局：候选列从右向左](docs/images/candidate-layouts/vertical_text_right_to_left.png)
+![竖排文字布局：候选列从右向左](Docs/images/candidate-layouts/vertical_text_right_to_left.png)
 
 例如，使用流式布局可以配置为：
 
@@ -87,10 +87,10 @@ rabbit/
 |  ├─ ...               其他依赖，编译后可删除
 ├─ plum/                若使用东风破，将被安装到此路径
 ├─ Rime/                Rime 用户文件夹，运行后会自动生成；可修改注册表 "HKEY_CURRENT_USER\Software\Rime\Rabbit" 中的 "RimeUserDir" 来指定不同的用户文件夹
-├─ docs/                文档资源，包含 README 使用的截图
+├─ Docs/                文档资源，包含 README 使用的截图
 |  └─ images/
 |     └─ candidate-layouts/
-├─ locales/             多语言翻译，删除后回退到脚本内置的简体中文
+├─ Locales/             多语言翻译，删除后回退到脚本内置的简体中文
 ├─ LICENSE              开源许可，可删除
 ├─ Rabbit.ahk           玉兔毫启动脚本（含部署器模式）
 ├─ Rabbit.exe           AutoHotkey 可执行文件，若本机已安装 AutoHotkey 或已编译，可删除
@@ -131,4 +131,4 @@ rabbit/
 
 也可以在 `rabbit.custom.yaml` 的 `patch` 下设置 `language`，可选值为 `auto`、`zh-CN`、`zh-HK`、`zh-TW`、`en-US` 或 `ja-JP`，修改后重新部署。
 
-欢迎完善现有翻译或添加新语言，具体方法见 [翻译说明](locales/README.md)。
+欢迎完善现有翻译或添加新语言，具体方法见 [翻译说明](Locales/README.md)。

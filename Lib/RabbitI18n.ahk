@@ -25,7 +25,7 @@ class RabbitI18n {
     static diagnostics := []
     static directory := ""
 
-    static LoadStartupConfig(rime_api, path, directory := A_ScriptDir . "\locales") {
+    static LoadStartupConfig(rime_api, path, directory := A_ScriptDir . "\Locales") {
         local config := 0, preference := "auto", diagnostic := ""
         ; Read only the deployed YAML before Rime starts maintenance or command-line validation.
         try {
@@ -51,7 +51,7 @@ class RabbitI18n {
         }
     }
 
-    static LoadConfig(rime_api, directory := A_ScriptDir . "\locales") {
+    static LoadConfig(rime_api, directory := A_ScriptDir . "\Locales") {
         this.Initialize(directory, this.ReadPreference(rime_api))
     }
 
@@ -140,7 +140,7 @@ class RabbitI18n {
         }
         if !directory {
             directory := this.directory ? this.directory
-                : (A_IsCompiled ? A_ScriptDir . "\locales" : A_LineFile . "\..\..\locales")
+                : (A_IsCompiled ? A_ScriptDir . "\Locales" : A_LineFile . "\..\..\Locales")
         }
         Loop Files directory . "\*.ini", "F" {
             files .= A_LoopFileName . "`n"
@@ -256,7 +256,7 @@ class RabbitI18n {
     static Text(key, values := 0) {
         local template, result := "", position := 1, found, match
         if !this.fallback.Count {
-            this.Initialize(A_IsCompiled ? A_ScriptDir . "\locales" : A_LineFile . "\..\..\locales", "zh-CN")
+            this.Initialize(A_IsCompiled ? A_ScriptDir . "\Locales" : A_LineFile . "\..\..\Locales", "zh-CN")
         }
         if this.messages.Has(key) && this.messages[key] != "" {
             template := this.messages[key]

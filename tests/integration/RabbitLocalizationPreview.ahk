@@ -26,7 +26,7 @@ RunTest("localized settings preview", ShowLocalizedSettingsPreview.Bind())
 
 ShowLocalizedSettingsPreview() {
     global localization_preview
-    RabbitI18n.Initialize(A_ScriptDir . "\..\..\locales", "en-US")
+    RabbitI18n.Initialize(A_ScriptDir . "\..\..\Locales", "en-US")
     localization_preview := RabbitSettingsWindow(, , , , "about")
     localization_preview.Show("Center")
     SetTimer(() => ExitApp(), -60000)

@@ -54,7 +54,7 @@ TestStandaloneAboutDialogUsesSharedPage() {
 RunTest("localized about page grows for wrapped text", TestLocalizedAboutLayout.Bind())
 
 TestLocalizedAboutLayout() {
-    local directory := A_LineFile . "\..\..\..\locales", dialog := 0
+    local directory := A_LineFile . "\..\..\..\Locales", dialog := 0
     local description_y, description_height, first_row_y, normal_height
     try {
         RabbitI18n.Initialize(directory, "en-US")

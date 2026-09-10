@@ -43,7 +43,7 @@ TestAppearanceGroupBounds() {
     local x, y, w, h, gx, gy, gw, gh, text_width, label_x, label_width, edit_x, status_y
     try {
         for locale in ["zh-CN", "en-US", "ja-JP", "zh-HK", "zh-TW"] {
-            RabbitI18n.Initialize(A_ScriptDir . "\..\..\locales", locale)
+            RabbitI18n.Initialize(A_ScriptDir . "\..\..\Locales", locale)
             window := RabbitSettingsWindow(0, true)
             window.appearance_tabs.Choose(4)
             window.OnAppearanceTabChanged()
@@ -138,6 +138,6 @@ TestAppearanceGroupBounds() {
         if window {
             window.Dispose()
         }
-        RabbitI18n.Initialize(A_ScriptDir . "\..\..\locales", "zh-CN")
+        RabbitI18n.Initialize(A_ScriptDir . "\..\..\Locales", "zh-CN")
     }
 }

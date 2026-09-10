@@ -24,7 +24,7 @@ ExportShadowExamples() {
         "border_width", 1, "back_color", 0xfffafafa, "candidate_back_color", 0xfffafafa))
     local box := CandidateBox(style), modes, name, overrides, width, height, d2d, shapes, bounds
     local bitmap := 0, pixels, image := 0, encoder := Direct2D.str2guid("{557CF406-1A04-11D3-9A73-0000F81EF32E}")
-    local output_dir := A_ScriptDir . "\..\..\docs\images"
+    local output_dir := A_ScriptDir . "\..\..\Docs\images"
     modes := Map("shadow-disabled", Map(),
         "shadow-window", Map("shadow_radius", 12, "shadow_offset_y", 5, "shadow_color", 0x60000000),
         "shadow-all", Map("shadow_radius", 8, "shadow_offset_x", 2, "shadow_offset_y", 3,

@@ -205,8 +205,8 @@ jobs:
             !*Tests.ahk
             LICENSE
             README.md
-            locales/*.ini
-            docs/images/candidate-layouts/*.png
+            Locales/*.ini
+            Docs/images/candidate-layouts/*.png
             rime-install.bat
 
       - name: Upload Full Zip of Rabbit ${{ matrix.target }}
@@ -234,8 +234,8 @@ jobs:
             !*Tests.ahk
             LICENSE
             README.md
-            locales/*.ini
-            docs/images/candidate-layouts/*.png
+            Locales/*.ini
+            Docs/images/candidate-layouts/*.png
             rime-install.bat
 
   test-rabbit:
@@ -368,11 +368,11 @@ jobs:
           $package = Join-Path $env:GITHUB_WORKSPACE "package"
           New-Item -ItemType Directory -Force -Path $package | Out-Null
           Copy-Item "compiled\Rabbit.exe" $package
-          Copy-Item "locales" $package -Recurse
+          Copy-Item "Locales" $package -Recurse
           Copy-Item "Data" $package -Recurse
-          New-Item -ItemType Directory -Force -Path (Join-Path $package "docs\images\candidate-layouts") | Out-Null
-          Copy-Item "docs\images\candidate-layouts\*.png" `
-              (Join-Path $package "docs\images\candidate-layouts")
+          New-Item -ItemType Directory -Force -Path (Join-Path $package "Docs\images\candidate-layouts") | Out-Null
+          Copy-Item "Docs\images\candidate-layouts\*.png" `
+              (Join-Path $package "Docs\images\candidate-layouts")
           Copy-Item "deps\Rime\${{ matrix.rime }}" (Join-Path $package "rime.dll")
           Copy-Item "plum\rime-install.bat" (Join-Path $package "rime-install.bat")
           Copy-Item "LICENSE" $package

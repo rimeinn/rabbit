@@ -45,7 +45,7 @@ being added to the hard-coded official language choices.
 
 ## Additional languages
 
-Place `<lang-code>.ini` in `locales`, for example `ja-JP.ini`:
+Place `<lang-code>.ini` in `Locales`, for example `ja-JP.ini`:
 
 ```ini
 [meta]
@@ -91,13 +91,13 @@ backslash. Other characters, including equals signs, are literal in values.
 
 Lookup order is the selected locale file, the Chinese locale file, then the
 embedded Chinese catalog. Missing or empty values fall back to the next level.
-The application can start without the entire `locales` directory. Missing,
+The application can start without the entire `Locales` directory. Missing,
 unreadable or malformed external catalogs are ignored at runtime and reported to
 OutputDebug and `RabbitI18n.diagnostics`; `ReadCatalog` remains strict for tests.
 Keys absent from all three levels are displayed as keys and reported to OutputDebug.
 The embedded catalog is included in compiled executables and source distributions.
 
-After changing `locales/zh-CN.ini`, regenerate its checked-in fallback:
+After changing `Locales/zh-CN.ini`, regenerate its checked-in fallback:
 
 ```powershell
 AutoHotkey.exe /ErrorStdOut scripts/generate_locale_fallback.ahk
@@ -119,7 +119,7 @@ AutoHotkey.exe /ErrorStdOut tests\unit\RabbitI18nTest.ahk
 
 The test checks bundled catalog keys and placeholder sets, locale resolution,
 fallback, escape decoding, and literal placeholder substitution. It also runs
-through `tests/unit/RabbitTests.ahk`. Package the `locales/*.ini` files beside both
+through `tests/unit/RabbitTests.ahk`. Package the `Locales/*.ini` files beside both
 executables; CI includes them in both release artifacts.
 
 ## Settings regression tests

@@ -146,7 +146,7 @@ class RabbitDeployerApplication {
     }
 
     ActivateSettingsLanguage(preference) {
-        RabbitI18n.Initialize(A_ScriptDir . "\locales", preference)
+        RabbitI18n.Initialize(A_ScriptDir . "\Locales", preference)
         RabbitSetupMaintenanceTray()
     }
 
