@@ -161,7 +161,11 @@ CorruptArchive(original, installer_class, destination) {
         Invoke-Probe legacy
         Assert-Condition ([IO.File]::ReadAllText($bat) -eq 'preserve-user-bat') 'Existing BAT was overwritten.'
 
-        $env:LIBRIME_LIB_DIR = Split-Path -Parent (Resolve-Path -LiteralPath $RimeDll).Path
+        # CI artifacts retain architecture-specific names, but runtime lookup always uses rime.dll.
+        $environmentDirectory = Join-Path $testRoot 'environment'
+        New-Item -ItemType Directory -Path $environmentDirectory -Force | Out-Null
+        Copy-Item -LiteralPath $RimeDll -Destination (Join-Path $environmentDirectory 'rime.dll')
+        $env:LIBRIME_LIB_DIR = $environmentDirectory
         Invoke-Probe inspect
         Invoke-Probe dll
         $localDll = Join-Path $probeDirectory 'rime.dll'
@@ -179,7 +183,7 @@ CorruptArchive(original, installer_class, destination) {
                 'Final fallback did not install the embedded DLL.'
         }
         Copy-Item -LiteralPath $RimeDll -Destination $localDll -Force
-        $env:LIBRIME_LIB_DIR = Split-Path -Parent (Resolve-Path -LiteralPath $RimeDll).Path
+        $env:LIBRIME_LIB_DIR = $environmentDirectory
         Invoke-Probe dll
         Assert-Condition ((Get-Content (Join-Path $testRoot 'probe.log') -Raw).Contains("Selected DLL: $localDll API:")) `
             'A suitable local DLL did not take priority over the environment DLL.'
