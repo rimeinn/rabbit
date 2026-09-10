@@ -444,10 +444,10 @@ TestSettingsWindowContainsPreviewFailures() {
 TestSettingsWindowExposesOpenSourceLicenses() {
     local window := RabbitSettingsWindow(0, true)
     try {
-        AssertEqual(660, window.GetPageWindowHeight(7), "The about page used the wrong window height.")
+        AssertEqual(684, window.GetPageWindowHeight(7), "The about page used the wrong window height.")
         AssertTrue(window.SelectPage(7), "The settings window rejected the about page.")
         AssertEqual(
-            9,
+            10,
             RabbitAboutPage.OPEN_SOURCE_PROJECTS.Length,
             "The about page did not keep the complete open source project list."
         )
@@ -457,14 +457,19 @@ TestSettingsWindowExposesOpenSourceLicenses() {
             "The about page displayed the wrong librime license."
         )
         AssertEqual(
+            "GPL-3.0",
+            RabbitAboutPage.OPEN_SOURCE_PROJECTS[4].license,
+            "The about page displayed the wrong RimeDepot license."
+        )
+        AssertEqual(
             "LGPL-3.0",
-            RabbitAboutPage.OPEN_SOURCE_PROJECTS[8].license,
+            RabbitAboutPage.OPEN_SOURCE_PROJECTS[9].license,
             "The about page displayed the wrong plum license."
         )
         AssertTrue(window.about_page.about_open_source_group.Visible,
             "The about page did not show the open source project section.")
         AssertEqual(
-            9,
+            10,
             window.about_page.about_open_source_project_links.Length,
             "The about page did not create a project link for every component."
         )

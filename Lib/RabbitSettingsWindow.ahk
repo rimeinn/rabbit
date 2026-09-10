@@ -38,7 +38,7 @@ class RabbitSettingsWindow extends Gui {
     ; downloader tab remains inside the existing input-schemes page so the
     ; root navigation and its persisted page indices stay stable.
     static SWITCHER_HEIGHT := 700
-    static ABOUT_HEIGHT := 660
+    static ABOUT_HEIGHT := 684
     static COMPACT_HEIGHT := 500
     static SWITCH_ACTION_VALUES := [
         "noop",

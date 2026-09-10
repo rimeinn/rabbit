@@ -20,7 +20,7 @@
 #Include RabbitWindowTheme.ahk
 
 class RabbitAboutPage {
-    static PAGE_HEIGHT := 456
+    static PAGE_HEIGHT := 480
     static OPEN_SOURCE_PROJECTS := [
         {
             name: "AutoHotkey v2",
@@ -39,6 +39,12 @@ class RabbitAboutPage {
             license: "GPL-3.0",
             project_url: "https://github.com/rimeinn/librime-ahk",
             license_url: "https://github.com/rimeinn/librime-ahk/blob/master/LICENSE"
+        },
+        {
+            name: "RimeDepot",
+            license: "GPL-3.0",
+            project_url: "https://github.com/rimeinn/RimeDepot",
+            license_url: "https://github.com/rimeinn/RimeDepot/blob/master/LICENSE"
         },
         {
             name: "AHK-Direct2D",

@@ -22,7 +22,7 @@
 RunTest("standalone about dialog uses the shared about page", TestStandaloneAboutDialogUsesSharedPage.Bind())
 
 TestStandaloneAboutDialogUsesSharedPage() {
-    local dialog := RabbitAboutDialog()
+    local dialog := RabbitAboutDialog(), project, rime_depot := 0
     try {
         AssertEqual(
             "RabbitAboutPage",
@@ -35,6 +35,17 @@ TestStandaloneAboutDialogUsesSharedPage() {
             RabbitAboutPage.OPEN_SOURCE_PROJECTS.Length,
             dialog.about_page.about_open_source_project_links.Length,
             "The standalone about dialog did not show every open source project.")
+        for project in RabbitAboutPage.OPEN_SOURCE_PROJECTS {
+            if project.name = "RimeDepot" {
+                rime_depot := project
+                break
+            }
+        }
+        AssertTrue(IsObject(rime_depot), "The About page omitted RimeDepot from its open source credits.")
+        AssertTrue(rime_depot.license = "GPL-3.0"
+            && rime_depot.project_url = "https://github.com/rimeinn/RimeDepot"
+            && rime_depot.license_url = "https://github.com/rimeinn/RimeDepot/blob/master/LICENSE",
+            "The About page exposes incomplete or incorrect RimeDepot project information.")
     } finally {
         dialog.Dispose()
     }
