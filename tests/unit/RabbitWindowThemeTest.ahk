@@ -32,6 +32,7 @@ TestWindowThemeAppliesSystemAppearance() {
     local controller := RabbitWindowThemeController(window, reader, native)
     window.AddText(, "Text")
     window.AddEdit(, "Edit")
+    window.AddProgress(, 50)
     try {
         controller.Register()
         AssertTrue(controller.registered, "The theme controller did not register the window.")
@@ -39,7 +40,9 @@ TestWindowThemeAppliesSystemAppearance() {
         AssertEqual(1, native.app_modes.Length, "The initial theme did not set the preferred app mode.")
         AssertEqual(true, native.app_modes[1], "The initial app mode was not dark.")
         AssertEqual(1, native.window_modes.Length, "The initial theme did not update the window.")
-        AssertEqual(2, native.control_modes.Length, "The initial theme did not update every control.")
+        AssertEqual(3, native.control_modes.Length, "The initial theme did not update every control.")
+        AssertEqual("Progress", native.control_modes[3].type,
+            "The progress control did not receive its native dark theme.")
 
         controller.Register()
         AssertEqual(1, native.app_modes.Length, "Registering twice reapplied the window theme.")

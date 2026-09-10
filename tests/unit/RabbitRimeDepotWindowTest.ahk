@@ -30,6 +30,7 @@ RabbitRimeDepotWindowTestMain() {
     RunTest("Rabbit Depot forces archive installs away from Git", RabbitRimeDepotWindowRppiInstallTest.Bind())
     RunTest("Rabbit Depot cancels and ignores stale callbacks", RabbitRimeDepotWindowLifecycleTest.Bind())
     RunTest("Rabbit Depot uses compact mode geometry", RabbitRimeDepotWindowGeometryTest.Bind())
+    RunTest("Rabbit Depot opens with the real dark theme controller", RabbitRimeDepotWindowDarkThemeTest.Bind())
     ExitApp(0)
 }
 
@@ -402,6 +403,45 @@ RabbitRimeDepotWindowGeometryTest() {
     }
 }
 
+RabbitRimeDepotWindowDarkThemeTest() {
+    local header_height, header_y, list_y, window := 0
+    try {
+        window := RabbitRimeDepotWindow(
+            0,
+            RabbitRimeDepotWindowFakeService(),
+            0,
+            0,
+            RabbitRimeDepotWindowDarkThemeFactory
+        )
+        AssertTrue(window.initial_dark_mode && window.window_theme.dark_mode,
+            "The downloader did not complete real dark-theme initialization.")
+        AssertTrue(window.catalog_category_header.Visible && window.catalog_scheme_header.Visible
+            && window.catalog_schemas_header.Visible && window.catalog_repository_header.Visible
+            && window.catalog_ref_header.Visible,
+            "The dark catalog did not replace its native header with themed controls.")
+        window.catalog_category_header.GetPos(, &header_y, , &header_height)
+        window.catalog_list.GetPos(, &list_y)
+        AssertEqual(header_y + header_height, list_y,
+            "The dark catalog rows do not begin directly below the themed header.")
+        AssertTrue(WinGetStyle("ahk_id " . window.catalog_list.Hwnd) & 0x4000,
+            "The light native catalog header remains enabled in dark mode.")
+        window.SetBusy(true)
+        AssertTrue(window.catalog_list.Enabled && !window.search_edit.Enabled
+            && !window.load_button.Enabled && !window.install_button.Enabled,
+            "Loading disabled the dark catalog view or left an operation control enabled.")
+        window.SetBusy(false)
+        window.SetMode("direct")
+        AssertTrue(!window.catalog_category_header.Visible && !window.catalog_scheme_header.Visible
+            && !window.catalog_schemas_header.Visible && !window.catalog_repository_header.Visible
+            && !window.catalog_ref_header.Visible,
+            "The themed catalog headers remained visible in Direct mode.")
+    } finally {
+        if window {
+            window.Dispose()
+        }
+    }
+}
+
 RabbitRimeDepotWindowCategoryIndex(window, path) {
     local index, value
     for index, value in window.category_paths {
@@ -451,10 +491,30 @@ class RabbitRimeDepotWindowTestTheme {
     RegisterMuted(controls*) {
     }
 
+    RegisterSurface(controls*) {
+    }
+
     Register() {
     }
 
     Dispose() {
+    }
+}
+
+class RabbitRimeDepotWindowDarkThemeFactory {
+    static Prepare() {
+        RabbitWindowThemeNative.SetPreferredAppMode(true)
+        return true
+    }
+
+    static Call(window) {
+        return RabbitWindowThemeController(window, RabbitRimeDepotWindowDarkModeReader)
+    }
+}
+
+class RabbitRimeDepotWindowDarkModeReader {
+    static Call() {
+        return true
     }
 }
 

@@ -145,10 +145,21 @@ class RabbitRimeDepotWindow extends Gui {
             this.detail_license,
             this.detail_recipe
         )
+        this.window_theme.RegisterSurface(
+            this.catalog_category_header,
+            this.catalog_scheme_header,
+            this.catalog_schemas_header,
+            this.catalog_repository_header,
+            this.catalog_ref_header
+        )
         this.window_theme.Register()
     }
 
     CreateControls() {
+        local catalog_options := this.initial_dark_mode
+            ? "x22 y86 w1006 h196 -Hdr"
+            : "x22 y62 w1006 h220"
+        local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
         this.MarginX := 12
         this.MarginY := 12
 
@@ -170,7 +181,7 @@ class RabbitRimeDepotWindow extends Gui {
         this.cancel_button := this.AddButton("x952 y26 w76 h28 Disabled +0x2000", RabbitI18n.Text("depot.cancel"))
 
         this.catalog_list := this.AddListView(
-            "x22 y62 w1006 h220 -Multi Grid",
+            catalog_options . " -Multi Grid",
             [
                 RabbitI18n.Text("depot.category"),
                 RabbitI18n.Text("depot.scheme"),
@@ -178,6 +189,26 @@ class RabbitRimeDepotWindow extends Gui {
                 RabbitI18n.Text("depot.repository"),
                 RabbitI18n.Text("depot.ref"),
             ]
+        )
+        this.catalog_category_header := this.AddText(
+            "x22 y62 w166 h24 +0x200 Hidden" . surface_options,
+            "  " . RabbitI18n.Text("depot.category")
+        )
+        this.catalog_scheme_header := this.AddText(
+            "x188 y62 w200 h24 +0x200 Hidden" . surface_options,
+            "  " . RabbitI18n.Text("depot.scheme")
+        )
+        this.catalog_schemas_header := this.AddText(
+            "x388 y62 w180 h24 +0x200 Hidden" . surface_options,
+            "  " . RabbitI18n.Text("depot.schemas")
+        )
+        this.catalog_repository_header := this.AddText(
+            "x568 y62 w300 h24 +0x200 Hidden" . surface_options,
+            "  " . RabbitI18n.Text("depot.repository")
+        )
+        this.catalog_ref_header := this.AddText(
+            "x868 y62 w160 h24 +0x200 Hidden" . surface_options,
+            "  " . RabbitI18n.Text("depot.ref")
         )
         this.catalog_list.ModifyCol(1, 166)
         this.catalog_list.ModifyCol(2, 200)
@@ -262,6 +293,16 @@ class RabbitRimeDepotWindow extends Gui {
             this.detail_license,
             this.detail_recipe,
         ]
+        if this.initial_dark_mode {
+            this.rppi_controls.InsertAt(
+                1,
+                this.catalog_category_header,
+                this.catalog_scheme_header,
+                this.catalog_schemas_header,
+                this.catalog_repository_header,
+                this.catalog_ref_header
+            )
+        }
         this.direct_controls := [
             this.direct_group,
             this.direct_source_label,
@@ -861,6 +902,11 @@ class RabbitRimeDepotWindow extends Gui {
         for control in this.rppi_controls {
             control.Enabled := enabled
         }
+        ; A disabled native ListView falls back to a light system background
+        ; even after its dark colors have been applied.  Keep this read-only
+        ; view enabled while actions and filters are locked; every operation
+        ; entry point still rejects busy or owner-busy requests.
+        this.catalog_list.Enabled := true
         for control in this.direct_controls {
             control.Enabled := enabled
         }

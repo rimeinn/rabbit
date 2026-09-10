@@ -162,7 +162,11 @@ class RabbitWindowThemeController {
         }
         background := RabbitWindowThemeController.DARK_SURFACE
         this.native.ApplyControl(control.Hwnd, control.Type, dark_mode)
-        control.SetFont("c" . color)
+        ; AutoHotkey rejects SetFont for Progress controls.  They still need
+        ; the native dark theme above, but do not render text of their own.
+        if control.Type != "Progress" {
+            control.SetFont("c" . color)
+        }
 
         if role = "surface" {
             control.Opt("Background" . background)
