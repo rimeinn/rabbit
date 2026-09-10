@@ -19,6 +19,8 @@
 
 正式发行版会在 [Release](https://github.com/rimeinn/rabbit/releases) 页面的 Assets 中，下载最新的 `rabbit-v<版本号>.zip`，解压到一个新建文件夹，运行 `Rabbit.exe` 即可。
 
+编译版提供 `rabbit-v<版本号>-compiled-x64.exe` 和 `rabbit-v<版本号>-compiled-x86.exe` 单文件下载，将 EXE 放进可写的独立文件夹后运行即可。编译版首次运行时，会向 EXE 所在目录释放资源文件。
+
 每夜构建版可在 [`latest`](https://github.com/rimeinn/rabbit/releases/tag/latest) 页面下载。
 
 ### 通过 [scoop](https://scoop.sh/) 安装
@@ -68,6 +70,19 @@ style:
 ## 脚本编译
 
 本仓库提供*源码形式的玉兔毫脚本*以及*仅修改主图标的 AutoHotkey 可执行文件*，用户可根据需要自行编译为可执行文件以及压缩。编译方式可参照 AutoHotkey 的[官方文档](https://www.autohotkey.com/docs/v2/Scripts.htm#ahk2exe)。
+
+编译单文件版本前，需准备好 `Data/`、图标和对应位宽的 `rime.dll`，并生成资源代码：
+
+```powershell
+pwsh -File .github/scripts/generate-compiled-resources.ps1 `
+    -ManifestPath scripts/compiled-resource-manifest.json `
+    -OutputPath Lib/RabbitCompiledResources.ahk `
+    -RimeDllPath path/to/rime.dll -Architecture x64
+```
+
+资源清单仅维护在 `scripts/compiled-resource-manifest.json` 中；生成的 AHK 文件和同名 ZIP 不提交到仓库。
+源码运行不需要生成文件，编译时则必须先生成。CI 会在准备资源和写入版本号之后自动执行生成步骤，
+正式版和每夜构建的编译产物直接发布为 EXE；源码 ZIP 保留原来的发布方式。
 
 ## 目录结构
 

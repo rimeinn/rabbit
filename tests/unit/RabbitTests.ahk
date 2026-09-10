@@ -55,5 +55,6 @@
 #Include RabbitUIStyleSnapshotTest.ahk
 #Include RabbitUIStyleSettingsTest.ahk
 #Include RabbitWindowThemeTest.ahk
+#Include RabbitRimeBootstrapTest.ahk
 
 ExitApp()

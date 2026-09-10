@@ -1,0 +1,33 @@
+{
+    "resources": [
+        {
+            "source": "Data",
+            "destination": "Data",
+            "recursive": true
+        },
+        {
+            "source": "Locales",
+            "destination": "Locales",
+            "recursive": true
+        },
+        {
+            "source": "Docs/images/candidate-layouts/*.png",
+            "destination": "Docs/images/candidate-layouts",
+            "recursive": false
+        },
+        {
+            "source": "README.md",
+            "destination": "README.md",
+            "recursive": false
+        },
+        {
+            "source": "LICENSE",
+            "destination": "LICENSE",
+            "recursive": false
+        }
+    ],
+    "legacy_installer": {
+        "source": "plum/rime-install.bat",
+        "destination": "rime-install.bat"
+    }
+}

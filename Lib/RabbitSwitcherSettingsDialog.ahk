@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitCompiledResourcePolicy.ahk
 
 class SwitcherSettingsDialog extends Gui {
     available_schemas := 0
@@ -165,6 +166,7 @@ class SwitcherSettingsDialog extends Gui {
     }
 
     OnGetSchema() {
+        RabbitCompiledResourcePolicy.EnsureLegacyInstaller()
         if !FileExist(Format("{}\rime-install.bat", A_ScriptDir)) {
             MsgBox("未找到东风破安装脚本，请检查安装目录。", ":-(", "Ok Iconx")
             return

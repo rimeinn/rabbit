@@ -342,6 +342,25 @@ jobs:
           )
           Write-Host "Rabbit version: $version"
 
+      - name: Generate compiled resource include
+        shell: pwsh
+        run: |
+          $generator = Join-Path $env:GITHUB_WORKSPACE ".github\scripts\generate-compiled-resources.ps1"
+          & $generator `
+              -ManifestPath "scripts\compiled-resource-manifest.json" `
+              -OutputPath "Lib\RabbitCompiledResources.ahk" `
+              -RimeDllPath "deps\Rime\${{ matrix.rime }}" `
+              -Architecture "${{ matrix.target }}"
+          $generated = Join-Path $env:GITHUB_WORKSPACE "Lib\RabbitCompiledResources.ahk"
+          if (!(Test-Path -LiteralPath $generated)) {
+            throw "The compiled resource generator did not produce its include."
+          }
+          $generatedSource = Get-Content -LiteralPath $generated -Raw
+          if ($generatedSource -notmatch "class RabbitCompiledResourceInstaller" -or
+              $generatedSource -notmatch "FileInstall") {
+            throw "The generated compiled resource include is incomplete."
+          }
+
       - name: Compile Rabbit
         shell: pwsh
         run: |
@@ -357,34 +376,30 @@ jobs:
           $base = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\${{ matrix.ahk }}"
           $input = Join-Path $env:GITHUB_WORKSPACE "Rabbit.ahk"
           $output = Join-Path $outputDirectory "Rabbit.exe"
-          & $compiler.FullName /in $input /out $output /base $base /silent verbose
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $compileProcess = Start-Process -FilePath $compiler.FullName -ArgumentList @(
+              '/in', ('"' + $input + '"'), '/out', ('"' + $output + '"'),
+              '/base', ('"' + $base + '"'), '/silent', 'verbose'
+          ) -WindowStyle Hidden -Wait -PassThru
+          if ($compileProcess.ExitCode -ne 0) {
+            exit $compileProcess.ExitCode
           }
+          & .\tests\integration\RabbitCompiledResourcesTests.ps1 `
+              -Compiler $compiler.FullName -Base $base `
+              -RimeDll "deps\Rime\${{ matrix.rime }}" -Architecture "${{ matrix.target }}"
 
-      - name: Assemble compiled package
+      - name: Validate compiled executable
         shell: pwsh
         run: |
-          $package = Join-Path $env:GITHUB_WORKSPACE "package"
-          New-Item -ItemType Directory -Force -Path $package | Out-Null
-          Copy-Item "compiled\Rabbit.exe" $package
-          Copy-Item "Locales" $package -Recurse
-          Copy-Item "Data" $package -Recurse
-          New-Item -ItemType Directory -Force -Path (Join-Path $package "Docs\images\candidate-layouts") | Out-Null
-          Copy-Item "Docs\images\candidate-layouts\*.png" `
-              (Join-Path $package "Docs\images\candidate-layouts")
-          Copy-Item "deps\Rime\${{ matrix.rime }}" (Join-Path $package "rime.dll")
-          Copy-Item "plum\rime-install.bat" (Join-Path $package "rime-install.bat")
-          Copy-Item "LICENSE" $package
-          Copy-Item "README.md" $package
-          Compress-Archive -Path (Join-Path $package "*") `
-              -DestinationPath "rabbit-compiled-${{ matrix.target }}.zip" -Force
+          $executable = Join-Path $env:GITHUB_WORKSPACE "compiled\Rabbit.exe"
+          if (!(Test-Path -LiteralPath $executable -PathType Leaf)) {
+            throw "The compiled Rabbit executable was not produced."
+          }
 
       - name: Upload compiled package
         uses: actions/upload-artifact@v7
         with:
           name: Rabbit-Compiled-${{ matrix.target }}
-          path: rabbit-compiled-${{ matrix.target }}.zip
+          path: compiled/Rabbit.exe
 
   create-nightly:
     name: Create Nightly release
@@ -429,10 +444,10 @@ jobs:
           name: Rabbit-Compiled-x86
           path: compiled-x86
 
-      - name: Rename compiled nightly packages
+      - name: Rename compiled nightly executables
         run: |
-          cp compiled-x64/rabbit-compiled-x64.zip rabbit-nightly-compiled-x64.zip
-          cp compiled-x86/rabbit-compiled-x86.zip rabbit-nightly-compiled-x86.zip
+          cp compiled-x64/Rabbit.exe rabbit-nightly-compiled-x64.exe
+          cp compiled-x86/Rabbit.exe rabbit-nightly-compiled-x86.exe
 
       - name: Upload Nightly
         uses: marvinpinto/action-automatic-releases@latest
@@ -444,8 +459,8 @@ jobs:
           files: |
             rabbit-nightly-x64.zip
             rabbit-nightly-x86.zip
-            rabbit-nightly-compiled-x64.zip
-            rabbit-nightly-compiled-x86.zip
+            rabbit-nightly-compiled-x64.exe
+            rabbit-nightly-compiled-x86.exe
 
   # Keep development builds separate from the public "latest" nightly channel.
   create-dev-nightly:
@@ -491,10 +506,10 @@ jobs:
           name: Rabbit-Compiled-x86
           path: compiled-x86
 
-      - name: Rename compiled dev nightly packages
+      - name: Rename compiled dev nightly executables
         run: |
-          cp compiled-x64/rabbit-compiled-x64.zip rabbit-dev-nightly-compiled-x64.zip
-          cp compiled-x86/rabbit-compiled-x86.zip rabbit-dev-nightly-compiled-x86.zip
+          cp compiled-x64/Rabbit.exe rabbit-dev-nightly-compiled-x64.exe
+          cp compiled-x86/Rabbit.exe rabbit-dev-nightly-compiled-x86.exe
 
       - name: Upload Dev Nightly
         uses: marvinpinto/action-automatic-releases@latest
@@ -506,8 +521,8 @@ jobs:
           files: |
             rabbit-dev-nightly-x64.zip
             rabbit-dev-nightly-x86.zip
-            rabbit-dev-nightly-compiled-x64.zip
-            rabbit-dev-nightly-compiled-x86.zip
+            rabbit-dev-nightly-compiled-x64.exe
+            rabbit-dev-nightly-compiled-x86.exe
 
   create-release:
     name: Create Release
@@ -565,10 +580,10 @@ jobs:
           path: compiled
 
       - name: Rename Compiled Asset
-        run: cp compiled/rabbit-compiled-${{ matrix.target }}.zip rabbit-${{ github.ref_name }}-compiled-${{ matrix.target }}.zip
+        run: cp compiled/Rabbit.exe rabbit-${{ github.ref_name }}-compiled-${{ matrix.target }}.exe
 
       - name: Publish Compiled Asset
         uses: softprops/action-gh-release@v3
         with:
           prerelease: true
-          files: rabbit-${{ github.ref_name }}-compiled-${{ matrix.target }}.zip
+          files: rabbit-${{ github.ref_name }}-compiled-${{ matrix.target }}.exe

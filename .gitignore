@@ -8,3 +8,6 @@ rime-install.bat
 *.ico
 *.obj
 *.portable
+Lib/RabbitCompiledResources.ahk
+Lib/RabbitCompiledResources.zip
+.rabbit
