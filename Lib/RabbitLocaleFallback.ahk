@@ -77,7 +77,7 @@ class RabbitLocaleFallback {
         catalog["about.homepage"] := "访问项目主页"
         catalog["about.license"] := "GPL-3.0 许可证"
         catalog["about.credits"] := "使用的开源项目"
-        catalog["about.credits_description"] := "点击项目名或许可证查看详情。东风破安装的词库和方案可能有独立许可证。"
+        catalog["about.credits_description"] := "点击项目名或许可证查看详情。安装的词库和方案可能有独立许可证。"
         catalog["about.link_error"] := "无法打开链接：`n{reason}"
         catalog["about.message_title"] := "【玉兔毫】"
         catalog["controls.preedit_group"] := "浮动预编辑"

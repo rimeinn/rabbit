@@ -194,7 +194,10 @@ jobs:
             Lib/librime-ahk/LICENSE
             Lib/GetCaretPosEx/*.ahk
             Lib/GetCaretPosEx/LICENSE.txt
-            Lib/RimeDepot/**
+            Lib/RimeDepot/*.ahk
+            !Lib/RimeDepot/RimeDepotApp.ahk
+            !Lib/RimeDepot/RimeDepotGui.ahk
+            Lib/RimeDepot/LICENSE
             Lib/*.ahk
             Lib/*.ico
             Rabbit.exe
@@ -220,7 +223,10 @@ jobs:
             Lib/librime-ahk/LICENSE
             Lib/GetCaretPosEx/*.ahk
             Lib/GetCaretPosEx/LICENSE.txt
-            Lib/RimeDepot/**
+            Lib/RimeDepot/*.ahk
+            !Lib/RimeDepot/RimeDepotApp.ahk
+            !Lib/RimeDepot/RimeDepotGui.ahk
+            Lib/RimeDepot/LICENSE
             Lib/*.ahk
             Lib/*.ico
             Rabbit.exe
