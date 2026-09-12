@@ -189,7 +189,8 @@ class CandidateBox {
     }
 
     Build(context, &win_w, &win_h) {
-        local presentation := RabbitCandidatePresentation(context, this.style.label_format)
+        local presentation := RabbitCandidatePresentation(
+            context, this.style.label_format, this.style.preedit_type)
         this.BuildPresentation(presentation, &win_w, &win_h)
     }
 

@@ -1056,7 +1056,8 @@ class RabbitInputController {
             style.layout_type,
             style.flow_rows,
             this.rime,
-            this.session_id
+            this.session_id,
+            style.preedit_type
         )
         if caret && caret.caret_h > 0 && HasMethod(this.candidate_box, "BuildFloatingPresentation") {
             this.candidate_box.BuildFloatingPresentation(

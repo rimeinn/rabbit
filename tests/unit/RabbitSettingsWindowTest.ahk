@@ -295,6 +295,8 @@ TestSettingsWindowExposesAppearanceControls() {
             "The preedit corner control is missing.")
         AssertEqual("高亮圆角：", window.appearance_preedit_round_corner_label.Text,
             "The preedit highlight corner control is missing.")
+        AssertEqual("预编辑内容：", window.appearance_preedit_type_label.Text,
+            "The preedit type control is missing.")
         AssertEqual("候选水平内边距：", window.appearance_candidate_padding_x_label.Text,
             "The horizontal candidate padding control is missing.")
         AssertEqual("候选垂直内边距：", window.appearance_candidate_padding_y_label.Text,
@@ -327,6 +329,7 @@ TestSettingsWindowExposesAppearanceControls() {
 
         window.appearance_tabs.Choose(4)
         window.OnAppearanceTabChanged()
+        window.appearance_preedit_type.Choose(2)
         window.appearance_floating_preedit.Value := true
         window.OnAppearanceControlsChanged()
         AssertTrue(
@@ -336,6 +339,11 @@ TestSettingsWindowExposesAppearanceControls() {
         AssertTrue(
             window.appearance_page.settings.last_values["floating_preedit"],
             "The appearance page did not stage floating preedit."
+        )
+        AssertEqual(
+            "preview",
+            window.appearance_page.settings.last_values["preedit_type"],
+            "The appearance page staged the wrong preedit type."
         )
         AssertEqual(
             "flow",

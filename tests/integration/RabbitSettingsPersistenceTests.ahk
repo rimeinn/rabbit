@@ -129,6 +129,7 @@ TestSharedRabbitSettingsPersistence() {
             "candidate_padding_x", current_style.candidate_padding_x + 1,
             "candidate_padding_y", current_style.candidate_padding_y + 1,
             "candidate_spacing", current_style.candidate_spacing + 1,
+            "preedit_type", "preview",
             "floating_preedit", !current_style.floating_preedit,
             "shadow_radius", 8,
             "shadow_offset_x", -4,
@@ -168,6 +169,7 @@ TestSharedRabbitSettingsPersistence() {
         AssertEqual(0x80402010, reloaded_scheme.colors["shadow_color"], "Reloading changed shadow alpha.")
         AssertEqual(0, reloaded_scheme.colors["candidate_shadow_color"], "Reloading made transparent shadows opaque.")
         AssertEqual(-4, style.GetCurrentStyle().shadow_offset_x, "Reloading lost the signed shadow offset.")
+        AssertEqual("preview", style.GetCurrentStyle().preedit_type, "Reloading lost the preedit type.")
         local behavior_values := behavior.GetCurrentValues()
         behavior_values.show_tips := !behavior.show_tips
         AssertTrue(
@@ -192,6 +194,7 @@ TestSharedRabbitSettingsPersistence() {
             "The saved config omitted vertical candidate padding.")
         AssertTrue(InStr(saved, "style/layout/candidate_spacing"),
             "The saved config omitted candidate spacing.")
+        AssertTrue(InStr(saved, "style/preedit_type"), "The saved config omitted the preedit type.")
         AssertTrue(InStr(saved, "style/floating_preedit"), "The saved config omitted floating preedit.")
         AssertTrue(InStr(saved, "show_tips"), "A later save removed the behavior setting.")
         AssertTrue(InStr(saved, "rabbit-settings-test.exe"), "The application setting was not saved.")

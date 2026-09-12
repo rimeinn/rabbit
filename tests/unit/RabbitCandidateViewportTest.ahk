@@ -23,6 +23,7 @@ RunTest("flow viewport expands after page transition", TestFlowViewportExpansion
 RunTest("flow viewport collapses when returning to first page", TestFlowViewportCollapse.Bind())
 RunTest("flow viewport centers the final page", TestFlowViewportFinalPage.Bind())
 RunTest("flow viewport falls back without iterator APIs", TestFlowViewportFallback.Bind())
+RunTest("viewport applies candidate preview preedit", TestViewportCandidatePreviewPreedit.Bind())
 
 TestFlowViewportExpansion() {
     local rime := RabbitCandidateViewportRimeProbe(18)
@@ -70,6 +71,15 @@ TestFlowViewportFallback() {
     local presentation := viewport.Build(CreateViewportContext(1), "{}", "flow", 5, rime, 1)
 
     AssertEqual(3, presentation.candidates.Length, "An unavailable iterator did not fall back to the current page.")
+}
+
+TestViewportCandidatePreviewPreedit() {
+    local context := CreateViewportContext(0)
+    context.commit_text_preview := "输入法"
+    local presentation := RabbitCandidateViewport().Build(
+        context, "{}", "stacked", 5, 0, 0, "preview")
+
+    AssertEqual("输入法", presentation.preedit.selected, "The viewport ignored the preview preedit type.")
 }
 
 CreateViewportContext(page_no) {

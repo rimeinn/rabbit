@@ -67,6 +67,10 @@ style:
     type: flow
 ```
 
+现代候选窗和浮动预编辑框还可以通过 `style/preedit_type` 选择预编辑内容：`composition` 显示当前编码，
+`preview` 显示高亮候选的提交预览；提交预览为空时会自动回退到当前编码。该设置也可以在“输入法设定”的
+“外观 → 预编辑”页中修改。
+
 ## 脚本编译
 
 本仓库提供*源码形式的玉兔毫脚本*以及*仅修改主图标的 AutoHotkey 可执行文件*，用户可根据需要自行编译为可执行文件以及压缩。编译方式可参照 AutoHotkey 的[官方文档](https://www.autohotkey.com/docs/v2/Scripts.htm#ahk2exe)。

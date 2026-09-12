@@ -30,8 +30,9 @@ class RabbitCandidateViewport {
         this.last_page_no := -1
     }
 
-    Build(context, label_format, layout_type, flow_rows, rime_api := 0, session_id := 0) {
-        local presentation := RabbitCandidatePresentation(context, label_format)
+    Build(context, label_format, layout_type, flow_rows, rime_api := 0, session_id := 0,
+        preedit_type := "composition") {
+        local presentation := RabbitCandidatePresentation(context, label_format, preedit_type)
         local page_no := context.menu.page_no
         local page_size := context.menu.page_size
 

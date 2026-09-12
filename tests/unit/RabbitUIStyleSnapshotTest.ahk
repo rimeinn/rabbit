@@ -75,6 +75,17 @@ TestStyleSnapshotCopiesValues() {
     AssertEqual(0, style.candidate_padding_x, "The default horizontal candidate padding changed.")
     AssertEqual(0, style.candidate_padding_y, "The default vertical candidate padding changed.")
     AssertEqual(6, style.candidate_spacing, "The default candidate spacing changed.")
+    AssertEqual("composition", style.preedit_type, "The default preedit type changed.")
+    AssertEqual(
+        "composition",
+        RabbitUIStyleSnapshot(Map("preedit_type", "preview_all")).preedit_type,
+        "An unsupported preedit type was accepted."
+    )
+    AssertEqual(
+        "preview",
+        RabbitUIStyleSnapshot(Map("preedit_type", "PREVIEW")).preedit_type,
+        "The supported preview preedit type was not normalized."
+    )
     AssertTrue(!style.vertical_text_left_to_right, "The default vertical text direction is not right to left.")
     AssertTrue(!style.floating_preedit, "Floating preedit is not disabled by default.")
     AssertEqual(0.8, style.floating_preedit_opacity, "The default floating preedit opacity changed.")
@@ -110,6 +121,7 @@ TestStyleSnapshotParsing() {
     AssertEqual(180, light_style.min_width, "The stacked minimum width was not parsed.")
     AssertEqual(240, light_style.min_height, "The vertical text minimum height was not parsed.")
     AssertEqual("flow", light_style.layout_type, "The active layout type was not parsed.")
+    AssertEqual("preview", light_style.preedit_type, "The preedit type was not parsed.")
     AssertTrue(light_style.vertical_text_left_to_right, "The vertical text direction was not parsed.")
     AssertTrue(light_style.floating_preedit, "Floating preedit was not parsed.")
     AssertEqual(0.25, light_style.floating_preedit_opacity, "Floating preedit opacity was not parsed.")
@@ -192,6 +204,7 @@ CreateStyleConfigValues() {
         "style/font_point", 18,
         "style/label_font_point", 16,
         "style/comment_font_point", 15,
+        "style/preedit_type", "preview",
         "style/layout/margin_x", 9,
         "style/layout/margin_y", 11,
         "style/layout/candidate_padding_x", 3,

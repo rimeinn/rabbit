@@ -21,7 +21,7 @@ class RabbitUIStyleSnapshot {
     static MAX_SHADOW_OFFSET := 128
 
     __New(values := 0, overrides := 0) {
-        local key, limit, value, explicit
+        local key, limit, value, explicit, preedit_type
         ; Copy supported scalar values so published snapshots do not retain mutable input containers.
         this.use_dark := this.GetValue(overrides, "use_dark", this.GetValue(values, "use_dark", false))
         this.font_face := this.GetValue(
@@ -41,6 +41,9 @@ class RabbitUIStyleSnapshot {
         this.comment_font_point := this.GetValue(
             overrides, "comment_font_point", this.GetValue(values, "comment_font_point", 14))
         this.label_format := this.GetValue(overrides, "label_format", this.GetValue(values, "label_format", "{}. "))
+        preedit_type := StrLower(this.GetValue(
+            overrides, "preedit_type", this.GetValue(values, "preedit_type", "composition")))
+        this.preedit_type := preedit_type = "preview" ? "preview" : "composition"
 
         this.border_width := this.GetValue(overrides, "border_width", this.GetValue(values, "border_width", 2))
         this.preedit_border_width := this.ResolveFallbackValue(
@@ -164,7 +167,7 @@ class RabbitUIStyleSnapshot {
     }
 
     static FromConfig(rime_api, config, dark_mode := false, color_scheme?) {
-        local fmt, bw, preedit_bw, cr, preedit_cr, r, preedit_r, mx, my
+        local fmt, preedit_type, bw, preedit_bw, cr, preedit_cr, r, preedit_r, mx, my
         local preedit_mx, preedit_my, candidate_padding_x, candidate_padding_y, candidate_spacing
         local w, h, vertical_text_left_to_right, floating_preedit
         local floating_preedit_opacity
@@ -210,6 +213,12 @@ class RabbitUIStyleSnapshot {
 
         if rime_api.config_test_get_string(config, "style/label_format", &fmt) && fmt {
             values["label_format"] := fmt
+        }
+        if rime_api.config_test_get_string(config, "style/preedit_type", &preedit_type) {
+            preedit_type := StrLower(preedit_type)
+            if preedit_type = "composition" || preedit_type = "preview" {
+                values["preedit_type"] := preedit_type
+            }
         }
         if rime_api.config_test_get_int(config, "style/layout/border_width", &bw) && bw >= 0 {
             values["border_width"] := bw

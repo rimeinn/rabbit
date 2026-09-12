@@ -21,6 +21,7 @@
 RunTest("appearance preview uses the production candidate renderer", TestAppearancePreviewUsesCandidateRenderer.Bind())
 RunTest("appearance preview builds standard placeholders", TestAppearancePreviewBuildsStandardPlaceholders.Bind())
 RunTest("appearance preview builds expanded flow placeholders", TestAppearancePreviewBuildsFlowPlaceholders.Bind())
+RunTest("appearance preview reflects candidate preview preedit", TestAppearancePreviewReflectsCandidatePreview.Bind())
 RunTest("appearance preview uses configured candidate labels", TestAppearancePreviewUsesConfiguredLabels.Bind())
 RunTest("appearance preview aligns beside the client area", TestAppearancePreviewAlignsBesideClientArea.Bind())
 
@@ -82,6 +83,15 @@ TestAppearancePreviewBuildsFlowPlaceholders() {
         AssertEqual(index = 6, candidate.highlighted, "The flow preview highlighted the wrong candidate.")
         AssertEqual(current, !!candidate.label, "A flow candidate used the wrong label visibility.")
     }
+}
+
+TestAppearancePreviewReflectsCandidatePreview() {
+    local presentation := RabbitAppearancePreview.CreatePresentation(
+        RabbitUIStyleSnapshot({ preedit_type: "preview" }))
+
+    AssertEqual("", presentation.preedit.before_selection, "Preview mode retained the placeholder prefix.")
+    AssertEqual("输入法", presentation.preedit.selected, "Preview mode did not show the candidate preview.")
+    AssertEqual("", presentation.preedit.after_selection, "Preview mode retained the placeholder suffix.")
 }
 
 TestAppearancePreviewUsesConfiguredLabels() {

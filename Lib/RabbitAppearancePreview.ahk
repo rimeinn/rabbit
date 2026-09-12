@@ -261,8 +261,8 @@ class RabbitAppearancePreview {
 
     static CreatePresentation(style, select_labels := 0) {
         return style.layout_type = "flow"
-            ? this.CreateFlowPresentation(style.label_format, select_labels)
-            : this.CreateStandardPresentation(style.label_format, select_labels)
+            ? this.CreateFlowPresentation(style.label_format, select_labels, style.preedit_type)
+            : this.CreateStandardPresentation(style.label_format, select_labels, style.preedit_type)
     }
 
     static AlignBesidePositionToClient(position, client_top, width, height, monitor_info) {
@@ -282,7 +282,7 @@ class RabbitAppearancePreview {
         return aligned
     }
 
-    static CreateStandardPresentation(label_format, select_labels := 0) {
+    static CreateStandardPresentation(label_format, select_labels := 0, preedit_type := "composition") {
         local texts := ["输入", "书", "数", "树", "输"]
         local comments := ["shū rù", "shū", "shǔ", "shù", "shū"]
         local candidates := []
@@ -295,13 +295,15 @@ class RabbitAppearancePreview {
             })
         }
         return {
-            preedit: this.CreatePreedit("玉兔毫", "shu ru", "fa", "after_selection", 0),
+            preedit: preedit_type = "preview"
+                ? this.CreatePreedit("", "输入法", "", "after_selection", 0)
+                : this.CreatePreedit("玉兔毫", "shu ru", "fa", "after_selection", 0),
             highlighted_index: 1,
             candidates: candidates,
         }
     }
 
-    static CreateFlowPresentation(label_format, select_labels := 0) {
+    static CreateFlowPresentation(label_format, select_labels := 0, preedit_type := "composition") {
         local pages := [
             ["输入法", "输入", "书", "数", "树"],
             ["输", "属", "熟", "术", "舒"],
@@ -325,7 +327,9 @@ class RabbitAppearancePreview {
             }
         }
         return {
-            preedit: this.CreatePreedit("玉兔毫", "shu", "rufa", "after_selection", 4),
+            preedit: preedit_type = "preview"
+                ? this.CreatePreedit("", "输入法", "", "after_selection", 0)
+                : this.CreatePreedit("玉兔毫", "shu", "rufa", "after_selection", 4),
             highlighted_index: 6,
             candidates: candidates,
             flow_page_size: 5,

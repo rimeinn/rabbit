@@ -212,6 +212,7 @@ class RabbitAppearanceSettingsPage {
         owner.appearance_label_font_point.Value := style.label_font_point
         owner.appearance_comment_font_point.Value := style.comment_font_point
         owner.appearance_label_format.Value := style.label_format
+        owner.appearance_preedit_type.Choose(style.preedit_type = "preview" ? 2 : 1)
         owner.appearance_layout_type.Choose(
             style.layout_type = "flow" ? 2 : style.layout_type = "vertical_text" ? 3 : 1)
         owner.appearance_align_type.Choose(
@@ -739,6 +740,7 @@ class RabbitAppearanceSettingsPage {
             "comment_font_point", this.ReadNumber(
                 owner.appearance_comment_font_point, RabbitI18n.Text("appearance.comment_size"), 6, 72),
             "label_format", label_format,
+            "preedit_type", ["composition", "preview"][owner.appearance_preedit_type.Value],
             "layout_type", ["stacked", "flow", "vertical_text"][owner.appearance_layout_type.Value],
             "align_type", ["top", "center", "bottom"][owner.appearance_align_type.Value],
             "margin_x", this.ReadNumber(owner.appearance_margin_x, RabbitI18n.Text("appearance.margin_x"), 0, 500),

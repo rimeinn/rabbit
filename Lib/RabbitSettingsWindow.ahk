@@ -1062,6 +1062,13 @@ class RabbitSettingsWindow extends Gui {
         )
         this.appearance_vertical_direction.OnEvent("Click", (*) => this.OnAppearanceControlsChanged())
         this.appearance_tabs.UseTab(4)
+        this.appearance_preedit_type_label := this.AddText("x260 y634 w112 h22 Hidden",
+            RabbitI18n.Text("controls.preedit_type"))
+        this.appearance_preedit_type := this.AddDropDownList(
+            "x374 y630 w180 Choose1 Hidden",
+            [RabbitI18n.Text("controls.preedit_composition"), RabbitI18n.Text("controls.preedit_preview")]
+        )
+        this.appearance_preedit_type.OnEvent("Change", (*) => this.OnAppearanceControlsChanged())
         this.appearance_floating_preedit := this.AddCheckbox(
             "x260 y634 w190 h24 Hidden",
             RabbitI18n.Text("controls.floating_preedit")
@@ -1150,6 +1157,8 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_flow_rows_label,
             this.appearance_flow_rows,
             this.appearance_vertical_direction,
+            this.appearance_preedit_type_label,
+            this.appearance_preedit_type,
             this.appearance_floating_preedit,
             this.appearance_floating_opacity_label,
             this.appearance_floating_opacity,
@@ -1248,8 +1257,18 @@ class RabbitSettingsWindow extends Gui {
             this.%"appearance_" . name . "_label"%.Move(, 428)
             this.%"appearance_" . name%.Move(, 424)
         }
-        this.appearance_preedit_controls := [this.appearance_floating_preedit]
-        this.appearance_floating_preedit.Move(260, 196, 506)
+        this.appearance_preedit_controls := [
+            this.appearance_preedit_type_label,
+            this.appearance_preedit_type,
+            this.appearance_floating_preedit,
+        ]
+        measured := this.AddText("Hidden", this.appearance_preedit_type_label.Text)
+        measured.GetPos(, , &width)
+        label_width := Max(112, width + 8)
+        this.appearance_preedit_type_label.Move(260, 196, label_width)
+        this.appearance_preedit_type.Move(260 + label_width, 192, Min(220, 506 - label_width))
+        this.appearance_floating_preedit.Move(260, 226, 506)
+        label_width := 112
         local pairs := [
             ["floating_opacity", "floating_height"],
             ["preedit_margin_x", "preedit_margin_y"],
@@ -1268,14 +1287,14 @@ class RabbitSettingsWindow extends Gui {
             for col, name in pair {
                 label := this.%"appearance_" . name . "_label"%
                 edit := this.%"appearance_" . name%
-                label.Move(260 + (col - 1) * 254, 230 + (row - 1) * 28, label_width, 22)
-                edit.Move(260 + (col - 1) * 254 + label_width, 226 + (row - 1) * 28,
+                label.Move(260 + (col - 1) * 254, 260 + (row - 1) * 28, label_width, 22)
+                edit.Move(260 + (col - 1) * 254 + label_width, 256 + (row - 1) * 28,
                     Max(48, 244 - label_width))
                 this.appearance_preedit_controls.Push(label, edit)
             }
         }
         this.appearance_tabs.UseTab(4)
-        this.appearance_preedit_hint := this.AddText("x260 y350 w510 h32 Hidden",
+        this.appearance_preedit_hint := this.AddText("x260 y380 w510 h32 Hidden",
             RabbitI18n.Text("controls.preedit_hint"))
         this.appearance_tabs.UseTab()
         this.appearance_preedit_controls.Push(this.appearance_preedit_hint)

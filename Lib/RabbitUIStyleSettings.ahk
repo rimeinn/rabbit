@@ -238,6 +238,7 @@ class UIStyleSettings {
             "label_font_point",
             "comment_font_point",
             "label_format",
+            "preedit_type",
             "layout_type",
             "align_type",
             "border_width",
@@ -285,6 +286,7 @@ class UIStyleSettings {
             "label_font_face", "style/label_font_face",
             "comment_font_face", "style/comment_font_face",
             "label_format", "style/label_format",
+            "preedit_type", "style/preedit_type",
             "layout_type", "style/layout/type",
             "align_type", "style/layout/align_type"
         ) {

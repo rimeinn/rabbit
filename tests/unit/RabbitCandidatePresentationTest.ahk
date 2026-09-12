@@ -20,6 +20,8 @@
 #Include ..\..\Lib\RabbitCandidatePresentation.ahk
 
 RunTest("UTF-8 candidate presentation", TestUtf8CandidatePresentation.Bind())
+RunTest("candidate preview preedit presentation", TestCandidatePreviewPreeditPresentation.Bind())
+RunTest("empty candidate preview falls back to composition", TestEmptyCandidatePreviewFallback.Bind())
 RunTest("candidate label fallback presentation", TestCandidateLabelFallbackPresentation.Bind())
 RunTest("empty candidate presentation", TestEmptyCandidatePresentation.Bind())
 
@@ -40,6 +42,28 @@ TestUtf8CandidatePresentation() {
     AssertEqual("‸", presentation.preedit.cursor.text, "The cursor text is incorrect.")
     AssertEqual("after_selection", presentation.preedit.cursor.segment, "The cursor segment is incorrect.")
     AssertEqual(0, presentation.preedit.cursor.offset, "The cursor offset is incorrect.")
+}
+
+TestCandidatePreviewPreeditPresentation() {
+    local context := CreatePresentationContext()
+    context.commit_text_preview := "输入法"
+    local presentation := RabbitCandidatePresentation(context, "{}", "preview")
+
+    AssertEqual("", presentation.preedit.before_selection, "Preview preedit retained a composition prefix.")
+    AssertEqual("输入法", presentation.preedit.selected, "Preview preedit did not use the commit-text preview.")
+    AssertEqual("", presentation.preedit.after_selection, "Preview preedit retained a composition suffix.")
+    AssertEqual("after_selection", presentation.preedit.cursor.segment, "The preview cursor is in the wrong segment.")
+    AssertEqual(0, presentation.preedit.cursor.offset, "The preview cursor is not at the end of the selection.")
+}
+
+TestEmptyCandidatePreviewFallback() {
+    local context := CreatePresentationContext()
+    context.composition.preedit := "shuru"
+    context.composition.cursor_pos := 5
+    local presentation := RabbitCandidatePresentation(context, "{}", "preview")
+
+    AssertEqual("shuru", presentation.preedit.before_selection, "An empty preview did not fall back to composition.")
+    AssertEqual("", presentation.preedit.selected, "The composition fallback created an unexpected selection.")
 }
 
 TestCandidateLabelFallbackPresentation() {
@@ -83,6 +107,7 @@ CreatePresentationContext() {
             sel_start: 0,
             sel_end: 0
         },
+        commit_text_preview: "",
         menu: {
             candidates: [
                 { text: "候选一", comment: "注释" },

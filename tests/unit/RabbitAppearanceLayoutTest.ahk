@@ -49,6 +49,8 @@ TestAppearanceGroupBounds() {
             window.OnAppearanceTabChanged()
             AssertTrue(window.appearance_floating_preedit.Visible,
                 "Opening the preedit tab first did not initialize its controls.")
+            AssertTrue(window.appearance_preedit_type.Visible,
+                "Opening the preedit tab first did not show the preedit type control.")
             AssertTrue(!window.appearance_font.Visible, "The preedit tab exposed typography controls.")
             window.appearance_tabs.Choose(2)
             window.OnAppearanceTabChanged()
@@ -92,6 +94,14 @@ TestAppearanceGroupBounds() {
             AssertTrue(gy + gh < status_y, locale . ": preedit group overlaps the status line.")
             window.appearance_preedit_hint.GetPos(, &y, , &h)
             AssertTrue(y + h <= gy + gh, locale . ": fallback hint is outside the preedit group.")
+            window.appearance_preedit_type.GetPos(&x, &y, &w, &h)
+            AssertTrue(x >= gx && y >= gy && x + w <= gx + gw && y + h <= gy + gh,
+                locale . ": preedit type control is outside its group.")
+            window.appearance_preedit_type_label.GetPos(&label_x, , &label_width)
+            measure := window.AddText("Hidden", window.appearance_preedit_type_label.Text)
+            measure.GetPos(, , &text_width)
+            AssertTrue(text_width <= label_width && label_x + label_width <= x,
+                locale . ": clipped preedit type label.")
             for name in ["preedit_margin_x", "preedit_margin_y", "preedit_border_width",
                 "preedit_corner_radius", "preedit_round_corner", "floating_opacity", "floating_height"] {
                 controls := window.%"appearance_" . name%

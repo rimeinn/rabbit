@@ -34,6 +34,7 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
             "font_face", "Test Candidate Font",
             "preedit_font_face", "Test Preedit Font",
             "font_point", 18,
+            "preedit_type", "preview",
             "layout_type", "flow",
             "flow_rows", 4,
             "candidate_padding_x", 3,
@@ -59,6 +60,7 @@ TestUIStyleSettingsSaveTypographyAndLayout() {
     for expected in [
         "string:style/font_face:Test Candidate Font",
         "string:style/preedit_font_face:Test Preedit Font",
+        "string:style/preedit_type:preview",
         "string:style/layout/type:flow",
         "int:style/font_point:18",
         "int:style/layout/flow_rows:4",

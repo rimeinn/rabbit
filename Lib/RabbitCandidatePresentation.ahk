@@ -17,12 +17,12 @@
  */
 
 class RabbitCandidatePresentation {
-    __New(context, label_format) {
+    __New(context, label_format, preedit_type := "composition") {
         local before_selection, selected, after_selection, cursor
         local menu := context.menu
         local candidates := menu.candidates
-        RabbitGetCompositionText(
-            context.composition, &before_selection, &selected, &after_selection, &cursor)
+        RabbitGetPreeditText(
+            context, preedit_type, &before_selection, &selected, &after_selection, &cursor)
         this.preedit := {
             before_selection: before_selection,
             selected: selected,
@@ -57,6 +57,21 @@ class RabbitCandidatePresentation {
         }
         return label
     }
+}
+
+RabbitGetPreeditText(context, preedit_type, &pre_selected, &selected, &post_selected, &cursor) {
+    local preview
+    if preedit_type = "preview"
+        && HasProp(context, "commit_text_preview")
+        && (preview := context.commit_text_preview) {
+        pre_selected := ""
+        selected := preview
+        post_selected := ""
+        cursor := {text: "‸", segment: "after_selection", offset: 0}
+        return true
+    }
+    return RabbitGetCompositionText(
+        context.composition, &pre_selected, &selected, &post_selected, &cursor)
 }
 
 RabbitGetCompositionText(composition, &pre_selected, &selected, &post_selected, &cursor) {
