@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitDeployerWorkflow.ahk
 
 RunTest("deploy workflow ownership", TestDeployWorkflowOwnership.Bind())
+RunTest("deploy workflow honors granular plans", TestDeployWorkflowGranularity.Bind())
 RunTest("sync workflow ownership", TestSyncWorkflowOwnership.Bind())
 RunTest("deploy workflow failure cleanup", TestDeployWorkflowFailureCleanup.Bind())
 RunTest("deploy workflow checks librime results", TestDeployWorkflowChecksLibrimeResults.Bind())
@@ -34,9 +35,53 @@ TestDeployWorkflowOwnership() {
 
     AssertEqual(0, workflow.UpdateWorkspace(), "The deploy workflow failed.")
     AssertEqual(
-        "mutex_create,deploy,deploy_config,mutex_close",
+        "mutex_create,deploy,deploy_config:rabbit.yaml,mutex_close",
         JoinWorkflowCalls(calls),
         "The deploy workflow created unrelated services or released its mutex out of order."
+    )
+}
+
+TestDeployWorkflowGranularity() {
+    local calls := []
+    local workflow := RabbitDeployerWorkflowProbe(
+        RabbitDeployerWorkflowRimeProbe(calls),
+        calls
+    )
+
+    AssertEqual(0, workflow.Deploy(RabbitDeploymentPlan()), "An empty deployment plan failed.")
+    AssertEqual("", JoinWorkflowCalls(calls), "An empty deployment plan acquired the deployment mutex.")
+
+    AssertEqual(0, workflow.Deploy(RabbitDeploymentPlan.RabbitConfig()), "Rabbit config deployment failed.")
+    AssertEqual(
+        "mutex_create,deploy_config:rabbit.yaml,mutex_close",
+        JoinWorkflowCalls(calls),
+        "A Rabbit-only change triggered unrelated deployment work."
+    )
+
+    calls.Length := 0
+    AssertEqual(0, workflow.Deploy(RabbitDeploymentPlan.DefaultConfig()), "Default config deployment failed.")
+    AssertEqual(
+        "mutex_create,deploy_config:default.yaml,mutex_close",
+        JoinWorkflowCalls(calls),
+        "A default-only change triggered unrelated deployment work."
+    )
+
+    calls.Length := 0
+    local plan := RabbitDeploymentPlan.DefaultConfig().Merge(RabbitDeploymentPlan.RabbitConfig())
+    AssertEqual(0, workflow.Deploy(plan), "Merged config deployment failed.")
+    AssertEqual(
+        "mutex_create,deploy_config:default.yaml,deploy_config:rabbit.yaml,mutex_close",
+        JoinWorkflowCalls(calls),
+        "Merged config changes were not deployed in dependency order."
+    )
+
+    calls.Length := 0
+    plan.RequireWorkspace()
+    AssertEqual(0, workflow.Deploy(plan), "Workspace deployment failed.")
+    AssertEqual(
+        "mutex_create,deploy,deploy_config:rabbit.yaml,mutex_close",
+        JoinWorkflowCalls(calls),
+        "A workspace deployment redundantly deployed default.yaml."
     )
 }
 
@@ -82,7 +127,7 @@ TestDeployWorkflowChecksLibrimeResults() {
 
     AssertEqual(1, workflow.UpdateWorkspace(), "The deploy workflow ignored a failed config deployment.")
     AssertEqual(
-        "mutex_create,deploy,deploy_config,mutex_close",
+        "mutex_create,deploy,deploy_config:rabbit.yaml,mutex_close",
         JoinWorkflowCalls(calls),
         "A reported config deployment failure skipped mutex cleanup."
     )
@@ -235,7 +280,7 @@ class RabbitDeployerWorkflowRimeProbe {
     }
 
     deploy_config_file(filename, version_key) {
-        this.calls.Push("deploy_config")
+        this.calls.Push("deploy_config:" . filename)
         return this.config_result
     }
 

@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitDeploymentPlan.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitBehaviorSettingsModel.ahk
 #Include RabbitDictionarySettingsModel.ahk
@@ -218,7 +219,17 @@ class RabbitDeployerWorkflow {
     }
 
     UpdateWorkspace(report_errors := false) {
+        return this.Deploy(RabbitDeploymentPlan.FullRedeploy(), report_errors)
+    }
+
+    Deploy(plan, report_errors := false) {
         local mutex
+        if !(plan is RabbitDeploymentPlan) {
+            throw TypeError("Expected a RabbitDeploymentPlan.")
+        }
+        if plan.IsEmpty() {
+            return 0
+        }
         mutex := this.CreateMutex()
         if !mutex.Create() {
             ; TODO: log error
@@ -238,10 +249,16 @@ class RabbitDeployerWorkflow {
                 return 1
             }
 
-            if !this.rime.deploy() {
+            if plan.full_workspace_required {
+                if !this.rime.deploy() {
+                    return 1
+                }
+            } else if plan.default_config_changed
+                && !this.rime.deploy_config_file("default.yaml", "config_version") {
                 return 1
             }
-            if !this.rime.deploy_config_file("rabbit.yaml", "config_version") {
+            if plan.rabbit_config_changed
+                && !this.rime.deploy_config_file("rabbit.yaml", "config_version") {
                 return 1
             }
             return 0

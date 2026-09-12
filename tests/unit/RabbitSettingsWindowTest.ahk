@@ -919,9 +919,10 @@ TestSettingsWindowCompletesFirstInstallInPlace() {
         AssertEqual("应用并重新部署", window.apply_button.Text, "The unlocked window kept the install action label.")
         AssertTrue(window.SelectPage(7), "The unlocked window could not open another settings page.")
         AssertEqual(
-            "create_model,force_schema_selection,save:schema_a:Control+grave,dispose_model,deploy,create_model",
+            "create_model,force_schema_selection,save:schema_a:Control+grave,dispose_model," .
+                "deploy:workspace+rabbit,create_model",
             JoinSettingsWorkflowCalls(calls),
-            "Install mode did not dispose, deploy, and recreate its model in order."
+            "Install mode did not perform a full deployment between disposing and recreating its model."
         )
     } finally {
         window.Dispose()
@@ -945,9 +946,9 @@ TestSettingsWindowDeploysFirstInstallWithoutSaving() {
         window.Dispose()
     }
     AssertEqual(
-        "create_model,prompt,deploy,dispose_model",
+        "create_model,prompt,deploy:workspace+rabbit,dispose_model",
         JoinSettingsWorkflowCalls(calls),
-        "Confirmed install close did not deploy without saving."
+        "Confirmed install close did not perform a full deployment without saving."
     )
 }
 
@@ -1117,6 +1118,15 @@ class RabbitSettingsInstallWorkflowProbe {
         return RabbitSettingsSwitcherModelProbe(this.calls)
     }
 
+    Deploy(plan, report_errors := false) {
+        local operation := plan.full_workspace_required ? "workspace" : "config"
+        if plan.rabbit_config_changed {
+            operation .= "+rabbit"
+        }
+        this.calls.Push("deploy:" . operation)
+        return this.deploy_result
+    }
+
     UpdateWorkspace(report_errors := false) {
         this.calls.Push("deploy")
         return this.deploy_result
@@ -1199,6 +1209,10 @@ class RabbitSettingsBehaviorModelProbe {
 
     GetBindings() {
         return RabbitBehaviorSettingsModel.CloneValue(this.bindings)
+    }
+
+    GetDeploymentPlan(values) {
+        return RabbitDeploymentPlan.RabbitConfig()
     }
 
     Save(values) {
@@ -1505,6 +1519,10 @@ class RabbitSettingsSwitcherModelProbe {
             custom: false,
             selected: true,
         }]
+    }
+
+    GetDeploymentPlan(values, force_schema_selection := false) {
+        return RabbitDeploymentPlan.Workspace()
     }
 
     Save(values, force_schema_selection := false) {

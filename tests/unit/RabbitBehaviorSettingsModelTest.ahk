@@ -22,6 +22,7 @@
 RunTest("behavior settings model loads effective defaults", TestBehaviorSettingsModelLoadsDefaults.Bind())
 RunTest("behavior settings model isolates config files", TestBehaviorSettingsModelIsolatesConfigFiles.Bind())
 RunTest("behavior settings model replaces bindings without losing fields", TestBehaviorSettingsModelBindings.Bind())
+RunTest("behavior settings model selects deployment granularity", TestBehaviorDeploymentGranularity.Bind())
 
 TestBehaviorSettingsModelLoadsDefaults() {
     local calls := []
@@ -134,6 +135,37 @@ TestBehaviorSettingsModelBindings() {
             BehaviorCallsContain(calls, 'item:default:key_binder/bindings:', '"custom_field": "kept"'),
             "The full-list replacement dropped an unknown binding field."
         )
+    } finally {
+        model.Dispose()
+    }
+}
+
+TestBehaviorDeploymentGranularity() {
+    local calls := []
+    local model := CreateBehaviorModel(calls)
+    local plan, values
+    try {
+        values := model.GetCurrentValues()
+        AssertTrue(model.GetDeploymentPlan(values).IsEmpty(), "Unchanged behavior settings requested deployment.")
+
+        values.show_tips := !values.show_tips
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.rabbit_config_changed, "A Rabbit setting did not request rabbit.yaml deployment.")
+        AssertTrue(!plan.default_config_changed, "A Rabbit setting requested default.yaml deployment.")
+        AssertTrue(!plan.full_workspace_required, "A Rabbit setting requested workspace deployment.")
+
+        values := model.GetCurrentValues()
+        values.good_old_caps_lock := !values.good_old_caps_lock
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.default_config_changed, "An ASCII composer setting did not request default.yaml deployment.")
+        AssertTrue(!plan.rabbit_config_changed, "An ASCII composer setting requested rabbit.yaml deployment.")
+        AssertTrue(!plan.full_workspace_required, "An ASCII composer setting requested workspace deployment.")
+
+        values := model.GetCurrentValues()
+        values.page_size += 1
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.full_workspace_required, "A schema-visible menu setting did not request workspace deployment.")
+        AssertTrue(!plan.rabbit_config_changed, "A menu setting requested rabbit.yaml deployment.")
     } finally {
         model.Dispose()
     }

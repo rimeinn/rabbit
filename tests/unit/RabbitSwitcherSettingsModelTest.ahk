@@ -20,6 +20,7 @@
 #Include ..\..\Lib\RabbitSwitcherSettingsModel.ahk
 
 RunTest("switcher settings model loads, discovers, and saves all fields", TestSwitcherSettingsModel.Bind())
+RunTest("switcher settings model selects deployment granularity", TestSwitcherDeploymentGranularity.Bind())
 
 TestSwitcherSettingsModel() {
     local calls := []
@@ -89,6 +90,35 @@ TestSwitcherSettingsModel() {
         model.Dispose()
     }
     AssertTrue(HasSwitcherModelCall(calls, "settings_destroy"), "The switcher settings leaked.")
+}
+
+TestSwitcherDeploymentGranularity() {
+    local calls := []
+    local model := RabbitSwitcherSettingsModelProbe(
+        RabbitSwitcherModelLeversProbe(calls),
+        RabbitSwitcherModelRimeProbe(calls)
+    )
+    local plan, values
+    try {
+        values := model.GetCurrentValues()
+        AssertTrue(model.GetDeploymentPlan(values).IsEmpty(), "Unchanged switcher settings requested deployment.")
+
+        values.caption := "方案"
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.default_config_changed, "A switcher setting did not request default.yaml deployment.")
+        AssertTrue(!plan.full_workspace_required, "A switcher setting requested workspace deployment.")
+
+        values := model.GetCurrentValues()
+        values.schema_ids := ["schema_a"]
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.full_workspace_required, "A schema-list change did not request workspace deployment.")
+        AssertTrue(!plan.default_config_changed, "A schema-list-only change requested redundant default deployment.")
+
+        plan := model.GetDeploymentPlan(model.GetCurrentValues(), true)
+        AssertTrue(plan.full_workspace_required, "A forced schema selection did not request workspace deployment.")
+    } finally {
+        model.Dispose()
+    }
 }
 
 HasSwitcherModelCall(calls, expected) {

@@ -19,6 +19,7 @@
 #Include RabbitAdvancedFontSettingsDialog.ahk
 #Include RabbitColorSchemeDialog.ahk
 #Include RabbitCommon.ahk
+#Include RabbitDeploymentPlan.ahk
 #Include Direct2D\Direct2D.ahk
 #Include RabbitFontSpec.ahk
 #Include RabbitUIStyleSnapshot.ahk
@@ -893,7 +894,7 @@ class RabbitAppearanceSettingsPage {
                 owner.appearance_status.Value := RabbitI18n.Text("controls.appearance_save_error")
                 return false
             }
-            deploy_result := owner.UpdateWorkspace()
+            deploy_result := owner.Deploy(RabbitDeploymentPlan.RabbitConfig())
             if deploy_result != 0 {
                 owner.appearance_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false

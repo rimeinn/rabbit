@@ -139,6 +139,11 @@ RabbitSettingsRimeDepotOpenTest() {
         AssertTrue(window.OpenRimeDepot(), "The downloader tab did not complete its open transaction.")
         AssertEqual(1, workflow.save_count, "Open downloader did not save the four downloader keys once.")
         AssertEqual(1, workflow.deploy_count, "Open downloader did not perform exactly one deployment.")
+        AssertTrue(workflow.last_deployment_plan.rabbit_config_changed,
+            "Open downloader did not deploy rabbit.yaml.")
+        AssertTrue(!workflow.last_deployment_plan.default_config_changed
+            && !workflow.last_deployment_plan.full_workspace_required,
+            "Open downloader performed unrelated deployment work.")
         AssertEqual(1, factory.create_count, "Open downloader did not create exactly one child.")
         AssertTrue(!window.rime_depot_dirty && !window.parent_operation_busy && !window.rime_depot_busy,
             "Open downloader left the parent dirty or locked after success.")
@@ -250,6 +255,11 @@ RabbitSettingsRimeDepotGlobalApplyTest() {
             . window.footer_status.Value . " save=" . workflow.save_count . " deploy=" . workflow.deploy_count)
         AssertEqual(1, workflow.save_count, "Global Apply did not save downloader settings once.")
         AssertEqual(1, workflow.deploy_count, "Global Apply did not deploy once.")
+        AssertTrue(workflow.last_deployment_plan.rabbit_config_changed,
+            "Global Apply did not deploy its Rabbit settings.")
+        AssertTrue(!workflow.last_deployment_plan.default_config_changed
+            && !workflow.last_deployment_plan.full_workspace_required,
+            "Rabbit-only global changes performed unrelated deployment work.")
         AssertEqual(1, window.application_model.save_count, "Global Apply did not save the other dirty page.")
         AssertTrue(!window.rime_depot_dirty && !window.application_dirty && !window.rime_depot_window,
             "Global Apply left dirty state or opened the downloader child.")
@@ -446,6 +456,7 @@ class RabbitSettingsRimeDepotWorkflowProbe {
         this.fail_save := false
         this.deploy_result := 0
         this.saved_values := 0
+        this.last_deployment_plan := RabbitDeploymentPlan()
     }
 
     CreateRimeDepotSettings() {
@@ -461,8 +472,15 @@ class RabbitSettingsRimeDepotWorkflowProbe {
         return true
     }
 
+    Deploy(plan, *) {
+        this.deploy_count += 1
+        this.last_deployment_plan := plan
+        return this.deploy_result
+    }
+
     UpdateWorkspace(*) {
         this.deploy_count += 1
+        this.last_deployment_plan := RabbitDeploymentPlan.FullRedeploy()
         return this.deploy_result
     }
 }

@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitDeploymentPlan.ahk
 
 #Include RabbitI18n.ahk
 
@@ -329,6 +330,34 @@ class RabbitSwitcherSettingsModel {
         this.SetCurrentValues(values)
         this.original_values := this.GetCurrentValues()
         return true
+    }
+
+    GetDeploymentPlan(values, force_schema_selection := false) {
+        local plan := RabbitDeploymentPlan()
+        if force_schema_selection || this.HasSchemaListChanges(values) {
+            plan.RequireWorkspace()
+        }
+        if this.HasSwitcherConfigChanges(values) {
+            plan.RequireDefaultConfig()
+        }
+        return plan
+    }
+
+    HasSchemaListChanges(values) {
+        return !RabbitSwitcherSettingsModel.ValuesEqual(values.schema_ids, this.original_values.schema_ids)
+    }
+
+    HasSwitcherConfigChanges(values) {
+        local original := this.original_values
+        return values.hotkeys != original.hotkeys
+            || values.caption != original.caption
+            || !RabbitSwitcherSettingsModel.StringSetsEqual(values.save_options, original.save_options)
+            || values.fold_options != original.fold_options
+            || values.abbreviate_options != original.abbreviate_options
+            || values.option_list_prefix != original.option_list_prefix
+            || values.option_list_suffix != original.option_list_suffix
+            || values.option_list_separator != original.option_list_separator
+            || values.fix_schema_list_order != original.fix_schema_list_order
     }
 
     CustomizeHotkeys(hotkeys, original_hotkeys := "") {

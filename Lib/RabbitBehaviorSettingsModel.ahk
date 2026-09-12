@@ -17,6 +17,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitDeploymentPlan.ahk
 
 #Include RabbitI18n.ahk
 
@@ -250,6 +251,20 @@ class RabbitBehaviorSettingsModel {
         return true
     }
 
+    GetDeploymentPlan(values) {
+        local plan := RabbitDeploymentPlan()
+        if this.HasRabbitChanges(values) {
+            plan.RequireRabbitConfig()
+        }
+        if this.HasAsciiComposerChanges(values) {
+            plan.RequireDefaultConfig()
+        }
+        if this.HasSchemaAffectingDefaultChanges(values) {
+            plan.RequireWorkspace()
+        }
+        return plan
+    }
+
     HasRabbitChanges(values) {
         local original := this.original_values
         return values.language != original.language
@@ -264,10 +279,18 @@ class RabbitBehaviorSettingsModel {
     }
 
     HasDefaultChanges(values) {
+        return this.HasAsciiComposerChanges(values) || this.HasSchemaAffectingDefaultChanges(values)
+    }
+
+    HasAsciiComposerChanges(values) {
         local original := this.original_values
         return !RabbitBehaviorSettingsModel.ValuesEqual(values.switch_key, original.switch_key)
             || values.good_old_caps_lock != original.good_old_caps_lock
-            || values.page_size != original.page_size
+    }
+
+    HasSchemaAffectingDefaultChanges(values) {
+        local original := this.original_values
+        return values.page_size != original.page_size
             || !RabbitBehaviorSettingsModel.ValuesEqual(
                 values.alternative_select_labels,
                 original.alternative_select_labels

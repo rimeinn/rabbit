@@ -19,6 +19,7 @@
 #Include RabbitAppearanceSettingsPage.ahk
 #Include RabbitAbout.ahk
 #Include RabbitCommon.ahk
+#Include RabbitDeploymentPlan.ahk
 #Include RabbitI18n.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
@@ -1830,6 +1831,7 @@ class RabbitSettingsWindow extends Gui {
         local behavior_values := 0
         local switcher_values := 0
         local rime_depot_values := 0
+        local deployment_plan := RabbitDeploymentPlan()
         local deploy_result
         if this.IsRimeDepotBusy() {
             this.footer_status.Value := RabbitI18n.Text("depot.busy")
@@ -1855,6 +1857,7 @@ class RabbitSettingsWindow extends Gui {
                 this.switcher_status.Value := RabbitI18n.Text("controls.need_scheme")
                 return false
             }
+            deployment_plan.Merge(this.switcher_model.GetDeploymentPlan(switcher_values))
         }
         if this.appearance_page.dirty {
             try {
@@ -1864,6 +1867,7 @@ class RabbitSettingsWindow extends Gui {
                 this.appearance_status.Value := err.Message
                 return false
             }
+            deployment_plan.RequireRabbitConfig()
         }
         if this.behavior_dirty {
             try {
@@ -1873,6 +1877,7 @@ class RabbitSettingsWindow extends Gui {
                 this.behavior_status.Value := err.Message
                 return false
             }
+            deployment_plan.Merge(this.behavior_model.GetDeploymentPlan(behavior_values))
         }
         if this.rime_depot_dirty {
             if !this.EnsureRimeDepotSettings() {
@@ -1884,6 +1889,10 @@ class RabbitSettingsWindow extends Gui {
                 this.ShowRimeDepotSettingsError(err.Message)
                 return false
             }
+            deployment_plan.RequireRabbitConfig()
+        }
+        if this.application_dirty {
+            deployment_plan.RequireRabbitConfig()
         }
 
         if !this.TryBeginParentOperation() {
@@ -1927,7 +1936,7 @@ class RabbitSettingsWindow extends Gui {
                 return false
             }
 
-            deploy_result := this.UpdateWorkspace()
+            deploy_result := this.Deploy(deployment_plan)
             if deploy_result != 0 {
                 this.footer_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -2205,7 +2214,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     ApplyBehaviorSettings() {
-        local deploy_result, values
+        local deployment_plan, deploy_result, values
         if !this.behavior_model || !this.behavior_dirty {
             return false
         }
@@ -2215,6 +2224,7 @@ class RabbitSettingsWindow extends Gui {
             this.behavior_status.Value := err.Message
             return false
         }
+        deployment_plan := this.behavior_model.GetDeploymentPlan(values)
 
         if !this.TryBeginParentOperation() {
             return false
@@ -2225,7 +2235,7 @@ class RabbitSettingsWindow extends Gui {
                 this.behavior_status.Value := RabbitI18n.Text("controls.behavior_save_error")
                 return false
             }
-            deploy_result := this.UpdateWorkspace()
+            deploy_result := this.Deploy(deployment_plan)
             if deploy_result != 0 {
                 this.behavior_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -2385,7 +2395,7 @@ class RabbitSettingsWindow extends Gui {
                 this.application_status.Value := RabbitI18n.Text("controls.applications_save_error")
                 return false
             }
-            deploy_result := this.UpdateWorkspace()
+            deploy_result := this.Deploy(RabbitDeploymentPlan.RabbitConfig())
             if deploy_result != 0 {
                 this.application_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -2638,7 +2648,7 @@ class RabbitSettingsWindow extends Gui {
                 this.ShowRimeDepotSettingsError(RabbitI18n.Text("depot.settings_save_error"))
                 return false
             }
-            deploy_result := this.UpdateWorkspace()
+            deploy_result := this.Deploy(RabbitDeploymentPlan.RabbitConfig())
             if deploy_result != 0 {
                 this.footer_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -3285,7 +3295,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     ApplySwitcherSettings() {
-        local deploy_result, values
+        local deployment_plan, deploy_result, values
         if !this.switcher_model || !this.switcher_dirty {
             return false
         }
@@ -3299,6 +3309,7 @@ class RabbitSettingsWindow extends Gui {
             this.ShowMessage(RabbitI18n.Text("controls.need_scheme"), RabbitI18n.Text("about.message_title"), "Ok Icon!")
             return false
         }
+        deployment_plan := this.switcher_model.GetDeploymentPlan(values)
 
         if !this.TryBeginParentOperation() {
             return false
@@ -3309,7 +3320,7 @@ class RabbitSettingsWindow extends Gui {
                 this.switcher_status.Value := RabbitI18n.Text("controls.schemes_save_error")
                 return false
             }
-            deploy_result := this.UpdateWorkspace()
+            deploy_result := this.Deploy(deployment_plan)
             if deploy_result != 0 {
                 this.switcher_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -3720,12 +3731,21 @@ class RabbitSettingsWindow extends Gui {
     }
 
     UpdateWorkspace() {
+        return this.Deploy(RabbitDeploymentPlan.FullRedeploy())
+    }
+
+    Deploy(plan) {
         if this.IsRimeDepotBusy() {
             this.footer_status.Value := RabbitI18n.Text("depot.busy")
             return 1
         }
         this.deployment_pending := false
-        local result := this.workflow.UpdateWorkspace(true)
+        if plan.IsEmpty() {
+            return 0
+        }
+        local result := HasMethod(this.workflow, "Deploy")
+            ? this.workflow.Deploy(plan, true)
+            : this.workflow.UpdateWorkspace(true)
         this.deployment_pending := result = 0
         if result = 0 {
             if IsObject(this.rime_depot_window)
