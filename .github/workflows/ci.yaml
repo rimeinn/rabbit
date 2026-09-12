@@ -6,6 +6,15 @@ on:
       - '**'
     tags:
       - 'v*'
+    # README and candidate screenshots are packaged resources, so keep them in the application build.
+    paths:
+      - '**'
+      - '!Docs/**'
+      - '!Locales/README.md'
+      - '!mkdocs.yml'
+      - '!requirements-docs.txt'
+      - '!.github/workflows/docs.yaml'
+      - 'Docs/images/candidate-layouts/**'
 
 jobs:
   prepare-autohotkey-binaries:

@@ -1,6 +1,7 @@
 Rime
 Data
 dist
+.venv
 test.ahk
 rime-install.bat
 *.exe

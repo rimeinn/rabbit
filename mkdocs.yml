@@ -1,0 +1,46 @@
+site_name: 玉兔毫文档
+site_description: 玉兔毫 Rime Windows 前端的使用、方案开发与贡献指南
+site_url: https://rimeinn.github.io/rabbit/
+repo_name: rimeinn/rabbit
+repo_url: https://github.com/rimeinn/rabbit
+edit_uri: edit/master/Docs/
+
+docs_dir: Docs
+site_dir: dist/docs
+
+theme:
+  name: readthedocs
+  locale: zh_CN
+  navigation_depth: 3
+
+plugins:
+  - search
+
+nav:
+  - 首页: index.md
+  - 普通用户:
+      - 快速开始: user/quickstart.md
+      - 设置窗口: user/control-panel.md
+      - 配置与部署: user/configuration.md
+      - 外观与候选窗: user/appearance.md
+      - 用户词典与同步: user/dictionary-and-sync.md
+      - 文件与目录: user/files-and-directories.md
+      - 故障排除: user/troubleshooting.md
+  - 方案开发者:
+      - 与玉兔毫配合: scheme/compatibility.md
+      - 前端配置参考: scheme/configuration-reference.md
+      - 配色与字体: scheme/colors-and-fonts.md
+      - 方案开关: scheme/switches.md
+  - 贡献者:
+      - 开发环境: contributor/development-setup.md
+      - 测试: contributor/testing.md
+      - 文档: contributor/documentation.md
+      - 构建与发布: contributor/release-process.md
+      - 架构概览: contributor/architecture.md
+      - 设计记录:
+          - 运行时架构重构: runtime-architecture-refactoring.md
+          - 阴影支持: weasel-style-shadows.md
+  - 参考:
+      - 兼容性: reference/compatibility.md
+      - 术语表: reference/glossary.md
+      - 版本与发布: reference/releases.md
