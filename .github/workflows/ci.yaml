@@ -263,6 +263,12 @@ jobs:
           name: AutoHotkey
           path: deps/AutoHotkey
 
+      - name: Download icons
+        uses: actions/download-artifact@v8
+        with:
+          name: Icon
+          path: Lib
+
       - name: Run unit tests
         shell: pwsh
         run: |
