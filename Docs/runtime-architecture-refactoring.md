@@ -6,7 +6,7 @@ Last updated: 2026-07-31
 ## 1. Purpose
 
 This document records the current runtime ownership, UI lifecycles, mutable state, dependency direction, and staged
-refactoring plan for Rabbit. It covers both `Rabbit.ahk` and `RabbitDeployer.ahk`.
+refactoring plan for Rabbit. It covers both the normal and `--deployer` modes of `Rabbit.ahk`.
 
 The refactoring preserves current control flow and user-visible behavior by default. Existing defects discovered during
 the work are recorded and reproduced separately. A defect is fixed only after approval, in an independent `fix(...)`
@@ -59,7 +59,7 @@ Rime, and the mutex in order. Runtime components receive only their direct depen
 ### 3.2 Deployer
 
 ```text
-RabbitDeployer.ahk
+Rabbit.ahk --deployer
   -> register the exit callback
   -> set maintenance tray state
   -> construct Configurator
@@ -92,7 +92,7 @@ lookup data. “Target owner” describes the planned boundary, not an implement
 | State | Current writers | Current readers | Lifetime | Target owner |
 |---|---|---|---|---|
 | main `rime` | constructed by `Rabbit.ahk` | app context and narrow runtime owners | process | implemented app-context ownership |
-| deployer `rime` | constructed by `RabbitDeployer.ahk` | deployer UI | process | deployer context in Phase 5 |
+| deployer `rime` | constructed by `Rabbit.ahk` in `--deployer` mode | deployer UI | process | deployer context in Phase 5 |
 | `rabbit_traits` | app context and `Configurator.Initialize()` | Rime setup lifetime | initialization/process | app implemented; deployer Phase 5 |
 | `session_id` | `RabbitApplication` | input, runtime state, tray, shutdown | Rime session | implemented app-context ownership |
 | `mutex` | `RabbitApplication` | startup and shutdown | main process | implemented app-context ownership |
@@ -231,7 +231,7 @@ Rabbit.ahk
         +-> RabbitAppearanceController
               +-> rime/candidate/current style and dark mode
 
-RabbitDeployer.ahk
+Rabbit.ahk --deployer
   +-> RabbitConfigurator
         +-> global rime/rabbit_traits
         +-> switcher, style, and dictionary dialogs
@@ -420,7 +420,7 @@ Reproduction:
 
 1. Use a clean source worktree without the generated, ignored `Lib/rabbit.ico`, `Lib/rabbit-alt.ico`, and
    `Lib/rabbit-ascii.ico` files.
-2. Start `Rabbit.ahk` without maintenance or run `RabbitDeployer.ahk deploy`.
+2. Start `Rabbit.ahk` without maintenance or run `Rabbit.ahk --deployer deploy`.
 3. `UpdateTrayIcon()` calls `TraySetIcon()` with a missing file and AutoHotkey displays an exception dialog.
 
 Resolution:
@@ -433,7 +433,7 @@ Validation:
 
 - with all three generated icons temporarily removed, the main application remained running without captured output or
   an exception dialog;
-- with the icons removed, `RabbitDeployer.ahk deploy` exited with code 0 and no captured output or exception;
+- with the icons removed, `Rabbit.ahk --deployer deploy` exited with code 0 and no captured output or exception;
 - the ignored local test icons were restored and remain outside the diff.
 
 ### BUG-002: Legacy candidate box displays an empty custom label
@@ -810,7 +810,7 @@ Commit: `refactor(deployer): make workflow ownership explicit`
 
 Implementation result:
 
-- `RabbitDeployer.ahk` constructs its Rime API and delegates command dispatch and shutdown to
+- `Rabbit.ahk` in `--deployer` mode constructs its Rime API and delegates command dispatch and shutdown to
   `RabbitDeployerApplication`;
 - `RabbitDeployerContext` owns deployer traits, command state, the Rime initialization boundary, and idempotent
   finalization;
@@ -828,7 +828,7 @@ Every implementation phase performs checks proportional to its changes and pause
 Common checks:
 
 - inspect `git diff` and submodule status;
-- launch `Rabbit.ahk` and `RabbitDeployer.ahk` from source;
+- launch `Rabbit.ahk` in normal and `--deployer` modes from source;
 - confirm no generated/runtime files or submodule pointer changes enter the diff;
 - restore any temporary local safety override before staging;
 - stop an interfering prerelease `Rabbit.exe` without restoring it.
@@ -865,8 +865,8 @@ Focused tests:
 |---|---|---|
 | Phase 0 | branch and recursive submodule baseline | Pass |
 | Phase 0 | `Rabbit.ahk 0 0 1033` source startup for five seconds | Pass; remained running with no captured exception |
-| Phase 0 | `RabbitDeployer.ahk` default source entry | Pass; opened its expected first-run configuration path |
-| Phase 0 | `RabbitDeployer.ahk deploy` | Pass; exit code 0 with no captured exception |
+| Phase 0 | `Rabbit.ahk --deployer` default source entry | Pass; opened its expected first-run configuration path |
+| Phase 0 | `Rabbit.ahk --deployer deploy` | Pass; exit code 0 with no captured exception |
 | Phase 1 | caller-resolved factory selection in fresh processes | Pass; old-Windows and configured-legacy choices constructed 0 Direct2D renderers, modern constructed 1 |
 | Phase 1 | configured legacy selection and build in a dedicated fresh process | Pass; a calibrated `Direct2D.__New()` probe observed 0 constructions while valid dimensions were produced |
 | Phase 1 | candidate lifecycle and partial-construction cleanup contract tests | Pass for both backends, including repeated build, hide, and dispose |
@@ -881,12 +881,12 @@ Focused tests:
 | Phase 2 | backend lifecycle and local dimensions | Pass; modern remained 160 x 101 and legacy remained 172 x 99 |
 | Phase 2 | dedicated legacy build process | Pass; calibrated `Direct2D.__New()` probe observed 0 constructions |
 | Phase 2 | modern and legacy real-input paths | Pass; preedit, candidates, highlighting, paging, and hiding were exercised |
-| Phase 2 | `Rabbit.ahk` and `RabbitDeployer.ahk` validation | Pass; both entry scripts exited validation with code 0 |
+| Phase 2 | `Rabbit.ahk` normal and `--deployer` validation | Pass; both modes exited validation with code 0 |
 | Phase 2 | local caret-hook safety override cleanup | Pass; `rabbit.custom.yaml` was restored, redeployed, and absent from the diff |
 | Phase 3 | style snapshot construction and parsing fixtures | Pass; constructor and override Maps were not retained, and active, dark, and explicit preview schemes stayed independent |
 | Phase 3 | candidate lifecycle and local dimensions | Pass; modern remained 160 x 101 and legacy remained 172 x 99 with explicit default snapshots |
 | Phase 3 | fresh-process candidate factory and legacy build modes | Pass; all selection modes passed and the calibrated legacy Direct2D probe remained at zero |
-| Phase 3 | `Rabbit.ahk` and `RabbitDeployer.ahk` validation | Pass; both entry scripts exited validation with code 0 |
+| Phase 3 | `Rabbit.ahk` normal and `--deployer` validation | Pass; both modes exited validation with code 0 |
 | Phase 3 | supported style preview integration | Pass; preset snapshots rendered positive dimensions and `rabbit.custom.yaml` remained byte-for-byte unchanged |
 | Phase 3 | modern real-input path | Pass; `shuru`, `Down`, and `Esc` showed, updated, and hid a `160 x 190` candidate while Direct2D, DirectWrite, and GDI+ were loaded |
 | Phase 3 | configured legacy real-input path | Pass with BUG-003 recorded; the active `172 x 190` candidate showed, updated, and hid, and no Direct2D, DirectWrite, or GDI+ module loaded |
@@ -904,7 +904,7 @@ Focused tests:
 | Phase 5 | preview construction policy fixtures | Pass; forced old-Windows configuration constructed no preview, while the supported path constructed and disposed exactly one |
 | Phase 5 | real levers dialog integration | Pass; hidden switcher and dictionary dialogs loaded actual data and released schema lists, the dictionary iterator, GUI resources, and custom settings |
 | Phase 5 | supported style preview integration | Pass; actual preset snapshots rendered positive dimensions and the dialog explicitly released its bitmap and Direct2D preview |
-| Phase 5 | `RabbitDeployer.ahk deploy` | Pass; the real deployment path exited with code 0 after explicit workflow and Rime cleanup |
+| Phase 5 | `Rabbit.ahk --deployer deploy` | Pass; the real deployment path exited with code 0 after explicit workflow and Rime cleanup |
 | Phase 5 | repository scope and safety | Pass; no submodule pointer, caret-hook setting, generated runtime file, or BUG-004 behavior changed |
 | Post-Phase 5 | nightly deployer handoff regression | Pass after BUG-005 fix; application and tray fixtures require complete main-process Rime and mutex cleanup before child launch |
 

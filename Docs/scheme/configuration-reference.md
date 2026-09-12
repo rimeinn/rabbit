@@ -1,6 +1,6 @@
 # 前端配置参考
 
-默认值和字段注释以仓库中的 [`schemas/rabbit.yaml`](https://github.com/rimeinn/rabbit/blob/master/schemas/rabbit.yaml) 为准。下表列出方案开发和用户定制最常用的字段；没有列出的字段仍可能在设置窗口中可用。
+发布包中的默认配置文件位于程序目录的 `Data/rabbit.yaml`。下表列出方案开发和用户定制最常用的字段；没有列出的字段仍可能在设置窗口中可用。仓库贡献者查看默认配置的源文件时，对应路径是 `schemas/rabbit.yaml`。
 
 ## 根级设置
 
@@ -26,7 +26,7 @@
 | `style/color_scheme_dark` | `null` | 深色模式配色；为空时跟随浅色配色 |
 | `style/preedit_type` | `composition` | 预编辑显示编码或高亮候选 |
 | `style/floating_preedit` | `false` | 是否显示浮动预编辑框 |
-| `style/font_face` | `Microsoft YaHei UI` | 候选文字字体及后备字体 |
+| `style/font_face` | `Microsoft YaHei UI` | 候选文字字体及回退字体 |
 | `style/font_point` | `14` | 候选文字字号 |
 | `style/layout/type` | `stacked` | `stacked`、`flow` 或 `vertical_text` |
 | `style/layout/flow_rows` | `5` | 流式布局的展开页数 |

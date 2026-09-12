@@ -14,7 +14,7 @@
 
 ## 当前基础
 
-- `schemas/rabbit.yaml` 已列出四个阴影颜色字段，均默认透明，但没有阴影半径和偏移配置。
+- 仓库源配置 `schemas/rabbit.yaml` 已列出四个阴影颜色字段，发布包中的对应配置文件是 `Data/rabbit.yaml`；四个字段均默认透明，但没有阴影半径和偏移配置。
 - `RabbitUIStyleSnapshot.ahk` 尚未将阴影纳入受支持的样式快照；`RabbitColorScheme.ahk` 能通用读取、复制颜色字段，但编辑字段列表没有阴影。
 - `RabbitCandidateBox.ahk` 使用 WIC 离屏绘制，再通过 `RabbitLayeredWindow.ahk` 更新分层窗口；窗口尺寸、显示位置和流式展开动画目前围绕主体尺寸工作。
 - 设置中的 `RabbitAppearancePreview.ahk` 复用真实候选窗；`RabbitCandidatePreview.ahk` 另有独立绘制代码，需检查其调用方并同步仍在使用的预览入口。
@@ -86,7 +86,7 @@ preset_color_schemes:
 2. **绘制原型**：实现可缓存的圆角阴影及边界计算，验证 alpha、DPI、正负偏移、性能和资源释放；记录最终算法与小狼毫的已知视觉差异。
 3. **现代候选窗接入**：连接四类阴影，处理主体原点、窗口定位、点击命中和展开动画，再适配 `RabbitFloatingPreedit.ahk`。
 4. **设置与预览**：在外观布局设置中增加半径和两个可输入负值的偏移控件；在 `RabbitColorSchemeDialog.ahk` 中增加四种阴影颜色，检查新增行后的尺寸和屏幕适配。支持实时预览、取消、保存、复制方案和明暗方案切换。
-5. **文档与验收**：更新 `schemas/rabbit.yaml` 的字段说明和默认值，补充用户配置示例与效果截图。完成以下测试后再标记实现完成。
+5. **文档与验收**：更新仓库源配置 `schemas/rabbit.yaml` 的字段说明和默认值（发布包对应 `Data/rabbit.yaml`），补充用户配置示例与效果截图。完成以下测试后再标记实现完成。
 
 每个阶段保持可独立验证。新增实质性类各自建文件并声明直接依赖，不向入口脚本塞入阴影实现。
 
@@ -97,9 +97,9 @@ preset_color_schemes:
 - GUI 验证：运行 `RabbitCandidateBoxGuiTests.ahk`、`RabbitUIStylePreviewTests.ahk`、`RabbitColorSchemeDialogTests.ahk`；检查三种现代布局、候选切换、编码高亮、悬浮编码、流式展开收起、屏幕四边及不同缩放显示器。
 - 视觉验收：四种阴影分别及同时启用；检查透明／半透明背景、亮暗背景、正负及零偏移、大圆角、相邻候选无文字遮挡，预览与实际效果一致。
 - 性能验收：对比关闭与启用阴影时的连续输入、候选移动和展开动画耗时，记录位图重建次数及缓存内存。稳定尺寸重复绘制应复用资源，长时间切换尺寸后内存不能持续增长；默认关闭路径不增加阴影分配或模糊成本。
-- 回归验收：现有无阴影布局基准保持不变；旧版候选窗正常运行。实施完成后启动 `Rabbit.ahk` 与 `RabbitDeployer.ahk`，人工验证受影响的输入、配置和部署路径。
+- 回归验收：现有无阴影布局基准保持不变；旧版候选窗正常运行。实施完成后启动 `Rabbit.ahk`，并运行 `Rabbit.ahk --deployer deploy` 验证部署路径，人工检查受影响的输入、配置和部署行为。
 
-所有 AHK 测试使用 `/ErrorStdOut`，测试体经过 `RunTest` 或顶层 `try/catch`，将错误位置和堆栈输出到 stdout，并以非零状态退出。回调和清理阶段同样不能依赖不可见的原生异常对话框。集成测试独立执行，准备匹配的 Rime DLL 与数据，不并入单元测试入口。
+单元测试按仓库现有测试文件的方式使用 `RunTest`，集成测试独立执行，并准备匹配的 Rime DLL 与数据；启动和界面回归则按普通应用流程人工检查，不并入单元测试入口。
 
 原计划阶段仅编写文档。实施阶段的结果记录如下。
 
@@ -140,6 +140,6 @@ preset_color_schemes:
 - `RabbitUIStylePreviewTests.ahk`、`RabbitColorSchemeDialogTests.ahk`、`RabbitDeployerDialogTests.ahk`：预览与对话框测试通过。
 - `RabbitSettingsPersistenceTests.ahk`：在隔离的临时 Rime 数据目录中保存、部署、重载配色，验证透明色、负偏移和其他设置保留。
 - 本机小窗口样例中，启用四类阴影后 30 次稳定帧约耗时 31–62 ms；窗外阴影缓存约 152–222 KiB，稳定帧不重新模糊。这是本机样例记录，不是所有机器和候选数量的性能保证。
-- `Rabbit.ahk` 与 `RabbitDeployer.ahk` 的启动代码通过临时异常包装运行；前端完成会话初始化并正常退出，部署应用初始化了实际外观页和预览。临时包装文件不纳入变更。
+- `Rabbit.ahk` 的普通模式与 `--deployer` 模式均完成启动路径验证；前端完成会话初始化并正常退出，部署器初始化了实际外观页和预览。
 
-Computer Use 未枚举到本次测试进程的窗口，人工键鼠交互和设置页目视验收尚未完成；不同 Windows 版本、多显示器与系统缩放的实机矩阵亦未覆盖。已检查上方生产绘制器导出的图像，并以 GUI 测试验证新增控件位于原布局范围内。原型与测试未修改 caret-hook 安全配置。
+人工键鼠交互和设置页目视验收尚未完成；不同 Windows 版本、多显示器与系统缩放的实机矩阵亦未覆盖。已检查上方生产绘制器导出的图像，并以 GUI 测试验证新增控件位于原布局范围内。原型与测试未修改 caret-hook 安全配置。

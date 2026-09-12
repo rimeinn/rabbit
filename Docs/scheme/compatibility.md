@@ -18,7 +18,7 @@
 - `style/preedit_type`、`style/floating_preedit`：预编辑显示；
 - 根级行为项：输入状态、候选位置、剪贴板上屏和密码框处理。
 
-这些设置应通过 `rabbit.custom.yaml` 的 `patch` 节点覆盖，不要修改程序目录中的默认 `schemas/rabbit.yaml`。
+这些设置应通过 `rabbit.custom.yaml` 的 `patch` 节点覆盖，不要直接修改程序目录中的默认 `Data/rabbit.yaml`。
 
 ## 建议的兼容测试
 

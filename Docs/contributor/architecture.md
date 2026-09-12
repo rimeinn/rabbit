@@ -22,6 +22,6 @@ Rabbit.ahk
 
 ## 部署器
 
-`RabbitDeployer.ahk` 负责重新部署、词典管理、资料同步、方案管理和设置工作流。部署器与主程序拥有独立的 Rime 生命周期，不能假设主程序的全局状态已经存在。
+`Rabbit.ahk` 负责入口分流：普通启动创建 `RabbitApplication`，传入 `--deployer` 后创建 `RabbitDeployerApplication`。部署器负责重新部署、词典管理、资料同步、方案管理和设置工作流。部署器与主程序拥有独立的 Rime 生命周期，不能假设主程序的全局状态已经存在。
 
 更细的所有权、生命周期和缺陷记录见[运行时架构重构记录](../runtime-architecture-refactoring.md)。这些记录描述实现过程，不是面向普通用户的 API 承诺。

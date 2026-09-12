@@ -29,9 +29,9 @@ preset_color_schemes:
 
 阴影只新增到现代候选窗和浮动预编辑框，旧版候选窗只保证兼容运行。
 
-## 字体后备
+## 字体回退
 
-现代候选窗支持按顺序指定后备字体，也可以限制 Unicode 范围。例如：
+现代候选窗支持按顺序指定回退字体，也可以限制 Unicode 范围。例如：
 
 ```yaml
 font_face: "Microsoft YaHei UI, Segoe UI Emoji"

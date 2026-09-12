@@ -16,14 +16,17 @@ git submodule update --init --recursive
 
 ```powershell
 AutoHotkey.exe Rabbit.ahk
-AutoHotkey.exe RabbitDeployer.ahk
+AutoHotkey.exe Rabbit.ahk --deployer
+AutoHotkey.exe Rabbit.ahk --deployer deploy
 ```
+
+不带参数时启动普通前端；带 `--deployer` 时启动部署器，默认打开设置页面。部署器还支持 `deploy` 和 `sync` 命令；具体参数以 `Lib/RabbitCommandLine.ahk` 为准。
 
 源码运行不需要生成编译资源。编译单文件版本时，按照根目录 README 和 CI 脚本准备 `Data/`、图标、对应位宽的 Rime DLL，再生成 `Lib/RabbitCompiledResources.ahk`。
 
 ## 代码边界
 
-- `Rabbit.ahk` 和 `RabbitDeployer.ahk` 保持启动流程清晰；
+- `Rabbit.ahk` 只负责启动和模式分流；普通模式与 `--deployer` 模式分别进入对应应用类；
 - 运行时状态、输入、候选窗、设置和部署逻辑放在 `Lib/` 的专门模块中；
 - 新候选窗功能只面向现代候选窗；旧版候选窗需要回归保护；
 - 不要把应用改动混入 `Lib/librime-ahk`、`Lib/RimeDepot` 或 `plum` 子模块；
