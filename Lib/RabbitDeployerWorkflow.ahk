@@ -28,6 +28,7 @@
 #Include RabbitUIStyleSettingsDialog.ahk
 #Include RabbitI18n.ahk
 #Include RabbitRimeDepotSettings.ahk
+#Include RabbitSchemaSettingsModel.ahk
 
 class RabbitDeployerWorkflow {
     __New(rime_api) {
@@ -66,6 +67,10 @@ class RabbitDeployerWorkflow {
 
     CreateBehaviorSettingsModel() {
         return RabbitBehaviorSettingsModel(this.CreateLevers(), this.rime)
+    }
+
+    CreateSchemaSettingsModel(schema_id) {
+        return RabbitSchemaSettingsModel(this.rime, this.CreateLevers(), schema_id)
     }
 
     ReadCandidateLabels() {
@@ -260,6 +265,11 @@ class RabbitDeployerWorkflow {
             if plan.rabbit_config_changed
                 && !this.rime.deploy_config_file("rabbit.yaml", "config_version") {
                 return 1
+            }
+            for schema_id in plan.schema_config_ids {
+                if !this.rime.deploy_config_file(schema_id . ".schema.yaml", "schema/version") {
+                    return 1
+                }
             }
             return 0
         } finally {

@@ -142,6 +142,7 @@ jobs:
           rm -rf ${rime_dir} && mkdir -p ${rime_dir}
           rime_dir=${rime_dir} bash plum/rime-install
           cp ${SCHEMAS}/rabbit.yaml ${rime_dir}/
+          cp ${SCHEMAS}/schema.rabbit-fallback.ini ${rime_dir}/
           cp -r ${WORK}/opencc ${rime_dir}/
 
       - name: Upload Data

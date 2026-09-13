@@ -48,6 +48,7 @@
 #Include RabbitShadowTest.ahk
 #Include RabbitStatusTipTest.ahk
 #Include RabbitSettingsWindowTest.ahk
+#Include RabbitSchemaSettingsManifestTest.ahk
 #Include RabbitSwitcherSettingsModelTest.ahk
 #Include RabbitTestCommonTest.ahk
 #Include RabbitTrayClickTest.ahk

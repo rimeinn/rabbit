@@ -25,6 +25,7 @@
 #Include RabbitKeyBindingDialog.ahk
 #Include RabbitRimeDepotSettings.ahk
 #Include RabbitRimeDepotWindow.ahk
+#Include RabbitSchemaSettingsDialog.ahk
 #Include RabbitWindowTheme.ahk
 
 class RabbitSettingsWindow extends Gui {
@@ -423,7 +424,6 @@ class RabbitSettingsWindow extends Gui {
             case 2:
                 this.window_theme.RegisterMuted(
                     this.switcher_schema_help,
-                    this.switcher_order_help,
                     this.switcher_preview,
                     this.switcher_save_help,
                     this.switcher_option_note,
@@ -491,10 +491,11 @@ class RabbitSettingsWindow extends Gui {
         this.switcher_move_down := this.AddButton("x348 y456 w84 h30 Disabled Hidden +0x2000",
             RabbitI18n.Text("controls.move_down"))
         this.switcher_move_down.OnEvent("Click", (*) => this.MoveSwitcherSchema(1))
-        this.switcher_order_help := this.AddText(
-            "x448 y460 w326 h24 cGray Hidden",
-            RabbitI18n.Text("controls.reorder_hint")
+        this.switcher_schema_settings := this.AddButton(
+            "x654 y456 w120 h30 Disabled Hidden +0x2000",
+            RabbitI18n.Text("controls.scheme_settings")
         )
+        this.switcher_schema_settings.OnEvent("Click", (*) => this.OpenSelectedSchemaSettings())
         this.switcher_fix_order := this.AddCheckbox(
             "x254 y496 w510 h24 Hidden",
             RabbitI18n.Text("controls.always_first")
@@ -510,7 +511,7 @@ class RabbitSettingsWindow extends Gui {
             this.switcher_details,
             this.switcher_move_up,
             this.switcher_move_down,
-            this.switcher_order_help,
+            this.switcher_schema_settings,
             this.switcher_fix_order,
             this.switcher_schema_help,
         ]
@@ -3010,6 +3011,9 @@ class RabbitSettingsWindow extends Gui {
                 this.switcher_list.Modify(1, "Select Focus")
                 this.ShowSwitcherDetails(1)
                 this.UpdateSwitcherMoveButtons(1)
+                this.UpdateSwitcherSchemaSettingsButton(1)
+            } else {
+                this.UpdateSwitcherSchemaSettingsButton()
             }
         } finally {
             this.switcher_loading := false
@@ -3177,6 +3181,79 @@ class RabbitSettingsWindow extends Gui {
     OnSwitcherSchemaSelected(row) {
         this.ShowSwitcherDetails(row)
         this.UpdateSwitcherMoveButtons(row)
+        this.UpdateSwitcherSchemaSettingsButton(row)
+    }
+
+    UpdateSwitcherSchemaSettingsButton(row := 0) {
+        local item
+        if !row {
+            row := this.switcher_list.GetNext(0)
+        }
+        if !row || !this.switcher_items.Has(row) {
+            this.switcher_schema_settings.Enabled := false
+            return
+        }
+        item := this.switcher_items[row]
+        this.switcher_schema_settings.Enabled := RegExMatch(item.id, "^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    }
+
+    OpenSelectedSchemaSettings() {
+        local dialog := 0, item, model := 0, values
+        local deployment_plan
+        local loaded := false
+        local row := this.switcher_list.GetNext(0)
+        if !row || !this.switcher_items.Has(row) || !this.workflow
+            || !HasMethod(this.workflow, "CreateSchemaSettingsModel") {
+            this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_unavailable")
+            return false
+        }
+        item := this.switcher_items[row]
+        try {
+            model := this.workflow.CreateSchemaSettingsModel(item.id)
+            loaded := model.Load()
+            if !loaded {
+                deployment_plan := RabbitDeploymentPlan.SchemaConfig(item.id)
+                if this.Deploy(deployment_plan) != 0 || !(loaded := model.Load()) {
+                    this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_read_error")
+                    return false
+                }
+            }
+            dialog := RabbitSchemaSettingsDialog(
+                this,
+                model,
+                item.name,
+                this.window_theme.dark_mode_reader
+            )
+            values := dialog.ShowModal()
+            dialog := 0
+            if !values {
+                return true
+            }
+            if !this.TryBeginParentOperation() {
+                return false
+            }
+            try {
+                if !model.Save(values) {
+                    this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_save_error")
+                    return false
+                }
+                if this.Deploy(RabbitDeploymentPlan.SchemaConfig(item.id)) != 0 {
+                    this.switcher_status.Value := RabbitI18n.Text("controls.redeploy_error")
+                    return false
+                }
+                this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_saved", Map("schema", item.name))
+                return true
+            } finally {
+                this.EndParentOperation()
+            }
+        } catch as err {
+            this.switcher_status.Value := err.Message
+            return false
+        } finally {
+            if dialog {
+                dialog.Dispose()
+            }
+        }
     }
 
     OnSwitcherSchemaCheck(row, checked) {

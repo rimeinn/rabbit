@@ -21,6 +21,10 @@ class RabbitDeploymentPlan {
     default_config_changed := false
     full_workspace_required := false
 
+    __New() {
+        this.schema_config_ids := Map()
+    }
+
     RequireRabbitConfig() {
         this.rabbit_config_changed := true
         return this
@@ -36,6 +40,14 @@ class RabbitDeploymentPlan {
         return this
     }
 
+    RequireSchemaConfig(schema_id) {
+        if !RegExMatch(schema_id, "^[A-Za-z0-9][A-Za-z0-9_.-]*$") {
+            throw ValueError("Invalid schema id.")
+        }
+        this.schema_config_ids[schema_id] := true
+        return this
+    }
+
     Merge(other) {
         if !(other is RabbitDeploymentPlan) {
             throw TypeError("Expected a RabbitDeploymentPlan.")
@@ -43,11 +55,15 @@ class RabbitDeploymentPlan {
         this.rabbit_config_changed := this.rabbit_config_changed || other.rabbit_config_changed
         this.default_config_changed := this.default_config_changed || other.default_config_changed
         this.full_workspace_required := this.full_workspace_required || other.full_workspace_required
+        for schema_id in other.schema_config_ids {
+            this.schema_config_ids[schema_id] := true
+        }
         return this
     }
 
     IsEmpty() {
         return !this.rabbit_config_changed && !this.default_config_changed && !this.full_workspace_required
+            && !this.schema_config_ids.Count
     }
 
     static RabbitConfig() {
@@ -60,6 +76,10 @@ class RabbitDeploymentPlan {
 
     static Workspace() {
         return RabbitDeploymentPlan().RequireWorkspace()
+    }
+
+    static SchemaConfig(schema_id) {
+        return RabbitDeploymentPlan().RequireSchemaConfig(schema_id)
     }
 
     static FullRedeploy() {

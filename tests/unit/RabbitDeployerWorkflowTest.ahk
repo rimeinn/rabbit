@@ -21,6 +21,7 @@
 
 RunTest("deploy workflow ownership", TestDeployWorkflowOwnership.Bind())
 RunTest("deploy workflow honors granular plans", TestDeployWorkflowGranularity.Bind())
+RunTest("deploy workflow deploys requested schemas", TestDeployWorkflowSchemaConfig.Bind())
 RunTest("sync workflow ownership", TestSyncWorkflowOwnership.Bind())
 RunTest("deploy workflow failure cleanup", TestDeployWorkflowFailureCleanup.Bind())
 RunTest("deploy workflow checks librime results", TestDeployWorkflowChecksLibrimeResults.Bind())
@@ -82,6 +83,22 @@ TestDeployWorkflowGranularity() {
         "mutex_create,deploy,deploy_config:rabbit.yaml,mutex_close",
         JoinWorkflowCalls(calls),
         "A workspace deployment redundantly deployed default.yaml."
+    )
+}
+
+TestDeployWorkflowSchemaConfig() {
+    local calls := []
+    local workflow := RabbitDeployerWorkflowProbe(
+        RabbitDeployerWorkflowRimeProbe(calls),
+        calls
+    )
+    local plan := RabbitDeploymentPlan.SchemaConfig("demo")
+        .Merge(RabbitDeploymentPlan.SchemaConfig("other"))
+    AssertEqual(0, workflow.Deploy(plan), "Schema config deployment failed.")
+    AssertEqual(
+        "mutex_create,deploy_config:demo.schema.yaml,deploy_config:other.schema.yaml,mutex_close",
+        JoinWorkflowCalls(calls),
+        "The deploy workflow did not target each requested schema."
     )
 }
 

@@ -20,6 +20,33 @@
 
 这些设置应通过 `rabbit.custom.yaml` 的 `patch` 节点覆盖，不要直接修改程序目录中的默认 `Data/rabbit.yaml`。
 
+## 方案设置声明
+
+方案作者可随方案提供 `<schema_id>.rabbit.ini`，声明玉兔毫“方案设置”窗口可编辑的字段。它仅描述界面，
+不包含 custom 补丁；用户修改后由玉兔毫写入用户目录的 `<schema_id>.custom.yaml`。
+
+声明可定义 `boolean`、`integer`、`number`、`string` 和 `enum` 标量字段。字段路径不能使用 `+`、`-`、
+`@after`、`@N` 等顺序型补丁语法。若没有专用声明，玉兔毫使用 Data 中的
+`schema.rabbit-fallback.ini`。
+
+字段较多时，用 `[group.<id>]` 分组，并在每个字段中指定 `group = <id>`。组和字段均按 ini 中的声明
+顺序显示；多个组显示为左侧导航，单个组省略导航且内容区域可滚动。
+
+~~~ini
+[meta]
+format = 1
+title = 方案设置
+
+[group.translator]
+label = 翻译器
+
+[field.enable_completion]
+group = translator
+path = translator/enable_completion
+type = boolean
+label = 启用补全
+~~~
+
 ## 建议的兼容测试
 
 发布方案前，至少在以下场景测试：

@@ -39,6 +39,7 @@ RunTest("settings window contains appearance preview failures", TestSettingsWind
 RunTest("settings window defers its initial appearance preview", TestSettingsWindowDefersInitialPreview.Bind())
 RunTest("settings window previews pending candidate labels", TestSettingsWindowPreviewsPendingLabels.Bind())
 RunTest("settings window saves switcher settings", TestSettingsWindowSavesSwitcherSettings.Bind())
+RunTest("settings window exposes settings for highlighted schema", TestSettingsWindowExposesSchemaSettings.Bind())
 RunTest("settings window reorders selected schemas", TestSettingsWindowReordersSelectedSchemas.Bind())
 RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOptionHeaders.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
@@ -695,6 +696,21 @@ TestSettingsWindowSavesSwitcherSettings() {
         JoinSettingsWorkflowCalls(calls),
         "The switcher page did not save, deploy, and dispose in order."
     )
+}
+
+TestSettingsWindowExposesSchemaSettings() {
+    local calls := []
+    local window := RabbitSettingsWindow(RabbitSettingsSwitcherWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
+        AssertTrue(window.switcher_schema_settings.Visible, "The schema-settings action was not shown.")
+        AssertTrue(window.switcher_schema_settings.Enabled, "The highlighted schema could not open settings.")
+        window.switcher_list.Modify(2, "Select Focus")
+        window.OnSwitcherSchemaSelected(2)
+        AssertTrue(window.switcher_schema_settings.Enabled, "Changing the highlighted schema disabled its settings.")
+    } finally {
+        window.Dispose()
+    }
 }
 
 TestSettingsWindowReordersSelectedSchemas() {
