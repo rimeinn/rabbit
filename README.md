@@ -37,29 +37,29 @@ scoop install siku/rabbit-nightly
 
 玉兔毫的现代候选窗提供三种布局，可以在 `rabbit.custom.yaml` 的 `style/layout/type` 中选择：
 
-### 堆叠布局（`stacked`）
+### 纵向堆叠（`stacked`）
 
 默认布局。候选逐行显示，适合一般的拼音、注音和形码输入。
 
-![堆叠布局](Docs/images/candidate-layouts/stacked.png)
+![纵向堆叠](Docs/images/candidate-layouts/stacked.png)
 
-### 流式布局（`flow`）
+### 横向流式（`flow`）
 
 候选按行横向排列，可以在较宽的屏幕上同时看到更多候选。候选超过一行时，玉兔毫会以多行分页显示，并在展开和收起时使用平滑过渡。
 
-![流式布局](Docs/images/candidate-layouts/flow.png)
+![横向流式](Docs/images/candidate-layouts/flow.png)
 
-![流式布局的多行分页](Docs/images/candidate-layouts/flow_paging.png)
+![横向流式的多行分页](Docs/images/candidate-layouts/flow_paging.png)
 
-### 竖排文字布局（`vertical_text`）
+### 竖排文字（`vertical_text`）
 
 候选文字从上到下排列，适合竖排文字输入。候选列可以设置为从左向右或从右向左排列，分别对应 `vertical_text_left_to_right` 的 `true` 和 `false`。
 
-![竖排文字布局：候选列从左向右](Docs/images/candidate-layouts/vertical_text_left_to_right.png)
+![竖排文字：候选列从左向右](Docs/images/candidate-layouts/vertical_text_left_to_right.png)
 
-![竖排文字布局：候选列从右向左](Docs/images/candidate-layouts/vertical_text_right_to_left.png)
+![竖排文字：候选列从右向左](Docs/images/candidate-layouts/vertical_text_right_to_left.png)
 
-例如，使用流式布局可以配置为：
+例如，使用横向流式可以配置为：
 
 ```yaml
 style:

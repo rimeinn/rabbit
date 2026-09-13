@@ -28,10 +28,10 @@
 | `style/floating_preedit` | `false` | 是否显示浮动预编辑框 |
 | `style/font_face` | `Microsoft YaHei UI` | 候选文字字体及回退字体 |
 | `style/font_point` | `14` | 候选文字字号 |
-| `style/layout/type` | `stacked` | `stacked`、`flow` 或 `vertical_text` |
-| `style/layout/flow_rows` | `5` | 流式布局的展开页数 |
-| `style/layout/min_width` | `160` | 堆叠布局最小宽度 |
-| `style/layout/min_height` | `160` | 竖排布局最小高度 |
+| `style/layout/type` | `stacked` | `stacked`（纵向堆叠）、`flow`（横向流式）或 `vertical_text`（竖排文字） |
+| `style/layout/flow_rows` | `5` | 横向流式的展开页数 |
+| `style/layout/min_width` | `160` | 纵向堆叠最小宽度 |
+| `style/layout/min_height` | `160` | 竖排文字最小高度 |
 
 ## 阴影设置
 

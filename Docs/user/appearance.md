@@ -1,28 +1,32 @@
 # 外观与候选窗
 
-现代候选窗支持三种布局。可以在设置窗口的“外观 → 排版”中选择，也可以在 `rabbit.custom.yaml` 中设置 `style/layout/type`。
+现代候选窗支持三种布局，程序中的选项名称分别是“纵向堆叠”“横向流式”和“竖排文字”。可以在设置窗口的“外观 → 排版”中选择，也可以在 `rabbit.custom.yaml` 中设置 `style/layout/type`。
 
-## 堆叠布局
+“布局”标签页还提供边距、圆角、候选间距、最小尺寸和阴影参数；修改时可以直接观察右侧的候选窗预览：
+
+![外观设置的布局标签页和候选窗预览](../images/settings/appearance-layout.png)
+
+## 纵向堆叠
 
 默认布局。候选逐行显示，适合一般的拼音、注音和形码输入。
 
-![堆叠布局](../images/candidate-layouts/stacked.png)
+![纵向堆叠](../images/candidate-layouts/stacked.png)
 
-## 流式布局
+## 横向流式
 
 候选按行横向排列，可以在较宽的屏幕上同时看到更多候选。候选超过一行时会分页显示。
 
-![流式布局](../images/candidate-layouts/flow.png)
+![横向流式](../images/candidate-layouts/flow.png)
 
-![流式布局的多行分页](../images/candidate-layouts/flow_paging.png)
+![横向流式的多行分页](../images/candidate-layouts/flow_paging.png)
 
-## 竖排文字布局
+## 竖排文字
 
 候选文字从上到下排列。候选列可以从左向右或从右向左排列，由 `style/vertical_text_left_to_right` 控制。
 
-![竖排文字布局：候选列从左向右](../images/candidate-layouts/vertical_text_left_to_right.png)
+![竖排文字：候选列从左向右](../images/candidate-layouts/vertical_text_left_to_right.png)
 
-![竖排文字布局：候选列从右向左](../images/candidate-layouts/vertical_text_right_to_left.png)
+![竖排文字：候选列从右向左](../images/candidate-layouts/vertical_text_right_to_left.png)
 
 ## 预编辑内容
 

@@ -51,7 +51,7 @@ Rabbit.ahk
 | 层次 | 主要模块 | 职责 |
 | --- | --- | --- |
 | 输入与数据 | `RabbitInput.ahk`、`RabbitCandidatePresentation.ahk` | 从 Rime 获取预编辑、候选、注释和选中状态，并处理提交、翻页和焦点变化 |
-| 视口与布局 | `RabbitCandidateViewport.ahk`、`RabbitCandidateBox.ahk` | 计算页范围、堆叠／流式／竖排布局、浮动预编辑和动画 |
+| 视口与布局 | `RabbitCandidateViewport.ahk`、`RabbitCandidateBox.ahk` | 计算页范围、“纵向堆叠”／“横向流式”／“竖排文字”布局、浮动预编辑和动画 |
 | 绘制与窗口 | `RabbitDirect2D.ahk`、`RabbitLayeredWindow.ahk`、`RabbitShadowSurface.ahk` | 创建字体和绘制资源，合成位图并更新不激活的分层窗口 |
 | 兼容后端 | `RabbitLegacyCandidateBox.ahk`、`RabbitLegacyCandidateLayout.ahk` | 为旧版 Windows 保留独立的候选窗和布局路径 |
 
