@@ -22,10 +22,17 @@
 RunTest("schema settings resolve manifests by data precedence", TestSchemaSettingsManifestPrecedence.Bind())
 RunTest("schema settings validate manifest fields", TestSchemaSettingsManifestValidation.Bind())
 RunTest("schema settings parse manifest groups", TestSchemaSettingsManifestGroups.Bind())
+RunTest("schema settings parse ordered list fields", TestSchemaSettingsListManifest.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
+RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
 RunTest("schema settings dialog switches groups", TestSchemaSettingsDialogGroups.Bind())
+RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDialogLists.Bind())
+RunTest("schema settings dialog sizes configured list rows", TestSchemaSettingsDialogListRows.Bind())
+RunTest("schema settings dialog fits short described list groups", TestSchemaSettingsDialogDescribedLists.Bind())
+RunTest("schema settings dialog reveals the final described list field", TestSchemaSettingsDialogLongDescribedLists.Bind())
+RunTest("schema settings dialog lays out wrapped descriptions", TestSchemaSettingsDialogWrappedDescriptions.Bind())
 
 TestSchemaSettingsManifestPrecedence() {
     local root := A_Temp . "\\rabbit-schema-settings-" . A_TickCount
@@ -107,6 +114,106 @@ TestSchemaSettingsManifestGroups() {
     }
 }
 
+TestSchemaSettingsListManifest() {
+    local root := A_Temp . "\\rabbit-schema-settings-lists-" . A_TickCount
+    local path := root . "\\lists.ini"
+    local manifest, newline := Chr(10)
+    try {
+        DirCreate(root)
+        FileAppend(
+            "[meta]`nformat=1`n[field.processors]`npath=engine/processors`ntype=list`nlabel=Processors`n"
+                . "[field.bindings]`npath=key_binder/bindings`ntype=key_binding_list`nlabel=Bindings`n",
+            path,
+            "UTF-8"
+        )
+        manifest := RabbitSchemaSettingsManifest.Parse(path)
+        AssertEqual("list", manifest.fields[1].type, "The string list type was not retained.")
+        AssertEqual("key_binding_list", manifest.fields[2].type, "The binding-list type was not retained.")
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            manifest.fields[1].rows,
+            "A missing string-list row count did not use the default."
+        )
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            manifest.fields[2].rows,
+            "A missing binding-list row count did not use the default."
+        )
+
+        FileDelete(path)
+        FileAppend(
+            "[meta]" . newline . "format=1" . newline
+                . "[field.processors]" . newline . "path=engine/processors" . newline . "type=list" . newline
+                . "label=Processors" . newline . "rows=1" . newline
+                . "[field.bindings]" . newline . "path=key_binder/bindings" . newline
+                . "type=key_binding_list" . newline . "label=Bindings" . newline . "rows=10" . newline,
+            path,
+            "UTF-8"
+        )
+        manifest := RabbitSchemaSettingsManifest.Parse(path)
+        AssertEqual(1, manifest.fields[1].rows, "The string-list row count was not retained.")
+        AssertEqual(10, manifest.fields[2].rows, "The binding-list row count was not retained.")
+
+        FileDelete(path)
+        FileAppend(
+            "[meta]" . newline . "format=1" . newline
+                . "[field.processors]" . newline . "path=engine/processors" . newline . "type=list" . newline
+                . "label=Processors" . newline . "rows=11" . newline
+                . "[field.bindings]" . newline . "path=key_binder/bindings" . newline
+                . "type=key_binding_list" . newline . "label=Bindings" . newline . "rows=rows" . newline,
+            path,
+            "UTF-8"
+        )
+        manifest := RabbitSchemaSettingsManifest.Parse(path)
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            manifest.fields[1].rows,
+            "An oversized string-list row count did not use the default."
+        )
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            manifest.fields[2].rows,
+            "A non-integer binding-list row count did not use the default."
+        )
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            RabbitSchemaSettingsManifest.ParseListRows(Map("rows", "11")),
+            "An oversized list row count did not use the default."
+        )
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            RabbitSchemaSettingsManifest.ParseListRows(Map("rows", "rows")),
+            "A non-integer list row count did not use the default."
+        )
+
+        FileDelete(path)
+        FileAppend(
+            "[meta]`nformat=1`n[field.bindings]`npath=menu/bindings`ntype=key_binding_list`nlabel=Bindings`n",
+            path,
+            "UTF-8"
+        )
+        AssertThrows(
+            RabbitSchemaSettingsManifest.Parse.Bind(path),
+            "The binding-list type accepted an unrelated path."
+        )
+
+        FileDelete(path)
+        FileAppend(
+            "[meta]`nformat=1`n[field.records]`npath=menu/records`ntype=record_list`nlabel=Records`n",
+            path,
+            "UTF-8"
+        )
+        AssertThrows(
+            RabbitSchemaSettingsManifest.Parse.Bind(path),
+            "The manifest accepted the reserved record-list type."
+        )
+    } finally {
+        if DirExist(root) {
+            DirDelete(root, true)
+        }
+    }
+}
+
 TestBundledSchemaSettingsFallback() {
     local manifest := RabbitSchemaSettingsManifest.Parse(
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
@@ -152,6 +259,73 @@ TestSchemaSettingsModelPersistence() {
     AssertThrows(
         model.NormalizeValues.Bind(model, Map("page_size", 11)),
         "The schema settings model accepted a value above the manifest maximum."
+    )
+}
+
+TestSchemaSettingsListPersistence() {
+    local calls := []
+    local manifest := SchemaSettingsListManifest()
+    local rime := RabbitSchemaSettingsListRimeProbe(Map(
+        "engine/processors", ["ascii_composer", "recognizer", "table_translator@custom_phrase"],
+        "key_binder/bindings", [Map("accept", "Tab", "when", "composing", "send", "Down", "custom", "kept")]
+    ), [
+        "engine/processors/+",
+        "engine/processors/@after recognizer",
+        "key_binder/bindings/-",
+        "key_binder/bindings/@5",
+    ], calls)
+    local model := RabbitSchemaSettingsModelProbe(rime, RabbitSchemaSettingsListLeversProbe(calls), "demo", manifest)
+    local values
+    AssertTrue(model.Load(), "The schema settings model could not read ordered lists.")
+    AssertEqual(
+        "table_translator@custom_phrase",
+        model.values["processors"][3],
+        "The string list changed processor text."
+    )
+    AssertEqual("kept", model.values["bindings"][1]["custom"], "The binding list dropped an unknown field.")
+
+    calls.Length := 0
+    AssertTrue(model.Save(RabbitConfigValue.Clone(model.values)), "The unchanged lists failed to save.")
+    AssertEqual(0, calls.Length, "Unchanged lists opened or wrote custom settings.")
+    AssertEqual(0, model.ensure_count, "Unchanged lists created a custom configuration file.")
+
+    values := RabbitConfigValue.Clone(model.values)
+    values["processors"].InsertAt(1, values["processors"].RemoveAt(3))
+    AssertTrue(model.Save(values), "The model failed to replace a string list.")
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:engine/processors/+"),
+        "Replacing a list did not clear an appended patch."
+    )
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:engine/processors/@after recognizer"),
+        "Replacing a list did not clear an ordered patch."
+    )
+    AssertTrue(
+        SchemaSettingsCallsContain(calls, "item:engine/processors:", "table_translator@custom_phrase"),
+        "The replacement did not preserve the processor expression."
+    )
+
+    calls.Length := 0
+    values := RabbitConfigValue.Clone(model.values)
+    values["bindings"][1]["send"] := "Up"
+    AssertTrue(model.Save(values), "The model failed to replace a key-binding list.")
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:key_binder/bindings/@5"),
+        "Replacing bindings did not clear an indexed patch."
+    )
+    AssertTrue(
+        SchemaSettingsCallsContain(calls, "item:key_binder/bindings:", '"custom": "kept"'),
+        "Replacing bindings dropped an unknown binding field."
+    )
+
+    calls.Length := 0
+    AssertTrue(
+        model.Save(RabbitConfigValue.Clone(model.values), Map("processors", true)),
+        "The model failed to restore a list default."
+    )
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:engine/processors"),
+        "Restoring a list default did not remove its full-list override."
     )
 }
 
@@ -228,6 +402,212 @@ TestSchemaSettingsDialogGroups() {
         }
         if long_dialog {
             long_dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogLists() {
+    local calls := []
+    local owner := Gui()
+    local model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsListManifest()
+    )
+    local bindings, dialog := 0, header_y, list_y, processors
+    try {
+        model.values := Map(
+            "processors", ["ascii_composer", "recognizer"],
+            "bindings", [Map("accept", "Tab", "when", "composing", "send", "Down")]
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        processors := model.manifest.fields[1]
+        AssertTrue(dialog.field_controls.Has("processors"), "The dialog did not create a string-list editor.")
+        AssertTrue(dialog.field_controls.Has("bindings"), "The dialog did not create a key-binding editor.")
+        bindings := dialog.field_controls["bindings"]
+        AssertTrue(
+            HasProp(bindings, "accept_header") && HasProp(bindings, "when_header") && HasProp(bindings, "action_header"),
+            "Dark key-binding lists did not create all replacement headers."
+        )
+        AssertTrue(
+            WinGetStyle("ahk_id " . bindings.list.Hwnd) & 0x4000,
+            "Dark key-binding lists kept the native light header."
+        )
+        AssertEqual(
+            "surface",
+            dialog.content_window_theme.roles[bindings.accept_header.Hwnd],
+            "The replacement key-binding header did not use the surface theme."
+        )
+        bindings.accept_header.GetPos(, &header_y)
+        bindings.list.GetPos(, &list_y)
+        AssertEqual(24, list_y - header_y, "The key-binding list did not begin below its replacement header.")
+        AssertTrue(
+            dialog.content_list_hwnds.Has(dialog.field_controls["processors"].list.Hwnd),
+            "The string-list editor was not registered for native wheel scrolling."
+        )
+        AssertTrue(
+            dialog.content_list_hwnds.Has(dialog.field_controls["bindings"].list.Hwnd),
+            "The key-binding editor was not registered for native wheel scrolling."
+        )
+        AssertEqual(
+            0,
+            dialog.GetListControlAtWheelPoint(0),
+            "The list wheel hit test did not safely ignore a point outside the content panel."
+        )
+        dialog.field_controls["processors"].list.Choose(2)
+        AssertTrue(dialog.MoveListItem(processors, -1), "The dialog could not move a list item upward.")
+        AssertEqual(
+            "recognizer",
+            dialog.draft_values["processors"][1],
+            "Moving a list item changed its order incorrectly."
+        )
+        AssertTrue(dialog.RestoreListDefault(processors), "The dialog could not mark a list for reset.")
+        AssertTrue(dialog.reset_fields.Has("processors"), "The list reset was not retained.")
+        dialog.field_controls["processors"].list.Choose(1)
+        AssertTrue(dialog.MoveListItem(processors, 1), "The dialog could not edit after a pending reset.")
+        AssertTrue(!dialog.reset_fields.Has("processors"), "Editing a list did not cancel its pending reset.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogWrappedDescriptions() {
+    local calls := [], content_height, content_y, dialog := 0, field_y, header_height, model, owner := Gui()
+    local long_description := "This deliberately long description verifies that schema settings text wraps "
+        . "without overlapping the next control in a narrow page. "
+        . "It must remain completely readable after the window chooses its content height."
+    try {
+        model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsWrappedDescriptionManifest(long_description)
+        )
+        model.values := Map("page_size", 5)
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        dialog.outer_muted_controls[1].GetPos(, , , &header_height)
+        AssertTrue(header_height > 34, "A wrapped manifest description kept the old fixed height.")
+        dialog.content_muted_controls[1].GetPos(, &content_y, , &content_height)
+        AssertTrue(content_height > 30, "A wrapped group description kept the old fixed height.")
+        dialog.field_controls["page_size"].GetPos(, &field_y)
+        AssertTrue(field_y >= content_y + content_height + 10,
+            "The first field overlapped its wrapped group description.")
+        dialog.content_muted_controls[2].GetPos(, &content_y, , &content_height)
+        AssertTrue(content_height > 30, "A wrapped field description kept the old fixed height.")
+        AssertTrue(dialog.content_virtual_height >= content_y + content_height + 14,
+            "The content scrolling range clipped a wrapped field description.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogListRows() {
+    local calls := [], long_binding_height, long_dialog := 0, long_model, long_string_height
+    local owner := Gui()
+    local short_binding_height, short_dialog := 0, short_model, short_string_height
+    try {
+        short_model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsListManifest(1, 1)
+        )
+        short_model.values := Map(
+            "processors", ["ascii_composer", "recognizer"],
+            "bindings", [Map("accept", "Tab", "when", "composing", "send", "Down")]
+        )
+        short_dialog := RabbitSchemaSettingsDialog(owner, short_model, "Demo", (*) => true)
+        short_dialog.field_controls["processors"].list.GetPos(, , , &short_string_height)
+        short_dialog.field_controls["bindings"].list.GetPos(, , , &short_binding_height)
+
+        long_model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsListManifest(10, 10)
+        )
+        long_model.values := Map(
+            "processors", ["ascii_composer", "recognizer"],
+            "bindings", [Map("accept", "Tab", "when", "composing", "send", "Down")]
+        )
+        long_dialog := RabbitSchemaSettingsDialog(owner, long_model, "Demo", (*) => true)
+        long_dialog.field_controls["processors"].list.GetPos(, , , &long_string_height)
+        long_dialog.field_controls["bindings"].list.GetPos(, , , &long_binding_height)
+        AssertTrue(long_string_height > short_string_height,
+            "The configured string-list row count did not change its height.")
+        AssertTrue(long_binding_height > short_binding_height,
+            "The configured key-binding row count did not change its height.")
+    } finally {
+        if short_dialog {
+            short_dialog.Dispose()
+        }
+        if long_dialog {
+            long_dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogDescribedLists() {
+    local calls := [], dialog := 0, model, owner := Gui()
+    try {
+        model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsListManifest(3, 3, "A short group description.")
+        )
+        model.values := Map(
+            "processors", ["ascii_composer", "recognizer"],
+            "bindings", [Map("accept", "Tab", "when", "composing", "send", "Down")]
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => false)
+        AssertTrue(
+            dialog.content_virtual_height <= dialog.content_viewport_height,
+            "A short described list group exceeded its content viewport."
+        )
+        AssertEqual(0, dialog.content_scroll_max,
+            "A short described list group unexpectedly enabled page scrolling.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogLongDescribedLists() {
+    local calls := [], dialog := 0, model, owner := Gui()
+    local description := "This description must be fully visible after scrolling to the end of the settings page."
+    try {
+        model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsListManifest(10, 10, "A short group description.", description)
+        )
+        model.values := Map(
+            "processors", ["ascii_composer", "recognizer"],
+            "bindings", [Map("accept", "Tab", "when", "composing", "send", "Down")]
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => false)
+        AssertTrue(dialog.content_scroll_max > 0, "The long described list group did not require scrolling.")
+        dialog.ScrollContentTo(dialog.content_scroll_max)
+        AssertTrue(
+            dialog.GetContentControlBottom(dialog.content_muted_controls[5]) <= dialog.content_viewport_height,
+            "Scrolling to the end clipped the final list description."
+        )
+    } finally {
+        if dialog {
+            dialog.Dispose()
         }
         owner.Destroy()
     }
@@ -330,6 +710,59 @@ SchemaSettingsLongGroupManifest() {
     }
 }
 
+SchemaSettingsWrappedDescriptionManifest(description) {
+    return {
+        title: "Settings",
+        description: description,
+        groups: [{ id: "general", label: "General", description: description }],
+        fields: [{
+            id: "page_size",
+            group: "general",
+            path: "menu/page_size",
+            type: "integer",
+            label: "Page size",
+            description: description,
+            min: 1,
+            max: 10,
+            options: [],
+        }],
+    }
+}
+
+SchemaSettingsListManifest(processor_rows := "", binding_rows := "", group_description := "", field_description := "") {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "general", label: "General", description: group_description }],
+        fields: [
+            {
+                id: "processors",
+                group: "general",
+                path: "engine/processors",
+                type: "list",
+                label: "Processors",
+                description: field_description,
+                min: "",
+                max: "",
+                options: [],
+                rows: processor_rows,
+            },
+            {
+                id: "bindings",
+                group: "general",
+                path: "key_binder/bindings",
+                type: "key_binding_list",
+                label: "Bindings",
+                description: field_description,
+                min: "",
+                max: "",
+                options: [],
+                rows: binding_rows,
+            },
+        ],
+    }
+}
+
 JoinSchemaSettingsCalls(calls) {
     local result := "", call
     for call in calls {
@@ -338,8 +771,34 @@ JoinSchemaSettingsCalls(calls) {
     return result
 }
 
+SchemaSettingsCallsHave(calls, expected) {
+    local call
+    for call in calls {
+        if call = expected {
+            return true
+        }
+    }
+    return false
+}
+
+SchemaSettingsCallsContain(calls, prefix, expected) {
+    local call
+    for call in calls {
+        if SubStr(call, 1, StrLen(prefix)) = prefix && InStr(call, expected) {
+            return true
+        }
+    }
+    return false
+}
+
 class RabbitSchemaSettingsModelProbe extends RabbitSchemaSettingsModel {
+    __New(rime_api, levers_api, schema_id, manifest := 0) {
+        super.__New(rime_api, levers_api, schema_id, manifest)
+        this.ensure_count := 0
+    }
+
     EnsureCustomFile() {
+        this.ensure_count += 1
     }
 }
 
@@ -384,6 +843,176 @@ class RabbitSchemaSettingsLeversProbe {
 
     customize_int(settings, path, value) {
         this.calls.Push("integer:" . path . ":" . value)
+        return true
+    }
+
+    save_settings(settings) {
+        this.calls.Push("save")
+        return true
+    }
+
+    custom_settings_destroy(settings) {
+        this.calls.Push("destroy")
+    }
+}
+
+class RabbitSchemaSettingsListRimeProbe {
+    __New(values, patch_keys, calls) {
+        this.values := values
+        this.patch_keys := patch_keys
+        this.calls := calls
+    }
+
+    schema_open(schema_id) {
+        return "schema"
+    }
+
+    user_config_open(config_id) {
+        return "user"
+    }
+
+    config_close(config) {
+    }
+
+    config_begin_map(config, path) {
+        local items := [], key, value
+        if Type(config) = "String" && config = "user" && path = "patch" {
+            for key in this.patch_keys {
+                items.Push({ key: key, path: "patch/" . key, value: "" })
+            }
+        } else if config is Map && config.Has("value") && path = "/" && config["value"] is Map {
+            for key, value in config["value"] {
+                items.Push({ key: key, path: key, value: value })
+            }
+        } else {
+            return 0
+        }
+        return { items: items, index: 0, key: "", path: "" }
+    }
+
+    config_begin_list(config, path) {
+        local index, items := [], prefix := Type(config) = "String" && config = "schema" ? path . "/" : "", value
+        if !this.TryGetValue(config, path, &value) || !(value is Array) {
+            return 0
+        }
+        for index, value in value {
+            items.Push({ key: String(index - 1), path: prefix . (index - 1), value: value })
+        }
+        return { items: items, index: 0, key: "", path: "" }
+    }
+
+    config_next(iter) {
+        local item
+        iter.index += 1
+        if iter.index > iter.items.Length {
+            return false
+        }
+        item := iter.items[iter.index]
+        iter.key := item.key
+        iter.path := item.path
+        return true
+    }
+
+    config_end(iter) {
+    }
+
+    config_get_item(config, path) {
+        local value
+        if !this.TryGetValue(config, path, &value) {
+            return 0
+        }
+        return Map("value", value)
+    }
+
+    config_test_get_string(config, path, &value) {
+        return this.TryGetScalar(config, path, "String", &value)
+    }
+
+    config_test_get_int(config, path, &value) {
+        return this.TryGetScalar(config, path, "Integer", &value)
+    }
+
+    config_test_get_double(config, path, &value) {
+        return this.TryGetScalar(config, path, "Float", &value)
+    }
+
+    config_test_get_bool(config, path, &value) {
+        if !this.TryGetValue(config, path, &value) || Type(value) != "Integer"
+            || value != 0 && value != 1 {
+            return false
+        }
+        return true
+    }
+
+    config_load_string(value) {
+        return Map("yaml", value)
+    }
+
+    TryGetScalar(config, path, expected_type, &value) {
+        return this.TryGetValue(config, path, &value) && Type(value) = expected_type
+    }
+
+    TryGetValue(config, path, &value) {
+        local base_path, base_value, index, remainder
+        if config is Map && config.Has("value") {
+            if path = "/" {
+                value := config["value"]
+                return true
+            }
+            if config["value"] is Map && config["value"].Has(path) {
+                value := config["value"][path]
+                return true
+            }
+            if config["value"] is Array && RegExMatch(path, "^\d+$") {
+                index := Integer(path) + 1
+                if index >= 1 && index <= config["value"].Length {
+                    value := config["value"][index]
+                    return true
+                }
+            }
+            return false
+        }
+        if Type(config) != "String" || config != "schema" {
+            return false
+        }
+        if this.values.Has(path) {
+            value := this.values[path]
+            return true
+        }
+        for base_path, base_value in this.values {
+            if !(base_value is Array) || SubStr(path, 1, StrLen(base_path) + 1) != base_path . "/" {
+                continue
+            }
+            remainder := SubStr(path, StrLen(base_path) + 2)
+            if RegExMatch(remainder, "^\d+$") {
+                index := Integer(remainder) + 1
+                if index >= 1 && index <= base_value.Length {
+                    value := base_value[index]
+                    return true
+                }
+            }
+        }
+        return false
+    }
+}
+
+class RabbitSchemaSettingsListLeversProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    custom_settings_init(config_id, generator_id) {
+        this.calls.Push("init:" . config_id)
+        return "settings"
+    }
+
+    load_settings(settings) {
+        this.calls.Push("load")
+        return true
+    }
+
+    customize_item(settings, path, value) {
+        this.calls.Push(value ? "item:" . path . ":" . value["yaml"] : "reset:" . path)
         return true
     }
 

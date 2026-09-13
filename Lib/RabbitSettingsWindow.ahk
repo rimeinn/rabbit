@@ -3233,7 +3233,7 @@ class RabbitSettingsWindow extends Gui {
                 return false
             }
             try {
-                if !model.Save(values) {
+                if !model.Save(values.values, values.reset_fields) {
                     this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_save_error")
                     return false
                 }

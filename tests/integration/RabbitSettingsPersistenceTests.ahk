@@ -22,12 +22,14 @@
 #Include ..\..\Lib\RabbitApplicationSettingsModel.ahk
 #Include ..\..\Lib\RabbitBehaviorSettingsModel.ahk
 #Include ..\..\Lib\RabbitCommon.ahk
+#Include ..\..\Lib\RabbitSchemaSettingsModel.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsModel.ahk
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
 #Include ..\support\TestCommon.ahk
 
 RunTest("switcher settings persist through generic customization", TestSwitcherHotkeyPersistence.Bind())
 RunTest("shared rabbit settings preserve earlier saves", TestSharedRabbitSettingsPersistence.Bind())
+RunTest("schema lists replace incremental custom patches", TestSchemaListPersistence.Bind())
 ExitApp()
 
 TestSwitcherHotkeyPersistence() {
@@ -229,6 +231,64 @@ TestSharedRabbitSettingsPersistence() {
     }
 }
 
+TestSchemaListPersistence() {
+    local model := 0
+    local rime := 0
+    local test_dir := RabbitSettingsPersistenceTestDirectory("schema-list")
+    local values
+    try {
+        FileAppend(
+            "patch:`n  engine/processors/+: [legacy_processor]`n",
+            test_dir . "\luna_pinyin_simp.custom.yaml",
+            "UTF-8"
+        )
+        rime := RabbitSettingsPersistenceRime(test_dir)
+        AssertTrue(
+            rime.deploy_schema(A_ScriptDir . "\..\..\Data\luna_pinyin_simp.schema.yaml"),
+            "The schema test data could not be deployed."
+        )
+        model := RabbitSchemaSettingsIntegrationModel(
+            rime,
+            RimeLeversApi(rime),
+            "luna_pinyin_simp",
+            {
+                title: "Test",
+                description: "",
+                groups: [{ id: "general", label: "General", description: "" }],
+                fields: [{
+                    id: "processors",
+                    group: "general",
+                    path: "engine/processors",
+                    type: "list",
+                    label: "Processors",
+                    description: "",
+                    min: "",
+                    max: "",
+                    options: [],
+                }],
+            },
+            test_dir
+        )
+        AssertTrue(model.Load(), "The schema settings model could not read the deployed processor list.")
+        values := RabbitConfigValue.Clone(model.values)
+        values["processors"].RemoveAt(values["processors"].Length)
+        AssertTrue(model.Save(values), "The schema settings model could not replace the processor list.")
+        local saved := FileRead(test_dir . "\luna_pinyin_simp.custom.yaml", "UTF-8")
+        AssertTrue(InStr(saved, "engine/processors"), "The schema custom file omitted the replacement list.")
+        AssertTrue(
+            !InStr(saved, "engine/processors/+"),
+            "The replacement list retained an incremental processor patch."
+        )
+    } finally {
+        if rime {
+            rime.finalize()
+        }
+        if DirExist(test_dir) {
+            DirDelete(test_dir, true)
+        }
+    }
+}
+
 RabbitSettingsPersistenceRime(user_data_dir) {
     local repository_root := A_ScriptDir . "\..\.."
     local rime := RimeApi(repository_root . "\Lib\librime-ahk\rime.dll")
@@ -246,4 +306,18 @@ RabbitSettingsPersistenceTestDirectory(name) {
         DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount
     DirCreate(path)
     return path
+}
+
+class RabbitSchemaSettingsIntegrationModel extends RabbitSchemaSettingsModel {
+    __New(rime_api, levers_api, schema_id, manifest, user_data_dir) {
+        super.__New(rime_api, levers_api, schema_id, manifest)
+        this.user_data_dir := user_data_dir
+    }
+
+    EnsureCustomFile() {
+        local path := this.user_data_dir . "\" . this.schema_id . ".custom.yaml"
+        if !FileExist(path) {
+            FileAppend("patch: {}`n", path, "UTF-8")
+        }
+    }
 }

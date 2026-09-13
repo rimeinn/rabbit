@@ -16,6 +16,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitConfigValue.ahk
 #Include RabbitSchemaSettingsManifest.ahk
 
 #Include RabbitI18n.ahk
@@ -31,6 +32,7 @@ class RabbitSchemaSettingsModel {
         this.schema_id := schema_id
         this.manifest := manifest ? manifest : RabbitSchemaSettingsManifest.Load(schema_id)
         this.values := Map()
+        this.last_save_changed := false
     }
 
     Load() {
@@ -43,6 +45,7 @@ class RabbitSchemaSettingsModel {
             for field in this.manifest.fields {
                 this.values[field.id] := this.ReadField(config, field)
             }
+            this.values := RabbitConfigValue.Clone(this.values)
             return true
         } finally {
             this.rime.config_close(config)
@@ -64,12 +67,40 @@ class RabbitSchemaSettingsModel {
                 if this.rime.config_test_get_double(config, field.path, &value) {
                     return value
                 }
+            case "list", "key_binding_list":
+                return this.ReadListField(config, field)
             default:
                 if this.rime.config_test_get_string(config, field.path, &value) {
                     return value
                 }
         }
         throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
+    }
+
+    ReadListField(config, field) {
+        local item_config, item_value, iter
+        local result := []
+        if !(iter := this.rime.config_begin_list(config, field.path)) {
+            throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
+        }
+        try {
+            while this.rime.config_next(iter) {
+                if !(item_config := this.rime.config_get_item(config, iter.path)) {
+                    throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
+                }
+                try {
+                    if !RabbitConfigValue.Read(this.rime, item_config, "/", &item_value) {
+                        throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
+                    }
+                    result.Push(this.NormalizeListItem(field, item_value))
+                } finally {
+                    this.rime.config_close(item_config)
+                }
+            }
+        } finally {
+            this.rime.config_end(iter)
+        }
+        return result
     }
 
     NormalizeValues(values) {
@@ -87,7 +118,7 @@ class RabbitSchemaSettingsModel {
     }
 
     NormalizeFieldValue(field, value) {
-        local normalized
+        local item, normalized
         switch field.type {
             case "boolean":
                 return !!value
@@ -108,6 +139,14 @@ class RabbitSchemaSettingsModel {
                 if !this.HasOption(field.options, normalized) {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
+            case "list", "key_binding_list":
+                if !(value is Array) {
+                    throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+                }
+                normalized := []
+                for item in value {
+                    normalized.Push(this.NormalizeListItem(field, item))
+                }
             default:
                 normalized := String(value)
         }
@@ -115,6 +154,19 @@ class RabbitSchemaSettingsModel {
             throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
         }
         return normalized
+    }
+
+    NormalizeListItem(field, value) {
+        if field.type = "list" {
+            if value is Map || value is Array || Type(value) != "String" {
+                throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+            }
+            return value
+        }
+        if !(value is Map) {
+            throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+        }
+        return RabbitConfigValue.Clone(value)
     }
 
     HasOption(options, value) {
@@ -127,8 +179,57 @@ class RabbitSchemaSettingsModel {
         return false
     }
 
-    Save(values) {
-        local field, normalized := this.NormalizeValues(values), settings := 0
+    HasChanges(values, reset_fields := 0) {
+        local normalized := this.NormalizeValues(values)
+        local resets := this.NormalizeResetFields(reset_fields)
+        return this.HasNormalizedChanges(normalized, resets)
+    }
+
+    HasNormalizedChanges(normalized, reset_fields := 0) {
+        local field
+        for field in this.manifest.fields {
+            if reset_fields.Has(field.id) || !this.values.Has(field.id)
+                || !RabbitConfigValue.ValuesEqual(normalized[field.id], this.values[field.id]) {
+                return true
+            }
+        }
+        return false
+    }
+
+    NormalizeResetFields(reset_fields) {
+        local field, matched, reset_id, resets := Map()
+        if !reset_fields {
+            return resets
+        }
+        if !(reset_fields is Map) {
+            throw TypeError("Expected a map of schema setting resets.")
+        }
+        for reset_id, value in reset_fields {
+            if !value {
+                continue
+            }
+            matched := 0
+            for field in this.manifest.fields {
+                if field.id = reset_id {
+                    matched := field
+                    break
+                }
+            }
+            if !matched || matched.type != "list" && matched.type != "key_binding_list" {
+                throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", reset_id)))
+            }
+            resets[reset_id] := true
+        }
+        return resets
+    }
+
+    Save(values, reset_fields := 0) {
+        local field, normalized := this.NormalizeValues(values), resets := this.NormalizeResetFields(reset_fields)
+        local settings := 0
+        this.last_save_changed := this.HasNormalizedChanges(normalized, resets)
+        if !this.last_save_changed {
+            return true
+        }
         this.EnsureCustomFile()
         try {
             settings := this.api.custom_settings_init(this.schema_id . ".schema", RABBIT_CUSTOMIZATION_GENERATOR_ID)
@@ -136,14 +237,19 @@ class RabbitSchemaSettingsModel {
                 return false
             }
             for field in this.manifest.fields {
-                if !this.CustomizeField(settings, field, normalized[field.id]) {
+                if resets.Has(field.id) {
+                    if !this.ResetListField(settings, field) {
+                        return false
+                    }
+                } else if !RabbitConfigValue.ValuesEqual(normalized[field.id], this.values[field.id])
+                    && !this.CustomizeField(settings, field, normalized[field.id]) {
                     return false
                 }
             }
             if !this.api.save_settings(settings) {
                 return false
             }
-            this.values := normalized
+            this.values := RabbitConfigValue.Clone(normalized)
             return true
         } finally {
             if settings {
@@ -157,7 +263,83 @@ class RabbitSchemaSettingsModel {
             case "boolean": return !!this.api.customize_bool(settings, field.path, value)
             case "integer": return !!this.api.customize_int(settings, field.path, value)
             case "number": return !!this.api.customize_double(settings, field.path, value)
+            case "list", "key_binding_list": return this.CustomizeListField(settings, field, value)
             default: return !!this.api.customize_string(settings, field.path, value)
+        }
+    }
+
+    CustomizeListField(settings, field, value) {
+        if !this.ClearListPatchOperations(settings, field.path) {
+            return false
+        }
+        return this.CustomizeYamlItem(settings, field.path, value)
+    }
+
+    ResetListField(settings, field) {
+        return this.ClearListPatchOperations(settings, field.path, true)
+    }
+
+    ClearListPatchOperations(settings, path, reset_value := false) {
+        local key, keys := Map(path . "/+", true, path . "/-", true)
+        if reset_value {
+            keys[path] := true
+        }
+        for key in this.GetExistingListPatchOperations(path) {
+            keys[key] := true
+        }
+        for key in keys {
+            if !this.api.customize_item(settings, key, 0) {
+                return false
+            }
+        }
+        return true
+    }
+
+    GetExistingListPatchOperations(path) {
+        local config := 0, iter := 0, key
+        local result := []
+        if !HasMethod(this.rime, "user_config_open")
+            || !(config := this.rime.user_config_open(this.schema_id . ".custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    key := iter.key
+                    if this.IsListPatchOperation(key, path) {
+                        result.Push(key)
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            this.rime.config_close(config)
+        }
+        return result
+    }
+
+    IsListPatchOperation(key, path) {
+        local operation
+        if SubStr(key, 1, StrLen(path) + 1) != path . "/" {
+            return false
+        }
+        operation := SubStr(key, StrLen(path) + 2)
+        return operation = "+" || operation = "-" || SubStr(operation, 1, 1) = "@"
+    }
+
+    CustomizeYamlItem(settings, key, value) {
+        local config := 0
+        if !(config := this.rime.config_load_string(RabbitConfigValue.ToYaml(value))) {
+            return false
+        }
+        try {
+            return !!this.api.customize_item(settings, key, config)
+        } finally {
+            this.rime.config_close(config)
         }
     }
 

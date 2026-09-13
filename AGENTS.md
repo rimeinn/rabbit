@@ -75,6 +75,8 @@ Use double-quoted strings by default, allowing single quotes when they avoid sub
 
 Write first-party source comments in English and focus on rationale, platform constraints, and non-obvious behavior. Preserve TODOs, warnings, and source links unless they can be conclusively updated. Keep Chinese user-facing text unchanged. Preserve GPL headers and use `2023 - <current year>` for Xuesong Peng's copyright range in files modified during that year.
 
+For a dark-themed ListView, use the established replacement-header pattern: hide the native header with -Hdr, add aligned Text headers with the surface theme role, and account for the replacement header height in dynamic layout. Keep the native header only in light mode. Add a focused regression test for the replacement header's presence, theme role, and alignment.
+
 Match surrounding YAML indentation and comments. No formatter or linter is currently configured; do not introduce one without a separate project decision.
 
 ## Testing Guidelines

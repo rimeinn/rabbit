@@ -21,6 +21,9 @@
 
 class RabbitSchemaSettingsManifest {
     static FALLBACK_FILE := "schema.rabbit-fallback.ini"
+    static DEFAULT_LIST_ROWS := 3
+    static MIN_LIST_ROWS := 1
+    static MAX_LIST_ROWS := 10
 
     static Load(schema_id, user_data_dir := "", shared_data_dir := "") {
         local path
@@ -139,13 +142,21 @@ class RabbitSchemaSettingsManifest {
     static ParseField(field_id, group_id, properties, path) {
         local type := StrLower(properties.Get("type", ""))
         local minimum := "", maximum := "", options := []
+        local rows := ""
         local option, seen := Map()
         if !properties.Has("path") || !properties.Has("label") || !type
             || !this.IsSafeConfigPath(properties["path"]) {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
-        if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "enum" {
+        if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "enum"
+            && type != "list" && type != "key_binding_list" {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+        }
+        if type = "key_binding_list" && properties["path"] != "key_binder/bindings" {
+            throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+        }
+        if type = "list" || type = "key_binding_list" {
+            rows := this.ParseListRows(properties)
         }
         if type = "integer" || type = "number" {
             minimum := this.ParseNumber(properties, "min", path)
@@ -177,7 +188,25 @@ class RabbitSchemaSettingsManifest {
             min: minimum,
             max: maximum,
             options: options,
+            rows: rows,
         }
+    }
+
+    static ParseListRows(properties) {
+        local rows, value
+        if !properties.Has("rows") {
+            return this.DEFAULT_LIST_ROWS
+        }
+        value := Trim(properties["rows"])
+        if !RegExMatch(value, "^\d+$") {
+            return this.DEFAULT_LIST_ROWS
+        }
+        try {
+            rows := Integer(value)
+        } catch {
+            return this.DEFAULT_LIST_ROWS
+        }
+        return rows >= this.MIN_LIST_ROWS && rows <= this.MAX_LIST_ROWS ? rows : this.DEFAULT_LIST_ROWS
     }
 
     static ParseNumber(properties, key, path) {

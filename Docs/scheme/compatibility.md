@@ -25,9 +25,23 @@
 方案作者可随方案提供 `<schema_id>.rabbit.ini`，声明玉兔毫“方案设置”窗口可编辑的字段。它仅描述界面，
 不包含 custom 补丁；用户修改后由玉兔毫写入用户目录的 `<schema_id>.custom.yaml`。
 
-声明可定义 `boolean`、`integer`、`number`、`string` 和 `enum` 标量字段。字段路径不能使用 `+`、`-`、
-`@after`、`@N` 等顺序型补丁语法。若没有专用声明，玉兔毫使用 Data 中的
-`schema.rabbit-fallback.ini`。
+声明可定义 `boolean`、`integer`、`number`、`string` 和 `enum` 标量字段，以及两类有序列表：
+
+- `list`：仅包含字符串的有序列表；
+- `key_binding_list`：仅用于 `key_binder/bindings`，使用玉兔毫的专用按键绑定编辑器。
+
+列表字段可选 `rows = N` 来指定显示的条目行数。玉兔毫仅接受 1 到 10；未设置、非整数或超出范围时都使用默认的
+3 行。
+
+`engine/processors`、`engine/segmentors`、`engine/translators` 和 `engine/filters` 应声明为 `list`。
+列表的每一项都是 `string`，并可使用 Rime 的 `<engine_type>@<engine_name>` 表达式。
+
+列表由玉兔毫整体维护：仅在用户实际修改后写入完整列表；“还原方案默认”会移除该列表的完整覆盖及同路径的
+`+`、`-`、`@…` 增量补丁。方案作者不应为同一路径同时声明列表和其子字段，也不应让两个字段的路径互为祖先或后代；
+这些冲突会使 custom 配置的所有权不明确。
+
+字段路径不能使用 `+`、`-`、`@after`、`@N` 等顺序型补丁语法。`record_list` 保留给未来支持的通用记录列表，
+当前不是有效类型。若没有专用声明，玉兔毫使用 Data 中的 `schema.rabbit-fallback.ini`。
 
 字段较多时，用 `[group.<id>]` 分组，并在每个字段中指定 `group = <id>`。组和字段均按 ini 中的声明
 顺序显示；多个组显示为左侧导航，单个组省略导航且内容区域可滚动。
@@ -45,6 +59,20 @@ group = translator
 path = translator/enable_completion
 type = boolean
 label = 启用补全
+
+[field.candidate_labels]
+group = translator
+path = menu/alternative_select_labels
+type = list
+label = 候选序号
+rows = 4
+
+[field.bindings]
+group = translator
+path = key_binder/bindings
+type = key_binding_list
+label = 按键绑定
+rows = 3
 ~~~
 
 ## 建议的兼容测试

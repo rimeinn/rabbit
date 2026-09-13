@@ -22,13 +22,15 @@ class RabbitConfigValue {
             try {
                 value := Map()
                 while api.config_next(iter) {
-                    item := api.config_get_item(config, iter.key)
-                    try {
-                        if this.Read(api, item, "/", &child) {
-                            value[iter.key] := child
+                    item := api.config_get_item(config, iter.path)
+                    if item {
+                        try {
+                            if this.Read(api, item, "/", &child) {
+                                value[iter.key] := child
+                            }
+                        } finally {
+                            api.config_close(item)
                         }
-                    } finally {
-                        api.config_close(item)
                     }
                 }
                 return true
@@ -40,13 +42,15 @@ class RabbitConfigValue {
             try {
                 value := []
                 while api.config_next(iter) {
-                    item := api.config_get_item(config, iter.key)
-                    try {
-                        if this.Read(api, item, "/", &child) {
-                            value.Push(child)
+                    item := api.config_get_item(config, iter.path)
+                    if item {
+                        try {
+                            if this.Read(api, item, "/", &child) {
+                                value.Push(child)
+                            }
+                        } finally {
+                            api.config_close(item)
                         }
-                    } finally {
-                        api.config_close(item)
                     }
                 }
                 return true
@@ -67,6 +71,52 @@ class RabbitConfigValue {
             return true
         }
         return false
+    }
+
+    static Clone(value) {
+        local copy, item, key
+        if value is Map {
+            copy := Map()
+            for key, item in value {
+                copy[key] := this.Clone(item)
+            }
+            return copy
+        }
+        if value is Array {
+            copy := []
+            for item in value {
+                copy.Push(this.Clone(item))
+            }
+            return copy
+        }
+        return value
+    }
+
+    static ValuesEqual(left, right) {
+        local key, value
+        if left is Map {
+            if !(right is Map) || left.Count != right.Count {
+                return false
+            }
+            for key, value in left {
+                if !right.Has(key) || !this.ValuesEqual(value, right[key]) {
+                    return false
+                }
+            }
+            return true
+        }
+        if left is Array {
+            if !(right is Array) || left.Length != right.Length {
+                return false
+            }
+            Loop left.Length {
+                if !this.ValuesEqual(left[A_Index], right[A_Index]) {
+                    return false
+                }
+            }
+            return true
+        }
+        return !(right is Map) && !(right is Array) && left == right && Type(left) = Type(right)
     }
 
     static ToYaml(value) {
