@@ -537,7 +537,7 @@ class RabbitLocaleFallback {
         catalog["depot.summary_value"] := "{description}  仓库：{repository} 版本：{ref}"
         catalog["depot.schemas_value"] := "方案：{value}"
         catalog["depot.dependencies_value"] := "依赖：{value}"
-        catalog["depot.reverse_dependencies_value"] := "反向依赖：{value}"
+        catalog["depot.reverse_dependencies_value"] := "反查依赖：{value}"
         catalog["depot.labels_value"] := "标签：{value}"
         catalog["depot.license_value"] := "许可证：{value}"
         catalog["depot.recipe_value"] := "配方：{recipe}  配方集合：{recipes}"
