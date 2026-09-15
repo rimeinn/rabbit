@@ -24,11 +24,13 @@
 #Include RabbitI18n.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
+#Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMapDialog.ahk
 #Include RabbitRecognizerPatternsDialog.ahk
 #Include RabbitRimeDepotSettings.ahk
 #Include RabbitRimeDepotWindow.ahk
 #Include RabbitSchemaSettingsDialog.ahk
+#Include RabbitStringListItemDialog.ahk
 #Include RabbitWindowTheme.ahk
 
 class RabbitSettingsWindow extends Gui {
@@ -155,6 +157,7 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_loading := false
         this.behavior_dirty := false
         this.bindings := []
+        this.menu_labels_reset := false
         this.punctuator_maps := Map()
         this.punctuator_reset_fields := Map()
         this.recognizer_patterns := Map()
@@ -685,8 +688,8 @@ class RabbitSettingsWindow extends Gui {
             "x230 y136 w570 h482 Hidden"
                 . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             [RabbitI18n.Text("controls.general"), RabbitI18n.Text("controls.key_bindings"),
-                RabbitI18n.Text("language.tab"), RabbitI18n.Text("punctuator.tab"),
-                RabbitI18n.Text("recognizer.tab")]
+                RabbitI18n.Text("language.tab"), RabbitI18n.Text("menu.tab"),
+                RabbitI18n.Text("punctuator.tab"), RabbitI18n.Text("recognizer.tab")]
         )
         this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
         this.behavior_group := this.behavior_tabs
@@ -741,20 +744,6 @@ class RabbitSettingsWindow extends Gui {
         )
         this.good_old_caps_lock.OnEvent("Click", (*) => this.OnBehaviorChanged())
 
-        this.menu_group := this.AddGroupBox("x246 y514 w538 h86 Hidden", RabbitI18n.Text("controls.candidate_paging"))
-        this.menu_page_size_label := this.AddText("x260 y540 w88 h22 Hidden", RabbitI18n.Text("controls.page_size"))
-        this.menu_page_size := this.AddEdit("x350 y536 w68 r1 Number -Multi Hidden")
-        this.SetEditCue(this.menu_page_size, "5")
-        this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.menu_labels_label := this.AddText("x438 y540 w90 h22 Hidden", RabbitI18n.Text("controls.labels"))
-        this.menu_labels := this.AddEdit("x530 y536 w236 r1 -Multi Hidden")
-        this.SetEditCue(this.menu_labels, "1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
-        this.menu_labels.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.menu_help := this.AddText(
-            "x260 y570 w506 h22 cGray Hidden",
-            RabbitI18n.Text("controls.labels_hint")
-        )
-
         this.behavior_tabs.UseTab(2)
         this.binding_list := this.AddListView(
             (this.initial_dark_mode ? "x250 y198 w530 h302 -Hdr" : "x250 y174 w530 h326")
@@ -797,6 +786,64 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_interface_controls := [this.language_label, this.language_choice, this.language_help]
 
         this.behavior_tabs.UseTab(4)
+        this.menu_group := this.AddGroupBox("x246 y170 w538 h330 Hidden", RabbitI18n.Text("menu.tab"))
+        this.menu_page_size_label := this.AddText("x260 y198 w90 h22 Hidden", RabbitI18n.Text("controls.page_size"))
+        this.menu_page_size := this.AddEdit("x350 y194 w68 r1 Number -Multi Hidden")
+        this.SetEditCue(this.menu_page_size, "5")
+        this.menu_page_size.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.menu_page_down_cycle := this.AddCheckbox(
+            "x438 y194 w328 h24 Hidden",
+            RabbitI18n.Text("menu.page_down_cycle")
+        )
+        this.menu_page_down_cycle.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.menu_alternative_select_keys_label := this.AddText(
+            "x260 y234 w190 h22 Hidden",
+            RabbitI18n.Text("menu.alternative_select_keys")
+        )
+        this.menu_alternative_select_keys := this.AddEdit("x450 y230 w316 r1 -Multi Hidden")
+        this.SetEditCue(this.menu_alternative_select_keys, "1234567890")
+        this.menu_alternative_select_keys.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.menu_labels_label := this.AddText("x260 y270 w506 h22 Hidden", RabbitI18n.Text("controls.labels"))
+        this.menu_labels := this.AddListBox("x260 y298 w506 r5 -Multi Hidden")
+        this.menu_labels.OnEvent("DoubleClick", (*) => this.EditMenuLabel())
+        this.menu_labels_add := this.AddButton("x260 y410 w58 h28 Hidden +0x2000", RabbitI18n.Text("controls.add"))
+        this.menu_labels_add.OnEvent("Click", (*) => this.AddMenuLabel())
+        this.menu_labels_edit := this.AddButton("x324 y410 w58 h28 Hidden +0x2000", RabbitI18n.Text("controls.edit"))
+        this.menu_labels_edit.OnEvent("Click", (*) => this.EditMenuLabel())
+        this.menu_labels_delete := this.AddButton("x388 y410 w58 h28 Hidden +0x2000", RabbitI18n.Text("controls.delete"))
+        this.menu_labels_delete.OnEvent("Click", (*) => this.DeleteMenuLabel())
+        this.menu_labels_up := this.AddButton("x452 y410 w58 h28 Hidden +0x2000", RabbitI18n.Text("controls.move_up"))
+        this.menu_labels_up.OnEvent("Click", (*) => this.MoveMenuLabel(-1))
+        this.menu_labels_down := this.AddButton("x516 y410 w58 h28 Hidden +0x2000", RabbitI18n.Text("controls.move_down"))
+        this.menu_labels_down.OnEvent("Click", (*) => this.MoveMenuLabel(1))
+        this.menu_labels_restore := this.AddButton(
+            "x580 y410 w186 h28 Hidden +0x2000",
+            RabbitI18n.Text("menu.restore_default")
+        )
+        this.menu_labels_restore.OnEvent("Click", (*) => this.RestoreMenuLabels())
+        this.menu_help := this.AddText(
+            "x260 y448 w506 h40 cGray Hidden",
+            RabbitI18n.Text("controls.labels_hint")
+        )
+        this.behavior_menu_controls := [
+            this.menu_group,
+            this.menu_page_size_label,
+            this.menu_page_size,
+            this.menu_page_down_cycle,
+            this.menu_alternative_select_keys_label,
+            this.menu_alternative_select_keys,
+            this.menu_labels_label,
+            this.menu_labels,
+            this.menu_labels_add,
+            this.menu_labels_edit,
+            this.menu_labels_delete,
+            this.menu_labels_up,
+            this.menu_labels_down,
+            this.menu_labels_restore,
+            this.menu_help,
+        ]
+
+        this.behavior_tabs.UseTab(5)
         this.punctuator_help := this.AddText(
             "x260 y178 w506 h38 cGray Hidden",
             RabbitI18n.Text("punctuator.page_hint")
@@ -845,7 +892,7 @@ class RabbitSettingsWindow extends Gui {
             this.punctuator_digit_separator_action
         )
         this.behavior_punctuator_controls := this.punctuator_controls.Clone()
-        this.behavior_tabs.UseTab(5)
+        this.behavior_tabs.UseTab(6)
         this.recognizer_use_space := this.AddCheckbox(
             "x260 y190 w506 h24 Hidden",
             RabbitI18n.Text("recognizer.use_space")
@@ -874,12 +921,6 @@ class RabbitSettingsWindow extends Gui {
             this.bypass_password_fields,
             this.ascii_switch_group,
             this.good_old_caps_lock,
-            this.menu_group,
-            this.menu_page_size_label,
-            this.menu_page_size,
-            this.menu_labels_label,
-            this.menu_labels,
-            this.menu_help,
         ]
         for key, controls in this.ascii_switch_controls {
             this.behavior_common_controls.Push(controls.label)
@@ -1728,8 +1769,9 @@ class RabbitSettingsWindow extends Gui {
         local common_visible := visible && this.behavior_tabs.Value = 1
         local bindings_visible := visible && this.behavior_tabs.Value = 2
         local interface_visible := visible && this.behavior_tabs.Value = 3
-        local punctuator_visible := visible && this.behavior_tabs.Value = 4
-        local recognizer_visible := visible && this.behavior_tabs.Value = 5
+        local menu_visible := visible && this.behavior_tabs.Value = 4
+        local punctuator_visible := visible && this.behavior_tabs.Value = 5
+        local recognizer_visible := visible && this.behavior_tabs.Value = 6
         for ctrl in this.behavior_common_controls {
             ctrl.Visible := common_visible
         }
@@ -1738,6 +1780,9 @@ class RabbitSettingsWindow extends Gui {
         }
         for ctrl in this.behavior_interface_controls {
             ctrl.Visible := interface_visible
+        }
+        for ctrl in this.behavior_menu_controls {
+            ctrl.Visible := menu_visible
         }
         for ctrl in this.behavior_punctuator_controls {
             ctrl.Visible := punctuator_visible
@@ -1908,15 +1953,9 @@ class RabbitSettingsWindow extends Gui {
     }
 
     GetAppearancePreviewLabels() {
-        local label
         local labels := []
-        if this.behavior_model || (HasProp(this, "menu_labels") && Trim(this.menu_labels.Value)) {
-            Loop Parse this.menu_labels.Value, "," {
-                if (label := Trim(A_LoopField)) {
-                    labels.Push(label)
-                }
-            }
-            return labels
+        if HasProp(this, "menu_labels_values") {
+            return this.menu_labels_values.Clone()
         }
 
         if !this.appearance_preview_labels_loaded {
@@ -2284,10 +2323,13 @@ class RabbitSettingsWindow extends Gui {
                 this.SelectAsciiSwitchAction(controls, this.behavior_model.switch_key[key])
             }
             this.menu_page_size.Value := this.behavior_model.page_size
-            this.menu_labels.Value := RabbitBehaviorSettingsModel.Join(
-                this.behavior_model.alternative_select_labels,
-                ", "
+            this.menu_labels_values := RabbitBehaviorSettingsModel.CloneValue(
+                this.behavior_model.alternative_select_labels
             )
+            this.menu_labels_reset := false
+            this.RefreshMenuLabels()
+            this.menu_alternative_select_keys.Value := this.behavior_model.alternative_select_keys
+            this.menu_page_down_cycle.Value := this.behavior_model.page_down_cycle
             this.bindings := this.behavior_model.GetBindings()
             this.RefreshBindingList()
             this.punctuator_maps := HasMethod(this.behavior_model, "GetPunctuatorMaps")
@@ -2304,6 +2346,7 @@ class RabbitSettingsWindow extends Gui {
                 ? this.behavior_model.GetRecognizerPatterns() : Map()
             this.recognizer_reset_fields := Map()
             this.UpdateRecognizerPatternsCard()
+            this.UpdateMenuLabelsResetState()
             this.show_tips_time.Enabled := !!this.show_tips.Value
             this.UpdateClipboardControls()
             this.UpdateGoodOldCapsLockControl()
@@ -2335,10 +2378,109 @@ class RabbitSettingsWindow extends Gui {
         this.clipboard_length.Enabled := use_threshold
     }
 
+    RefreshMenuLabels(selected_row := 0) {
+        local label
+        this.menu_labels.Delete()
+        for label in this.menu_labels_values {
+            this.menu_labels.Add([label])
+        }
+        if selected_row && selected_row <= this.menu_labels_values.Length {
+            this.menu_labels.Choose(selected_row)
+        }
+        this.UpdateMenuLabelsResetState()
+    }
+
+    UpdateMenuLabelsResetState() {
+        this.menu_help.Value := this.menu_labels_reset
+            ? RabbitI18n.Text("menu.restore_default_pending")
+            : RabbitI18n.Text("controls.labels_hint")
+    }
+
+    CancelMenuLabelsReset() {
+        this.menu_labels_reset := false
+    }
+
+    SelectedMenuLabelRow() {
+        return this.menu_labels.Value
+    }
+
+    AddMenuLabel() {
+        local item := RabbitStringListItemDialog(
+            this,
+            "",
+            false,
+            this.window_theme.dark_mode_reader
+        ).ShowModal()
+        if !item {
+            return false
+        }
+        this.CancelMenuLabelsReset()
+        this.menu_labels_values.Push(item["value"])
+        this.RefreshMenuLabels(this.menu_labels_values.Length)
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    EditMenuLabel(row := 0) {
+        local item
+        if !row {
+            row := this.SelectedMenuLabelRow()
+        }
+        if row < 1 || row > this.menu_labels_values.Length {
+            return false
+        }
+        item := RabbitStringListItemDialog(
+            this,
+            this.menu_labels_values[row],
+            true,
+            this.window_theme.dark_mode_reader
+        ).ShowModal()
+        if !item {
+            return false
+        }
+        this.CancelMenuLabelsReset()
+        this.menu_labels_values[row] := item["value"]
+        this.RefreshMenuLabels(row)
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    DeleteMenuLabel() {
+        local row := this.SelectedMenuLabelRow()
+        if row < 1 || row > this.menu_labels_values.Length {
+            return false
+        }
+        this.CancelMenuLabelsReset()
+        this.menu_labels_values.RemoveAt(row)
+        this.RefreshMenuLabels(Min(row, this.menu_labels_values.Length))
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    MoveMenuLabel(offset) {
+        local item, row := this.SelectedMenuLabelRow(), target := row + offset
+        if row < 1 || target < 1 || target > this.menu_labels_values.Length {
+            return false
+        }
+        this.CancelMenuLabelsReset()
+        item := this.menu_labels_values.RemoveAt(row)
+        this.menu_labels_values.InsertAt(target, item)
+        this.RefreshMenuLabels(target)
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    RestoreMenuLabels() {
+        this.menu_labels_reset := true
+        this.UpdateMenuLabelsResetState()
+        this.OnBehaviorChanged()
+        return true
+    }
+
     GetBehaviorValues() {
-        local controls, key, label
-        local labels := []
+        local controls, key
         local page_size := Trim(this.menu_page_size.Value)
+        local alternative_select_keys := this.menu_alternative_select_keys.Value
         local show_tips_time := Trim(this.show_tips_time.Value)
         local clipboard_length := Trim(this.clipboard_length.Value)
         local digit_separators := Trim(this.punctuator_digit_separators.Value)
@@ -2358,11 +2500,7 @@ class RabbitSettingsWindow extends Gui {
             throw ValueError(RabbitI18n.Text("controls.clipboard_invalid"))
         }
         RabbitPunctuatorMap.ValidateDigitSeparators(digit_separators)
-        Loop Parse this.menu_labels.Value, "," {
-            if (label := Trim(A_LoopField)) {
-                labels.Push(label)
-            }
-        }
+        RabbitMenuSettings.ValidateAlternativeSelectKeys(alternative_select_keys)
         local switch_key := Map()
         for key, controls in this.ascii_switch_controls {
             switch_key[key] := controls.values[controls.dropdown.Value]
@@ -2382,7 +2520,10 @@ class RabbitSettingsWindow extends Gui {
             good_old_caps_lock: !!this.good_old_caps_lock.Value,
             switch_key: switch_key,
             page_size: Number(page_size),
-            alternative_select_labels: labels,
+            alternative_select_labels: RabbitBehaviorSettingsModel.CloneValue(this.menu_labels_values),
+            alternative_select_labels_reset: this.menu_labels_reset,
+            alternative_select_keys: alternative_select_keys,
+            page_down_cycle: !!this.menu_page_down_cycle.Value,
             bindings: RabbitBehaviorSettingsModel.CloneValue(this.bindings),
             punctuator_maps: RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps),
             punctuator_reset_fields: RabbitBehaviorSettingsModel.CloneValue(this.punctuator_reset_fields),
@@ -2424,7 +2565,7 @@ class RabbitSettingsWindow extends Gui {
                 this.behavior_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
             }
-            if (this.punctuator_reset_fields.Count || this.recognizer_reset_fields.Count)
+            if (this.menu_labels_reset || this.punctuator_reset_fields.Count || this.recognizer_reset_fields.Count)
                 && HasMethod(this.behavior_model, "Load") {
                 if !this.behavior_model.Load() {
                     throw Error(RabbitI18n.Text("models.behavior_read"))

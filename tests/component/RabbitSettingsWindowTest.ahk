@@ -44,6 +44,7 @@ RunTest("settings window reorders selected schemas", TestSettingsWindowReordersS
 RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOptionHeaders.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
+RunTest("settings window exposes menu controls", TestSettingsWindowMenuControls.Bind())
 RunTest("settings window exposes punctuation map controls", TestSettingsWindowPunctuatorControls.Bind())
 RunTest("settings window exposes recognizer pattern controls", TestSettingsWindowRecognizerControls.Bind())
 RunTest("key binding dialog preserves unknown fields", TestKeyBindingDialogPreservesUnknownFields.Bind())
@@ -654,7 +655,8 @@ TestSettingsWindowPreviewsPendingLabels() {
     try {
         window.SelectPage(3)
         window.SelectPage(1)
-        window.menu_labels.Value := "壹, 贰, 叁, 肆, 伍"
+        window.menu_labels_values := ["壹", "贰", "叁", "肆", "伍"]
+        window.RefreshMenuLabels()
         AssertTrue(window.PreviewAppearance(), "The appearance page failed to refresh its preview.")
         AssertEqual(
             "壹",
@@ -1231,6 +1233,8 @@ class RabbitSettingsBehaviorModelProbe {
         )
         this.page_size := 5
         this.alternative_select_labels := []
+        this.alternative_select_keys := ""
+        this.page_down_cycle := false
         this.bindings := [Map("accept", "Control+p", "send", "Up", "when", "composing")]
         this.punctuator_maps := Map(
             RabbitPunctuatorMap.FULL_SHAPE_PATH, Map("(", Map("pair", ["（", "）"])),
@@ -1381,31 +1385,34 @@ class RabbitSettingsAdvancedFontDialogProbe {
 }
 
 TestSettingsWindowDefaultBehaviorControls() {
+    static LB_GETCOUNT := 0x018B
     local calls := []
     local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        window.behavior_tabs.Choose(4)
+        window.OnBehaviorTabChanged()
         AssertEqual(5, window.menu_page_size.Value, "The behavior page showed the wrong page size.")
         AssertEqual(1, window.binding_list.GetCount(), "The behavior page showed the wrong binding count.")
         AssertEqual("5", RabbitSettingsEditCue(window.menu_page_size), "The page-size placeholder was wrong.")
+        AssertEqual(0, SendMessage(LB_GETCOUNT, 0, 0, window.menu_labels.Hwnd),
+            "The candidate-label list showed unexpected entries.")
         AssertEqual(
             "例如：Control+Shift+F12",
             RabbitSettingsEditCue(window.suspend_hotkey),
             "The suspend-hotkey placeholder was wrong."
         )
-        AssertEqual(
-            "1, 2, 3, 4, 5, 6, 7, 8, 9, 10",
-            RabbitSettingsEditCue(window.menu_labels),
-            "The candidate-label placeholder was wrong."
-        )
         window.behavior_tabs.Choose(2)
         window.OnBehaviorTabChanged()
         AssertTrue(window.binding_list.Visible, "The key-binding tab did not show the binding list.")
         AssertTrue(!window.menu_page_size.Visible, "The key-binding tab left general controls visible.")
-        window.behavior_tabs.Choose(1)
+        window.behavior_tabs.Choose(4)
         window.OnBehaviorTabChanged()
         window.menu_page_size.Value := 7
-        window.menu_labels.Value := "①, ②"
+        window.menu_labels_values := ["①", "②"]
+        window.RefreshMenuLabels(2)
+        window.menu_alternative_select_keys.Value := "asdfg"
+        window.menu_page_down_cycle.Value := true
         window.suspend_hotkey.Value := "Control+Shift+F12"
         window.clipboard_mode.Choose(2)
         window.OnClipboardModeChanged()
@@ -1416,6 +1423,9 @@ TestSettingsWindowDefaultBehaviorControls() {
             values.alternative_select_labels.Length,
             "The behavior page parsed candidate labels incorrectly."
         )
+        AssertEqual("asdfg", values.alternative_select_keys,
+            "The behavior page returned the wrong candidate selection keys.")
+        AssertTrue(values.page_down_cycle, "The behavior page returned the wrong page-cycle value.")
         AssertEqual("inline_ascii", values.switch_key["Shift_L"], "The behavior page returned the wrong switch action.")
         AssertTrue(values.good_old_caps_lock, "The behavior page returned the wrong Caps Lock compatibility value.")
         AssertTrue(
@@ -1452,10 +1462,60 @@ TestSettingsWindowDefaultBehaviorControls() {
         AssertEqual(0, values.send_by_clipboard_length, "The always-use clipboard mode was encoded incorrectly.")
         AssertTrue(!window.clipboard_length.Enabled, "The always-use mode left the threshold enabled.")
         window.menu_page_size.Value := ""
-        window.menu_labels.Value := ""
+        window.menu_labels_values := []
+        window.RefreshMenuLabels()
+        window.menu_alternative_select_keys.Value := ""
+        window.menu_page_down_cycle.Value := false
         values := window.GetBehaviorValues()
         AssertEqual(5, values.page_size, "An empty page size did not use its placeholder value.")
         AssertEqual(0, values.alternative_select_labels.Length, "An empty label field created custom labels.")
+        AssertEqual("", values.alternative_select_keys, "An empty selection-key field did not remain empty.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowMenuControls() {
+    static LB_GETCOUNT := 0x018B
+    local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        window.behavior_tabs.Choose(4)
+        window.OnBehaviorTabChanged()
+        AssertTrue(window.menu_group.Visible, "The menu settings group stayed hidden.")
+        AssertTrue(window.menu_alternative_select_keys.Visible, "The candidate selection-key control stayed hidden.")
+        AssertEqual(
+            "1234567890",
+            RabbitSettingsEditCue(window.menu_alternative_select_keys),
+            "The empty selection-key field did not show its cue."
+        )
+        AssertEqual("循环翻页", window.menu_page_down_cycle.Text, "The page-cycle label changed unexpectedly.")
+        AssertTrue(!window.menu_page_down_cycle.Value, "The page-cycle control showed the wrong default.")
+        window.menu_labels_values := ["①", "②", "③"]
+        window.RefreshMenuLabels(2)
+        AssertEqual(3, SendMessage(LB_GETCOUNT, 0, 0, window.menu_labels.Hwnd),
+            "The candidate-label list showed the wrong item count.")
+        AssertTrue(window.MoveMenuLabel(-1), "The candidate-label list could not move an item upward.")
+        AssertEqual("②", window.menu_labels_values[1], "The candidate-label list changed order incorrectly.")
+        AssertTrue(window.DeleteMenuLabel(), "The candidate-label list could not delete an item.")
+        AssertEqual(2, window.menu_labels_values.Length, "The candidate-label list did not delete one item.")
+        AssertTrue(window.RestoreMenuLabels(), "The candidate-label list could not stage a reset.")
+        AssertTrue(window.menu_labels_reset, "The candidate-label reset was not staged.")
+        AssertTrue(
+            InStr(window.menu_help.Value, "保存后") = 1,
+            "The candidate-label reset did not update its pending status."
+        )
+
+        window.menu_alternative_select_keys.Value := "aa"
+        AssertThrows(
+            window.GetBehaviorValues.Bind(window),
+            "The menu control accepted duplicate candidate selection keys."
+        )
+        window.menu_alternative_select_keys.Value := "asdfg"
+        window.menu_page_down_cycle.Value := true
+        values := window.GetBehaviorValues()
+        AssertEqual("asdfg", values.alternative_select_keys, "The menu control returned the wrong selection keys.")
+        AssertTrue(values.page_down_cycle, "The menu control returned the wrong page-cycle value.")
     } finally {
         window.Dispose()
     }
@@ -1466,7 +1526,7 @@ TestSettingsWindowPunctuatorControls() {
     local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(4)
+        window.behavior_tabs.Choose(5)
         window.OnBehaviorTabChanged()
         AssertTrue(
             window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH].edit.Visible,
@@ -1516,7 +1576,7 @@ TestSettingsWindowRecognizerControls() {
     local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(5)
+        window.behavior_tabs.Choose(6)
         window.OnBehaviorTabChanged()
         AssertTrue(window.recognizer_use_space.Visible, "The recognizer spacing control stayed hidden.")
         AssertTrue(window.recognizer_control_map.patterns.edit.Visible,

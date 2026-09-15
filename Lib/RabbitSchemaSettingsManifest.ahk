@@ -233,6 +233,10 @@ class RabbitSchemaSettingsManifest {
                 }
             case "string":
                 return value
+            case "list":
+                if !value {
+                    return []
+                }
         }
         throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
     }

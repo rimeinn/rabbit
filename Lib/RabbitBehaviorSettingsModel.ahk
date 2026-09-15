@@ -19,6 +19,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitConfigValue.ahk
 #Include RabbitDeploymentPlan.ahk
+#Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
 
@@ -81,8 +82,21 @@ class RabbitBehaviorSettingsModel {
             true
         )
         this.switch_key := this.LoadSwitchKeys(default_config)
-        this.page_size := this.GetInt(default_config, "menu/page_size", 5)
-        this.alternative_select_labels := this.LoadStringList(default_config, "menu/alternative_select_labels")
+        this.page_size := this.GetInt(default_config, RabbitMenuSettings.PAGE_SIZE_PATH, 5)
+        this.alternative_select_labels := this.LoadStringList(
+            default_config,
+            RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH
+        )
+        this.alternative_select_keys := this.GetString(
+            default_config,
+            RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH,
+            RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_DEFAULT
+        )
+        this.page_down_cycle := this.GetBool(
+            default_config,
+            RabbitMenuSettings.PAGE_DOWN_CYCLE_PATH,
+            RabbitMenuSettings.PAGE_DOWN_CYCLE_DEFAULT
+        )
         this.bindings := this.LoadBindings(default_config)
         this.punctuator_maps := this.LoadPunctuatorMaps(default_config)
         this.punctuator_use_space := this.GetBool(
@@ -280,6 +294,8 @@ class RabbitBehaviorSettingsModel {
             switch_key: RabbitBehaviorSettingsModel.CloneValue(this.switch_key),
             page_size: this.page_size,
             alternative_select_labels: RabbitBehaviorSettingsModel.CloneValue(this.alternative_select_labels),
+            alternative_select_keys: this.alternative_select_keys,
+            page_down_cycle: this.page_down_cycle,
             bindings: RabbitBehaviorSettingsModel.CloneValue(this.bindings),
             punctuator_maps: RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps),
             punctuator_use_space: this.punctuator_use_space,
@@ -305,6 +321,7 @@ class RabbitBehaviorSettingsModel {
     Save(values) {
         local default_changed := this.HasDefaultChanges(values)
         local rabbit_changed := this.HasRabbitChanges(values)
+        this.ValidateMenuValues(values)
         this.ValidatePunctuatorValues(values)
         this.ValidateRecognizerValues(values)
         if !rabbit_changed && !default_changed {
@@ -361,10 +378,13 @@ class RabbitBehaviorSettingsModel {
     HasSchemaAffectingDefaultChanges(values) {
         local original := this.original_values
         return values.page_size != original.page_size
+            || HasProp(values, "alternative_select_labels_reset") && values.alternative_select_labels_reset
             || !RabbitBehaviorSettingsModel.ValuesEqual(
                 values.alternative_select_labels,
                 original.alternative_select_labels
             )
+            || values.alternative_select_keys != original.alternative_select_keys
+            || values.page_down_cycle != original.page_down_cycle
             || !RabbitBehaviorSettingsModel.ValuesEqual(values.bindings, original.bindings)
             || this.HasPunctuatorChanges(values)
             || this.HasRecognizerChanges(values)
@@ -420,6 +440,10 @@ class RabbitBehaviorSettingsModel {
     ValidatePunctuatorValues(values) {
         RabbitPunctuatorMap.ValidateDigitSeparators(values.punctuator_digit_separators)
         RabbitPunctuatorMap.ValidateDigitSeparatorAction(values.punctuator_digit_separator_action)
+    }
+
+    ValidateMenuValues(values) {
+        RabbitMenuSettings.ValidateAlternativeSelectKeys(values.alternative_select_keys)
     }
 
     ValidateRecognizerValues(values) {
@@ -506,17 +530,33 @@ class RabbitBehaviorSettingsModel {
             }
         }
         if values.page_size != original.page_size
-            && !this.api.customize_int(this.default_settings, "menu/page_size", values.page_size) {
+            && !this.api.customize_int(this.default_settings, RabbitMenuSettings.PAGE_SIZE_PATH, values.page_size) {
             return false
         }
-        if !RabbitBehaviorSettingsModel.ValuesEqual(
-            values.alternative_select_labels,
-            original.alternative_select_labels
-        ) && !this.CustomizeYamlItem(
-            this.default_settings,
-            "menu/alternative_select_labels",
-            values.alternative_select_labels
-        ) {
+        if HasProp(values, "alternative_select_labels_reset") && values.alternative_select_labels_reset {
+            if !this.ClearAlternativeSelectLabelsPatch() {
+                return false
+            }
+        } else if !RabbitBehaviorSettingsModel.ValuesEqual(
+                values.alternative_select_labels,
+                original.alternative_select_labels
+            ) && !this.CustomizeAlternativeSelectLabels(values.alternative_select_labels) {
+            return false
+        }
+        if values.alternative_select_keys != original.alternative_select_keys
+            && !this.api.customize_string(
+                this.default_settings,
+                RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH,
+                values.alternative_select_keys
+            ) {
+            return false
+        }
+        if values.page_down_cycle != original.page_down_cycle
+            && !this.api.customize_bool(
+                this.default_settings,
+                RabbitMenuSettings.PAGE_DOWN_CYCLE_PATH,
+                values.page_down_cycle
+            ) {
             return false
         }
         if !RabbitBehaviorSettingsModel.ValuesEqual(values.bindings, original.bindings)
@@ -591,6 +631,58 @@ class RabbitBehaviorSettingsModel {
             return false
         }
         return this.CustomizeYamlItem(this.default_settings, path, value)
+    }
+
+    CustomizeAlternativeSelectLabels(value) {
+        if !this.ClearAlternativeSelectLabelsPatch() {
+            return false
+        }
+        return this.CustomizeYamlItem(
+            this.default_settings,
+            RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH,
+            value
+        )
+    }
+
+    ClearAlternativeSelectLabelsPatch() {
+        local key, keys := Map(RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH, true)
+        for key in this.GetExistingAlternativeSelectLabelsPatchKeys() {
+            keys[key] := true
+        }
+        for key in keys {
+            if !this.api.customize_item(this.default_settings, key, 0) {
+                return false
+            }
+        }
+        return true
+    }
+
+    GetExistingAlternativeSelectLabelsPatchKeys() {
+        local config := 0, iter := 0, key, result := []
+        if !HasMethod(this.rime, "user_config_open")
+            || !(config := this.rime.user_config_open("default.custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    key := iter.key
+                    if key = RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH
+                        || SubStr(key, 1, StrLen(RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH) + 1)
+                            = RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH . "/" {
+                        result.Push(key)
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            this.rime.config_close(config)
+        }
+        return result
     }
 
     ClearPunctuatorMapPatch(path) {
@@ -719,6 +811,8 @@ class RabbitBehaviorSettingsModel {
         this.switch_key := RabbitBehaviorSettingsModel.CloneValue(values.switch_key)
         this.page_size := values.page_size
         this.alternative_select_labels := RabbitBehaviorSettingsModel.CloneValue(values.alternative_select_labels)
+        this.alternative_select_keys := values.alternative_select_keys
+        this.page_down_cycle := values.page_down_cycle
         this.bindings := RabbitBehaviorSettingsModel.CloneValue(values.bindings)
         if HasProp(values, "punctuator_maps") {
             this.punctuator_maps := RabbitBehaviorSettingsModel.CloneValue(values.punctuator_maps)

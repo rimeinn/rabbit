@@ -27,11 +27,13 @@ RunTest("punctuator maps validate and use a dedicated editor", TestPunctuatorMap
 RunTest("recognizer patterns validate and use a dedicated editor", TestRecognizerPatternEditor.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
+RunTest("schema settings save menu values", TestSchemaSettingsMenuPersistence.Bind())
 RunTest("schema settings save punctuation scalar values", TestSchemaSettingsPunctuatorScalarPersistence.Bind())
 RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
 RunTest("schema settings save punctuation maps", TestSchemaSettingsPunctuatorMapPersistence.Bind())
 RunTest("schema settings save recognizer patterns", TestSchemaSettingsRecognizerPatternPersistence.Bind())
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
+RunTest("schema settings dialog exposes menu controls", TestSchemaSettingsDialogMenuControls.Bind())
 RunTest("schema settings dialog switches groups", TestSchemaSettingsDialogGroups.Bind())
 RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDialogLists.Bind())
 RunTest("schema settings dialog supports librime binding values", TestSchemaSettingsDialogBindingValues.Bind())
@@ -226,33 +228,44 @@ TestBundledSchemaSettingsFallback() {
     local manifest := RabbitSchemaSettingsManifest.Parse(
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
-    AssertEqual(9, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(12, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
     AssertEqual(3, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
-    AssertEqual("general", manifest.fields[1].group, "The bundled fallback did not assign its field to a group.")
+    AssertEqual("menu", manifest.fields[1].group, "The bundled fallback did not assign its field to a group.")
     AssertEqual("menu/page_size", manifest.fields[1].path, "The bundled fallback omitted the page-size setting.")
-    AssertEqual("punctuator_map", manifest.fields[2].type, "The bundled fallback omitted punctuation map support.")
+    AssertEqual("list", manifest.fields[2].type, "The bundled fallback omitted candidate label support.")
+    AssertTrue(manifest.fields[2].default is Array, "The candidate label default was not parsed as an empty list.")
+    AssertEqual(
+        "menu/alternative_select_keys",
+        manifest.fields[3].path,
+        "The bundled fallback omitted candidate selection-key support."
+    )
+    AssertTrue(manifest.fields[3].has_default && manifest.fields[3].default = "",
+        "The candidate selection-key default was not parsed.")
+    AssertEqual("boolean", manifest.fields[4].type, "The bundled fallback omitted page-cycle support.")
+    AssertTrue(!manifest.fields[4].default, "The page-cycle default was not parsed.")
+    AssertEqual("punctuator_map", manifest.fields[5].type, "The bundled fallback omitted punctuation map support.")
     AssertEqual(
         "punctuator/full_shape",
-        manifest.fields[2].path,
+        manifest.fields[5].path,
         "The bundled fallback omitted the full-shape punctuation map."
     )
-    AssertEqual("boolean", manifest.fields[5].type, "The bundled fallback omitted punctuation spacing support.")
-    AssertTrue(!manifest.fields[5].default, "The punctuation spacing default was not parsed.")
+    AssertEqual("boolean", manifest.fields[8].type, "The bundled fallback omitted punctuation spacing support.")
+    AssertTrue(!manifest.fields[8].default, "The punctuation spacing default was not parsed.")
     AssertEqual(
         "punctuator/digit_separators",
-        manifest.fields[6].path,
+        manifest.fields[9].path,
         "The bundled fallback omitted digit separator support."
     )
-    AssertEqual(".:", manifest.fields[6].default, "The digit separator default was not parsed.")
-    AssertEqual("enum", manifest.fields[7].type, "The bundled fallback omitted digit separator action support.")
-    AssertEqual("forward", manifest.fields[7].default, "The digit separator action default was not parsed.")
-    AssertEqual(2, manifest.fields[7].options.Length, "The digit separator action options were incomplete.")
-    AssertEqual("recognizer", manifest.fields[8].group, "The bundled fallback omitted the recognizer group.")
-    AssertEqual("boolean", manifest.fields[8].type, "The bundled fallback omitted recognizer spacing support.")
-    AssertTrue(!manifest.fields[8].default, "The recognizer spacing default was not parsed.")
-    AssertEqual("recognizer_patterns", manifest.fields[9].type,
+    AssertEqual(".:", manifest.fields[9].default, "The digit separator default was not parsed.")
+    AssertEqual("enum", manifest.fields[10].type, "The bundled fallback omitted digit separator action support.")
+    AssertEqual("forward", manifest.fields[10].default, "The digit separator action default was not parsed.")
+    AssertEqual(2, manifest.fields[10].options.Length, "The digit separator action options were incomplete.")
+    AssertEqual("recognizer", manifest.fields[11].group, "The bundled fallback omitted the recognizer group.")
+    AssertEqual("boolean", manifest.fields[11].type, "The bundled fallback omitted recognizer spacing support.")
+    AssertTrue(!manifest.fields[11].default, "The recognizer spacing default was not parsed.")
+    AssertEqual("recognizer_patterns", manifest.fields[12].type,
         "The bundled fallback omitted recognizer pattern support.")
-    AssertEqual("recognizer/patterns", manifest.fields[9].path,
+    AssertEqual("recognizer/patterns", manifest.fields[12].path,
         "The bundled fallback omitted the recognizer pattern path.")
 }
 
@@ -376,6 +389,51 @@ TestSchemaSettingsModelPersistence() {
     )
 }
 
+TestSchemaSettingsMenuPersistence() {
+    local calls := [], values, model
+    local manifest := SchemaSettingsMenuManifest()
+    local rime := RabbitSchemaSettingsListRimeProbe(Map(
+        "menu/page_size", 5,
+        "menu/alternative_select_labels", ["①", "②", "③"],
+        "menu/alternative_select_keys", "asdfg",
+        "menu/page_down_cycle", 0
+    ), ["menu/alternative_select_labels/@legacy"], calls)
+    model := RabbitSchemaSettingsModelProbe(
+        rime,
+        RabbitSchemaSettingsListLeversProbe(calls),
+        "demo",
+        manifest
+    )
+    AssertTrue(model.Load(), "The schema settings model could not load menu settings.")
+    AssertEqual(5, model.values["page_size"], "The menu page size was loaded incorrectly.")
+    AssertEqual("②", model.values["alternative_select_labels"][2],
+        "The menu labels were loaded incorrectly.")
+    AssertEqual("asdfg", model.values["alternative_select_keys"],
+        "The candidate selection keys were loaded incorrectly.")
+    AssertTrue(!model.values["page_down_cycle"], "The page-cycle value was loaded incorrectly.")
+
+    values := RabbitConfigValue.Clone(model.values)
+    values["page_size"] := 6
+    values["alternative_select_labels"] := ["一", "二"]
+    values["alternative_select_keys"] := " asdfg"
+    values["page_down_cycle"] := true
+    AssertTrue(model.Save(values), "The schema settings model failed to save menu settings.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "integer:menu/page_size:6"),
+        "The schema settings model did not save the menu page size.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "string:menu/alternative_select_keys: asdfg"),
+        "The schema settings model did not preserve candidate selection keys.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "boolean:menu/page_down_cycle:1"),
+        "The schema settings model did not save the page-cycle value.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:menu/alternative_select_labels/@legacy"),
+        "Replacing menu labels did not clear a nested patch.")
+    AssertTrue(SchemaSettingsCallsContain(calls, "item:menu/alternative_select_labels:", '"一"'),
+        "The schema settings model did not save the complete menu label list.")
+
+    values["alternative_select_keys"] := "aa"
+    AssertThrows(model.NormalizeValues.Bind(model, values),
+        "The schema settings model accepted duplicate candidate selection keys.")
+}
+
 TestSchemaSettingsPunctuatorScalarPersistence() {
     local calls := []
     local model := RabbitSchemaSettingsModelProbe(
@@ -497,6 +555,44 @@ TestSchemaSettingsDialogDarkAppearance() {
             dialog.BackColor,
             "The schema settings dialog did not use the dark window background."
         )
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogMenuControls() {
+    local calls := [], owner := Gui(), dialog := 0
+    local model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsMenuManifest()
+    )
+    try {
+        model.values := Map(
+            "page_size", 5,
+            "alternative_select_labels", [],
+            "alternative_select_keys", "",
+            "page_down_cycle", false
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        AssertTrue(dialog.field_controls.Has("page_size"), "The schema dialog omitted the menu page-size field.")
+        AssertTrue(
+            dialog.field_controls.Has("alternative_select_keys"),
+            "The schema dialog omitted the candidate selection-key field."
+        )
+        AssertEqual(
+            "1234567890",
+            SchemaSettingsEditCue(dialog.field_controls["alternative_select_keys"]),
+            "The schema dialog did not show the empty selection-key cue."
+        )
+        AssertTrue(dialog.field_controls.Has("alternative_select_labels"),
+            "The schema dialog omitted the candidate label list.")
+        AssertTrue(dialog.field_controls.Has("page_down_cycle"),
+            "The schema dialog omitted the page-cycle field.")
     } finally {
         if dialog {
             dialog.Dispose()
@@ -1107,6 +1203,67 @@ SchemaSettingsListManifest(processor_rows := "", binding_rows := "", group_descr
     }
 }
 
+SchemaSettingsMenuManifest() {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "menu", label: "Candidate menu", description: "" }],
+        fields: [
+            {
+                id: "page_size",
+                group: "menu",
+                path: "menu/page_size",
+                type: "integer",
+                label: "Page size",
+                description: "",
+                min: 1,
+                max: 10,
+                options: [],
+            },
+            {
+                id: "alternative_select_labels",
+                group: "menu",
+                path: "menu/alternative_select_labels",
+                type: "list",
+                label: "Candidate labels",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+                rows: 3,
+                has_default: true,
+                default: [],
+            },
+            {
+                id: "alternative_select_keys",
+                group: "menu",
+                path: "menu/alternative_select_keys",
+                type: "string",
+                label: "Candidate selection keys",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+                has_default: true,
+                default: "",
+            },
+            {
+                id: "page_down_cycle",
+                group: "menu",
+                path: "menu/page_down_cycle",
+                type: "boolean",
+                label: "Cycle pages",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+                has_default: true,
+                default: false,
+            },
+        ],
+    }
+}
+
 SchemaSettingsPunctuatorManifest() {
     return {
         title: "Settings",
@@ -1207,6 +1364,24 @@ SchemaSettingsRecognizerManifest() {
             },
         ],
     }
+}
+
+SchemaSettingsEditCue(ctrl) {
+    static EM_GETCUEBANNER := 0x1502
+    local buf := Buffer(256, 0)
+    DllCall(
+        "User32\SendMessageW",
+        "Ptr",
+        ctrl.Hwnd,
+        "UInt",
+        EM_GETCUEBANNER,
+        "Ptr",
+        buf.Ptr,
+        "Ptr",
+        buf.Size / 2,
+        "Ptr"
+    )
+    return StrGet(buf, "UTF-16")
 }
 
 JoinSchemaSettingsCalls(calls) {
@@ -1503,6 +1678,16 @@ class RabbitSchemaSettingsListLeversProbe {
 
     customize_bool(settings, path, value) {
         this.calls.Push("boolean:" . path . ":" . value)
+        return true
+    }
+
+    customize_int(settings, path, value) {
+        this.calls.Push("integer:" . path . ":" . value)
+        return true
+    }
+
+    customize_string(settings, path, value) {
+        this.calls.Push("string:" . path . ":" . value)
         return true
     }
 

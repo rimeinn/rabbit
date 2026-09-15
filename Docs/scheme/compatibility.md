@@ -33,6 +33,9 @@
 - `punctuator_map`：仅用于 `punctuator/full_shape`、`punctuator/half_shape` 和 `punctuator/symbols`，使用标点映射编辑器；
 - `recognizer_patterns`：仅用于 `recognizer/patterns`，使用识别模式编辑器，每项由标签和正则表达式组成。
 
+候选选单常用字段包括 `menu/page_size`（整数）、`menu/alternative_select_labels`（字符串列表）、
+`menu/alternative_select_keys`（可打印 ASCII 字符组成的字符串）和 `menu/page_down_cycle`（布尔值）。
+
 专用映射字段由玉兔毫整体维护：编辑后写入完整映射表，并清除同路径的精确覆盖及嵌套补丁；“还原方案默认”会移除完整覆盖和所有嵌套补丁。
 `recognizer_patterns` 不在玉兔毫中预先校验正则表达式，最终语法由 librime 的 Boost.Regex 处理。
 

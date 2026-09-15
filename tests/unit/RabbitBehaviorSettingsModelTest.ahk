@@ -42,6 +42,8 @@ TestBehaviorSettingsModelLoadsDefaults() {
         AssertEqual("inline_ascii", model.switch_key["Shift_L"], "The model loaded the wrong switch action.")
         AssertEqual(6, model.page_size, "The model loaded the wrong candidate page size.")
         AssertEqual("①", model.alternative_select_labels[1], "The model loaded the wrong candidate label.")
+        AssertEqual("", model.alternative_select_keys, "The model loaded the wrong candidate selection keys.")
+        AssertTrue(!model.page_down_cycle, "The model loaded the wrong page-cycle value.")
         AssertEqual(1, model.bindings.Length, "The model loaded the wrong binding count.")
         AssertEqual("kept", model.bindings[1]["custom_field"], "The model discarded an unknown binding field.")
         AssertTrue(!model.punctuator_use_space, "The model loaded the wrong punctuation spacing value.")
@@ -99,6 +101,55 @@ TestBehaviorSettingsModelIsolatesConfigFiles() {
         AssertTrue(!BehaviorCallsHave(calls, "save:rabbit"), "A default-only edit wrote rabbit.custom.yaml.")
         AssertTrue(BehaviorCallsHave(calls, "set_int:default:menu/page_size:7"), "The page size was not customized.")
         AssertTrue(BehaviorCallsHave(calls, "save:default"), "The model did not save default.custom.yaml.")
+
+        calls.Length := 0
+        values := model.GetCurrentValues()
+        values.alternative_select_labels := ["一", "二"]
+        AssertTrue(model.Save(values), "The model failed to save candidate labels as a list.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:menu/alternative_select_labels"),
+            "Replacing candidate labels did not clear the full-list patch."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:menu/alternative_select_labels/@legacy"),
+            "Replacing candidate labels did not clear a nested list patch."
+        )
+        AssertTrue(
+            BehaviorCallsContain(calls, "item:default:menu/alternative_select_labels:", '"一"'),
+            "The candidate labels were not written as a complete list."
+        )
+
+        calls.Length := 0
+        values := model.GetCurrentValues()
+        values.alternative_select_labels_reset := true
+        AssertTrue(model.Save(values), "The model failed to restore candidate labels.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:menu/alternative_select_labels"),
+            "Restoring candidate labels did not remove the full-list patch."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:menu/alternative_select_labels/@legacy"),
+            "Restoring candidate labels did not remove a nested list patch."
+        )
+
+        calls.Length := 0
+        values := model.GetCurrentValues()
+        values.alternative_select_keys := "asdfg"
+        values.page_down_cycle := true
+        AssertTrue(model.Save(values), "The model failed to save menu navigation settings.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_string:default:menu/alternative_select_keys:asdfg"),
+            "The candidate selection keys were not customized."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_bool:default:menu/page_down_cycle:1"),
+            "The page-cycle setting was not customized."
+        )
+        values := model.GetCurrentValues()
+        values.alternative_select_keys := "aa"
+        AssertThrows(model.Save.Bind(model, values), "The model accepted duplicate candidate selection keys.")
+        values.alternative_select_keys := "a`n"
+        AssertThrows(model.Save.Bind(model, values), "The model accepted a non-printable selection key.")
 
         calls.Length := 0
         values := model.GetCurrentValues()
@@ -201,6 +252,16 @@ TestBehaviorDeploymentGranularity() {
         plan := model.GetDeploymentPlan(values)
         AssertTrue(plan.full_workspace_required, "A schema-visible menu setting did not request workspace deployment.")
         AssertTrue(!plan.rabbit_config_changed, "A menu setting requested rabbit.yaml deployment.")
+
+        values := model.GetCurrentValues()
+        values.alternative_select_keys := "asdfg"
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.full_workspace_required, "Candidate selection keys did not request workspace deployment.")
+
+        values := model.GetCurrentValues()
+        values.page_down_cycle := !values.page_down_cycle
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.full_workspace_required, "Page cycling did not request workspace deployment.")
     } finally {
         model.Dispose()
     }
@@ -386,6 +447,8 @@ class RabbitBehaviorRimeProbe {
         this.punctuator_use_space := false
         this.punctuator_digit_separators := ".:"
         this.punctuator_digit_separator_action := "forward"
+        this.alternative_select_keys := ""
+        this.page_down_cycle := false
         this.recognizer_use_space := false
         this.recognizer_patterns := Map(
             "email", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
@@ -405,6 +468,10 @@ class RabbitBehaviorRimeProbe {
         }
         if config = "default" && key = RabbitPunctuatorMap.USE_SPACE_PATH {
             value := this.punctuator_use_space
+            return true
+        }
+        if config = "default" && key = RabbitMenuSettings.PAGE_DOWN_CYCLE_PATH {
+            value := this.page_down_cycle
             return true
         }
         if config = "default" && key = RabbitRecognizerPatterns.USE_SPACE_PATH {
@@ -468,6 +535,10 @@ class RabbitBehaviorRimeProbe {
             value := "①"
             return true
         }
+        if key = RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH {
+            value := this.alternative_select_keys
+            return true
+        }
         if key = RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH {
             value := this.punctuator_digit_separators
             return true
@@ -512,6 +583,7 @@ class RabbitBehaviorRimeProbe {
         local items := []
         if config = "user" && path = "patch" {
             return RabbitBehaviorConfigIterator([
+                ["menu/alternative_select_labels/@legacy", "patch/menu_labels_legacy"],
                 ["punctuator/full_shape/@legacy", "patch/punctuator_legacy"],
                 ["recognizer/patterns/@legacy", "patch/recognizer_legacy"]
             ])

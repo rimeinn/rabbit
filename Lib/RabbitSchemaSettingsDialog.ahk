@@ -17,6 +17,7 @@
 
 #Include RabbitDialogPlacement.ahk
 #Include RabbitKeyBindingDialog.ahk
+#Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMapDialog.ahk
 #Include RabbitRecognizerPatternsDialog.ahk
 #Include RabbitSchemaSettingsModel.ahk
@@ -368,6 +369,9 @@ class RabbitSchemaSettingsDialog extends Gui {
                     "x184 y" . y . " w" . control_width . " r1 -Multi",
                     this.draft_values[field.id]
                 )
+                if field.path = RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH {
+                    this.SetEditCue(control, "1234567890")
+                }
             }
             this.TrackContentControl(control)
             this.field_controls[field.id] := control
@@ -532,6 +536,22 @@ class RabbitSchemaSettingsDialog extends Gui {
         local control := this.content_gui.AddText(options, value)
         this.TrackContentControl(control)
         return control
+    }
+
+    SetEditCue(ctrl, text) {
+        static EM_SETCUEBANNER := 0x1501
+        DllCall(
+            "User32\SendMessageW",
+            "Ptr",
+            ctrl.Hwnd,
+            "UInt",
+            EM_SETCUEBANNER,
+            "Ptr",
+            true,
+            "WStr",
+            text,
+            "Ptr"
+        )
     }
 
     AddContentSurfaceText(options, value) {

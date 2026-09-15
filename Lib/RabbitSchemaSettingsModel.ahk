@@ -17,6 +17,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitConfigValue.ahk
+#Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
 #Include RabbitSchemaSettingsManifest.ahk
@@ -95,6 +96,9 @@ class RabbitSchemaSettingsModel {
         local item_config, item_value, iter
         local result := []
         if !(iter := this.rime.config_begin_list(config, field.path)) {
+            if HasProp(field, "has_default") && field.has_default {
+                return RabbitConfigValue.Clone(field.default)
+            }
             throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
         }
         try {
@@ -177,7 +181,9 @@ class RabbitSchemaSettingsModel {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
             case "string":
-                normalized := Trim(String(value))
+                normalized := field.path = RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH
+                    ? RabbitMenuSettings.ValidateAlternativeSelectKeys(String(value))
+                    : Trim(String(value))
                 if field.path = RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH {
                     normalized := RabbitPunctuatorMap.ValidateDigitSeparators(normalized)
                 }
