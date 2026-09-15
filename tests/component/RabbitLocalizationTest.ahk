@@ -124,9 +124,9 @@ TestTraditionalSettingsChoices() {
             window.SelectPage(3)
             AssertEqual("zh-HK", window.language_values[4], "Hong Kong language is not selectable.")
             AssertEqual("zh-TW", window.language_values[5], "Taiwan language is not selectable.")
-            window.behavior_tabs.Choose(3)
+            window.behavior_tabs.Choose(1)
             window.OnBehaviorTabChanged()
-            AssertTrue(window.language_choice.Visible, "Regional language picker is hidden.")
+            AssertTrue(window.language_choice.Visible, "Regional language picker is hidden on the general tab.")
             AssertEqual("介面語言：", window.language_label.Text, "Regional language label is not translated.")
             window.Dispose()
             window := 0

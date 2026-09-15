@@ -769,9 +769,19 @@ TestSettingsWindowSavesBehaviorSettings() {
     local window := RabbitSettingsWindow(workflow)
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(3)
+        window.behavior_tabs.Choose(1)
         window.OnBehaviorTabChanged()
-        AssertTrue(window.language_choice.Visible, "Language control is hidden on the interface tab.")
+        AssertTrue(window.language_choice.Visible, "Language control is hidden on the general tab.")
+        local language_y, language_choice_y, language_help_height, behavior_y
+        window.language_label.GetPos(, &language_y)
+        window.language_choice.GetPos(, &language_choice_y)
+        window.language_help.GetPos(, , , &language_help_height)
+        window.behavior_rabbit_group.GetPos(, &behavior_y)
+        AssertTrue(Abs(language_y - language_choice_y) <= 4,
+            "Language label and picker were not placed on the same row.")
+        AssertEqual(22, language_help_height, "The language hint reserved more than one line.")
+        AssertTrue(language_choice_y < behavior_y, "The language picker was placed below Rabbit behavior controls.")
+        AssertTrue(language_y < behavior_y, "Language controls were not placed before Rabbit behavior controls.")
         AssertEqual(1, window.language_choice.Value, "Language did not default to follow system.")
         window.language_choice.Choose(3)
         AssertEqual("en-US", window.GetBehaviorValues().language, "Language selection used the wrong code.")
@@ -1390,7 +1400,7 @@ TestSettingsWindowDefaultBehaviorControls() {
     local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(4)
+        window.behavior_tabs.Choose(3)
         window.OnBehaviorTabChanged()
         AssertEqual(5, window.menu_page_size.Value, "The behavior page showed the wrong page size.")
         AssertEqual(1, window.binding_list.GetCount(), "The behavior page showed the wrong binding count.")
@@ -1406,7 +1416,7 @@ TestSettingsWindowDefaultBehaviorControls() {
         window.OnBehaviorTabChanged()
         AssertTrue(window.binding_list.Visible, "The key-binding tab did not show the binding list.")
         AssertTrue(!window.menu_page_size.Visible, "The key-binding tab left general controls visible.")
-        window.behavior_tabs.Choose(4)
+        window.behavior_tabs.Choose(3)
         window.OnBehaviorTabChanged()
         window.menu_page_size.Value := 7
         window.menu_labels_values := ["①", "②"]
@@ -1480,7 +1490,7 @@ TestSettingsWindowMenuControls() {
     local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(4)
+        window.behavior_tabs.Choose(3)
         window.OnBehaviorTabChanged()
         AssertTrue(window.menu_group.Visible, "The menu settings group stayed hidden.")
         AssertTrue(window.menu_alternative_select_keys.Visible, "The candidate selection-key control stayed hidden.")
@@ -1526,7 +1536,7 @@ TestSettingsWindowPunctuatorControls() {
     local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(5)
+        window.behavior_tabs.Choose(4)
         window.OnBehaviorTabChanged()
         AssertTrue(
             window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH].edit.Visible,
@@ -1576,7 +1586,7 @@ TestSettingsWindowRecognizerControls() {
     local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
-        window.behavior_tabs.Choose(6)
+        window.behavior_tabs.Choose(5)
         window.OnBehaviorTabChanged()
         AssertTrue(window.recognizer_use_space.Visible, "The recognizer spacing control stayed hidden.")
         AssertTrue(window.recognizer_control_map.patterns.edit.Visible,

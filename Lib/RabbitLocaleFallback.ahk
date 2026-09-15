@@ -521,7 +521,7 @@ class RabbitLocaleFallback {
         catalog["language.tab"] := "界面"
         catalog["language.label"] := "界面语言："
         catalog["language.auto"] := "跟随系统"
-        catalog["language.hint"] := "语言更改将在应用并重新部署后生效；语言变化时控制面板将自动重新打开。"
+        catalog["language.hint"] := "应用并重新部署后生效；语言变化时控制面板会自动重开。"
         catalog["frontend.startup_busy"] := "有其他进程正在使用 RIME，启动失败"
         catalog["frontend.maintenance"] := "维护中"
         catalog["frontend.maintenance_done"] := "维护完成"
