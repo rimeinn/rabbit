@@ -18,6 +18,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitConfigValue.ahk
 #Include RabbitPunctuatorMap.ahk
+#Include RabbitRecognizerPatterns.ahk
 #Include RabbitSchemaSettingsManifest.ahk
 
 #Include RabbitI18n.ahk
@@ -77,6 +78,8 @@ class RabbitSchemaSettingsModel {
                 return this.ReadListField(config, field)
             case "punctuator_map":
                 return RabbitPunctuatorMap.Read(this.rime, config, field.path)
+            case "recognizer_patterns":
+                return RabbitRecognizerPatterns.Read(this.rime, config, field.path)
             default:
                 if this.rime.config_test_get_string(config, field.path, &value) {
                     return value
@@ -167,6 +170,12 @@ class RabbitSchemaSettingsModel {
                 } catch {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
+            case "recognizer_patterns":
+                try {
+                    normalized := RabbitRecognizerPatterns.Validate(value)
+                } catch {
+                    throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+                }
             case "string":
                 normalized := Trim(String(value))
                 if field.path = RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH {
@@ -241,7 +250,7 @@ class RabbitSchemaSettingsModel {
                 }
             }
             if !matched || matched.type != "list" && matched.type != "key_binding_list"
-                && matched.type != "punctuator_map" {
+                && matched.type != "punctuator_map" && matched.type != "recognizer_patterns" {
                 throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", reset_id)))
             }
             resets[reset_id] := true
@@ -291,6 +300,7 @@ class RabbitSchemaSettingsModel {
             case "number": return !!this.api.customize_double(settings, field.path, value)
             case "list", "key_binding_list": return this.CustomizeListField(settings, field, value)
             case "punctuator_map": return this.CustomizePunctuatorMapField(settings, field, value)
+            case "recognizer_patterns": return this.CustomizeRecognizerPatternsField(settings, field, value)
             default: return !!this.api.customize_string(settings, field.path, value)
         }
     }
@@ -308,6 +318,7 @@ class RabbitSchemaSettingsModel {
 
     ResetField(settings, field) {
         return field.type = "punctuator_map" ? this.ResetPunctuatorMapField(settings, field)
+            : field.type = "recognizer_patterns" ? this.ResetRecognizerPatternsField(settings, field)
             : this.ResetListField(settings, field)
     }
 
@@ -320,6 +331,61 @@ class RabbitSchemaSettingsModel {
 
     ResetPunctuatorMapField(settings, field) {
         return this.ClearPunctuatorMapPatchOperations(settings, field.path, true)
+    }
+
+    CustomizeRecognizerPatternsField(settings, field, value) {
+        if !this.ClearRecognizerPatternsPatchOperations(settings, field.path) {
+            return false
+        }
+        return this.CustomizeYamlItem(settings, field.path, value)
+    }
+
+    ResetRecognizerPatternsField(settings, field) {
+        return this.ClearRecognizerPatternsPatchOperations(settings, field.path, true)
+    }
+
+    ClearRecognizerPatternsPatchOperations(settings, path, reset_value := false) {
+        local key, keys := Map(path, true)
+        if !reset_value {
+            ; Writing the whole map still owns the exact path and all nested patches.
+            keys[path] := true
+        }
+        for key in this.GetExistingRecognizerPatternsPatchOperations(path) {
+            keys[key] := true
+        }
+        for key in keys {
+            if !this.api.customize_item(settings, key, 0) {
+                return false
+            }
+        }
+        return true
+    }
+
+    GetExistingRecognizerPatternsPatchOperations(path) {
+        local config := 0, iter := 0, key
+        local result := []
+        if !HasMethod(this.rime, "user_config_open")
+            || !(config := this.rime.user_config_open(this.schema_id . ".custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    key := iter.key
+                    if key = path || SubStr(key, 1, StrLen(path) + 1) = path . "/" {
+                        result.Push(key)
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            this.rime.config_close(config)
+        }
+        return result
     }
 
     ClearPunctuatorMapPatchOperations(settings, path, reset_value := false) {

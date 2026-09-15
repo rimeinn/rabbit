@@ -24,6 +24,7 @@ RunTest("behavior settings model isolates config files", TestBehaviorSettingsMod
 RunTest("behavior settings model replaces bindings without losing fields", TestBehaviorSettingsModelBindings.Bind())
 RunTest("behavior settings model selects deployment granularity", TestBehaviorDeploymentGranularity.Bind())
 RunTest("behavior settings model owns punctuation maps", TestBehaviorPunctuatorMaps.Bind())
+RunTest("behavior settings model owns recognizer patterns", TestBehaviorRecognizerPatterns.Bind())
 
 TestBehaviorSettingsModelLoadsDefaults() {
     local calls := []
@@ -47,6 +48,12 @@ TestBehaviorSettingsModelLoadsDefaults() {
         AssertEqual(".:", model.punctuator_digit_separators, "The model loaded the wrong digit separators.")
         AssertEqual("forward", model.punctuator_digit_separator_action,
             "The model loaded the wrong digit separator action.")
+        AssertTrue(!model.recognizer_use_space, "The model loaded the wrong recognizer spacing value.")
+        AssertEqual(
+            "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+            model.recognizer_patterns["email"],
+            "The model loaded the wrong recognizer pattern."
+        )
     } finally {
         model.Dispose()
         model.Dispose()
@@ -234,6 +241,47 @@ TestBehaviorPunctuatorMaps() {
     }
 }
 
+TestBehaviorRecognizerPatterns() {
+    local calls := [], model := CreateBehaviorModel(calls), values, plan
+    try {
+        values := model.GetCurrentValues()
+        AssertEqual(2, values.recognizer_patterns.Count, "The behavior model loaded the wrong pattern count.")
+        values.recognizer_use_space := true
+        values.recognizer_patterns["email"] := "^foo@bar\\.example$"
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.full_workspace_required, "A recognizer setting did not request workspace deployment.")
+        calls.Length := 0
+        AssertTrue(model.Save(values), "The behavior model failed to save recognizer settings.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_bool:default:recognizer/use_space:1"),
+            "The recognizer spacing setting was not customized."
+        )
+        AssertTrue(
+            BehaviorCallsContain(calls, "item:default:recognizer/patterns:", '"email": "^foo@bar\\\\.example$"'),
+            "The behavior model did not write the complete recognizer pattern map."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:recognizer/patterns/@legacy"),
+            "Replacing recognizer patterns did not clear a nested patch."
+        )
+
+        values := model.GetCurrentValues()
+        values.recognizer_reset_fields := Map(RabbitRecognizerPatterns.PATH, true)
+        calls.Length := 0
+        AssertTrue(model.Save(values), "The behavior model failed to restore recognizer patterns.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:recognizer/patterns"),
+            "Restoring recognizer patterns did not remove the full-map override."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:recognizer/patterns/@legacy"),
+            "Restoring recognizer patterns did not remove a nested patch."
+        )
+    } finally {
+        model.Dispose()
+    }
+}
+
 CreateBehaviorModel(calls) {
     return RabbitBehaviorSettingsModel(
         RabbitBehaviorLeversProbe(calls),
@@ -338,6 +386,11 @@ class RabbitBehaviorRimeProbe {
         this.punctuator_use_space := false
         this.punctuator_digit_separators := ".:"
         this.punctuator_digit_separator_action := "forward"
+        this.recognizer_use_space := false
+        this.recognizer_patterns := Map(
+            "email", "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+            "url", "https?://[^ ]+"
+        )
     }
 
     config_test_get_bool(config, key, &value) {
@@ -352,6 +405,10 @@ class RabbitBehaviorRimeProbe {
         }
         if config = "default" && key = RabbitPunctuatorMap.USE_SPACE_PATH {
             value := this.punctuator_use_space
+            return true
+        }
+        if config = "default" && key = RabbitRecognizerPatterns.USE_SPACE_PATH {
+            value := this.recognizer_use_space
             return true
         }
         if config != "rabbit" {
@@ -419,6 +476,13 @@ class RabbitBehaviorRimeProbe {
             value := this.punctuator_digit_separator_action
             return true
         }
+        if InStr(key, RabbitRecognizerPatterns.PATH . "/") = 1 {
+            name := SubStr(key, StrLen(RabbitRecognizerPatterns.PATH) + 2)
+            if this.recognizer_patterns.Has(name) {
+                value := this.recognizer_patterns[name]
+                return true
+            }
+        }
         if InStr(key, "key_binder/bindings/@0/") = 1 {
             name := SubStr(key, StrLen("key_binder/bindings/@0/") + 1)
             value := this.binding_values[name]
@@ -447,13 +511,19 @@ class RabbitBehaviorRimeProbe {
     config_begin_map(config, path) {
         local items := []
         if config = "user" && path = "patch" {
-            return RabbitBehaviorConfigIterator([["punctuator/full_shape/@legacy", "patch/legacy"]])
+            return RabbitBehaviorConfigIterator([
+                ["punctuator/full_shape/@legacy", "patch/punctuator_legacy"],
+                ["recognizer/patterns/@legacy", "patch/recognizer_legacy"]
+            ])
         }
         if config is Map && config.Has("value") && path = "/" && config["value"] is Map {
             return RabbitBehaviorConfigIterator(this.ConfigItems(config["value"], false))
         }
         if config = "default" && this.punctuator_maps.Has(path) {
             return RabbitBehaviorConfigIterator(this.ConfigItems(this.punctuator_maps[path], false, path . "/"))
+        }
+        if config = "default" && path = RabbitRecognizerPatterns.PATH {
+            return RabbitBehaviorConfigIterator(this.ConfigItems(this.recognizer_patterns, false, path . "/"))
         }
         if config != "default" || path != "key_binder/bindings/@0" {
             return 0
@@ -489,6 +559,12 @@ class RabbitBehaviorRimeProbe {
                     if value_map.Has(value) {
                         return Map("value", value_map[value])
                     }
+                }
+            }
+            if SubStr(path, 1, StrLen(RabbitRecognizerPatterns.PATH) + 1) = RabbitRecognizerPatterns.PATH . "/" {
+                value := SubStr(path, StrLen(RabbitRecognizerPatterns.PATH) + 2)
+                if this.recognizer_patterns.Has(value) {
+                    return Map("value", this.recognizer_patterns[value])
                 }
             }
         }

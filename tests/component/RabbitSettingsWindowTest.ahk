@@ -45,6 +45,7 @@ RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOp
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
 RunTest("settings window exposes punctuation map controls", TestSettingsWindowPunctuatorControls.Bind())
+RunTest("settings window exposes recognizer pattern controls", TestSettingsWindowRecognizerControls.Bind())
 RunTest("key binding dialog preserves unknown fields", TestKeyBindingDialogPreservesUnknownFields.Bind())
 RunTest("key binding dialog supports librime actions and conditions", TestKeyBindingDialogSupportsLibrimeValues.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
@@ -1239,6 +1240,8 @@ class RabbitSettingsBehaviorModelProbe {
         this.punctuator_use_space := false
         this.punctuator_digit_separators := ".:"
         this.punctuator_digit_separator_action := "forward"
+        this.recognizer_use_space := false
+        this.recognizer_patterns := Map("email", "email pattern", "url", "url pattern")
     }
 
     GetBindings() {
@@ -1247,6 +1250,10 @@ class RabbitSettingsBehaviorModelProbe {
 
     GetPunctuatorMaps() {
         return RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps)
+    }
+
+    GetRecognizerPatterns() {
+        return RabbitBehaviorSettingsModel.CloneValue(this.recognizer_patterns)
     }
 
     GetDeploymentPlan(values) {
@@ -1500,6 +1507,29 @@ TestSettingsWindowPunctuatorControls() {
             values.punctuator_reset_fields.Has(RabbitPunctuatorMap.FULL_SHAPE_PATH),
             "The native punctuation reset did not reach the behavior values."
         )
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowRecognizerControls() {
+    local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        window.behavior_tabs.Choose(5)
+        window.OnBehaviorTabChanged()
+        AssertTrue(window.recognizer_use_space.Visible, "The recognizer spacing control stayed hidden.")
+        AssertTrue(window.recognizer_control_map.patterns.edit.Visible,
+            "The recognizer pattern editor stayed hidden.")
+        AssertEqual(
+            "2 个模式",
+            window.recognizer_control_map.patterns.summary.Value,
+            "The recognizer editor did not summarize its patterns."
+        )
+        AssertTrue(window.RestoreRecognizerPatterns(), "The recognizer editor could not stage a reset.")
+        values := window.GetBehaviorValues()
+        AssertTrue(values.recognizer_reset_fields.Has(RabbitRecognizerPatterns.PATH),
+            "The recognizer reset did not reach behavior values.")
     } finally {
         window.Dispose()
     }

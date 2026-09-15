@@ -24,16 +24,19 @@ RunTest("schema settings validate manifest fields", TestSchemaSettingsManifestVa
 RunTest("schema settings parse manifest groups", TestSchemaSettingsManifestGroups.Bind())
 RunTest("schema settings parse ordered list fields", TestSchemaSettingsListManifest.Bind())
 RunTest("punctuator maps validate and use a dedicated editor", TestPunctuatorMapEditor.Bind())
+RunTest("recognizer patterns validate and use a dedicated editor", TestRecognizerPatternEditor.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
 RunTest("schema settings save punctuation scalar values", TestSchemaSettingsPunctuatorScalarPersistence.Bind())
 RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
 RunTest("schema settings save punctuation maps", TestSchemaSettingsPunctuatorMapPersistence.Bind())
+RunTest("schema settings save recognizer patterns", TestSchemaSettingsRecognizerPatternPersistence.Bind())
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
 RunTest("schema settings dialog switches groups", TestSchemaSettingsDialogGroups.Bind())
 RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDialogLists.Bind())
 RunTest("schema settings dialog supports librime binding values", TestSchemaSettingsDialogBindingValues.Bind())
 RunTest("schema settings dialog exposes punctuation map fields", TestSchemaSettingsDialogPunctuatorMaps.Bind())
+RunTest("schema settings dialog exposes recognizer pattern fields", TestSchemaSettingsDialogRecognizerPatterns.Bind())
 RunTest("schema settings dialog sizes configured list rows", TestSchemaSettingsDialogListRows.Bind())
 RunTest("schema settings dialog fits short described list groups", TestSchemaSettingsDialogDescribedLists.Bind())
 RunTest("schema settings dialog reveals the final described list field", TestSchemaSettingsDialogLongDescribedLists.Bind())
@@ -223,8 +226,8 @@ TestBundledSchemaSettingsFallback() {
     local manifest := RabbitSchemaSettingsManifest.Parse(
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
-    AssertEqual(7, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
-    AssertEqual(2, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
+    AssertEqual(9, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(3, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
     AssertEqual("general", manifest.fields[1].group, "The bundled fallback did not assign its field to a group.")
     AssertEqual("menu/page_size", manifest.fields[1].path, "The bundled fallback omitted the page-size setting.")
     AssertEqual("punctuator_map", manifest.fields[2].type, "The bundled fallback omitted punctuation map support.")
@@ -244,6 +247,13 @@ TestBundledSchemaSettingsFallback() {
     AssertEqual("enum", manifest.fields[7].type, "The bundled fallback omitted digit separator action support.")
     AssertEqual("forward", manifest.fields[7].default, "The digit separator action default was not parsed.")
     AssertEqual(2, manifest.fields[7].options.Length, "The digit separator action options were incomplete.")
+    AssertEqual("recognizer", manifest.fields[8].group, "The bundled fallback omitted the recognizer group.")
+    AssertEqual("boolean", manifest.fields[8].type, "The bundled fallback omitted recognizer spacing support.")
+    AssertTrue(!manifest.fields[8].default, "The recognizer spacing default was not parsed.")
+    AssertEqual("recognizer_patterns", manifest.fields[9].type,
+        "The bundled fallback omitted recognizer pattern support.")
+    AssertEqual("recognizer/patterns", manifest.fields[9].path,
+        "The bundled fallback omitted the recognizer pattern path.")
 }
 
 TestPunctuatorMapEditor() {
@@ -282,6 +292,41 @@ TestPunctuatorMapEditor() {
             (*) => true
         )
         AssertEqual(3, entry_dialog.type_choice.Value, "The entry editor did not select paired output.")
+    } finally {
+        if entry_dialog {
+            entry_dialog.Dispose()
+        }
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestRecognizerPatternEditor() {
+    local owner := Gui(), dialog := 0, entry_dialog := 0
+    local value := Map(
+        "email", "[A-Za-z]+@[A-Za-z]+\\.[A-Za-z]+",
+        "url", "https?://[^ ]+"
+    )
+    try {
+        value := RabbitRecognizerPatterns.Validate(value)
+        AssertEqual(2, value.Count, "The recognizer pattern validator lost entries.")
+        AssertThrows(
+            RabbitRecognizerPatterns.Validate.Bind(Map("", "pattern")),
+            "The recognizer pattern validator accepted an empty tag."
+        )
+        AssertThrows(
+            RabbitRecognizerPatterns.Validate.Bind(Map("tag", Map("nested", true))),
+            "The recognizer pattern validator accepted a nested definition."
+        )
+        dialog := RabbitRecognizerPatternsDialog(owner, value, (*) => true)
+        AssertEqual(2, dialog.list.GetCount(), "The recognizer editor lost pattern entries.")
+        AssertEqual("email", dialog.list.GetText(1, 1), "The recognizer editor changed pattern order.")
+        entry_dialog := RabbitRecognizerPatternEntryDialog(dialog, "email", value["email"], (*) => true)
+        AssertEqual("email", entry_dialog.tag_edit.Value, "The pattern entry editor lost the tag.")
+        AssertEqual(value["email"], entry_dialog.pattern_edit.Value,
+            "The pattern entry editor changed the regular expression.")
     } finally {
         if entry_dialog {
             entry_dialog.Dispose()
@@ -666,6 +711,48 @@ TestSchemaSettingsPunctuatorMapPersistence() {
     )
 }
 
+TestSchemaSettingsRecognizerPatternPersistence() {
+    local calls := [], manifest := SchemaSettingsRecognizerManifest(), values, model
+    local rime := RabbitSchemaSettingsListRimeProbe(Map(
+        "recognizer/use_space", 0,
+        "recognizer/patterns", Map(
+            "email", "old@example\\.com",
+            "url", "https?://[^ ]+"
+        )
+    ), ["recognizer/patterns/@legacy"], calls)
+    model := RabbitSchemaSettingsModelProbe(
+        rime,
+        RabbitSchemaSettingsListLeversProbe(calls),
+        "demo",
+        manifest
+    )
+    AssertTrue(model.Load(), "The schema settings model could not read recognizer settings.")
+    AssertTrue(!model.values["use_space"], "The recognizer spacing value was loaded incorrectly.")
+    AssertEqual("old@example\\.com", model.values["patterns"]["email"],
+        "The recognizer pattern was loaded incorrectly.")
+
+    values := RabbitConfigValue.Clone(model.values)
+    values["use_space"] := true
+    values["patterns"]["email"] := "new@example\\.com"
+    AssertTrue(model.Save(values), "The schema settings model failed to save recognizer settings.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "boolean:recognizer/use_space:1"),
+        "The schema settings model did not save recognizer spacing.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:recognizer/patterns/@legacy"),
+        "Replacing recognizer patterns did not clear a nested patch.")
+    AssertTrue(SchemaSettingsCallsContain(calls, "item:recognizer/patterns:", '"email": "new@example\\\\.com"'),
+        "Replacing recognizer patterns did not write the complete map.")
+
+    calls.Length := 0
+    AssertTrue(
+        model.Save(RabbitConfigValue.Clone(model.values), Map("patterns", true)),
+        "The schema settings model failed to restore recognizer patterns."
+    )
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:recognizer/patterns"),
+        "Restoring recognizer patterns did not remove the full-map override.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:recognizer/patterns/@legacy"),
+        "Restoring recognizer patterns did not remove a nested patch.")
+}
+
 TestSchemaSettingsDialogPunctuatorMaps() {
     local calls := [], dialog := 0, owner := Gui(), reset_width, summary_width
     local model := RabbitSchemaSettingsModelProbe(
@@ -695,6 +782,36 @@ TestSchemaSettingsDialogPunctuatorMaps() {
             dialog.reset_fields.Has("full_shape"),
             "The punctuation reset was not retained."
         )
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogRecognizerPatterns() {
+    local calls := [], dialog := 0, owner := Gui(), model
+    model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsRecognizerManifest()
+    )
+    try {
+        model.values := Map(
+            "use_space", false,
+            "patterns", Map("email", "email pattern")
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        AssertTrue(dialog.field_controls.Has("patterns"), "The schema dialog did not create a recognizer editor.")
+        AssertEqual("1 个模式", dialog.field_controls["patterns"].summary.Value,
+            "The recognizer editor did not summarize its patterns.")
+        AssertTrue(
+            dialog.RestoreRecognizerPatternsDefault(model.manifest.fields[2]),
+            "The schema dialog could not stage a recognizer reset."
+        )
+        AssertTrue(dialog.reset_fields.Has("patterns"), "The recognizer reset was not retained.")
     } finally {
         if dialog {
             dialog.Dispose()
@@ -1058,6 +1175,40 @@ SchemaSettingsPunctuatorScalarManifest() {
     }
 }
 
+SchemaSettingsRecognizerManifest() {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "recognizer", label: "Recognizer", description: "" }],
+        fields: [
+            {
+                id: "use_space",
+                group: "recognizer",
+                path: "recognizer/use_space",
+                type: "boolean",
+                label: "Use space",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+                has_default: true,
+                default: false,
+            },
+            {
+                id: "patterns",
+                group: "recognizer",
+                path: "recognizer/patterns",
+                type: "recognizer_patterns",
+                label: "Recognition patterns",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+            },
+        ],
+    }
+}
+
 JoinSchemaSettingsCalls(calls) {
     local result := "", call
     for call in calls {
@@ -1347,6 +1498,11 @@ class RabbitSchemaSettingsListLeversProbe {
 
     customize_item(settings, path, value) {
         this.calls.Push(value ? "item:" . path . ":" . value["yaml"] : "reset:" . path)
+        return true
+    }
+
+    customize_bool(settings, path, value) {
+        this.calls.Push("boolean:" . path . ":" . value)
         return true
     }
 

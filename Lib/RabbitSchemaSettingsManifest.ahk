@@ -17,6 +17,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitPunctuatorMap.ahk
+#Include RabbitRecognizerPatterns.ahk
 
 #Include RabbitI18n.ahk
 
@@ -151,13 +152,17 @@ class RabbitSchemaSettingsManifest {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "enum"
-            && type != "list" && type != "key_binding_list" && type != "punctuator_map" {
+            && type != "list" && type != "key_binding_list" && type != "punctuator_map"
+            && type != "recognizer_patterns" {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type = "key_binding_list" && properties["path"] != "key_binder/bindings" {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type = "punctuator_map" && !RabbitPunctuatorMap.IsEditablePath(properties["path"]) {
+            throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+        }
+        if type = "recognizer_patterns" && properties["path"] != RabbitRecognizerPatterns.PATH {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type = "list" || type = "key_binding_list" {

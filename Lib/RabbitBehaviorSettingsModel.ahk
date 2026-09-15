@@ -20,6 +20,7 @@
 #Include RabbitConfigValue.ahk
 #Include RabbitDeploymentPlan.ahk
 #Include RabbitPunctuatorMap.ahk
+#Include RabbitRecognizerPatterns.ahk
 
 #Include RabbitI18n.ahk
 
@@ -101,6 +102,12 @@ class RabbitBehaviorSettingsModel {
                 RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_DEFAULT
             )
         )
+        this.recognizer_use_space := this.GetBool(
+            default_config,
+            RabbitRecognizerPatterns.USE_SPACE_PATH,
+            false
+        )
+        this.recognizer_patterns := this.LoadRecognizerPatterns(default_config)
         this.original_values := this.GetCurrentValues()
         return true
     }
@@ -186,6 +193,19 @@ class RabbitBehaviorSettingsModel {
         return result
     }
 
+    LoadRecognizerPatterns(config) {
+        local value
+        if !RabbitConfigValue.Read(this.rime, config, RabbitRecognizerPatterns.PATH, &value)
+            || !(value is Map) {
+            return Map()
+        }
+        try {
+            return RabbitRecognizerPatterns.Validate(value)
+        } catch {
+            return Map()
+        }
+    }
+
     ReadConfigMap(config, path) {
         local iter, value
         local result := Map()
@@ -265,6 +285,8 @@ class RabbitBehaviorSettingsModel {
             punctuator_use_space: this.punctuator_use_space,
             punctuator_digit_separators: this.punctuator_digit_separators,
             punctuator_digit_separator_action: this.punctuator_digit_separator_action,
+            recognizer_use_space: this.recognizer_use_space,
+            recognizer_patterns: RabbitBehaviorSettingsModel.CloneValue(this.recognizer_patterns),
         }
     }
 
@@ -276,10 +298,15 @@ class RabbitBehaviorSettingsModel {
         return RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps)
     }
 
+    GetRecognizerPatterns() {
+        return RabbitBehaviorSettingsModel.CloneValue(this.recognizer_patterns)
+    }
+
     Save(values) {
         local default_changed := this.HasDefaultChanges(values)
         local rabbit_changed := this.HasRabbitChanges(values)
         this.ValidatePunctuatorValues(values)
+        this.ValidateRecognizerValues(values)
         if !rabbit_changed && !default_changed {
             return true
         }
@@ -340,6 +367,7 @@ class RabbitBehaviorSettingsModel {
             )
             || !RabbitBehaviorSettingsModel.ValuesEqual(values.bindings, original.bindings)
             || this.HasPunctuatorChanges(values)
+            || this.HasRecognizerChanges(values)
     }
 
     HasPunctuatorChanges(values) {
@@ -370,9 +398,34 @@ class RabbitBehaviorSettingsModel {
         return false
     }
 
+    HasRecognizerChanges(values) {
+        if values.recognizer_use_space != this.original_values.recognizer_use_space {
+            return true
+        }
+        if !HasProp(values, "recognizer_patterns") {
+            return false
+        }
+        if !(values.recognizer_patterns is Map) {
+            return true
+        }
+        if HasProp(values, "recognizer_reset_fields") && values.recognizer_reset_fields.Count {
+            return true
+        }
+        return !RabbitBehaviorSettingsModel.ValuesEqual(
+            values.recognizer_patterns,
+            this.original_values.recognizer_patterns
+        )
+    }
+
     ValidatePunctuatorValues(values) {
         RabbitPunctuatorMap.ValidateDigitSeparators(values.punctuator_digit_separators)
         RabbitPunctuatorMap.ValidateDigitSeparatorAction(values.punctuator_digit_separator_action)
+    }
+
+    ValidateRecognizerValues(values) {
+        if HasProp(values, "recognizer_patterns") {
+            RabbitRecognizerPatterns.Validate(values.recognizer_patterns)
+        }
     }
 
     SaveRabbitSettings(values) {
@@ -508,6 +561,28 @@ class RabbitBehaviorSettingsModel {
                 }
             }
         }
+        if values.recognizer_use_space != original.recognizer_use_space
+            && !this.api.customize_bool(
+                this.default_settings,
+                RabbitRecognizerPatterns.USE_SPACE_PATH,
+                values.recognizer_use_space
+            ) {
+            return false
+        }
+        if HasProp(values, "recognizer_patterns") && this.HasRecognizerChanges(values) {
+            if HasProp(values, "recognizer_reset_fields") && values.recognizer_reset_fields.Has(
+                RabbitRecognizerPatterns.PATH
+            ) {
+                if !this.ClearRecognizerPatternsPatch() {
+                    return false
+                }
+            } else if !RabbitBehaviorSettingsModel.ValuesEqual(
+                values.recognizer_patterns,
+                original.recognizer_patterns
+            ) && !this.CustomizeRecognizerPatterns(values.recognizer_patterns) {
+                return false
+            }
+        }
         return !!this.api.save_settings(this.default_settings)
     }
 
@@ -545,6 +620,54 @@ class RabbitBehaviorSettingsModel {
                 while this.rime.config_next(iter) {
                     key := iter.key
                     if key = path || SubStr(key, 1, StrLen(path) + 1) = path . "/" {
+                        result.Push(key)
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            this.rime.config_close(config)
+        }
+        return result
+    }
+
+    CustomizeRecognizerPatterns(value) {
+        if !this.ClearRecognizerPatternsPatch() {
+            return false
+        }
+        return this.CustomizeYamlItem(this.default_settings, RabbitRecognizerPatterns.PATH, value)
+    }
+
+    ClearRecognizerPatternsPatch() {
+        local key, keys := Map(RabbitRecognizerPatterns.PATH, true)
+        for key in this.GetExistingRecognizerPatternsPatchKeys() {
+            keys[key] := true
+        }
+        for key in keys {
+            if !this.api.customize_item(this.default_settings, key, 0) {
+                return false
+            }
+        }
+        return true
+    }
+
+    GetExistingRecognizerPatternsPatchKeys() {
+        local config := 0, iter := 0, key, result := []
+        if !HasMethod(this.rime, "user_config_open")
+            || !(config := this.rime.user_config_open("default.custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    key := iter.key
+                    if key = RabbitRecognizerPatterns.PATH
+                        || SubStr(key, 1, StrLen(RabbitRecognizerPatterns.PATH) + 1)
+                            = RabbitRecognizerPatterns.PATH . "/" {
                         result.Push(key)
                     }
                 }
@@ -603,6 +726,10 @@ class RabbitBehaviorSettingsModel {
         this.punctuator_use_space := values.punctuator_use_space
         this.punctuator_digit_separators := values.punctuator_digit_separators
         this.punctuator_digit_separator_action := values.punctuator_digit_separator_action
+        this.recognizer_use_space := values.recognizer_use_space
+        if HasProp(values, "recognizer_patterns") {
+            this.recognizer_patterns := RabbitBehaviorSettingsModel.CloneValue(values.recognizer_patterns)
+        }
     }
 
     static CloneValue(value) {

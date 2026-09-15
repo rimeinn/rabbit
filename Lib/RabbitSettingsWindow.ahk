@@ -25,6 +25,7 @@
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
 #Include RabbitPunctuatorMapDialog.ahk
+#Include RabbitRecognizerPatternsDialog.ahk
 #Include RabbitRimeDepotSettings.ahk
 #Include RabbitRimeDepotWindow.ahk
 #Include RabbitSchemaSettingsDialog.ahk
@@ -156,6 +157,8 @@ class RabbitSettingsWindow extends Gui {
         this.bindings := []
         this.punctuator_maps := Map()
         this.punctuator_reset_fields := Map()
+        this.recognizer_patterns := Map()
+        this.recognizer_reset_fields := Map()
         this.application_model := 0
         this.application_rules := Map()
         this.application_changes := Map()
@@ -448,6 +451,7 @@ class RabbitSettingsWindow extends Gui {
                         this.punctuator_control_map[path].hint
                     )
                 }
+                this.window_theme.RegisterMuted(this.recognizer_control_map.patterns.summary)
                 this.window_theme.RegisterSurface(
                     this.binding_accept_header,
                     this.binding_when_header,
@@ -681,7 +685,8 @@ class RabbitSettingsWindow extends Gui {
             "x230 y136 w570 h482 Hidden"
                 . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             [RabbitI18n.Text("controls.general"), RabbitI18n.Text("controls.key_bindings"),
-                RabbitI18n.Text("language.tab"), RabbitI18n.Text("punctuator.tab")]
+                RabbitI18n.Text("language.tab"), RabbitI18n.Text("punctuator.tab"),
+                RabbitI18n.Text("recognizer.tab")]
         )
         this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
         this.behavior_group := this.behavior_tabs
@@ -840,6 +845,16 @@ class RabbitSettingsWindow extends Gui {
             this.punctuator_digit_separator_action
         )
         this.behavior_punctuator_controls := this.punctuator_controls.Clone()
+        this.behavior_tabs.UseTab(5)
+        this.recognizer_use_space := this.AddCheckbox(
+            "x260 y190 w506 h24 Hidden",
+            RabbitI18n.Text("recognizer.use_space")
+        )
+        this.recognizer_use_space.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.recognizer_controls := []
+        this.recognizer_controls.Push(this.recognizer_use_space)
+        this.AddRecognizerPatternsCard(232)
+        this.behavior_recognizer_controls := this.recognizer_controls.Clone()
         this.behavior_tabs.UseTab()
 
         this.behavior_common_controls := [
@@ -916,6 +931,31 @@ class RabbitSettingsWindow extends Gui {
             edit: edit_button,
             reset: reset_button,
         }
+    }
+
+    AddRecognizerPatternsCard(y) {
+        local card := this.AddGroupBox(
+            "x246 y" . y . " w538 h104 Hidden",
+            RabbitI18n.Text("recognizer.patterns")
+        )
+        local edit_button := this.AddButton(
+            "x560 y" . (y + 24) . " w88 h30 Hidden +0x2000",
+            RabbitI18n.Text("controls.edit")
+        )
+        local reset_button := this.AddButton(
+            "x658 y" . (y + 24) . " w108 h30 Hidden +0x2000",
+            RabbitI18n.Text("punctuator.restore_default")
+        )
+        local summary := this.AddText("x260 y" . (y + 28) . " w286 h24 Hidden +0x200", "")
+        edit_button.OnEvent("Click", (*) => this.EditRecognizerPatterns())
+        reset_button.OnEvent("Click", (*) => this.RestoreRecognizerPatterns())
+        this.recognizer_controls.Push(card, summary, edit_button, reset_button)
+        this.recognizer_control_map := { patterns: {
+            group: card,
+            summary: summary,
+            edit: edit_button,
+            reset: reset_button,
+        } }
     }
 
     CreateApplicationControls() {
@@ -1689,6 +1729,7 @@ class RabbitSettingsWindow extends Gui {
         local bindings_visible := visible && this.behavior_tabs.Value = 2
         local interface_visible := visible && this.behavior_tabs.Value = 3
         local punctuator_visible := visible && this.behavior_tabs.Value = 4
+        local recognizer_visible := visible && this.behavior_tabs.Value = 5
         for ctrl in this.behavior_common_controls {
             ctrl.Visible := common_visible
         }
@@ -1700,6 +1741,9 @@ class RabbitSettingsWindow extends Gui {
         }
         for ctrl in this.behavior_punctuator_controls {
             ctrl.Visible := punctuator_visible
+        }
+        for ctrl in this.behavior_recognizer_controls {
+            ctrl.Visible := recognizer_visible
         }
     }
 
@@ -2255,6 +2299,11 @@ class RabbitSettingsWindow extends Gui {
             this.punctuator_digit_separator_action.Choose(
                 this.behavior_model.punctuator_digit_separator_action = "commit" ? 2 : 1
             )
+            this.recognizer_use_space.Value := this.behavior_model.recognizer_use_space
+            this.recognizer_patterns := HasMethod(this.behavior_model, "GetRecognizerPatterns")
+                ? this.behavior_model.GetRecognizerPatterns() : Map()
+            this.recognizer_reset_fields := Map()
+            this.UpdateRecognizerPatternsCard()
             this.show_tips_time.Enabled := !!this.show_tips.Value
             this.UpdateClipboardControls()
             this.UpdateGoodOldCapsLockControl()
@@ -2342,6 +2391,9 @@ class RabbitSettingsWindow extends Gui {
             punctuator_digit_separator_action: RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTIONS[
                 this.punctuator_digit_separator_action.Value
             ],
+            recognizer_use_space: !!this.recognizer_use_space.Value,
+            recognizer_patterns: RabbitBehaviorSettingsModel.CloneValue(this.recognizer_patterns),
+            recognizer_reset_fields: RabbitBehaviorSettingsModel.CloneValue(this.recognizer_reset_fields),
         }
     }
 
@@ -2372,7 +2424,8 @@ class RabbitSettingsWindow extends Gui {
                 this.behavior_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
             }
-            if this.punctuator_reset_fields.Count && HasMethod(this.behavior_model, "Load") {
+            if (this.punctuator_reset_fields.Count || this.recognizer_reset_fields.Count)
+                && HasMethod(this.behavior_model, "Load") {
                 if !this.behavior_model.Load() {
                     throw Error(RabbitI18n.Text("models.behavior_read"))
                 }
@@ -3948,6 +4001,13 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
+    UpdateRecognizerPatternsCard() {
+        local controls := this.recognizer_control_map.patterns
+        controls.summary.Value := this.recognizer_reset_fields.Count
+            ? RabbitI18n.Text("punctuator.restore_default_pending")
+            : RabbitRecognizerPatterns.Summary(this.recognizer_patterns)
+    }
+
     EditPunctuatorMap(path) {
         local value := RabbitPunctuatorMapDialog(
             this,
@@ -3971,6 +4031,29 @@ class RabbitSettingsWindow extends Gui {
     RestorePunctuatorMap(path) {
         this.punctuator_reset_fields[path] := true
         this.UpdatePunctuatorMapCard(path)
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    EditRecognizerPatterns() {
+        local value := RabbitRecognizerPatternsDialog(
+            this,
+            this.recognizer_patterns,
+            this.window_theme.dark_mode_reader
+        ).ShowModal()
+        if !value {
+            return false
+        }
+        this.recognizer_reset_fields := Map()
+        this.recognizer_patterns := RabbitConfigValue.Clone(value)
+        this.UpdateRecognizerPatternsCard()
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    RestoreRecognizerPatterns() {
+        this.recognizer_reset_fields[RabbitRecognizerPatterns.PATH] := true
+        this.UpdateRecognizerPatternsCard()
         this.OnBehaviorChanged()
         return true
     }

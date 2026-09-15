@@ -25,10 +25,16 @@
 方案作者可随方案提供 `<schema_id>.rabbit.ini`，声明玉兔毫“方案设置”窗口可编辑的字段。它仅描述界面，
 不包含 custom 补丁；用户修改后由玉兔毫写入用户目录的 `<schema_id>.custom.yaml`。
 
-声明可定义 `boolean`、`integer`、`number`、`string` 和 `enum` 标量字段，以及两类有序列表：
+声明可定义 `boolean`、`integer`、`number`、`string` 和 `enum` 标量字段，以及两类有序列表和两类专用映射字段：
 
 - `list`：仅包含字符串的有序列表；
 - `key_binding_list`：仅用于 `key_binder/bindings`，使用玉兔毫的专用按键绑定编辑器。
+
+- `punctuator_map`：仅用于 `punctuator/full_shape`、`punctuator/half_shape` 和 `punctuator/symbols`，使用标点映射编辑器；
+- `recognizer_patterns`：仅用于 `recognizer/patterns`，使用识别模式编辑器，每项由标签和正则表达式组成。
+
+专用映射字段由玉兔毫整体维护：编辑后写入完整映射表，并清除同路径的精确覆盖及嵌套补丁；“还原方案默认”会移除完整覆盖和所有嵌套补丁。
+`recognizer_patterns` 不在玉兔毫中预先校验正则表达式，最终语法由 librime 的 Boost.Regex 处理。
 
 列表字段可选 `rows = N` 来指定显示的条目行数。玉兔毫仅接受 1 到 10；未设置、非整数或超出范围时都使用默认的
 3 行。
