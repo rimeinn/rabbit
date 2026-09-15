@@ -23,7 +23,14 @@
 #Include RabbitI18n.ahk
 
 class RabbitKeyBindingDialog extends Gui {
-    static STANDARD_ACTIONS := ["send", "toggle", "select", "send_sequence"]
+    static STANDARD_ACTIONS := [
+        "send",
+        "toggle",
+        "select",
+        "send_sequence",
+        "set_option",
+        "unset_option"
+    ]
 
     __New(
         owner,
@@ -66,7 +73,7 @@ class RabbitKeyBindingDialog extends Gui {
         this.AddText("x20 y60 w86 h22", RabbitI18n.Text("controls.binding_when"))
         this.when := this.AddComboBox(
             "x110 y56 w330",
-            ["composing", "has_menu", "paging", "always"]
+            ["composing", "has_menu", "paging", "predicting", "always"]
         )
         this.when.Text := this.binding.Has("when") ? this.binding["when"] : "composing"
         this.AddText("x20 y98 w86 h22", RabbitI18n.Text("controls.binding_action"))

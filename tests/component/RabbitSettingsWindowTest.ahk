@@ -45,6 +45,7 @@ RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOp
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
 RunTest("key binding dialog preserves unknown fields", TestKeyBindingDialogPreservesUnknownFields.Bind())
+RunTest("key binding dialog supports librime actions and conditions", TestKeyBindingDialogSupportsLibrimeValues.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
 RunTest("settings window embeds dictionary management", TestSettingsWindowEmbedsDictionaryManagement.Bind())
 RunTest("settings window uses a global apply action", TestSettingsWindowUsesGlobalApplyAction.Bind())
@@ -1474,6 +1475,52 @@ TestKeyBindingDialogPreservesUnknownFields() {
         try dialog.Dispose()
         owner.Destroy()
     }
+}
+
+TestKeyBindingDialogSupportsLibrimeValues() {
+    local owner := Gui(), cases := [
+        Map("accept", "F1", "when", "predicting", "set_option", "ascii_mode"),
+        Map("accept", "F2", "when", "always", "unset_option", "ascii_mode")
+    ]
+    try {
+        for binding in cases {
+            local dialog := RabbitKeyBindingDialog(owner, binding)
+            try {
+                AssertTrue(
+                    RabbitSettingsWindowTestContains(RabbitKeyBindingDialog.STANDARD_ACTIONS, binding.Has("set_option")
+                        ? "set_option" : "unset_option"),
+                    "The key binding dialog did not expose the librime action."
+                )
+                AssertEqual(binding["when"], dialog.when.Text, "The key binding dialog lost the librime condition.")
+                AssertEqual(
+                    binding.Has("set_option") ? "set_option" : "unset_option",
+                    dialog.action_key.Text,
+                    "The key binding dialog selected the wrong librime action."
+                )
+                AssertTrue(dialog.SaveBinding(), "The key binding dialog rejected a librime binding.")
+                AssertEqual(binding["when"], dialog.result["when"], "The saved binding lost its condition.")
+                AssertEqual(
+                    binding.Has("set_option") ? binding["set_option"] : binding["unset_option"],
+                    binding.Has("set_option") ? dialog.result["set_option"] : dialog.result["unset_option"],
+                    "The saved binding lost its librime action value."
+                )
+            } finally {
+                try dialog.Dispose()
+            }
+        }
+    } finally {
+        owner.Destroy()
+    }
+}
+
+RabbitSettingsWindowTestContains(values, expected) {
+    local value
+    for value in values {
+        if value = expected {
+            return true
+        }
+    }
+    return false
 }
 
 class RabbitSettingsFailingAppearancePreview {

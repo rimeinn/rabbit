@@ -29,6 +29,7 @@ RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPers
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
 RunTest("schema settings dialog switches groups", TestSchemaSettingsDialogGroups.Bind())
 RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDialogLists.Bind())
+RunTest("schema settings dialog supports librime binding values", TestSchemaSettingsDialogBindingValues.Bind())
 RunTest("schema settings dialog sizes configured list rows", TestSchemaSettingsDialogListRows.Bind())
 RunTest("schema settings dialog fits short described list groups", TestSchemaSettingsDialogDescribedLists.Bind())
 RunTest("schema settings dialog reveals the final described list field", TestSchemaSettingsDialogLongDescribedLists.Bind())
@@ -468,6 +469,45 @@ TestSchemaSettingsDialogLists() {
         dialog.field_controls["processors"].list.Choose(1)
         AssertTrue(dialog.MoveListItem(processors, 1), "The dialog could not edit after a pending reset.")
         AssertTrue(!dialog.reset_fields.Has("processors"), "Editing a list did not cancel its pending reset.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogBindingValues() {
+    local calls := [], dialog := 0, model, owner := Gui()
+    try {
+        model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsListManifest()
+        )
+        model.values := Map(
+            "processors", ["ascii_composer"],
+            "bindings", [
+                Map("accept", "F1", "when", "predicting", "set_option", "ascii_mode"),
+                Map("accept", "F2", "when", "always", "unset_option", "ascii_mode")
+            ]
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        local bindings := dialog.field_controls["bindings"].list
+        AssertEqual("F1", bindings.GetText(1, 1), "The schema binding list lost the first key.")
+        AssertEqual("predicting", bindings.GetText(1, 2), "The schema binding list lost the predicting condition.")
+        AssertEqual(
+            "set_option: ascii_mode",
+            bindings.GetText(1, 3),
+            "The schema binding list lost the set_option action."
+        )
+        AssertEqual("always", bindings.GetText(2, 2), "The schema binding list lost the always condition.")
+        AssertEqual(
+            "unset_option: ascii_mode",
+            bindings.GetText(2, 3),
+            "The schema binding list lost the unset_option action."
+        )
     } finally {
         if dialog {
             dialog.Dispose()
