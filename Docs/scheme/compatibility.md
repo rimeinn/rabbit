@@ -36,6 +36,10 @@
 候选选单常用字段包括 `menu/page_size`（整数）、`menu/alternative_select_labels`（字符串列表）、
 `menu/alternative_select_keys`（可打印 ASCII 字符组成的字符串）和 `menu/page_down_cycle`（布尔值）。
 
+没有 `<schema_id>.rabbit.ini` 时，玉兔毫提供的通用 fallback 包含所有适合作为方案覆盖的通用输入配置，
+按“候选选单”“中西文切换”“按键绑定”“标点”和“识别器”分组。全局 `switcher` 设置不属于方案设置；
+`engine` 管线列表属于方案实现，仍应由方案作者在自己的声明中提供。
+
 专用映射字段由玉兔毫整体维护：编辑后写入完整映射表，并清除同路径的精确覆盖及嵌套补丁；“还原方案默认”会移除完整覆盖和所有嵌套补丁。
 `recognizer_patterns` 不在玉兔毫中预先校验正则表达式，最终语法由 librime 的 Boost.Regex 处理。
 
