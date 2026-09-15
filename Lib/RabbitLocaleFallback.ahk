@@ -427,7 +427,7 @@ class RabbitLocaleFallback {
         catalog["punctuator.card_hint"] := "修改后将完整接管此映射表。"
         catalog["punctuator.use_space"] := "使用空格"
         catalog["punctuator.digit_separators"] := "数字分隔符："
-        catalog["punctuator.digit_separator_action"] := "数字分隔符动作："
+        catalog["punctuator.digit_separator_action"] := "分隔符动作："
         catalog["punctuator.restore_default"] := "恢复默认"
         catalog["punctuator.restore_default_pending"] := "保存后将恢复默认。"
         catalog["punctuator.editor_title"] := "编辑{map}"

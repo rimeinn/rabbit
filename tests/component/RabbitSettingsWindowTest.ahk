@@ -1455,7 +1455,8 @@ TestSettingsWindowDefaultBehaviorControls() {
 }
 
 TestSettingsWindowPunctuatorControls() {
-    local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
+    local calls := [], values, action_label_x, action_label_width, action_dropdown_x, action_dropdown_width
+    local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
         window.behavior_tabs.Choose(4)
@@ -1478,6 +1479,16 @@ TestSettingsWindowPunctuatorControls() {
             "The digit separator control showed the wrong value.")
         AssertEqual(1, window.punctuator_digit_separator_action.Value,
             "The digit separator action did not default to forward.")
+        window.punctuator_digit_separator_action_label.GetPos(
+            &action_label_x, , &action_label_width
+        )
+        window.punctuator_digit_separator_action.GetPos(
+            &action_dropdown_x, , &action_dropdown_width
+        )
+        AssertTrue(action_label_width >= 110, "The digit separator action label remained too narrow.")
+        AssertEqual(action_label_x + action_label_width + 6, action_dropdown_x,
+            "The digit separator action label overlapped its dropdown.")
+        AssertEqual(110, action_dropdown_width, "The digit separator action dropdown changed width.")
         window.punctuator_digit_separator_action.Choose(2)
         values := window.GetBehaviorValues()
         AssertEqual("commit", values.punctuator_digit_separator_action,

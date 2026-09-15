@@ -813,18 +813,18 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("punctuator.symbols")
         )
         this.punctuator_use_space := this.AddCheckbox(
-            "x260 y566 w120 h24 Hidden",
+            "x260 y566 w104 h24 Hidden",
             RabbitI18n.Text("punctuator.use_space")
         )
         this.punctuator_use_space.OnEvent("Click", (*) => this.OnBehaviorChanged())
         this.punctuator_digit_separators_label := this.AddText(
-            "x390 y570 w94 h22 Hidden",
+            "x374 y570 w94 h22 Hidden",
             RabbitI18n.Text("punctuator.digit_separators")
         )
-        this.punctuator_digit_separators := this.AddEdit("x484 y566 w78 r1 -Multi Hidden")
+        this.punctuator_digit_separators := this.AddEdit("x472 y566 w72 r1 -Multi Hidden")
         this.punctuator_digit_separators.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.punctuator_digit_separator_action_label := this.AddText(
-            "x568 y570 w96 h22 Hidden",
+            "x550 y570 w110 h22 Hidden",
             RabbitI18n.Text("punctuator.digit_separator_action")
         )
         this.punctuator_digit_separator_action := this.AddDropDownList(
