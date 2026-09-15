@@ -46,6 +46,9 @@ TestColorSchemeDialogEditsArgb() {
         RabbitColorSchemeDialogThemeProbe
     )
     try {
+        AssertEqual("rabbit · preset_color_schemes/existing/back_color",
+            RabbitConfigToolTip.GetText(dialog.color_controls["back_color"].edit),
+            "The color editor did not expose its configuration path.")
         dialog.name_edit.Value := "Edited"
         dialog.color_controls["back_color"].edit.Value := "#80402010"
         AssertTrue(dialog.SaveScheme(), "The dialog rejected valid ARGB input.")
@@ -82,6 +85,10 @@ TestColorSchemeDialogCopiesArgb() {
     )
     try {
         dialog.id_edit.Value := "copy_result"
+        dialog.UpdateConfigToolTips()
+        AssertEqual("rabbit · preset_color_schemes/copy_result/back_color",
+            RabbitConfigToolTip.GetText(dialog.color_controls["back_color"].edit),
+            "Changing a color-scheme ID did not update its configuration path.")
         AssertTrue(dialog.SaveScheme(), "The dialog rejected a valid copied scheme.")
         AssertEqual("argb", dialog.result.color_format, "The copied scheme did not use ARGB.")
         AssertEqual("0x80402010", dialog.result.values["back_color"], "The copy was not normalized.")

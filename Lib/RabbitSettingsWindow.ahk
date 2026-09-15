@@ -19,6 +19,7 @@
 #Include RabbitAppearanceSettingsPage.ahk
 #Include RabbitAbout.ahk
 #Include RabbitCommon.ahk
+#Include RabbitConfigToolTip.ahk
 #Include RabbitConfigValue.ahk
 #Include RabbitDeploymentPlan.ahk
 #Include RabbitI18n.ahk
@@ -341,6 +342,7 @@ class RabbitSettingsWindow extends Gui {
             old_windows,
             preview_factory
         )
+        this.ApplyAppearanceConfigToolTips()
 
         this.placeholder := this.AddGroupBox("x230 y136 w570 h290", RabbitI18n.Text("controls.page_content"))
         this.placeholder_text := this.AddText(
@@ -382,6 +384,24 @@ class RabbitSettingsWindow extends Gui {
             }
         }
         return 0
+    }
+
+    ApplyAppearanceConfigToolTips() {
+        RabbitConfigToolTip.Apply("rabbit", "style/color_scheme_dark", this.appearance_follow_light)
+        this.UpdateAppearanceColorSchemeToolTips()
+    }
+
+    UpdateAppearanceColorSchemeToolTips() {
+        local color_scheme_id := "<方案 ID>"
+        local row := this.appearance_list.GetNext(0)
+        local style_path := this.appearance_target.Value = 2 ? "style/color_scheme_dark" : "style/color_scheme"
+        if row {
+            color_scheme_id := this.appearance_list.GetText(row, 3)
+        }
+        RabbitConfigToolTip.Apply("rabbit", style_path,
+            this.appearance_target_label, this.appearance_target, this.appearance_use)
+        RabbitConfigToolTip.Apply("rabbit", "preset_color_schemes/" . color_scheme_id, this.appearance_list,
+            this.appearance_add, this.appearance_copy, this.appearance_edit, this.appearance_delete)
     }
 
     EnsurePageControls(index) {
@@ -679,6 +699,30 @@ class RabbitSettingsWindow extends Gui {
         this.rime_depot_open_button.OnEvent("Click", (*) => this.OpenRimeDepot())
         this.switcher_tabs.UseTab()
         this.switcher_status := this.AddText("x230 y628 w570 h18 Hidden", "")
+        this.ApplySwitcherConfigToolTips()
+    }
+
+    ApplySwitcherConfigToolTips() {
+        RabbitConfigToolTip.Apply("default", "schema_list", this.switcher_list_header, this.switcher_list,
+            this.switcher_move_up, this.switcher_move_down)
+        RabbitConfigToolTip.Apply("default", "switcher/fix_schema_list_order", this.switcher_fix_order)
+        RabbitConfigToolTip.Apply("default", "switcher/caption", this.switcher_caption_label, this.switcher_caption)
+        RabbitConfigToolTip.Apply("default", "switcher/hotkeys", this.switcher_hotkeys_label, this.switcher_hotkeys)
+        RabbitConfigToolTip.Apply("default", "switcher/fold_options", this.switcher_fold_options)
+        RabbitConfigToolTip.Apply("default", "switcher/abbreviate_options", this.switcher_abbreviate_options)
+        RabbitConfigToolTip.Apply("default", "switcher/option_list_prefix", this.switcher_prefix_label, this.switcher_prefix)
+        RabbitConfigToolTip.Apply("default", "switcher/option_list_separator",
+            this.switcher_separator_label, this.switcher_separator)
+        RabbitConfigToolTip.Apply("default", "switcher/option_list_suffix", this.switcher_suffix_label, this.switcher_suffix)
+        RabbitConfigToolTip.Apply("default", "switcher/save_options", this.switcher_save_group,
+            this.switcher_save_list, this.switcher_option_add, this.switcher_option_delete)
+        RabbitConfigToolTip.Apply("rabbit", RabbitRimeDepotSettings.RPPI_URL_KEY,
+            this.rime_depot_url_label, this.rime_depot_url_edit)
+        RabbitConfigToolTip.Apply("rabbit", RabbitRimeDepotSettings.PROXY_KEY,
+            this.rime_depot_proxy_label, this.rime_depot_proxy_edit)
+        RabbitConfigToolTip.Apply("rabbit", RabbitRimeDepotSettings.USE_GIT_KEY, this.rime_depot_use_git)
+        RabbitConfigToolTip.Apply("rabbit", RabbitRimeDepotSettings.GIT_PATH_KEY,
+            this.rime_depot_git_path_label, this.rime_depot_git_path_edit, this.rime_depot_git_path_browse)
     }
 
     CreateBehaviorControls() {
@@ -945,6 +989,50 @@ class RabbitSettingsWindow extends Gui {
         }
         this.behavior_punctuator_controls.InsertAt(1, this.punctuator_help)
         this.behavior_status := this.AddText("x230 y620 w570 h24 Hidden", "")
+        this.ApplyBehaviorConfigToolTips()
+    }
+
+    ApplyBehaviorConfigToolTips() {
+        local controls, key, path
+        RabbitConfigToolTip.Apply("rabbit", "language", this.language_label, this.language_choice)
+        RabbitConfigToolTip.Apply("rabbit", "show_tips", this.show_tips)
+        RabbitConfigToolTip.Apply("rabbit", "show_tips_time", this.show_tips_time_label, this.show_tips_time)
+        RabbitConfigToolTip.Apply("rabbit", "suspend_hotkey", this.suspend_hotkey_label, this.suspend_hotkey)
+        RabbitConfigToolTip.Apply("rabbit", "send_by_clipboard_length", this.clipboard_mode_label,
+            this.clipboard_mode, this.clipboard_length_label, this.clipboard_length)
+        RabbitConfigToolTip.Apply("rabbit", "global_ascii", this.global_ascii)
+        RabbitConfigToolTip.Apply("rabbit", "fix_candidate_box", this.fix_candidate_box)
+        RabbitConfigToolTip.Apply("rabbit", "use_legacy_candidate_box", this.use_legacy_candidate_box)
+        RabbitConfigToolTip.Apply("rabbit", "bypass_password_fields", this.bypass_password_fields)
+        RabbitConfigToolTip.Apply("default", "ascii_composer/good_old_caps_lock", this.good_old_caps_lock)
+        for key, controls in this.ascii_switch_controls {
+            path := "ascii_composer/switch_key/" . key
+            RabbitConfigToolTip.Apply("default", path, controls.label, controls.dropdown)
+        }
+        RabbitConfigToolTip.Apply("default", "key_binder/bindings", this.binding_list,
+            this.binding_add, this.binding_edit, this.binding_delete, this.binding_up, this.binding_down)
+        RabbitConfigToolTip.Apply("default", RabbitMenuSettings.PAGE_SIZE_PATH,
+            this.menu_page_size_label, this.menu_page_size)
+        RabbitConfigToolTip.Apply("default", RabbitMenuSettings.PAGE_DOWN_CYCLE_PATH, this.menu_page_down_cycle)
+        RabbitConfigToolTip.Apply("default", RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH,
+            this.menu_alternative_select_keys_label, this.menu_alternative_select_keys)
+        RabbitConfigToolTip.Apply("default", RabbitMenuSettings.ALTERNATIVE_SELECT_LABELS_PATH,
+            this.menu_labels_label, this.menu_labels, this.menu_labels_add, this.menu_labels_edit,
+            this.menu_labels_delete, this.menu_labels_up, this.menu_labels_down, this.menu_labels_restore)
+        for path in RabbitPunctuatorMap.PATHS {
+            controls := this.punctuator_control_map[path]
+            RabbitConfigToolTip.Apply("default", path, controls.group, controls.summary, controls.hint,
+                controls.edit, controls.reset)
+        }
+        RabbitConfigToolTip.Apply("default", RabbitPunctuatorMap.USE_SPACE_PATH, this.punctuator_use_space)
+        RabbitConfigToolTip.Apply("default", RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH,
+            this.punctuator_digit_separators_label, this.punctuator_digit_separators)
+        RabbitConfigToolTip.Apply("default", RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_PATH,
+            this.punctuator_digit_separator_action_label, this.punctuator_digit_separator_action)
+        RabbitConfigToolTip.Apply("default", RabbitRecognizerPatterns.USE_SPACE_PATH, this.recognizer_use_space)
+        controls := this.recognizer_control_map.patterns
+        RabbitConfigToolTip.Apply("default", RabbitRecognizerPatterns.PATH, controls.group, controls.summary,
+            controls.edit, controls.reset)
     }
 
     AddPunctuatorMapCard(path, y, label) {
@@ -1031,6 +1119,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.reset_rule"))
         this.application_reset_button.OnEvent("Click", (*) => this.ResetSelectedApplicationRule())
         this.application_status := this.AddText("x254 y390 w320 h24 Hidden", "")
+        this.UpdateApplicationConfigToolTips()
     }
 
     CreateAboutControls() {
@@ -1336,6 +1425,7 @@ class RabbitSettingsWindow extends Gui {
             this.appearance_floating_height_label,
             this.appearance_floating_height,
         ]
+        this.ApplyAppearanceTypesettingConfigToolTips()
         this.LayoutPreeditControls()
         controls_elapsed := A_TickCount - controls_started_at
         this.appearance_typesetting_created := true
@@ -1368,6 +1458,53 @@ class RabbitSettingsWindow extends Gui {
             1
         )
         return true
+    }
+
+    ApplyAppearanceTypesettingConfigToolTips() {
+        local controls, label_name, name, path
+        for name, path in Map(
+            "font", "style/font_face",
+            "font_point", "style/font_point",
+            "preedit_font", "style/preedit_font_face",
+            "label_font", "style/label_font_face",
+            "label_font_point", "style/label_font_point",
+            "comment_font", "style/comment_font_face",
+            "comment_font_point", "style/comment_font_point",
+            "label_format", "style/label_format",
+            "layout_type", "style/layout/type",
+            "align_type", "style/layout/align_type",
+            "margin_x", "style/layout/margin_x",
+            "margin_y", "style/layout/margin_y",
+            "preedit_margin_x", "style/layout/preedit_margin_x",
+            "preedit_margin_y", "style/layout/preedit_margin_y",
+            "candidate_padding_x", "style/layout/candidate_padding_x",
+            "candidate_padding_y", "style/layout/candidate_padding_y",
+            "candidate_spacing", "style/layout/candidate_spacing",
+            "border_width", "style/layout/border_width",
+            "corner_radius", "style/layout/corner_radius",
+            "round_corner", "style/layout/round_corner",
+            "preedit_border_width", "style/layout/preedit_border_width",
+            "preedit_corner_radius", "style/layout/preedit_corner_radius",
+            "preedit_round_corner", "style/layout/preedit_round_corner",
+            "min_width", "style/layout/min_width",
+            "min_height", "style/layout/min_height",
+            "flow_rows", "style/layout/flow_rows",
+            "vertical_direction", "style/vertical_text_left_to_right",
+            "preedit_type", "style/preedit_type",
+            "floating_preedit", "style/floating_preedit",
+            "floating_opacity", "style/floating_preedit_opacity",
+            "floating_height", "style/floating_preedit_min_height",
+            "shadow_radius", "style/layout/shadow_radius",
+            "shadow_offset_x", "style/layout/shadow_offset_x",
+            "shadow_offset_y", "style/layout/shadow_offset_y"
+        ) {
+            controls := [this.%"appearance_" . name%]
+            label_name := "appearance_" . name . "_label"
+            if HasProp(this, label_name) {
+                controls.InsertAt(1, this.%label_name%)
+            }
+            RabbitConfigToolTip.Apply("rabbit", path, controls*)
+        }
     }
 
     LayoutPreeditControls() {
@@ -1906,10 +2043,12 @@ class RabbitSettingsWindow extends Gui {
 
     OnAppearanceTargetChange() {
         this.appearance_page.OnTargetChange()
+        this.UpdateAppearanceColorSchemeToolTips()
     }
 
     OnAppearanceSelectionChange() {
         this.appearance_page.OnSelectionChange()
+        this.UpdateAppearanceColorSchemeToolTips()
     }
 
     ShowAppearanceDetails(index) {
@@ -2646,6 +2785,7 @@ class RabbitSettingsWindow extends Gui {
         }
         this.application_process.Value := process_name
         this.application_mode.Choose(this.application_rules[process_name] ? 2 : 1)
+        this.UpdateApplicationConfigToolTips(process_name)
     }
 
     StageApplicationRule() {
@@ -2669,6 +2809,7 @@ class RabbitSettingsWindow extends Gui {
         this.application_changes[process_name] := { reset: false, ascii_mode: ascii_mode }
         this.application_process.Value := process_name
         this.application_list.Modify(row, "Select Focus Vis")
+        this.UpdateApplicationConfigToolTips(process_name)
         this.MarkApplicationDirty(RabbitI18n.Text("controls.rules_dirty"))
         return true
     }
@@ -2689,8 +2830,16 @@ class RabbitSettingsWindow extends Gui {
         this.application_list.Delete(row)
         this.application_process.Value := ""
         this.application_mode.Choose(2)
+        this.UpdateApplicationConfigToolTips()
         this.MarkApplicationDirty(RabbitI18n.Text("controls.reset_pending"))
         return true
+    }
+
+    UpdateApplicationConfigToolTips(process_name := "<程序名>") {
+        local path := "app_options/" . process_name . "/ascii_mode"
+        RabbitConfigToolTip.Apply("rabbit", path, this.application_list, this.application_process_label,
+            this.application_process, this.application_mode_label, this.application_mode,
+            this.application_update_button, this.application_reset_button)
     }
 
     FindApplicationRow(process_name) {

@@ -16,6 +16,7 @@
  */
 
 #Include RabbitDialogPlacement.ahk
+#Include RabbitConfigToolTip.ahk
 #Include RabbitKeyBindingDialog.ahk
 #Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMapDialog.ahk
@@ -338,6 +339,7 @@ class RabbitSchemaSettingsDialog extends Gui {
         } finally {
             this.content_window_theme := 0
             if this.content_gui {
+                RabbitConfigToolTip.DisposeGui(this.content_gui.Hwnd)
                 this.content_gui.Destroy()
                 this.content_gui := 0
             }
@@ -345,12 +347,13 @@ class RabbitSchemaSettingsDialog extends Gui {
     }
 
     AddField(field, y) {
-        local control, control_width := this.content_width - 196
+        local control, label, control_width := this.content_width - 196
         if field.type = "boolean" {
             control := this.content_gui.AddCheckbox("x12 y" . y . " w" . (this.content_width - 24) . " h24", field.label)
             control.Value := this.draft_values[field.id]
             this.TrackContentControl(control)
             this.field_controls[field.id] := control
+            RabbitConfigToolTip.Apply(this.ConfigId(), field.path, control)
             y += 28
         } else if field.type = "list" || field.type = "key_binding_list" {
             y := this.AddListField(field, y)
@@ -359,8 +362,8 @@ class RabbitSchemaSettingsDialog extends Gui {
         } else if field.type = "recognizer_patterns" {
             y := this.AddRecognizerPatternsField(field, y)
         } else {
-            control := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
-            this.TrackContentControl(control)
+            label := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
+            this.TrackContentControl(label)
             if field.type = "enum" {
                 control := this.content_gui.AddDropDownList("x184 y" . y . " w" . control_width, field.options)
                 control.Text := this.draft_values[field.id]
@@ -375,6 +378,7 @@ class RabbitSchemaSettingsDialog extends Gui {
             }
             this.TrackContentControl(control)
             this.field_controls[field.id] := control
+            RabbitConfigToolTip.Apply(this.ConfigId(), field.path, label, control)
             y += 30
         }
         if field.description {
@@ -388,7 +392,10 @@ class RabbitSchemaSettingsDialog extends Gui {
         local button_y, list_height, reset_y
         local rows := this.GetListRows(field)
         local list_y := y + 24
-        this.AddContentText("x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200", field.label)
+        controls.label := this.AddContentText(
+            "x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200",
+            field.label
+        )
         if field.type = "list" {
             controls.list := this.content_gui.AddListBox(
                 "x12 y" . list_y . " w" . (this.content_width - 24) . " r" . rows,
@@ -451,6 +458,9 @@ class RabbitSchemaSettingsDialog extends Gui {
             (*) => this.RestoreListDefault(field)
         )
         this.field_controls[field.id] := controls
+        RabbitConfigToolTip.Apply(this.ConfigId(), field.path, controls.label, controls.list, controls.reset_hint,
+            controls.add_button, controls.edit_button, controls.delete_button, controls.up_button,
+            controls.down_button, controls.reset_button)
         this.RefreshListField(field)
         return button_y + 36
     }
@@ -461,7 +471,10 @@ class RabbitSchemaSettingsDialog extends Gui {
         local reset_x := this.content_width - 12 - reset_width
         local edit_x := reset_x - 8 - edit_width
         local summary_width := edit_x - 12 - 8
-        this.AddContentText("x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200", field.label)
+        controls.label := this.AddContentText(
+            "x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200",
+            field.label
+        )
         controls.summary := this.AddContentMutedText(
             "x12 y" . (y + 28) . " w" . summary_width . " h22 +0x200",
             ""
@@ -481,6 +494,8 @@ class RabbitSchemaSettingsDialog extends Gui {
             ""
         )
         this.field_controls[field.id] := controls
+        RabbitConfigToolTip.Apply(this.ConfigId(), field.path, controls.label, controls.summary,
+            controls.edit_button, controls.reset_button, controls.reset_hint)
         this.RefreshPunctuatorMapField(field)
         return y + 80
     }
@@ -491,7 +506,10 @@ class RabbitSchemaSettingsDialog extends Gui {
         local reset_x := this.content_width - 12 - reset_width
         local edit_x := reset_x - 8 - edit_width
         local summary_width := edit_x - 12 - 8
-        this.AddContentText("x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200", field.label)
+        controls.label := this.AddContentText(
+            "x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200",
+            field.label
+        )
         controls.summary := this.AddContentMutedText(
             "x12 y" . (y + 28) . " w" . summary_width . " h22 +0x200",
             ""
@@ -511,6 +529,8 @@ class RabbitSchemaSettingsDialog extends Gui {
             ""
         )
         this.field_controls[field.id] := controls
+        RabbitConfigToolTip.Apply(this.ConfigId(), field.path, controls.label, controls.summary,
+            controls.edit_button, controls.reset_button, controls.reset_hint)
         this.RefreshRecognizerPatternsField(field)
         return y + 80
     }
@@ -536,6 +556,10 @@ class RabbitSchemaSettingsDialog extends Gui {
         local control := this.content_gui.AddText(options, value)
         this.TrackContentControl(control)
         return control
+    }
+
+    ConfigId() {
+        return this.model.schema_id
     }
 
     SetEditCue(ctrl, text) {

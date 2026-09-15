@@ -16,6 +16,7 @@
  */
 
 #Include RabbitColorScheme.ahk
+#Include RabbitConfigToolTip.ahk
 #Include RabbitDialogPlacement.ahk
 #Include RabbitWindowTheme.ahk
 
@@ -65,12 +66,13 @@ class RabbitColorSchemeDialog extends Gui {
             "Microsoft YaHei UI"
         )
 
-        this.AddText("x20 y24 w72 h22", RabbitI18n.Text("appearance.color_name"))
+        this.name_label := this.AddText("x20 y24 w72 h22", RabbitI18n.Text("appearance.color_name"))
         this.name_edit := this.AddEdit("x94 y20 w208 r1 -Multi", color_scheme.name)
-        this.AddText("x326 y24 w72 h22", RabbitI18n.Text("appearance.color_id"))
+        this.id_label := this.AddText("x326 y24 w72 h22", RabbitI18n.Text("appearance.color_id"))
         this.id_edit := this.AddEdit("x400 y20 w220 r1 -Multi", color_scheme.color_scheme_id)
         this.id_edit.Enabled := mode = "new" || mode = "copy"
-        this.AddText("x20 y62 w72 h22", RabbitI18n.Text("appearance.author"))
+        this.id_edit.OnEvent("Change", (*) => this.UpdateConfigToolTips())
+        this.author_label := this.AddText("x20 y62 w72 h22", RabbitI18n.Text("appearance.author"))
         this.author_edit := this.AddEdit("x94 y58 w526 r1 -Multi", color_scheme.author)
 
         local measure, label_width, column_width, group_height, status_y, buttons_y
@@ -94,6 +96,7 @@ class RabbitColorSchemeDialog extends Gui {
             }
             this.AddColorControl(field, x, y)
         }
+        this.UpdateConfigToolTips()
 
         group_height := 32 + Max(left_index, right_index) * 32
         this.window_group.Move(, , , group_height)
@@ -135,6 +138,16 @@ class RabbitColorSchemeDialog extends Gui {
         swatch.OnEvent("Click", (*) => this.PickColor(field.key))
         edit.OnEvent("Change", (*) => this.OnColorTextChanged(field.key))
         this.color_controls[field.key] := { label: label, swatch: swatch, edit: edit }
+    }
+
+    UpdateConfigToolTips() {
+        local controls, key, path := "preset_color_schemes/" . Trim(this.id_edit.Value)
+        RabbitConfigToolTip.Apply("rabbit", path, this.id_label, this.id_edit)
+        RabbitConfigToolTip.Apply("rabbit", path . "/name", this.name_label, this.name_edit)
+        RabbitConfigToolTip.Apply("rabbit", path . "/author", this.author_label, this.author_edit)
+        for key, controls in this.color_controls {
+            RabbitConfigToolTip.Apply("rabbit", path . "/" . key, controls.label, controls.swatch, controls.edit)
+        }
     }
 
     SetEditable(editable) {

@@ -606,6 +606,8 @@ TestSchemaSettingsDialogMenuControls() {
         )
         dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
         AssertTrue(dialog.field_controls.Has("page_size"), "The schema dialog omitted the menu page-size field.")
+        AssertEqual("demo · menu/page_size", RabbitConfigToolTip.GetText(dialog.field_controls["page_size"]),
+            "The schema field did not expose its configuration path.")
         AssertTrue(
             dialog.field_controls.Has("alternative_select_keys"),
             "The schema dialog omitted the candidate selection-key field."

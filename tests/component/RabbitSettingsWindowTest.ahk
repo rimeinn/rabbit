@@ -221,7 +221,7 @@ TestSettingsWindowExposesAppearanceControls() {
     local calls := []
     local color_actions_y, color_details_y, color_list_height, color_list_width, color_list_y
     local color_layout
-    local font_group_width, height_label_width, layout_group_width, opacity_label_width, tabs_width
+    local font_edit_hwnd, font_group_width, height_label_width, layout_group_width, opacity_label_width, tabs_width
     local window := RabbitSettingsWindow(RabbitSettingsAppearanceWorkflowProbe(calls), true)
     try {
         color_layout := RabbitSettingsWindow.CalculateAppearanceLayout(window.initial_dark_mode)
@@ -251,6 +251,12 @@ TestSettingsWindowExposesAppearanceControls() {
         AssertTrue(window.appearance_typesetting_created,
             "The typesetting controls were not created when their tab was opened.")
         AssertTrue(window.appearance_font.Visible, "The typography tab did not show font controls.")
+        AssertEqual("rabbit · style/font_face", RabbitConfigToolTip.GetText(window.appearance_font),
+            "The candidate-font control did not expose its configuration path.")
+        font_edit_hwnd := DllCall("User32\GetWindow", "Ptr", window.appearance_font.Hwnd, "UInt", 5, "Ptr")
+        AssertTrue(font_edit_hwnd, "The candidate-font combo box did not expose its editable child control.")
+        AssertEqual("rabbit · style/font_face", RabbitConfigToolTip.GetTextByHwnd(window.Hwnd, font_edit_hwnd),
+            "The candidate-font edit control did not expose its configuration path.")
         AssertTrue(!window.appearance_list.Visible, "The typography tab left color controls visible.")
         AssertEqual(0, GetComboBoxItemCount(window.appearance_font),
             "The typography tab eagerly populated the candidate font list.")
@@ -680,9 +686,13 @@ TestSettingsWindowSavesSwitcherSettings() {
     try {
         AssertTrue(window.SelectPage(2), "The settings window rejected the switcher page.")
         AssertEqual(2, window.switcher_list.GetCount(), "The switcher page showed the wrong schema count.")
+        AssertEqual("default · schema_list", RabbitConfigToolTip.GetText(window.switcher_list),
+            "The schema list did not expose its configuration path.")
         window.switcher_tabs.Choose(2)
         window.OnSwitcherTabChanged()
         AssertTrue(window.switcher_caption.Visible, "The switcher menu tab did not show its caption field.")
+        AssertEqual("default · switcher/caption", RabbitConfigToolTip.GetText(window.switcher_caption),
+            "The switcher caption did not expose its configuration path.")
         AssertEqual(1, window.switcher_save_list.GetCount(), "The switcher menu tab lost discovered options.")
         AssertTrue(window.switcher_prefix.Enabled, "Folded option formatting was unexpectedly disabled.")
         window.switcher_fold_options.Value := false
@@ -1551,6 +1561,10 @@ TestSettingsWindowPunctuatorControls() {
             window.RestorePunctuatorMap(RabbitPunctuatorMap.FULL_SHAPE_PATH),
             "The native punctuation editor could not stage a reset."
         )
+        AssertEqual("空格标点", window.punctuator_use_space.Text,
+            "The punctuation space setting label is unclear.")
+        AssertEqual("default · punctuator/use_space", RabbitConfigToolTip.GetText(window.punctuator_use_space),
+            "The punctuation space setting did not expose its configuration path.")
         AssertTrue(!window.punctuator_use_space.Value, "The punctuation spacing control showed the wrong value.")
         AssertEqual(".:", window.punctuator_digit_separators.Value,
             "The digit separator control showed the wrong value.")
@@ -1589,6 +1603,10 @@ TestSettingsWindowRecognizerControls() {
         window.behavior_tabs.Choose(5)
         window.OnBehaviorTabChanged()
         AssertTrue(window.recognizer_use_space.Visible, "The recognizer spacing control stayed hidden.")
+        AssertEqual("识别空格", window.recognizer_use_space.Text,
+            "The recognizer space setting label is unclear.")
+        AssertEqual("default · recognizer/use_space", RabbitConfigToolTip.GetText(window.recognizer_use_space),
+            "The recognizer space setting did not expose its configuration path.")
         AssertTrue(window.recognizer_control_map.patterns.edit.Visible,
             "The recognizer pattern editor stayed hidden.")
         AssertEqual(
