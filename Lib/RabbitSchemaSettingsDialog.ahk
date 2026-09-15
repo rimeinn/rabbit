@@ -25,6 +25,7 @@
 
 class RabbitSchemaSettingsDialog extends Gui {
     static CONTENT_SCROLL_LINE := 32
+    static CONTENT_BOTTOM_PADDING := 14
     static MAX_DIALOG_HEIGHT := 720
     static MIN_DIALOG_HEIGHT := 360
     static WM_VSCROLL := 0x0115
@@ -666,6 +667,9 @@ class RabbitSchemaSettingsDialog extends Gui {
 
     MeasureContentVirtualHeight() {
         local bottom := 0, bounds, control, origin := Buffer(8, 0), origin_y
+        local bottom_padding := Round(
+            RabbitSchemaSettingsDialog.CONTENT_BOTTOM_PADDING * this.GetContentDpiScale()
+        )
         if !DllCall("User32\ClientToScreen", "Ptr", this.content_gui.Hwnd, "Ptr", origin, "Int") {
             return this.content_height
         }
@@ -676,7 +680,13 @@ class RabbitSchemaSettingsDialog extends Gui {
                 bottom := Max(bottom, NumGet(bounds, 12, "Int") - origin_y)
             }
         }
-        return bottom + 8
+        ; Preserve the minimum trailing space already included by the layout cursor.
+        return bottom + bottom_padding
+    }
+
+    GetContentDpiScale() {
+        local dpi := DllCall("User32\GetDpiForWindow", "Ptr", this.content_gui.Hwnd, "UInt")
+        return dpi ? dpi / 96 : 1
     }
 
     GetContentControlBottom(control) {
