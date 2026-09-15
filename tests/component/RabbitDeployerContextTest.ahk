@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitDeployerContext.ahk
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
 #Include ..\..\Lib\RabbitUIStyleSettingsDialog.ahk

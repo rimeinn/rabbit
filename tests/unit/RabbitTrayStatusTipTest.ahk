@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitTrayMenu.ahk
 #Include ..\..\Lib\RabbitRuntimeState.ahk
 

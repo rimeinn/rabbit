@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitCandidatePresentation.ahk
 
 RunTest("UTF-8 candidate presentation", TestUtf8CandidatePresentation.Bind())

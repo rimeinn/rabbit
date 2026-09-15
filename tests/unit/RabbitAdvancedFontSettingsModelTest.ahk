@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitAdvancedFontSettingsModel.ahk
 
 RunTest("advanced font model edits fallback chains", TestAdvancedFontModelEdits.Bind())

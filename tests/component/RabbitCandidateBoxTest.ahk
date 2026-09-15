@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitCandidateBoxFactory.ahk
 
 candidate_context := CreateCandidateContext()

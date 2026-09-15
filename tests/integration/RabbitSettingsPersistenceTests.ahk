@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -25,7 +25,7 @@
 #Include ..\..\Lib\RabbitSchemaSettingsModel.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsModel.ahk
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 
 RunTest("switcher settings persist through generic customization", TestSwitcherHotkeyPersistence.Bind())
 RunTest("shared rabbit settings preserve earlier saves", TestSharedRabbitSettingsPersistence.Bind())

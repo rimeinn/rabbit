@@ -19,7 +19,7 @@
 #SingleInstance Off
 
 #Include ..\..\Lib\RabbitSettingsWindow.ahk
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 
 RunTest("settings window reaches first show before loading config", TestSettingsStartupFirstShow.Bind())
 ExitApp()

@@ -18,7 +18,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 #Include ..\..\Lib\RabbitDeployerWorkflow.ahk
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitSettingsWindow.ahk
 #Include ..\..\Lib\RabbitI18n.ahk
 

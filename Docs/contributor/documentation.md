@@ -59,7 +59,7 @@ README 不是文档站的详细手册。README 保留下载、基本使用、分
 AutoHotkey.exe /ErrorStdOut scripts\generate_locale_fallback.ahk
 ```
 
-新增语言时，在 `Locales/` 中添加带有 `[meta]`、`locale` 和 `language_name` 的 `<语言代码>.ini`，并使用稳定的 `snake_case` 消息键。运行 `tests\unit\RabbitI18nTest.ahk` 和 `tests\unit\RabbitLocalizationTest.ahk` 检查键、占位符、回退和设置界面；`Locales/*.ini` 会进入源码包和编译版，因此翻译文件改动会触发应用 CI，`Locales/README.md` 则属于文档例外。
+新增语言时，在 `Locales/` 中添加带有 `[meta]`、`locale` 和 `language_name` 的 `<语言代码>.ini`，并使用稳定的 `snake_case` 消息键。运行 `tests\unit\RabbitI18nTest.ahk` 和 `tests\component\RabbitLocalizationTest.ahk` 检查键、占位符、回退和设置界面；`Locales/*.ini` 会进入源码包和编译版，因此翻译文件改动会触发应用 CI，`Locales/README.md` 则属于文档例外。
 
 ## 发布流程
 

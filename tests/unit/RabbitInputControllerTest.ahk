@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitConfigSnapshot.ahk
 #Include ..\..\Lib\RabbitInput.ahk
 

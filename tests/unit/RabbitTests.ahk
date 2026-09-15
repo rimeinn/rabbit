@@ -19,14 +19,11 @@
 #Requires AutoHotkey v2.0
 
 #Include RabbitAppContextTest.ahk
-#Include RabbitAboutTest.ahk
 #Include RabbitI18nTest.ahk
-#Include RabbitLocalizationTest.ahk
 #Include RabbitApplicationTest.ahk
 #Include RabbitApplicationSettingsModelTest.ahk
 #Include RabbitAdvancedFontSettingsModelTest.ahk
 #Include RabbitAppearancePreviewTest.ahk
-#Include RabbitAppearanceLayoutTest.ahk
 #Include RabbitBehaviorSettingsModelTest.ahk
 #Include RabbitCandidatePresentationTest.ahk
 #Include RabbitCandidateViewportTest.ahk
@@ -34,28 +31,22 @@
 #Include RabbitCommandLineTest.ahk
 #Include RabbitConfigSnapshotTest.ahk
 #Include RabbitDeployerApplicationTest.ahk
-#Include RabbitDeployerContextTest.ahk
 #Include RabbitDeployerWorkflowTest.ahk
 #Include RabbitDialogPlacementTest.ahk
 #Include RabbitDictionarySettingsModelTest.ahk
 #Include RabbitFontSpecTest.ahk
 #Include RabbitInputControllerTest.ahk
 #Include RabbitInputTargetTest.ahk
-#Include RabbitNativeListViewTest.ahk
-#Include RabbitIconTest.ahk
 #Include RabbitPopupPlacementTest.ahk
 #Include RabbitShutdownTest.ahk
 #Include RabbitShadowTest.ahk
-#Include RabbitStatusTipTest.ahk
-#Include RabbitSettingsWindowTest.ahk
-#Include RabbitSchemaSettingsManifestTest.ahk
 #Include RabbitSwitcherSettingsModelTest.ahk
 #Include RabbitTestCommonTest.ahk
+#Include RabbitTestRunnerTest.ahk
 #Include RabbitTrayClickTest.ahk
 #Include RabbitTrayStatusTipTest.ahk
 #Include RabbitUIStyleSnapshotTest.ahk
 #Include RabbitUIStyleSettingsTest.ahk
-#Include RabbitWindowThemeTest.ahk
 #Include RabbitRimeBootstrapTest.ahk
 
 ExitApp()

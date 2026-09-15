@@ -18,7 +18,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitColorSchemeDialog.ahk
 
 RunTest("color scheme dialog edits through ARGB", TestColorSchemeDialogEditsArgb.Bind())

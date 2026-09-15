@@ -22,7 +22,7 @@
 #Include ..\..\Lib\RabbitCommon.ahk
 #Include ..\..\Lib\RabbitUIStyleSettings.ahk
 #Include ..\..\Lib\RabbitUIStyleSettingsDialog.ahk
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 
 RunTest("UI style preview snapshots", RunUIStylePreviewTest.Bind())
 

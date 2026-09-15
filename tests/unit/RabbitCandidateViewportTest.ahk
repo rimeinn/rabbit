@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitCandidateViewport.ahk
 
 RunTest("flow viewport expands after page transition", TestFlowViewportExpansion.Bind())

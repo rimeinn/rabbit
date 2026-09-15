@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitNativeListView.ahk
 
 RunTest("Native ListView protocol is detected", TestNativeListViewIsDetected.Bind())

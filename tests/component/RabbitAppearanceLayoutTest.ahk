@@ -1,5 +1,5 @@
 #Requires AutoHotkey v2.0
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitSettingsWindow.ahk
 
 RunTest("appearance groups contain their localized controls", TestAppearanceGroupBounds)

@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitDictionarySettingsModel.ahk
 
 RunTest("dictionary settings model operations", TestDictionarySettingsModelOperations.Bind())

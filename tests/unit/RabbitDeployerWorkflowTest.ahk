@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitDeployerWorkflow.ahk
 
 RunTest("deploy workflow ownership", TestDeployWorkflowOwnership.Bind())

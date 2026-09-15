@@ -1,9 +1,9 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 #Requires AutoHotkey v2.0
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitDirect2D.ahk
 #Include ..\..\Lib\RabbitUIStyleSnapshot.ahk
 #Include ..\..\Lib\RabbitCandidateBox.ahk

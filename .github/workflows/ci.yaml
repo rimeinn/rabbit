@@ -270,15 +270,32 @@ jobs:
           name: Icon
           path: Lib
 
-      - name: Run unit tests
+      - name: Run Rabbit unit tests
+        shell: pwsh
+        run: |
+          $ahk = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\AutoHotkey64.exe"
+          New-Item -ItemType Directory -Force "dist\test-results" | Out-Null
+          & $ahk /ErrorStdOut "tests\RabbitTestMain.ahk" --suite unit `
+            --junit "dist\test-results\rabbit-unit.xml"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run Rabbit RimeDepot component tests
+        shell: pwsh
+        run: |
+          $ahk = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\AutoHotkey64.exe"
+          & $ahk /ErrorStdOut "tests\RabbitTestMain.ahk" --suite component `
+            --filter RimeDepot --junit "dist\test-results\rabbit-rimedepot-component.xml"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Run RimeDepot submodule tests
         shell: pwsh
         run: |
           $ahk = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\AutoHotkey64.exe"
           $tests = @(
-            "tests\unit\RabbitTests.ahk",
-            "tests\unit\RabbitRimeDepotSettingsTest.ahk",
-            "tests\unit\RabbitRimeDepotWindowTest.ahk",
-            "tests\unit\RabbitSettingsRimeDepotTest.ahk",
             "Lib\RimeDepot\tests\RimeDepotCoreProbe.ahk",
             "Lib\RimeDepot\tests\integration\RimeDepotGuiSmokeTest.ahk"
           )
@@ -399,9 +416,17 @@ jobs:
           if ($compileProcess.ExitCode -ne 0) {
             exit $compileProcess.ExitCode
           }
-          & .\tests\integration\RabbitCompiledResourcesTests.ps1 `
-              -Compiler $compiler.FullName -Base $base `
-              -RimeDll "deps\Rime\${{ matrix.rime }}" -Architecture "${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path "dist\test-results" | Out-Null
+          & $base /ErrorStdOut .\tests\RabbitTestMain.ahk `
+              --suite packaging `
+              --compiler $compiler.FullName `
+              --base $base `
+              --rime-dll "deps\Rime\${{ matrix.rime }}" `
+              --architecture "${{ matrix.target }}" `
+              --junit "dist\test-results\rabbit-packaging-${{ matrix.target }}.xml"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: Validate compiled executable
         shell: pwsh

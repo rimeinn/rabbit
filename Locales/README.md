@@ -125,7 +125,7 @@ executables; CI includes them in both release artifacts.
 ## Settings regression tests
 
 ```powershell
-AutoHotkey.exe /ErrorStdOut tests\unit\RabbitLocalizationTest.ahk
+AutoHotkey.exe /ErrorStdOut tests\component\RabbitLocalizationTest.ahk
 ```
 
 This checks English controls and dialog creation, delayed static labels, unchanged

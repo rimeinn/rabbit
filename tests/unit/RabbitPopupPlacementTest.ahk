@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitPopupPlacement.ahk
 
 RunTest("popup placement below caret", TestPlacementBelowCaret.Bind())

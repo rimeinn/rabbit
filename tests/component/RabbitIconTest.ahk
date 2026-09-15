@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitIcon.ahk
 
 RunTest("status icon selects the closest ICO size without upscaling", TestIconPreferredSize.Bind())

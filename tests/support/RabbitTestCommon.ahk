@@ -17,12 +17,17 @@
  */
 
 global test_failure_count := 0
+global test_run_active := false
+global test_run_depth := 0
 
 OnError(TestUnhandledError)
 OnExit(TestExit)
 
 RunTest(name, test, failure_reporter := 0) {
-    global test_failure_count
+    global test_failure_count, test_run_active, test_run_depth
+    local record_result := test_run_depth = 0
+    test_run_depth += 1
+    test_run_active := true
     try {
         test.Call()
     } catch as err {
@@ -32,10 +37,36 @@ RunTest(name, test, failure_reporter := 0) {
         } else {
             TestReportFailure(name, err)
         }
+        test_run_depth -= 1
+        test_run_active := false
+        if record_result {
+            ScheduleTestProcessExit()
+        }
         return false
     }
-    TestWrite("PASS: " . name . "`n")
+    if record_result {
+        TestWrite("PASS: " . name . "`n")
+    }
+    test_run_depth -= 1
+    test_run_active := false
+    if record_result {
+        ScheduleTestProcessExit()
+    }
     return true
+}
+
+ScheduleTestProcessExit() {
+    if EnvGet("RABBIT_TEST_LOG_FILE") != "" {
+        SetTimer(TestExitWhenIdle, -100)
+    }
+}
+
+TestExitWhenIdle(*) {
+    global test_failure_count, test_run_active
+    if test_run_active {
+        return
+    }
+    ExitApp(test_failure_count ? 1 : 0)
 }
 
 TestUnhandledError(err, *) {
@@ -81,6 +112,15 @@ TestReportFailure(name, err) {
 }
 
 TestWrite(message) {
+    local log_path := EnvGet("RABBIT_TEST_LOG_FILE")
+    if log_path != "" {
+        try {
+            FileAppend(message, log_path, "UTF-8-RAW")
+        } catch as err {
+            OutputDebug("Could not write test log: " . err.Message)
+        }
+        return
+    }
     try {
         FileAppend(message, "*")
     } catch as err {

@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitApplication.ahk
 
 RunTest("deployer launch after application shutdown", TestDeployerLaunchAfterShutdown.Bind())

@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitShutdown.ahk
 
 RunTest("shutdown cleanup after candidate disposal failure", TestShutdownCleanupAfterDisposalFailure.Bind())

@@ -1,8 +1,8 @@
-﻿/*
+/*
  * Copyright (c) 2023 - 2026 Xuesong Peng <pengxuesong.cn@gmail.com>
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitShadowSurface.ahk
 #Include ..\..\Lib\RabbitColorScheme.ahk
 

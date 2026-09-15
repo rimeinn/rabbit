@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsModel.ahk
 
 RunTest("switcher settings model loads, discovers, and saves all fields", TestSwitcherSettingsModel.Bind())

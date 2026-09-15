@@ -128,13 +128,13 @@ preset_color_schemes:
 | --- | --- | --- |
 | ![无阴影](images/shadow-disabled.png) | ![窗口阴影](images/shadow-window.png) | ![全部阴影](images/shadow-all.png) |
 
-可通过 `AutoHotkey64.exe /ErrorStdOut tests/integration/RabbitShadowRendererTests.ahk export` 重新生成示例。
+可通过 `AutoHotkey64.exe /ErrorStdOut tests/component/RabbitShadowRendererTests.ahk export` 重新生成示例。
 
 ### 验证记录
 
 使用 AutoHotkey **2.0.19**：
 
-- 单元测试入口 `tests/unit/RabbitTests.ahk`：216 项通过，包含样式解析、字段边界、四类颜色、明暗方案切换、保存路径及设置控件读取测试。
+- 测试入口 `tests/RabbitTestMain.ahk --suite unit`：包含样式解析、字段边界、四类颜色、明暗方案切换、保存路径及设置控件读取测试。
 - `RabbitCandidateBoxGuiTests.ahk`：现代与旧版候选窗的现有 29 项回归通过。
 - `RabbitShadowRendererTests.ahk`：x64 和 x86 原生模糊、预乘 alpha、缓存复用与容量限制、三种候选布局、外扩像素、窗口穿透标志、收起锚点、隐藏清理、悬浮编码和位图预览测试通过。
 - `RabbitUIStylePreviewTests.ahk`、`RabbitColorSchemeDialogTests.ahk`、`RabbitDeployerDialogTests.ahk`：预览与对话框测试通过。

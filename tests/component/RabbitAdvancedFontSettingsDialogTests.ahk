@@ -18,7 +18,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitAdvancedFontSettingsDialog.ahk
 
 RunTest("advanced font dialog edits every font role", TestAdvancedFontDialogEditsRoles.Bind())

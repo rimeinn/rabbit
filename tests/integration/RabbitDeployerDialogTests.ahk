@@ -23,7 +23,7 @@
 #Include ..\..\Lib\RabbitDictionarySettingsModel.ahk
 #Include ..\..\Lib\RabbitDictManagementDialog.ahk
 #Include ..\..\Lib\RabbitSwitcherSettingsDialog.ahk
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 
 RunTest("deployer dialog ownership", RunDeployerDialogTests.Bind())
 

@@ -17,7 +17,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitCandidateBox.ahk
 #Include ..\..\Lib\RabbitDirect2D.ahk
 

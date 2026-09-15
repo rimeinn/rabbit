@@ -19,7 +19,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitInput.ahk
 
 RunTest("native and UI Automation password field detection", TestPasswordFieldDetection.Bind())

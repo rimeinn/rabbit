@@ -18,7 +18,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Off
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitAppearanceSettingsPage.ahk
 
 RunTest("DirectWrite enumerates installed font families", TestInstalledFontFamilies.Bind())

@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitDialogPlacement.ahk
 
 RunTest("dialog placement centers on the owner monitor", TestDialogPlacementCenters.Bind())

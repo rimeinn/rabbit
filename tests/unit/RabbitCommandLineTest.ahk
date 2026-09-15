@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitCommandLine.ahk
 
 RunTest("Rabbit named command line options", TestRabbitCommandLineOptions.Bind())

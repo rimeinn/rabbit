@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitBehaviorSettingsModel.ahk
 
 RunTest("behavior settings model loads effective defaults", TestBehaviorSettingsModelLoadsDefaults.Bind())

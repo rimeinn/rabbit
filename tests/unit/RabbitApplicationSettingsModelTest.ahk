@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitApplicationSettingsModel.ahk
 
 RunTest("application settings model lifecycle", TestApplicationSettingsModelLifecycle.Bind())

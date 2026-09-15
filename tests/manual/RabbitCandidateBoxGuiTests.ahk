@@ -19,4 +19,4 @@
 #Requires AutoHotkey v2.0
 
 ; These tests intentionally exercise native candidate windows and must not run in headless CI.
-#Include ..\unit\RabbitCandidateBoxTest.ahk
+#Include ..\component\RabbitCandidateBoxTest.ahk

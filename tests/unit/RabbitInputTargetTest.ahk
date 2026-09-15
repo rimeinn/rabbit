@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitInputTarget.ahk
 
 RunTest("Explorer file view is a type-ahead target", TestExplorerFileViewIsTypeAhead.Bind())

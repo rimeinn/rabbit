@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitDeployerApplication.ahk
 
 RunTest("settings window ownership", TestSettingsWindowOwnership.Bind())

@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitAppearancePreview.ahk
 
 RunTest("appearance preview uses the production candidate renderer", TestAppearancePreviewUsesCandidateRenderer.Bind())

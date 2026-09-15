@@ -16,7 +16,7 @@
  *
  */
 
-#Include ..\support\TestCommon.ahk
+#Include ..\support\RabbitTestCommon.ahk
 
 RunTest("test runner captures callback exceptions", TestRunTestCapturesCallbackExceptions.Bind())
 
