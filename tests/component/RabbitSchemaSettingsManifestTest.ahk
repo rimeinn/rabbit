@@ -23,13 +23,17 @@ RunTest("schema settings resolve manifests by data precedence", TestSchemaSettin
 RunTest("schema settings validate manifest fields", TestSchemaSettingsManifestValidation.Bind())
 RunTest("schema settings parse manifest groups", TestSchemaSettingsManifestGroups.Bind())
 RunTest("schema settings parse ordered list fields", TestSchemaSettingsListManifest.Bind())
+RunTest("punctuator maps validate and use a dedicated editor", TestPunctuatorMapEditor.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
+RunTest("schema settings save punctuation scalar values", TestSchemaSettingsPunctuatorScalarPersistence.Bind())
 RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
+RunTest("schema settings save punctuation maps", TestSchemaSettingsPunctuatorMapPersistence.Bind())
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
 RunTest("schema settings dialog switches groups", TestSchemaSettingsDialogGroups.Bind())
 RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDialogLists.Bind())
 RunTest("schema settings dialog supports librime binding values", TestSchemaSettingsDialogBindingValues.Bind())
+RunTest("schema settings dialog exposes punctuation map fields", TestSchemaSettingsDialogPunctuatorMaps.Bind())
 RunTest("schema settings dialog sizes configured list rows", TestSchemaSettingsDialogListRows.Bind())
 RunTest("schema settings dialog fits short described list groups", TestSchemaSettingsDialogDescribedLists.Bind())
 RunTest("schema settings dialog reveals the final described list field", TestSchemaSettingsDialogLongDescribedLists.Bind())
@@ -219,10 +223,74 @@ TestBundledSchemaSettingsFallback() {
     local manifest := RabbitSchemaSettingsManifest.Parse(
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
-    AssertEqual(1, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
-    AssertEqual(1, manifest.groups.Length, "The bundled fallback unexpectedly has multiple groups.")
+    AssertEqual(7, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(2, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
     AssertEqual("general", manifest.fields[1].group, "The bundled fallback did not assign its field to a group.")
     AssertEqual("menu/page_size", manifest.fields[1].path, "The bundled fallback omitted the page-size setting.")
+    AssertEqual("punctuator_map", manifest.fields[2].type, "The bundled fallback omitted punctuation map support.")
+    AssertEqual(
+        "punctuator/full_shape",
+        manifest.fields[2].path,
+        "The bundled fallback omitted the full-shape punctuation map."
+    )
+    AssertEqual("boolean", manifest.fields[5].type, "The bundled fallback omitted punctuation spacing support.")
+    AssertTrue(!manifest.fields[5].default, "The punctuation spacing default was not parsed.")
+    AssertEqual(
+        "punctuator/digit_separators",
+        manifest.fields[6].path,
+        "The bundled fallback omitted digit separator support."
+    )
+    AssertEqual(".:", manifest.fields[6].default, "The digit separator default was not parsed.")
+    AssertEqual("enum", manifest.fields[7].type, "The bundled fallback omitted digit separator action support.")
+    AssertEqual("forward", manifest.fields[7].default, "The digit separator action default was not parsed.")
+    AssertEqual(2, manifest.fields[7].options.Length, "The digit separator action options were incomplete.")
+}
+
+TestPunctuatorMapEditor() {
+    local owner := Gui(), dialog := 0, entry_dialog := 0
+    local value := Map(
+        "(", Map("pair", ["（", "）"]),
+        ")", "）",
+        ",", ["，", ","]
+    )
+    try {
+        value := RabbitPunctuatorMap.Validate(value, RabbitPunctuatorMap.FULL_SHAPE_PATH)
+        AssertEqual("pair", RabbitPunctuatorMap.DefinitionKind(value["("]),
+            "The punctuation map did not recognize paired definitions.")
+        AssertEqual("list", RabbitPunctuatorMap.DefinitionKind(value[","]),
+            "The punctuation map did not recognize candidate definitions.")
+        AssertThrows(
+            RabbitPunctuatorMap.Validate.Bind(Map("ab", "x"), RabbitPunctuatorMap.FULL_SHAPE_PATH),
+            "The full-shape map accepted a multi-character trigger."
+        )
+
+        dialog := RabbitPunctuatorMapDialog(
+            owner,
+            RabbitPunctuatorMap.FULL_SHAPE_PATH,
+            value,
+            0,
+            (*) => true
+        )
+        AssertEqual(3, dialog.list.GetCount(), "The punctuation editor lost map entries.")
+        AssertEqual("(", dialog.list.GetText(1, 1), "The punctuation editor changed map order.")
+        entry_dialog := RabbitPunctuatorEntryDialog(
+            dialog,
+            RabbitPunctuatorMap.FULL_SHAPE_PATH,
+            "(",
+            value["("],
+            0,
+            (*) => true
+        )
+        AssertEqual(3, entry_dialog.type_choice.Value, "The entry editor did not select paired output.")
+    } finally {
+        if entry_dialog {
+            entry_dialog.Dispose()
+        }
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
 }
 
 TestSchemaSettingsModelPersistence() {
@@ -261,6 +329,41 @@ TestSchemaSettingsModelPersistence() {
         model.NormalizeValues.Bind(model, Map("page_size", 11)),
         "The schema settings model accepted a value above the manifest maximum."
     )
+}
+
+TestSchemaSettingsPunctuatorScalarPersistence() {
+    local calls := []
+    local model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsPunctuatorScalarManifest()
+    )
+    local values
+    AssertTrue(model.Load(), "The schema settings model could not load punctuation scalar defaults.")
+    AssertTrue(!model.values["use_space"], "The punctuation spacing default was not loaded.")
+    AssertEqual(".:", model.values["digit_separators"], "The digit separator default was not loaded.")
+    AssertEqual("forward", model.values["digit_separator_action"],
+        "The digit separator action default was not loaded.")
+
+    values := RabbitConfigValue.Clone(model.values)
+    values["use_space"] := true
+    values["digit_separators"] := ",."
+    values["digit_separator_action"] := "commit"
+    AssertTrue(model.Save(values), "The schema settings model failed to save punctuation scalar values.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "boolean:punctuator/use_space:1"),
+        "The schema settings model did not save punctuation spacing.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "string:punctuator/digit_separators:,."),
+        "The schema settings model did not save digit separators.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "string:punctuator/digit_separator_action:commit"),
+        "The schema settings model did not save the digit separator action.")
+    values["digit_separators"] := "a"
+    AssertThrows(model.NormalizeValues.Bind(model, values),
+        "The schema settings model accepted a non-punctuation digit separator.")
+    values["digit_separators"] := ".:"
+    values["digit_separator_action"] := "unknown"
+    AssertThrows(model.NormalizeValues.Bind(model, values),
+        "The schema settings model accepted an unsupported digit separator action.")
 }
 
 TestSchemaSettingsListPersistence() {
@@ -507,6 +610,90 @@ TestSchemaSettingsDialogBindingValues() {
             "unset_option: ascii_mode",
             bindings.GetText(2, 3),
             "The schema binding list lost the unset_option action."
+        )
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsPunctuatorMapPersistence() {
+    local calls := [], manifest := SchemaSettingsPunctuatorManifest(), values, model
+    local rime := RabbitSchemaSettingsListRimeProbe(Map(
+        "punctuator/full_shape", Map(
+            "(", Map("pair", ["（", "）"]),
+            ")", "）",
+            ",", ["，", ","]
+        )
+    ), ["punctuator/full_shape/@legacy"], calls)
+    model := RabbitSchemaSettingsModelProbe(
+        rime,
+        RabbitSchemaSettingsListLeversProbe(calls),
+        "demo",
+        manifest
+    )
+    AssertTrue(model.Load(), "The schema settings model could not read a punctuation map.")
+    AssertEqual("）", model.values["full_shape"][")"], "The punctuation map lost a scalar definition.")
+    AssertEqual("list", RabbitPunctuatorMap.DefinitionKind(model.values["full_shape"][","]),
+        "The punctuation map lost a candidate definition.")
+
+    values := RabbitConfigValue.Clone(model.values)
+    values["full_shape"]["("]["pair"][1] := "【"
+    AssertTrue(model.Save(values), "The schema settings model failed to save a punctuation map.")
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:punctuator/full_shape/@legacy"),
+        "Replacing a punctuation map did not clear a nested patch."
+    )
+    AssertTrue(
+        SchemaSettingsCallsContain(calls, "item:punctuator/full_shape:", '"(": {"pair": ["【", "）"]}'),
+        "Replacing a punctuation map did not write the complete map."
+    )
+
+    calls.Length := 0
+    AssertTrue(
+        model.Save(RabbitConfigValue.Clone(model.values), Map("full_shape", true)),
+        "The schema settings model failed to restore a punctuation map."
+    )
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:punctuator/full_shape"),
+        "Restoring a punctuation map did not remove its full-map override."
+    )
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "reset:punctuator/full_shape/@legacy"),
+        "Restoring a punctuation map did not remove its nested patch."
+    )
+}
+
+TestSchemaSettingsDialogPunctuatorMaps() {
+    local calls := [], dialog := 0, owner := Gui(), reset_width, summary_width
+    local model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsPunctuatorManifest()
+    )
+    try {
+        model.values := Map("full_shape", Map("(", Map("pair", ["（", "）"])))
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        AssertTrue(dialog.field_controls.Has("full_shape"), "The schema dialog did not create a punctuation editor.")
+        dialog.field_controls["full_shape"].reset_button.GetPos(,, &reset_width)
+        dialog.field_controls["full_shape"].summary.GetPos(,, &summary_width)
+        AssertTrue(reset_width >= 120, "The punctuation reset button is too narrow for localized text.")
+        AssertTrue(summary_width >= 200, "The punctuation map summary lost its usable width.")
+        AssertEqual(
+            "1 个映射项",
+            dialog.field_controls["full_shape"].summary.Value,
+            "The punctuation editor did not summarize its map."
+        )
+        AssertTrue(
+            dialog.RestorePunctuatorMapDefault(model.manifest.fields[1]),
+            "The schema dialog could not stage a punctuation reset."
+        )
+        AssertTrue(
+            dialog.reset_fields.Has("full_shape"),
+            "The punctuation reset was not retained."
         )
     } finally {
         if dialog {
@@ -803,6 +990,74 @@ SchemaSettingsListManifest(processor_rows := "", binding_rows := "", group_descr
     }
 }
 
+SchemaSettingsPunctuatorManifest() {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "punctuator", label: "Punctuation", description: "" }],
+        fields: [{
+            id: "full_shape",
+            group: "punctuator",
+            path: "punctuator/full_shape",
+            type: "punctuator_map",
+            label: "Full-shape map",
+            description: "",
+            min: "",
+            max: "",
+            options: [],
+        }],
+    }
+}
+
+SchemaSettingsPunctuatorScalarManifest() {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "punctuator", label: "Punctuation", description: "" }],
+        fields: [
+            {
+                id: "use_space",
+                group: "punctuator",
+                path: "punctuator/use_space",
+                type: "boolean",
+                label: "Use space",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+                has_default: true,
+                default: false,
+            },
+            {
+                id: "digit_separators",
+                group: "punctuator",
+                path: "punctuator/digit_separators",
+                type: "string",
+                label: "Digit separators",
+                description: "",
+                min: "",
+                max: "",
+                options: [],
+                has_default: true,
+                default: ".:",
+            },
+            {
+                id: "digit_separator_action",
+                group: "punctuator",
+                path: "punctuator/digit_separator_action",
+                type: "enum",
+                label: "Digit separator action",
+                description: "",
+                min: "",
+                max: "",
+                options: ["forward", "commit"],
+                has_default: true,
+                default: "forward",
+            },
+        ],
+    }
+}
+
 JoinSchemaSettingsCalls(calls) {
     local result := "", call
     for call in calls {
@@ -864,6 +1119,23 @@ class RabbitSchemaSettingsRimeProbe {
         value := this.values[path]
         return true
     }
+
+    config_test_get_bool(config, path, &value) {
+        if !this.values.Has(path) || Type(this.values[path]) != "Integer"
+            || this.values[path] != 0 && this.values[path] != 1 {
+            return false
+        }
+        value := !!this.values[path]
+        return true
+    }
+
+    config_test_get_string(config, path, &value) {
+        if !this.values.Has(path) || Type(this.values[path]) != "String" {
+            return false
+        }
+        value := this.values[path]
+        return true
+    }
 }
 
 class RabbitSchemaSettingsLeversProbe {
@@ -883,6 +1155,16 @@ class RabbitSchemaSettingsLeversProbe {
 
     customize_int(settings, path, value) {
         this.calls.Push("integer:" . path . ":" . value)
+        return true
+    }
+
+    customize_bool(settings, path, value) {
+        this.calls.Push("boolean:" . path . ":" . value)
+        return true
+    }
+
+    customize_string(settings, path, value) {
+        this.calls.Push("string:" . path . ":" . value)
         return true
     }
 
@@ -923,6 +1205,11 @@ class RabbitSchemaSettingsListRimeProbe {
         } else if config is Map && config.Has("value") && path = "/" && config["value"] is Map {
             for key, value in config["value"] {
                 items.Push({ key: key, path: key, value: value })
+            }
+        } else if Type(config) = "String" && config = "schema"
+            && this.TryGetValue(config, path, &value) && value is Map {
+            for key, value in value {
+                items.Push({ key: key, path: path . "/" . key, value: value })
             }
         } else {
             return 0
@@ -1020,6 +1307,13 @@ class RabbitSchemaSettingsListRimeProbe {
             return true
         }
         for base_path, base_value in this.values {
+            if base_value is Map && SubStr(path, 1, StrLen(base_path) + 1) = base_path . "/" {
+                remainder := SubStr(path, StrLen(base_path) + 2)
+                if base_value.Has(remainder) {
+                    value := base_value[remainder]
+                    return true
+                }
+            }
             if !(base_value is Array) || SubStr(path, 1, StrLen(base_path) + 1) != base_path . "/" {
                 continue
             }

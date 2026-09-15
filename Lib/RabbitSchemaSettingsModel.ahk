@@ -17,6 +17,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitConfigValue.ahk
+#Include RabbitPunctuatorMap.ahk
 #Include RabbitSchemaSettingsManifest.ahk
 
 #Include RabbitI18n.ahk
@@ -67,12 +68,22 @@ class RabbitSchemaSettingsModel {
                 if this.rime.config_test_get_double(config, field.path, &value) {
                     return value
                 }
+            case "enum":
+                if this.rime.config_test_get_string(config, field.path, &value) {
+                    return field.path = RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_PATH
+                        ? RabbitPunctuatorMap.NormalizeDigitSeparatorAction(value) : value
+                }
             case "list", "key_binding_list":
                 return this.ReadListField(config, field)
+            case "punctuator_map":
+                return RabbitPunctuatorMap.Read(this.rime, config, field.path)
             default:
                 if this.rime.config_test_get_string(config, field.path, &value) {
                     return value
                 }
+        }
+        if HasProp(field, "has_default") && field.has_default {
+            return RabbitConfigValue.Clone(field.default)
         }
         throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
     }
@@ -136,6 +147,9 @@ class RabbitSchemaSettingsModel {
                 normalized := Number(value)
             case "enum":
                 normalized := Trim(String(value))
+                if field.path = RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_PATH {
+                    normalized := RabbitPunctuatorMap.ValidateDigitSeparatorAction(normalized)
+                }
                 if !this.HasOption(field.options, normalized) {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
@@ -146,6 +160,17 @@ class RabbitSchemaSettingsModel {
                 normalized := []
                 for item in value {
                     normalized.Push(this.NormalizeListItem(field, item))
+                }
+            case "punctuator_map":
+                try {
+                    normalized := RabbitPunctuatorMap.Validate(value, field.path)
+                } catch {
+                    throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+                }
+            case "string":
+                normalized := Trim(String(value))
+                if field.path = RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH {
+                    normalized := RabbitPunctuatorMap.ValidateDigitSeparators(normalized)
                 }
             default:
                 normalized := String(value)
@@ -215,7 +240,8 @@ class RabbitSchemaSettingsModel {
                     break
                 }
             }
-            if !matched || matched.type != "list" && matched.type != "key_binding_list" {
+            if !matched || matched.type != "list" && matched.type != "key_binding_list"
+                && matched.type != "punctuator_map" {
                 throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", reset_id)))
             }
             resets[reset_id] := true
@@ -238,7 +264,7 @@ class RabbitSchemaSettingsModel {
             }
             for field in this.manifest.fields {
                 if resets.Has(field.id) {
-                    if !this.ResetListField(settings, field) {
+                    if !this.ResetField(settings, field) {
                         return false
                     }
                 } else if !RabbitConfigValue.ValuesEqual(normalized[field.id], this.values[field.id])
@@ -264,6 +290,7 @@ class RabbitSchemaSettingsModel {
             case "integer": return !!this.api.customize_int(settings, field.path, value)
             case "number": return !!this.api.customize_double(settings, field.path, value)
             case "list", "key_binding_list": return this.CustomizeListField(settings, field, value)
+            case "punctuator_map": return this.CustomizePunctuatorMapField(settings, field, value)
             default: return !!this.api.customize_string(settings, field.path, value)
         }
     }
@@ -277,6 +304,66 @@ class RabbitSchemaSettingsModel {
 
     ResetListField(settings, field) {
         return this.ClearListPatchOperations(settings, field.path, true)
+    }
+
+    ResetField(settings, field) {
+        return field.type = "punctuator_map" ? this.ResetPunctuatorMapField(settings, field)
+            : this.ResetListField(settings, field)
+    }
+
+    CustomizePunctuatorMapField(settings, field, value) {
+        if !this.ClearPunctuatorMapPatchOperations(settings, field.path) {
+            return false
+        }
+        return this.CustomizeYamlItem(settings, field.path, value)
+    }
+
+    ResetPunctuatorMapField(settings, field) {
+        return this.ClearPunctuatorMapPatchOperations(settings, field.path, true)
+    }
+
+    ClearPunctuatorMapPatchOperations(settings, path, reset_value := false) {
+        local key, keys := Map(path, true)
+        if !reset_value {
+            ; Writing the whole map still owns the exact path and all nested patches.
+            keys[path] := true
+        }
+        for key in this.GetExistingPunctuatorMapPatchOperations(path) {
+            keys[key] := true
+        }
+        for key in keys {
+            if !this.api.customize_item(settings, key, 0) {
+                return false
+            }
+        }
+        return true
+    }
+
+    GetExistingPunctuatorMapPatchOperations(path) {
+        local config := 0, iter := 0, key
+        local result := []
+        if !HasMethod(this.rime, "user_config_open")
+            || !(config := this.rime.user_config_open(this.schema_id . ".custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    key := iter.key
+                    if key = path || SubStr(key, 1, StrLen(path) + 1) = path . "/" {
+                        result.Push(key)
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            this.rime.config_close(config)
+        }
+        return result
     }
 
     ClearListPatchOperations(settings, path, reset_value := false) {

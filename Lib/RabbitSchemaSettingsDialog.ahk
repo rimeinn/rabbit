@@ -17,6 +17,7 @@
 
 #Include RabbitDialogPlacement.ahk
 #Include RabbitKeyBindingDialog.ahk
+#Include RabbitPunctuatorMapDialog.ahk
 #Include RabbitSchemaSettingsModel.ahk
 #Include RabbitStringListItemDialog.ahk
 #Include RabbitWindowTheme.ahk
@@ -221,6 +222,9 @@ class RabbitSchemaSettingsDialog extends Gui {
         if field.type = "list" || field.type = "key_binding_list" {
             return this.MeasureListFieldHeight(field)
         }
+        if field.type = "punctuator_map" {
+            return 96
+        }
         return 30
     }
 
@@ -345,6 +349,8 @@ class RabbitSchemaSettingsDialog extends Gui {
             y += 28
         } else if field.type = "list" || field.type = "key_binding_list" {
             y := this.AddListField(field, y)
+        } else if field.type = "punctuator_map" {
+            y := this.AddPunctuatorMapField(field, y)
         } else {
             control := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
             this.TrackContentControl(control)
@@ -439,6 +445,36 @@ class RabbitSchemaSettingsDialog extends Gui {
         return button_y + 36
     }
 
+    AddPunctuatorMapField(field, y) {
+        local controls := {type: field.type}
+        local reset_width := 126, edit_width := 78, button_y := y + 26
+        local reset_x := this.content_width - 12 - reset_width
+        local edit_x := reset_x - 8 - edit_width
+        local summary_width := edit_x - 12 - 8
+        this.AddContentText("x12 y" . y . " w" . (this.content_width - 24) . " h22 +0x200", field.label)
+        controls.summary := this.AddContentMutedText(
+            "x12 y" . (y + 28) . " w" . summary_width . " h22 +0x200",
+            ""
+        )
+        controls.edit_button := this.AddListButton(
+            "x" . edit_x . " y" . button_y . " w" . edit_width . " h28 +0x2000",
+            RabbitI18n.Text("controls.edit"),
+            (*) => this.EditPunctuatorMapField(field)
+        )
+        controls.reset_button := this.AddListButton(
+            "x" . reset_x . " y" . button_y . " w" . reset_width . " h28 +0x2000",
+            RabbitI18n.Text("punctuator.restore_default"),
+            (*) => this.RestorePunctuatorMapDefault(field)
+        )
+        controls.reset_hint := this.AddContentMutedText(
+            "x12 y" . (y + 58) . " w" . (this.content_width - 24) . " h18",
+            ""
+        )
+        this.field_controls[field.id] := controls
+        this.RefreshPunctuatorMapField(field)
+        return y + 80
+    }
+
     AddKeyBindingListHeaders(controls, y) {
         local surface_options := " c" . RabbitWindowThemeController.DARK_TEXT
             . " Background" . RabbitWindowThemeController.DARK_SURFACE
@@ -507,6 +543,15 @@ class RabbitSchemaSettingsDialog extends Gui {
         this.UpdateListResetState(field)
     }
 
+    RefreshPunctuatorMapField(field) {
+        local controls := this.field_controls[field.id]
+        controls.summary.Value := this.reset_fields.Has(field.id)
+            ? RabbitI18n.Text("punctuator.restore_default_pending")
+            : RabbitPunctuatorMap.Summary(this.draft_values[field.id])
+        controls.reset_hint.Value := this.reset_fields.Has(field.id)
+            ? RabbitI18n.Text("punctuator.restore_default_pending") : ""
+    }
+
     ListValueText(value) {
         return value is Map || value is Array ? "…" : String(value)
     }
@@ -530,6 +575,35 @@ class RabbitSchemaSettingsDialog extends Gui {
         this.draft_values[field.id].Push(field.type = "list" ? item["value"] : item)
         this.RefreshListField(field, this.draft_values[field.id].Length)
         return true
+    }
+
+    EditPunctuatorMapField(field) {
+        local value := RabbitPunctuatorMapDialog(
+            this,
+            field.path,
+            this.draft_values[field.id],
+            this.model.rime,
+            this.dark_mode_reader
+        ).ShowModal()
+        if !value {
+            return false
+        }
+        this.CancelPunctuatorMapReset(field)
+        this.draft_values[field.id] := RabbitConfigValue.Clone(value)
+        this.RefreshPunctuatorMapField(field)
+        return true
+    }
+
+    RestorePunctuatorMapDefault(field) {
+        this.reset_fields[field.id] := true
+        this.RefreshPunctuatorMapField(field)
+        return true
+    }
+
+    CancelPunctuatorMapReset(field) {
+        if this.reset_fields.Has(field.id) {
+            this.reset_fields.Delete(field.id)
+        }
     }
 
     EditListItem(field, row := 0) {
@@ -635,7 +709,7 @@ class RabbitSchemaSettingsDialog extends Gui {
             if field.group != this.groups[this.current_group_index].id {
                 continue
             }
-            if field.type = "list" || field.type = "key_binding_list" {
+            if field.type = "list" || field.type = "key_binding_list" || field.type = "punctuator_map" {
                 continue
             }
             control := this.field_controls[field.id]

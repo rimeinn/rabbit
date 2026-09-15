@@ -46,6 +46,8 @@ TestRabbitI18n() {
         RabbitI18n.Initialize(directory, "ja-JP")
         AssertEqual("ja-JP", RabbitI18n.locale, "Bundled Japanese catalog was not discovered.")
         AssertEqual("入力と動作", RabbitI18n.Text("pages.behavior"), "Japanese settings labels were not loaded.")
+        AssertEqual("既定値に戻す", RabbitI18n.Text("punctuator.restore_default"),
+            "Japanese punctuation reset text was not kept compact.")
         AssertEqual("2 件のレコードをエクスポートしました。",
             RabbitI18n.Text("messages.exported", Map("count", 2)), "Japanese placeholder substitution failed.")
         AssertEqual("スキーマ", RabbitI18n.Text("depot.scheme"),

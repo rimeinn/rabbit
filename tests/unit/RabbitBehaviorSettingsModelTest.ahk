@@ -23,6 +23,7 @@ RunTest("behavior settings model loads effective defaults", TestBehaviorSettings
 RunTest("behavior settings model isolates config files", TestBehaviorSettingsModelIsolatesConfigFiles.Bind())
 RunTest("behavior settings model replaces bindings without losing fields", TestBehaviorSettingsModelBindings.Bind())
 RunTest("behavior settings model selects deployment granularity", TestBehaviorDeploymentGranularity.Bind())
+RunTest("behavior settings model owns punctuation maps", TestBehaviorPunctuatorMaps.Bind())
 
 TestBehaviorSettingsModelLoadsDefaults() {
     local calls := []
@@ -42,6 +43,10 @@ TestBehaviorSettingsModelLoadsDefaults() {
         AssertEqual("①", model.alternative_select_labels[1], "The model loaded the wrong candidate label.")
         AssertEqual(1, model.bindings.Length, "The model loaded the wrong binding count.")
         AssertEqual("kept", model.bindings[1]["custom_field"], "The model discarded an unknown binding field.")
+        AssertTrue(!model.punctuator_use_space, "The model loaded the wrong punctuation spacing value.")
+        AssertEqual(".:", model.punctuator_digit_separators, "The model loaded the wrong digit separators.")
+        AssertEqual("forward", model.punctuator_digit_separator_action,
+            "The model loaded the wrong digit separator action.")
     } finally {
         model.Dispose()
         model.Dispose()
@@ -110,6 +115,29 @@ TestBehaviorSettingsModelIsolatesConfigFiles() {
             !BehaviorCallsContain(calls, "set_string:default:ascii_composer/switch_key/", "Super"),
             "Saving exposed a deliberately unsupported Super key."
         )
+
+        calls.Length := 0
+        values := model.GetCurrentValues()
+        values.punctuator_use_space := true
+        values.punctuator_digit_separators := ",."
+        values.punctuator_digit_separator_action := "commit"
+        AssertTrue(model.Save(values), "The model failed to save punctuation scalar settings.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_bool:default:punctuator/use_space:1"),
+            "The punctuation spacing setting was not customized."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_string:default:punctuator/digit_separators:,."),
+            "The digit separators were not customized."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "set_string:default:punctuator/digit_separator_action:commit"),
+            "The digit separator action was not customized."
+        )
+
+        values := model.GetCurrentValues()
+        values.punctuator_digit_separators := "a"
+        AssertThrows(model.Save.Bind(model, values), "The model accepted a non-punctuation digit separator.")
     } finally {
         model.Dispose()
     }
@@ -166,6 +194,41 @@ TestBehaviorDeploymentGranularity() {
         plan := model.GetDeploymentPlan(values)
         AssertTrue(plan.full_workspace_required, "A schema-visible menu setting did not request workspace deployment.")
         AssertTrue(!plan.rabbit_config_changed, "A menu setting requested rabbit.yaml deployment.")
+    } finally {
+        model.Dispose()
+    }
+}
+
+TestBehaviorPunctuatorMaps() {
+    local calls := [], model := CreateBehaviorModel(calls), values, plan
+    try {
+        values := model.GetCurrentValues()
+        AssertEqual(
+            "（",
+            values.punctuator_maps[RabbitPunctuatorMap.FULL_SHAPE_PATH]["("]["pair"][1],
+            "The behavior model did not load the full-shape punctuation map."
+        )
+        values.punctuator_maps[RabbitPunctuatorMap.FULL_SHAPE_PATH]["("]["pair"][1] := "【"
+        plan := model.GetDeploymentPlan(values)
+        AssertTrue(plan.full_workspace_required, "A punctuation map did not request workspace deployment.")
+        calls.Length := 0
+        AssertTrue(model.Save(values), "The behavior model failed to save a punctuation map.")
+        AssertTrue(
+            BehaviorCallsContain(calls, "item:default:punctuator/full_shape:", '"(": {"pair": ["【", "）"]}'),
+            "The behavior model did not write the complete full-shape map."
+        )
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:punctuator/full_shape/@legacy"),
+            "Replacing a punctuation map did not clear a nested patch."
+        )
+        values := model.GetCurrentValues()
+        values.punctuator_reset_fields := Map(RabbitPunctuatorMap.FULL_SHAPE_PATH, true)
+        calls.Length := 0
+        AssertTrue(model.Save(values), "The behavior model failed to restore a punctuation map.")
+        AssertTrue(
+            BehaviorCallsHave(calls, "reset:default:punctuator/full_shape"),
+            "Restoring a punctuation map did not remove its full-map override."
+        )
     } finally {
         model.Dispose()
     }
@@ -267,11 +330,28 @@ class RabbitBehaviorRimeProbe {
             "when", "composing",
             "custom_field", "kept"
         )
+        this.punctuator_maps := Map(
+            RabbitPunctuatorMap.FULL_SHAPE_PATH, Map("(", Map("pair", ["（", "）"])),
+            RabbitPunctuatorMap.HALF_SHAPE_PATH, Map(")", ")"),
+            RabbitPunctuatorMap.SYMBOLS_PATH, Map("...", ["…", "..."])
+        )
+        this.punctuator_use_space := false
+        this.punctuator_digit_separators := ".:"
+        this.punctuator_digit_separator_action := "forward"
     }
 
     config_test_get_bool(config, key, &value) {
+        if config is Map && config.Has("value") && key = "/"
+            && Type(config["value"]) = "Integer" && (config["value"] = 0 || config["value"] = 1) {
+            value := config["value"]
+            return true
+        }
         if config = "default" && key = "ascii_composer/good_old_caps_lock" {
             value := true
+            return true
+        }
+        if config = "default" && key = RabbitPunctuatorMap.USE_SPACE_PATH {
+            value := this.punctuator_use_space
             return true
         }
         if config != "rabbit" {
@@ -282,6 +362,10 @@ class RabbitBehaviorRimeProbe {
     }
 
     config_test_get_int(config, key, &value) {
+        if config is Map && config.Has("value") && key = "/" && Type(config["value"]) = "Integer" {
+            value := config["value"]
+            return true
+        }
         if config = "rabbit" && key = "show_tips_time" {
             value := 1500
             return true
@@ -298,11 +382,19 @@ class RabbitBehaviorRimeProbe {
     }
 
     config_test_get_double(config, key, &value) {
+        if config is Map && config.Has("value") && key = "/" && Type(config["value"]) = "Float" {
+            value := config["value"]
+            return true
+        }
         return false
     }
 
     config_test_get_string(config, key, &value) {
         local name
+        if config is Map && config.Has("value") && key = "/" && Type(config["value"]) = "String" {
+            value := config["value"]
+            return true
+        }
         if config = "rabbit" && key = "suspend_hotkey" {
             value := "Control+Shift+F12"
             return true
@@ -319,6 +411,14 @@ class RabbitBehaviorRimeProbe {
             value := "①"
             return true
         }
+        if key = RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH {
+            value := this.punctuator_digit_separators
+            return true
+        }
+        if key = RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_PATH {
+            value := this.punctuator_digit_separator_action
+            return true
+        }
         if InStr(key, "key_binder/bindings/@0/") = 1 {
             name := SubStr(key, StrLen("key_binder/bindings/@0/") + 1)
             value := this.binding_values[name]
@@ -328,6 +428,10 @@ class RabbitBehaviorRimeProbe {
     }
 
     config_begin_list(config, path) {
+        local value
+        if config is Map && config.Has("value") && path = "/" && config["value"] is Array {
+            return RabbitBehaviorConfigIterator(this.ConfigItems(config["value"], true))
+        }
         if config != "default" {
             return 0
         }
@@ -342,6 +446,15 @@ class RabbitBehaviorRimeProbe {
 
     config_begin_map(config, path) {
         local items := []
+        if config = "user" && path = "patch" {
+            return RabbitBehaviorConfigIterator([["punctuator/full_shape/@legacy", "patch/legacy"]])
+        }
+        if config is Map && config.Has("value") && path = "/" && config["value"] is Map {
+            return RabbitBehaviorConfigIterator(this.ConfigItems(config["value"], false))
+        }
+        if config = "default" && this.punctuator_maps.Has(path) {
+            return RabbitBehaviorConfigIterator(this.ConfigItems(this.punctuator_maps[path], false, path . "/"))
+        }
         if config != "default" || path != "key_binder/bindings/@0" {
             return 0
         }
@@ -349,6 +462,45 @@ class RabbitBehaviorRimeProbe {
             items.Push([key, path . "/" . key])
         }
         return RabbitBehaviorConfigIterator(items)
+    }
+
+    user_config_open(config_id) {
+        return config_id = "default.custom" ? "user" : 0
+    }
+
+    config_get_item(config, path) {
+        local value
+        if config is Map && config.Has("value") {
+            if path = "/" {
+                return 0
+            }
+            if config["value"] is Map && config["value"].Has(path) {
+                return Map("value", config["value"][path])
+            }
+            if config["value"] is Array && RegExMatch(path, "^\d+$") {
+                value := Integer(path) + 1
+                return value <= config["value"].Length ? Map("value", config["value"][value]) : 0
+            }
+        }
+        if config = "default" {
+            for path_name, value_map in this.punctuator_maps {
+                if SubStr(path, 1, StrLen(path_name) + 1) = path_name . "/" {
+                    value := SubStr(path, StrLen(path_name) + 2)
+                    if value_map.Has(value) {
+                        return Map("value", value_map[value])
+                    }
+                }
+            }
+        }
+        return 0
+    }
+
+    ConfigItems(value, list, prefix := "") {
+        local items := [], item, key
+        for key, item in value {
+            items.Push([list ? String(key - 1) : key, prefix . (list ? String(key - 1) : key)])
+        }
+        return items
     }
 
     config_next(iter) {

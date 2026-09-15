@@ -44,6 +44,7 @@ RunTest("settings window reorders selected schemas", TestSettingsWindowReordersS
 RunTest("dark switcher uses themed option headers", TestDarkSwitcherUsesThemedOptionHeaders.Bind())
 RunTest("settings window saves behavior settings", TestSettingsWindowSavesBehaviorSettings.Bind())
 RunTest("settings window exposes default behavior controls", TestSettingsWindowDefaultBehaviorControls.Bind())
+RunTest("settings window exposes punctuation map controls", TestSettingsWindowPunctuatorControls.Bind())
 RunTest("key binding dialog preserves unknown fields", TestKeyBindingDialogPreservesUnknownFields.Bind())
 RunTest("key binding dialog supports librime actions and conditions", TestKeyBindingDialogSupportsLibrimeValues.Bind())
 RunTest("settings window saves application settings", TestSettingsWindowSavesApplicationSettings.Bind())
@@ -1230,10 +1231,22 @@ class RabbitSettingsBehaviorModelProbe {
         this.page_size := 5
         this.alternative_select_labels := []
         this.bindings := [Map("accept", "Control+p", "send", "Up", "when", "composing")]
+        this.punctuator_maps := Map(
+            RabbitPunctuatorMap.FULL_SHAPE_PATH, Map("(", Map("pair", ["（", "）"])),
+            RabbitPunctuatorMap.HALF_SHAPE_PATH, Map(")", ")"),
+            RabbitPunctuatorMap.SYMBOLS_PATH, Map("...", ["…", "..."])
+        )
+        this.punctuator_use_space := false
+        this.punctuator_digit_separators := ".:"
+        this.punctuator_digit_separator_action := "forward"
     }
 
     GetBindings() {
         return RabbitBehaviorSettingsModel.CloneValue(this.bindings)
+    }
+
+    GetPunctuatorMaps() {
+        return RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps)
     }
 
     GetDeploymentPlan(values) {
@@ -1436,6 +1449,46 @@ TestSettingsWindowDefaultBehaviorControls() {
         values := window.GetBehaviorValues()
         AssertEqual(5, values.page_size, "An empty page size did not use its placeholder value.")
         AssertEqual(0, values.alternative_select_labels.Length, "An empty label field created custom labels.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+TestSettingsWindowPunctuatorControls() {
+    local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
+    try {
+        AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
+        window.behavior_tabs.Choose(4)
+        window.OnBehaviorTabChanged()
+        AssertTrue(
+            window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH].edit.Visible,
+            "The full-shape punctuation editor stayed hidden."
+        )
+        AssertEqual(
+            "1 个映射项",
+            window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH].summary.Value,
+            "The native punctuation editor did not summarize its map."
+        )
+        AssertTrue(
+            window.RestorePunctuatorMap(RabbitPunctuatorMap.FULL_SHAPE_PATH),
+            "The native punctuation editor could not stage a reset."
+        )
+        AssertTrue(!window.punctuator_use_space.Value, "The punctuation spacing control showed the wrong value.")
+        AssertEqual(".:", window.punctuator_digit_separators.Value,
+            "The digit separator control showed the wrong value.")
+        AssertEqual(1, window.punctuator_digit_separator_action.Value,
+            "The digit separator action did not default to forward.")
+        window.punctuator_digit_separator_action.Choose(2)
+        values := window.GetBehaviorValues()
+        AssertEqual("commit", values.punctuator_digit_separator_action,
+            "The digit separator action dropdown returned the wrong value.")
+        window.punctuator_digit_separators.Value := "a"
+        AssertThrows(window.GetBehaviorValues.Bind(window),
+            "The native digit separator control accepted a non-punctuation value.")
+        AssertTrue(
+            values.punctuator_reset_fields.Has(RabbitPunctuatorMap.FULL_SHAPE_PATH),
+            "The native punctuation reset did not reach the behavior values."
+        )
     } finally {
         window.Dispose()
     }

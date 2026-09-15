@@ -17,7 +17,9 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitConfigValue.ahk
 #Include RabbitDeploymentPlan.ahk
+#Include RabbitPunctuatorMap.ahk
 
 #Include RabbitI18n.ahk
 
@@ -81,6 +83,24 @@ class RabbitBehaviorSettingsModel {
         this.page_size := this.GetInt(default_config, "menu/page_size", 5)
         this.alternative_select_labels := this.LoadStringList(default_config, "menu/alternative_select_labels")
         this.bindings := this.LoadBindings(default_config)
+        this.punctuator_maps := this.LoadPunctuatorMaps(default_config)
+        this.punctuator_use_space := this.GetBool(
+            default_config,
+            RabbitPunctuatorMap.USE_SPACE_PATH,
+            false
+        )
+        this.punctuator_digit_separators := this.GetString(
+            default_config,
+            RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH,
+            RabbitPunctuatorMap.DIGIT_SEPARATORS_DEFAULT
+        )
+        this.punctuator_digit_separator_action := RabbitPunctuatorMap.NormalizeDigitSeparatorAction(
+            this.GetString(
+                default_config,
+                RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_PATH,
+                RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_DEFAULT
+            )
+        )
         this.original_values := this.GetCurrentValues()
         return true
     }
@@ -148,6 +168,20 @@ class RabbitBehaviorSettingsModel {
             }
         } finally {
             this.rime.config_end(iter)
+        }
+        return result
+    }
+
+    LoadPunctuatorMaps(config) {
+        local path, value, result := Map()
+        for path in RabbitPunctuatorMap.PATHS {
+            if RabbitConfigValue.Read(this.rime, config, path, &value) && value is Map {
+                try {
+                    result[path] := RabbitPunctuatorMap.Validate(value, path)
+                    continue
+                }
+            }
+            result[path] := Map()
         }
         return result
     }
@@ -227,6 +261,10 @@ class RabbitBehaviorSettingsModel {
             page_size: this.page_size,
             alternative_select_labels: RabbitBehaviorSettingsModel.CloneValue(this.alternative_select_labels),
             bindings: RabbitBehaviorSettingsModel.CloneValue(this.bindings),
+            punctuator_maps: RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps),
+            punctuator_use_space: this.punctuator_use_space,
+            punctuator_digit_separators: this.punctuator_digit_separators,
+            punctuator_digit_separator_action: this.punctuator_digit_separator_action,
         }
     }
 
@@ -234,9 +272,14 @@ class RabbitBehaviorSettingsModel {
         return RabbitBehaviorSettingsModel.CloneValue(this.bindings)
     }
 
+    GetPunctuatorMaps() {
+        return RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps)
+    }
+
     Save(values) {
         local default_changed := this.HasDefaultChanges(values)
         local rabbit_changed := this.HasRabbitChanges(values)
+        this.ValidatePunctuatorValues(values)
         if !rabbit_changed && !default_changed {
             return true
         }
@@ -296,6 +339,40 @@ class RabbitBehaviorSettingsModel {
                 original.alternative_select_labels
             )
             || !RabbitBehaviorSettingsModel.ValuesEqual(values.bindings, original.bindings)
+            || this.HasPunctuatorChanges(values)
+    }
+
+    HasPunctuatorChanges(values) {
+        local path, maps
+        if values.punctuator_use_space != this.original_values.punctuator_use_space
+            || values.punctuator_digit_separators != this.original_values.punctuator_digit_separators
+            || values.punctuator_digit_separator_action != this.original_values.punctuator_digit_separator_action {
+            return true
+        }
+        if !HasProp(values, "punctuator_maps") {
+            return false
+        }
+        maps := values.punctuator_maps
+        if !(maps is Map) {
+            return true
+        }
+        if HasProp(values, "punctuator_reset_fields") && values.punctuator_reset_fields.Count {
+            return true
+        }
+        for path in RabbitPunctuatorMap.PATHS {
+            if !maps.Has(path) || !RabbitBehaviorSettingsModel.ValuesEqual(
+                maps[path],
+                this.original_values.punctuator_maps[path]
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    ValidatePunctuatorValues(values) {
+        RabbitPunctuatorMap.ValidateDigitSeparators(values.punctuator_digit_separators)
+        RabbitPunctuatorMap.ValidateDigitSeparatorAction(values.punctuator_digit_separator_action)
     }
 
     SaveRabbitSettings(values) {
@@ -393,7 +470,91 @@ class RabbitBehaviorSettingsModel {
             && !this.CustomizeBindings(values.bindings, original.bindings.Length) {
             return false
         }
+        if values.punctuator_use_space != original.punctuator_use_space
+            && !this.api.customize_bool(
+                this.default_settings,
+                RabbitPunctuatorMap.USE_SPACE_PATH,
+                values.punctuator_use_space
+            ) {
+            return false
+        }
+        if values.punctuator_digit_separators != original.punctuator_digit_separators
+            && !this.api.customize_string(
+                this.default_settings,
+                RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH,
+                values.punctuator_digit_separators
+            ) {
+            return false
+        }
+        if values.punctuator_digit_separator_action != original.punctuator_digit_separator_action
+            && !this.api.customize_string(
+                this.default_settings,
+                RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTION_PATH,
+                values.punctuator_digit_separator_action
+            ) {
+            return false
+        }
+        if HasProp(values, "punctuator_maps") && this.HasPunctuatorChanges(values) {
+            for path in RabbitPunctuatorMap.PATHS {
+                if HasProp(values, "punctuator_reset_fields") && values.punctuator_reset_fields.Has(path) {
+                    if !this.ClearPunctuatorMapPatch(path) {
+                        return false
+                    }
+                } else if !RabbitBehaviorSettingsModel.ValuesEqual(
+                    values.punctuator_maps[path],
+                    original.punctuator_maps[path]
+                ) && !this.CustomizePunctuatorMap(path, values.punctuator_maps[path]) {
+                    return false
+                }
+            }
+        }
         return !!this.api.save_settings(this.default_settings)
+    }
+
+    CustomizePunctuatorMap(path, value) {
+        if !this.ClearPunctuatorMapPatch(path) {
+            return false
+        }
+        return this.CustomizeYamlItem(this.default_settings, path, value)
+    }
+
+    ClearPunctuatorMapPatch(path) {
+        local key, keys := Map(path, true)
+        for key in this.GetExistingPunctuatorMapPatchKeys(path) {
+            keys[key] := true
+        }
+        for key in keys {
+            if !this.api.customize_item(this.default_settings, key, 0) {
+                return false
+            }
+        }
+        return true
+    }
+
+    GetExistingPunctuatorMapPatchKeys(path) {
+        local config := 0, iter := 0, key, result := []
+        if !HasMethod(this.rime, "user_config_open")
+            || !(config := this.rime.user_config_open("default.custom")) {
+            return result
+        }
+        try {
+            if !(iter := this.rime.config_begin_map(config, "patch")) {
+                return result
+            }
+            try {
+                while this.rime.config_next(iter) {
+                    key := iter.key
+                    if key = path || SubStr(key, 1, StrLen(path) + 1) = path . "/" {
+                        result.Push(key)
+                    }
+                }
+            } finally {
+                this.rime.config_end(iter)
+            }
+        } finally {
+            this.rime.config_close(config)
+        }
+        return result
     }
 
     CustomizeBindings(bindings, original_length) {
@@ -436,6 +597,12 @@ class RabbitBehaviorSettingsModel {
         this.page_size := values.page_size
         this.alternative_select_labels := RabbitBehaviorSettingsModel.CloneValue(values.alternative_select_labels)
         this.bindings := RabbitBehaviorSettingsModel.CloneValue(values.bindings)
+        if HasProp(values, "punctuator_maps") {
+            this.punctuator_maps := RabbitBehaviorSettingsModel.CloneValue(values.punctuator_maps)
+        }
+        this.punctuator_use_space := values.punctuator_use_space
+        this.punctuator_digit_separators := values.punctuator_digit_separators
+        this.punctuator_digit_separator_action := values.punctuator_digit_separator_action
     }
 
     static CloneValue(value) {

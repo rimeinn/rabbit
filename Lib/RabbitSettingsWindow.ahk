@@ -19,10 +19,12 @@
 #Include RabbitAppearanceSettingsPage.ahk
 #Include RabbitAbout.ahk
 #Include RabbitCommon.ahk
+#Include RabbitConfigValue.ahk
 #Include RabbitDeploymentPlan.ahk
 #Include RabbitI18n.ahk
 #Include RabbitApplicationSettingsModel.ahk
 #Include RabbitKeyBindingDialog.ahk
+#Include RabbitPunctuatorMapDialog.ahk
 #Include RabbitRimeDepotSettings.ahk
 #Include RabbitRimeDepotWindow.ahk
 #Include RabbitSchemaSettingsDialog.ahk
@@ -152,6 +154,8 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_loading := false
         this.behavior_dirty := false
         this.bindings := []
+        this.punctuator_maps := Map()
+        this.punctuator_reset_fields := Map()
         this.application_model := 0
         this.application_rules := Map()
         this.application_changes := Map()
@@ -413,6 +417,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     RegisterPageControlThemes(index) {
+        local path
         switch index {
             case 1:
                 this.window_theme.RegisterSurface(
@@ -436,7 +441,13 @@ class RabbitSettingsWindow extends Gui {
                     this.switcher_option_source_header
                 )
             case 3:
-                this.window_theme.RegisterMuted(this.menu_help, this.binding_help, this.language_help)
+                this.window_theme.RegisterMuted(this.menu_help, this.binding_help, this.language_help, this.punctuator_help)
+                for path in RabbitPunctuatorMap.PATHS {
+                    this.window_theme.RegisterMuted(
+                        this.punctuator_control_map[path].summary,
+                        this.punctuator_control_map[path].hint
+                    )
+                }
                 this.window_theme.RegisterSurface(
                     this.binding_accept_header,
                     this.binding_when_header,
@@ -670,7 +681,7 @@ class RabbitSettingsWindow extends Gui {
             "x230 y136 w570 h482 Hidden"
                 . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             [RabbitI18n.Text("controls.general"), RabbitI18n.Text("controls.key_bindings"),
-                RabbitI18n.Text("language.tab")]
+                RabbitI18n.Text("language.tab"), RabbitI18n.Text("punctuator.tab")]
         )
         this.behavior_tabs.OnEvent("Change", (*) => this.OnBehaviorTabChanged())
         this.behavior_group := this.behavior_tabs
@@ -779,6 +790,56 @@ class RabbitSettingsWindow extends Gui {
         this.language_choice.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.language_help := this.AddText("x260 y268 w506 Hidden cGray", RabbitI18n.Text("language.hint"))
         this.behavior_interface_controls := [this.language_label, this.language_choice, this.language_help]
+
+        this.behavior_tabs.UseTab(4)
+        this.punctuator_help := this.AddText(
+            "x260 y178 w506 h38 cGray Hidden",
+            RabbitI18n.Text("punctuator.page_hint")
+        )
+        this.punctuator_controls := []
+        this.AddPunctuatorMapCard(
+            RabbitPunctuatorMap.FULL_SHAPE_PATH,
+            218,
+            RabbitI18n.Text("punctuator.full_shape")
+        )
+        this.AddPunctuatorMapCard(
+            RabbitPunctuatorMap.HALF_SHAPE_PATH,
+            334,
+            RabbitI18n.Text("punctuator.half_shape")
+        )
+        this.AddPunctuatorMapCard(
+            RabbitPunctuatorMap.SYMBOLS_PATH,
+            450,
+            RabbitI18n.Text("punctuator.symbols")
+        )
+        this.punctuator_use_space := this.AddCheckbox(
+            "x260 y566 w120 h24 Hidden",
+            RabbitI18n.Text("punctuator.use_space")
+        )
+        this.punctuator_use_space.OnEvent("Click", (*) => this.OnBehaviorChanged())
+        this.punctuator_digit_separators_label := this.AddText(
+            "x390 y570 w94 h22 Hidden",
+            RabbitI18n.Text("punctuator.digit_separators")
+        )
+        this.punctuator_digit_separators := this.AddEdit("x484 y566 w78 r1 -Multi Hidden")
+        this.punctuator_digit_separators.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.punctuator_digit_separator_action_label := this.AddText(
+            "x568 y570 w96 h22 Hidden",
+            RabbitI18n.Text("punctuator.digit_separator_action")
+        )
+        this.punctuator_digit_separator_action := this.AddDropDownList(
+            "x666 y566 w110 Hidden",
+            RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTIONS
+        )
+        this.punctuator_digit_separator_action.OnEvent("Change", (*) => this.OnBehaviorChanged())
+        this.punctuator_controls.Push(
+            this.punctuator_use_space,
+            this.punctuator_digit_separators_label,
+            this.punctuator_digit_separators,
+            this.punctuator_digit_separator_action_label,
+            this.punctuator_digit_separator_action
+        )
+        this.behavior_punctuator_controls := this.punctuator_controls.Clone()
         this.behavior_tabs.UseTab()
 
         this.behavior_common_controls := [
@@ -826,7 +887,35 @@ class RabbitSettingsWindow extends Gui {
                 this.binding_action_header
             )
         }
+        this.behavior_punctuator_controls.InsertAt(1, this.punctuator_help)
         this.behavior_status := this.AddText("x230 y620 w570 h24 Hidden", "")
+    }
+
+    AddPunctuatorMapCard(path, y, label) {
+        local card := this.AddGroupBox("x246 y" . y . " w538 h104 Hidden", label)
+        local edit_button := this.AddButton(
+            "x560 y" . (y + 24) . " w88 h30 Hidden +0x2000",
+            RabbitI18n.Text("controls.edit")
+        )
+        local reset_button := this.AddButton(
+            "x658 y" . (y + 24) . " w108 h30 Hidden +0x2000",
+            RabbitI18n.Text("punctuator.restore_default")
+        )
+        local summary := this.AddText("x260 y" . (y + 28) . " w286 h24 Hidden +0x200", "")
+        local hint := this.AddText("x260 y" . (y + 64) . " w506 h20 Hidden cGray", "")
+        edit_button.OnEvent("Click", (*) => this.EditPunctuatorMap(path))
+        reset_button.OnEvent("Click", (*) => this.RestorePunctuatorMap(path))
+        this.punctuator_controls.Push(card, summary, hint, edit_button, reset_button)
+        if !HasProp(this, "punctuator_control_map") {
+            this.punctuator_control_map := Map()
+        }
+        this.punctuator_control_map[path] := {
+            group: card,
+            summary: summary,
+            hint: hint,
+            edit: edit_button,
+            reset: reset_button,
+        }
     }
 
     CreateApplicationControls() {
@@ -1598,6 +1687,8 @@ class RabbitSettingsWindow extends Gui {
     SetBehaviorTabControlsVisible(visible) {
         local common_visible := visible && this.behavior_tabs.Value = 1
         local bindings_visible := visible && this.behavior_tabs.Value = 2
+        local interface_visible := visible && this.behavior_tabs.Value = 3
+        local punctuator_visible := visible && this.behavior_tabs.Value = 4
         for ctrl in this.behavior_common_controls {
             ctrl.Visible := common_visible
         }
@@ -1605,7 +1696,10 @@ class RabbitSettingsWindow extends Gui {
             ctrl.Visible := bindings_visible
         }
         for ctrl in this.behavior_interface_controls {
-            ctrl.Visible := visible && this.behavior_tabs.Value = 3
+            ctrl.Visible := interface_visible
+        }
+        for ctrl in this.behavior_punctuator_controls {
+            ctrl.Visible := punctuator_visible
         }
     }
 
@@ -2152,6 +2246,15 @@ class RabbitSettingsWindow extends Gui {
             )
             this.bindings := this.behavior_model.GetBindings()
             this.RefreshBindingList()
+            this.punctuator_maps := HasMethod(this.behavior_model, "GetPunctuatorMaps")
+                ? this.behavior_model.GetPunctuatorMaps() : Map()
+            this.punctuator_reset_fields := Map()
+            this.RefreshPunctuatorMaps()
+            this.punctuator_use_space.Value := this.behavior_model.punctuator_use_space
+            this.punctuator_digit_separators.Value := this.behavior_model.punctuator_digit_separators
+            this.punctuator_digit_separator_action.Choose(
+                this.behavior_model.punctuator_digit_separator_action = "commit" ? 2 : 1
+            )
             this.show_tips_time.Enabled := !!this.show_tips.Value
             this.UpdateClipboardControls()
             this.UpdateGoodOldCapsLockControl()
@@ -2189,6 +2292,7 @@ class RabbitSettingsWindow extends Gui {
         local page_size := Trim(this.menu_page_size.Value)
         local show_tips_time := Trim(this.show_tips_time.Value)
         local clipboard_length := Trim(this.clipboard_length.Value)
+        local digit_separators := Trim(this.punctuator_digit_separators.Value)
         if !RegExMatch(show_tips_time, "^\d+$") || Number(show_tips_time) > 2147483647 {
             throw ValueError(RabbitI18n.Text("controls.tip_duration_invalid"))
         }
@@ -2204,6 +2308,7 @@ class RabbitSettingsWindow extends Gui {
                 || Number(clipboard_length) > 2147483647) {
             throw ValueError(RabbitI18n.Text("controls.clipboard_invalid"))
         }
+        RabbitPunctuatorMap.ValidateDigitSeparators(digit_separators)
         Loop Parse this.menu_labels.Value, "," {
             if (label := Trim(A_LoopField)) {
                 labels.Push(label)
@@ -2230,6 +2335,13 @@ class RabbitSettingsWindow extends Gui {
             page_size: Number(page_size),
             alternative_select_labels: labels,
             bindings: RabbitBehaviorSettingsModel.CloneValue(this.bindings),
+            punctuator_maps: RabbitBehaviorSettingsModel.CloneValue(this.punctuator_maps),
+            punctuator_reset_fields: RabbitBehaviorSettingsModel.CloneValue(this.punctuator_reset_fields),
+            punctuator_use_space: !!this.punctuator_use_space.Value,
+            punctuator_digit_separators: digit_separators,
+            punctuator_digit_separator_action: RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTIONS[
+                this.punctuator_digit_separator_action.Value
+            ],
         }
     }
 
@@ -2259,6 +2371,12 @@ class RabbitSettingsWindow extends Gui {
             if deploy_result != 0 {
                 this.behavior_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
+            }
+            if this.punctuator_reset_fields.Count && HasMethod(this.behavior_model, "Load") {
+                if !this.behavior_model.Load() {
+                    throw Error(RabbitI18n.Text("models.behavior_read"))
+                }
+                this.PopulateBehaviorSettings()
             }
             this.behavior_dirty := false
             this.behavior_status.Value := RabbitI18n.Text("controls.behavior_saved")
@@ -3807,6 +3925,54 @@ class RabbitSettingsWindow extends Gui {
     MarkBindingsDirty() {
         this.behavior_status.Value := ""
         this.OnBehaviorChanged()
+    }
+
+    RefreshPunctuatorMaps() {
+        local path
+        for path in RabbitPunctuatorMap.PATHS {
+            if !this.punctuator_maps.Has(path) {
+                this.punctuator_maps[path] := Map()
+            }
+            this.UpdatePunctuatorMapCard(path)
+        }
+    }
+
+    UpdatePunctuatorMapCard(path) {
+        local controls := this.punctuator_control_map[path]
+        if this.punctuator_reset_fields.Has(path) {
+            controls.summary.Value := RabbitI18n.Text("punctuator.restore_default_pending")
+            controls.hint.Value := RabbitI18n.Text("punctuator.restore_default_pending")
+        } else {
+            controls.summary.Value := RabbitPunctuatorMap.Summary(this.punctuator_maps[path])
+            controls.hint.Value := RabbitI18n.Text("punctuator.card_hint")
+        }
+    }
+
+    EditPunctuatorMap(path) {
+        local value := RabbitPunctuatorMapDialog(
+            this,
+            path,
+            this.punctuator_maps[path],
+            this.behavior_model.rime,
+            this.window_theme.dark_mode_reader
+        ).ShowModal()
+        if !value {
+            return false
+        }
+        if this.punctuator_reset_fields.Has(path) {
+            this.punctuator_reset_fields.Delete(path)
+        }
+        this.punctuator_maps[path] := RabbitConfigValue.Clone(value)
+        this.UpdatePunctuatorMapCard(path)
+        this.OnBehaviorChanged()
+        return true
+    }
+
+    RestorePunctuatorMap(path) {
+        this.punctuator_reset_fields[path] := true
+        this.UpdatePunctuatorMapCard(path)
+        this.OnBehaviorChanged()
+        return true
     }
 
     Show(options := "") {

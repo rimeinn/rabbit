@@ -16,6 +16,7 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitPunctuatorMap.ahk
 
 #Include RabbitI18n.ahk
 
@@ -144,15 +145,19 @@ class RabbitSchemaSettingsManifest {
         local minimum := "", maximum := "", options := []
         local rows := ""
         local option, seen := Map()
+        local has_default := properties.Has("default"), default_value := ""
         if !properties.Has("path") || !properties.Has("label") || !type
             || !this.IsSafeConfigPath(properties["path"]) {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "enum"
-            && type != "list" && type != "key_binding_list" {
+            && type != "list" && type != "key_binding_list" && type != "punctuator_map" {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type = "key_binding_list" && properties["path"] != "key_binder/bindings" {
+            throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+        }
+        if type = "punctuator_map" && !RabbitPunctuatorMap.IsEditablePath(properties["path"]) {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type = "list" || type = "key_binding_list" {
@@ -178,6 +183,9 @@ class RabbitSchemaSettingsManifest {
                 options.Push(option)
             }
         }
+        if has_default {
+            default_value := this.ParseDefault(properties["default"], type, options, path)
+        }
         return {
             id: field_id,
             group: group_id,
@@ -189,7 +197,39 @@ class RabbitSchemaSettingsManifest {
             max: maximum,
             options: options,
             rows: rows,
+            has_default: has_default,
+            default: default_value,
         }
+    }
+
+    static ParseDefault(value, type, options, path) {
+        local option
+        switch type {
+            case "boolean":
+                if value != "true" && value != "false" {
+                    throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+                }
+                return value = "true"
+            case "integer":
+                if !RegExMatch(value, "^-?\d+$") {
+                    throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+                }
+                return Integer(value)
+            case "number":
+                if !RegExMatch(value, "^-?(?:\d+(?:\.\d*)?|\.\d+)$") {
+                    throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+                }
+                return Number(value)
+            case "enum":
+                for option in options {
+                    if option = value {
+                        return value
+                    }
+                }
+            case "string":
+                return value
+        }
+        throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
     }
 
     static ParseListRows(properties) {
