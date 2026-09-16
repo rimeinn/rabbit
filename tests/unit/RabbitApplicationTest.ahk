@@ -31,13 +31,8 @@ TestDeployerLaunchAfterShutdown() {
         RabbitApplicationRimeProbe(calls),
         calls
     )
-    application.context.rime_initialized := true
-    application.context.session_id := 42
-    application.context.mutex := RabbitApplicationCloseProbe(calls)
-    application.context.candidate_box := RabbitApplicationDisposeProbe(calls, "candidate")
-    application.context.input := RabbitApplicationDisposeProbe(calls, "input")
-    application.context.runtime_state := RabbitApplicationDisposeProbe(calls, "runtime")
-    application.context.appearance := RabbitApplicationDisposeProbe(calls, "appearance")
+    application.runtime := RabbitApplicationStopProbe(calls)
+    application.application_mutex := RabbitApplicationCloseProbe(calls)
 
     application.RunDeployer(
         "legacy-settings",
@@ -49,7 +44,7 @@ TestDeployerLaunchAfterShutdown() {
     application.OnExit("Exit", 1)
 
     AssertEqual(
-        "input,runtime,appearance,candidate,destroy:42,finalize,close,"
+        "runtime_stop,close,"
             . "launch:legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409,exit:1",
         JoinApplicationCalls(calls),
         "The deployer started before the main application released Rime."
@@ -123,7 +118,7 @@ TestTrayRoutesLegacySettings() {
 TestFirstInstallUsesPlatformSettings() {
     local modern_calls := []
     local modern := RabbitApplicationInstallProbe(modern_calls, false)
-    modern.context.keyboard_layout := 1033
+    modern.keyboard_layout := 1033
     modern.RunFirstInstallation()
     AssertEqual(
         "settings:input-schemes:--install:--return-to-rabbit:--keyboard-layout:0x0409",
@@ -133,7 +128,7 @@ TestFirstInstallUsesPlatformSettings() {
 
     local legacy_calls := []
     local legacy := RabbitApplicationInstallProbe(legacy_calls, true)
-    legacy.context.keyboard_layout := 1033
+    legacy.keyboard_layout := 1033
     legacy.RunFirstInstallation()
     AssertEqual(
         "legacy-settings:--install:--return-to-rabbit:--keyboard-layout:0x0409",
@@ -231,6 +226,16 @@ class RabbitApplicationDisposeProbe {
 
     Dispose() {
         this.calls.Push(this.label)
+    }
+}
+
+class RabbitApplicationStopProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    Stop() {
+        this.calls.Push("runtime_stop")
     }
 }
 

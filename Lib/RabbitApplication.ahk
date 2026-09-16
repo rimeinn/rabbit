@@ -18,20 +18,17 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitI18n.ahk
-#Include RabbitAppContext.ahk
-#Include RabbitCandidateBoxFactory.ahk
 #Include RabbitCommandLine.ahk
-#Include RabbitConfig.ahk
-#Include RabbitInput.ahk
-#Include RabbitRuntimeState.ahk
+#Include RabbitFrontendRuntime.ahk
 #Include RabbitSettingsController.ahk
-#Include RabbitStatusTip.ahk
 #Include RabbitTrayMenu.ahk
-#Include RabbitUIStyle.ahk
 
 class RabbitApplication {
     __New(rime_api) {
-        this.context := RabbitAppContext(rime_api, RabbitApplicationMutex())
+        this.rime := rime_api
+        this.application_mutex := RabbitApplicationMutex()
+        this.keyboard_layout := 0
+        this.runtime := 0
         this.tray := 0
         this.settings := 0
         this.tray_click_callback := 0
@@ -43,19 +40,19 @@ class RabbitApplication {
     }
 
     Run(args) {
-        RabbitI18n.LoadStartupConfig(this.context.rime, RabbitUserDataPath() . "\build\rabbit.yaml")
+        RabbitI18n.LoadStartupConfig(this.rime, RabbitUserDataPath() . "\build\rabbit.yaml")
         A_IconTip := RabbitI18n.Text("tray.maintenance")
-        local fail_count, options, status
-        options := RabbitApplicationOptions.Parse(args)
-        this.context.keyboard_layout := this.ResolveKeyboardLayout(options.keyboard_layout)
+        local options := RabbitApplicationOptions.Parse(args)
+        this.keyboard_layout := this.ResolveKeyboardLayout(options.keyboard_layout)
         this.SetDefaultKeyboard()
         OnExit(this.exit_callback)
         this.exit_registered := true
 
-        fail_count := 0
-        while !this.context.mutex.Create() {
-            this.context.mutex.Close()
-            fail_count++
+        local fail_count := 0
+        while !this.application_mutex.Create()
+            || this.application_mutex.lasterr == ERROR_ALREADY_EXISTS {
+            this.application_mutex.Close()
+            fail_count += 1
             if fail_count > 500 {
                 TrayTip()
                 TrayTip(RabbitI18n.Text("frontend.startup_busy"))
@@ -70,108 +67,10 @@ class RabbitApplication {
             || !FileExist(RabbitUserDataPath() . "\installation.yaml")
             || !FileExist(RabbitUserDataPath() . "\build\rabbit.yaml")
 
-        this.context.traits := RabbitCreateTraits()
-        this.context.rime.setup(this.context.traits)
-        this.context.rime.set_notification_handler(this.rime_message_callback, 0)
-        this.context.rime.initialize(this.context.traits)
-        this.context.rime_initialized := true
-
-        local maintenance := options.maintenance
-        RabbitDebug(
-            Format(
-                "startup: keyboard_layout=0x{:04x} maintenance={} first_run={}",
-                this.context.keyboard_layout & 0xffff,
-                maintenance,
-                first_run
-            ),
-            Format("RabbitApplication.ahk:{}", A_LineNumber)
-        )
-        if maintenance != RABBIT_NO_MAINTENANCE {
-            RabbitUpdateMaintenanceTrayIcon()
-            if first_run {
-                this.RunFirstInstallation()
-            } else if this.context.rime.start_maintenance(
-                maintenance == RABBIT_FULL_MAINTENANCE) {
-                this.context.rime.join_maintenance_thread()
-            }
-        } else {
-            TrayTip()
-            TrayTip(RabbitI18n.Text("frontend.maintenance_done"), RabbitI18n.Text("settings.product"))
-            SetTimer(TrayTip, -2000)
-        }
-
-        this.context.session_id := this.context.rime.create_session()
-        if !this.context.session_id {
-            this.SetDefaultKeyboard(this.context.keyboard_layout)
-            throw Error(RabbitI18n.Text("frontend.session_error"))
-        }
-        RabbitDebug(
-            Format("startup: rime session created (id={})", this.context.session_id),
-            Format("RabbitApplication.ahk:{}", A_LineNumber)
-        )
-
-        RabbitCleanOldLogs()
-        RabbitCleanMisplacedConfigs()
-        RabbitI18n.LoadConfig(this.context.rime)
-        local loaded := RabbitConfigLoader.Load(this.context.rime)
-        this.context.config := loaded.config
-        if loaded.dark_mode {
-            DarkMode.set(loaded.dark_mode)
-        }
-
-        local use_legacy_candidate_box := RabbitIsOldWindows()
-            || this.context.config.use_legacy_candidate_box
-        this.context.candidate_box := RabbitCandidateBoxFactory(loaded.style).Create(
-            use_legacy_candidate_box)
-        if !use_legacy_candidate_box {
-            this.context.status_tip := RabbitStatusTip(loaded.style, this.context.config)
-        }
-        this.context.runtime_state := RabbitRuntimeState(
-            this.context.rime,
-            this.context.session_id,
-            this.context.config
-        )
         this.settings := this.CreateSettingsController()
-        this.tray := RabbitTrayController(
-            this.context.rime,
-            this.context.session_id,
-            this.context.candidate_box,
-            this.context.config,
-            this.context.runtime_state,
-            this.context.keyboard_layout,
-            this.settings.Show.Bind(this.settings),
-            this.RunDeployer.Bind(this),
-            this.context.status_tip
-        )
-        this.context.runtime_state.SetTray(this.tray)
-        this.context.input := RabbitInputController(
-            this.context.rime,
-            this.context.session_id,
-            this.context.candidate_box,
-            this.context.config,
-            this.context.runtime_state,
-            this.tray
-        )
-        this.context.appearance := RabbitAppearanceController(
-            this.context.rime,
-            this.context.candidate_box,
-            loaded.style,
-            loaded.dark_mode,
-            this.context.status_tip
-        )
-
-        this.context.input.RegisterHotKeys()
-        this.context.input.StartFocusMonitor()
-        this.context.runtime_state.UpdateStateLabels()
-        if (status := this.context.rime.get_status(this.context.session_id)) {
-            local schema_id := status.schema_id
-            local schema_name := status.schema_name
-            local ascii_mode := status.is_ascii_mode
-            local full_shape := status.is_full_shape
-            local ascii_punct := status.is_ascii_punct
-            this.context.rime.free_status(status)
-            this.tray.UpdateTip(schema_name, ascii_mode, full_shape, ascii_punct)
-            this.tray.UpdateSchemaIcon(schema_id)
+        this.tray := this.CreateTrayController()
+        if !this.StartFrontendRuntime(options.maintenance, first_run) {
+            return
         }
 
         this.tray.SetupMenu()
@@ -179,8 +78,49 @@ class RabbitApplication {
         this.tray_click_callback := this.tray.OnClick.Bind(this.tray)
         OnMessage(AHK_NOTIFYICON, this.tray_click_callback)
         this.tray_message_registered := true
-        this.context.appearance.Register()
-        this.context.runtime_state.StartTimer()
+    }
+
+    CreateTrayController() {
+        return RabbitTrayController(
+            0,
+            0,
+            0,
+            0,
+            0,
+            this.keyboard_layout,
+            this.settings.Show.Bind(this.settings),
+            this.RunDeployer.Bind(this)
+        )
+    }
+
+    CreateFrontendRuntime() {
+        return RabbitFrontendRuntime(
+            this.rime,
+            this.tray,
+            this.keyboard_layout,
+            this.rime_message_callback
+        )
+    }
+
+    StartFrontendRuntime(maintenance := RABBIT_NO_MAINTENANCE, first_run := false) {
+        if this.runtime && this.runtime.started {
+            return true
+        }
+        this.runtime := this.CreateFrontendRuntime()
+        try {
+            return this.runtime.Start(maintenance, first_run, this.RunFirstInstallation.Bind(this))
+        } catch {
+            this.runtime := 0
+            throw
+        }
+    }
+
+    StopFrontendRuntime() {
+        if !this.runtime {
+            return
+        }
+        this.runtime.Stop()
+        this.runtime := 0
     }
 
     RunDeployer(command, args*) {
@@ -193,14 +133,14 @@ class RabbitApplication {
         args.Push(
             "--return-to-rabbit",
             "--keyboard-layout",
-            RabbitFormatKeyboardLayout(this.context.keyboard_layout)
+            RabbitFormatKeyboardLayout(this.keyboard_layout)
         )
         this.RunDeployer(command, args*)
     }
 
     CreateSettingsController() {
         return RabbitSettingsController(
-            this.context.rime,
+            this.rime,
             this.RunSettingsMaintenance.Bind(this),
             this.OnSettingsLanguageChanged.Bind(this)
         )
@@ -209,8 +149,10 @@ class RabbitApplication {
     OnSettingsLanguageChanged() {
         if this.tray {
             this.tray.SetupMenu()
-            this.context.runtime_state.UpdateStateLabels()
-            this.tray.UpdateTip()
+            if this.runtime && this.runtime.started {
+                this.runtime.context.runtime_state.UpdateStateLabels()
+                this.tray.UpdateTip()
+            }
         }
     }
 
@@ -236,7 +178,7 @@ class RabbitApplication {
             "--install",
             "--return-to-rabbit",
             "--keyboard-layout",
-            RabbitFormatKeyboardLayout(this.context.keyboard_layout)
+            RabbitFormatKeyboardLayout(this.keyboard_layout)
         )
         this.RunDeployer(command, args*)
     }
@@ -293,7 +235,7 @@ class RabbitApplication {
         }
         this.shutting_down := true
         if code == 0 {
-            this.SetDefaultKeyboard(this.context.keyboard_layout)
+            this.SetDefaultKeyboard(this.keyboard_layout)
         }
         TrayTip()
         ToolTip(, , , STATUS_TOOLTIP)
@@ -305,9 +247,11 @@ class RabbitApplication {
             this.settings.Dispose()
             this.settings := 0
         }
+        this.StopFrontendRuntime()
         if this.tray && HasMethod(this.tray, "Dispose") {
             this.tray.Dispose()
+            this.tray := 0
         }
-        this.context.Dispose()
+        this.application_mutex.Close()
     }
 }

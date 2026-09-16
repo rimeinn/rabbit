@@ -67,15 +67,9 @@ class RabbitTrayController {
         maintenance_callback,
         status_tip := 0
     ) {
-        this.rime := rime_api
-        this.session_id := session_id
-        this.candidate_box := candidate_box
-        this.config := config
-        this.runtime_state := runtime_state
         this.keyboard_layout := keyboard_layout
         this.settings_callback := settings_callback
         this.maintenance_callback := maintenance_callback
-        this.status_tip := status_tip
         this.schema_name := ""
         this.ascii_mode := false
         this.full_shape := false
@@ -86,6 +80,33 @@ class RabbitTrayController {
         ; every call. Remember the last resolved icon so repeated calls with an
         ; unchanged key do not reload it.
         this.last_icon_key := ""
+        this.BindRuntime(
+            rime_api,
+            session_id,
+            candidate_box,
+            config,
+            runtime_state,
+            status_tip
+        )
+    }
+
+    BindRuntime(rime_api, session_id, candidate_box, config, runtime_state, status_tip := 0) {
+        this.rime := rime_api
+        this.session_id := session_id
+        this.candidate_box := candidate_box
+        this.config := config
+        this.runtime_state := runtime_state
+        this.status_tip := status_tip
+        this.last_icon_key := ""
+    }
+
+    UnbindRuntime() {
+        this.rime := 0
+        this.session_id := 0
+        this.candidate_box := 0
+        this.config := 0
+        this.runtime_state := 0
+        this.status_tip := 0
     }
 
     SetupMenu() {
@@ -214,6 +235,9 @@ class RabbitTrayController {
     }
 
     ToggleSuspend() {
+        if !this.rime || !this.session_id {
+            return false
+        }
         if this.candidate_box && HasMethod(this.candidate_box, "Hide") {
             this.candidate_box.Hide()
         }
