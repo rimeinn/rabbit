@@ -2309,7 +2309,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     CompleteInstallation() {
-        local deploy_result, reloaded, values
+        local async_deployment, deploy_result, values
         if this.IsRimeDepotBusy() {
             this.footer_status.Value := RabbitI18n.Text("depot.busy")
             return false
@@ -2338,25 +2338,16 @@ class RabbitSettingsWindow extends Gui {
                 return false
             }
             this.DisposeSwitcherSettings()
-            deploy_result := this.UpdateWorkspace()
+            async_deployment := HasMethod(this.workflow, "Submit")
+            deploy_result := this.UpdateWorkspace(
+                async_deployment ? this.OnInstallationDeploymentComplete.Bind(this) : 0
+            )
             if deploy_result != 0 {
                 this.EnsureSwitcherSettings()
                 this.footer_status.Value := RabbitI18n.Text("controls.install_error")
                 return false
             }
-
-            this.installing := false
-            this.navigation.Enabled := true
-            reloaded := this.EnsureSwitcherSettings()
-            this.switcher_dirty := false
-            if reloaded {
-                this.switcher_status.Value := RabbitI18n.Text("controls.schemes_saved")
-                this.footer_status.Value := RabbitI18n.Text("controls.install_done")
-            } else {
-                this.footer_status.Value := RabbitI18n.Text("controls.install_reload_error")
-            }
-            this.UpdateApplyButton()
-            return true
+            return async_deployment ? true : this.FinishInstallationDeployment(0, true)
         } catch as err {
             this.EnsureSwitcherSettings()
             this.footer_status.Value := RabbitI18n.Text("messages.install_error", Map("reason", err.Message))
@@ -2369,7 +2360,8 @@ class RabbitSettingsWindow extends Gui {
     UpdateApplyButton() {
         if this.installing {
             this.apply_button.Text := RabbitI18n.Text("settings.install")
-            this.apply_button.Enabled := !this.IsRimeDepotBusy() && !this.parent_operation_busy
+            this.apply_button.Enabled := !this.IsRimeDepotBusy()
+                && !this.parent_operation_busy && !this.deploying
             return
         }
         this.apply_button.Text := RabbitI18n.Text("settings.apply")
@@ -3095,7 +3087,8 @@ class RabbitSettingsWindow extends Gui {
     }
 
     OpenRimeDepot(*) {
-        local values := 0, deploy_result, transaction_succeeded := false, sync_succeeded := true
+        local async_deployment, values := 0, deploy_result, transaction_succeeded := false
+        local sync_succeeded := true
         if this.disposed || this.parent_operation_busy || this.IsRimeDepotBusy() {
             if !this.disposed {
                 this.SetRimeDepotStatus(RabbitI18n.Text("depot.busy"), true)
@@ -3122,7 +3115,11 @@ class RabbitSettingsWindow extends Gui {
                 this.ShowRimeDepotSettingsError(RabbitI18n.Text("depot.settings_save_error"))
                 return false
             }
-            deploy_result := this.Deploy(RabbitDeploymentPlan.RabbitConfig())
+            async_deployment := HasMethod(this.workflow, "Submit")
+            deploy_result := this.Deploy(
+                RabbitDeploymentPlan.RabbitConfig(),
+                async_deployment ? this.OnRimeDepotOpenDeploymentComplete.Bind(this) : 0
+            )
             if deploy_result != 0 {
                 this.footer_status.Value := RabbitI18n.Text("controls.redeploy_error")
                 return false
@@ -3148,6 +3145,9 @@ class RabbitSettingsWindow extends Gui {
         if !transaction_succeeded {
             return false
         }
+        if async_deployment {
+            return true
+        }
         ; EndParentOperation clears a child which rejected the accepted
         ; snapshot.  A successful Open transaction must then create a fresh
         ; child rather than activating that stale instance.
@@ -3155,6 +3155,17 @@ class RabbitSettingsWindow extends Gui {
             this.DisposeRimeDepotWindow()
         }
         return this.StartRimeDepot()
+    }
+
+    OnRimeDepotOpenDeploymentComplete(result, resumed) {
+        if this.disposed {
+            return
+        }
+        if result != 0 || !resumed {
+            this.SetRimeDepotStatus(RabbitI18n.Text("controls.redeploy_error"), true)
+            return
+        }
+        this.StartRimeDepot()
     }
 
     StartRimeDepot() {
@@ -3652,9 +3663,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     OpenSelectedSchemaSettings() {
-        local dialog := 0, item, model := 0, values
-        local deployment_plan
-        local loaded := false
+        local async_deployment, deployment_plan, item, model := 0
         local row := this.switcher_list.GetNext(0)
         if !row || !this.switcher_items.Has(row) || !this.workflow
             || !HasMethod(this.workflow, "CreateSchemaSettingsModel") {
@@ -3664,14 +3673,50 @@ class RabbitSettingsWindow extends Gui {
         item := this.switcher_items[row]
         try {
             model := this.workflow.CreateSchemaSettingsModel(item.id)
-            loaded := model.Load()
-            if !loaded {
+            if !model.Load() {
                 deployment_plan := RabbitDeploymentPlan.SchemaConfig(item.id)
-                if this.Deploy(deployment_plan) != 0 || !(loaded := model.Load()) {
+                async_deployment := HasMethod(this.workflow, "Submit")
+                if async_deployment {
+                    if this.Deploy(
+                        deployment_plan,
+                        this.OnSchemaSettingsDeploymentComplete.Bind(this, model, item)
+                    ) != 0 {
+                        this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_read_error")
+                        return false
+                    }
+                    this.switcher_status.Value := RabbitI18n.Text("controls.working")
+                    return true
+                }
+                if this.Deploy(deployment_plan) != 0 || !model.Load() {
                     this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_read_error")
                     return false
                 }
             }
+            return this.ShowSchemaSettingsDialog(model, item)
+        } catch as err {
+            this.switcher_status.Value := err.Message
+            return false
+        }
+    }
+
+    OnSchemaSettingsDeploymentComplete(model, item, result, resumed) {
+        if this.disposed {
+            return
+        }
+        try {
+            if result != 0 || !resumed || !model.Load() {
+                this.switcher_status.Value := RabbitI18n.Text("controls.scheme_settings_read_error")
+                return
+            }
+            this.ShowSchemaSettingsDialog(model, item)
+        } catch as err {
+            this.switcher_status.Value := err.Message
+        }
+    }
+
+    ShowSchemaSettingsDialog(model, item) {
+        local dialog := 0, values
+        try {
             dialog := RabbitSchemaSettingsDialog(
                 this,
                 model,
@@ -4415,16 +4460,19 @@ class RabbitSettingsWindow extends Gui {
         }
     }
 
-    UpdateWorkspace() {
-        return this.Deploy(RabbitDeploymentPlan.FullRedeploy())
+    UpdateWorkspace(completion_callback := 0) {
+        return this.Deploy(RabbitDeploymentPlan.FullRedeploy(), completion_callback)
     }
 
-    Deploy(plan) {
+    Deploy(plan, completion_callback := 0) {
         if this.IsRimeDepotBusy() {
             this.footer_status.Value := RabbitI18n.Text("depot.busy")
             return 1
         }
         if plan.IsEmpty() {
+            if completion_callback {
+                this.QueueDeploymentCompletion(completion_callback, 0, true)
+            }
             return 0
         }
         this.pending_plan.Merge(plan)
@@ -4438,7 +4486,9 @@ class RabbitSettingsWindow extends Gui {
             this.deploying := true
             if !this.workflow.Submit(
                 RabbitDeploymentPlan.Parse(this.pending_plan.Serialize()),
-                this.OnDeploymentComplete.Bind(this)
+                completion_callback
+                    ? this.OnDeploymentCompleteWithCallback.Bind(this, completion_callback)
+                    : this.OnDeploymentComplete.Bind(this)
             ) {
                 this.deploying := false
                 this.UpdateApplyButton()
@@ -4452,7 +4502,31 @@ class RabbitSettingsWindow extends Gui {
             ? this.workflow.Deploy(plan, true)
             : this.workflow.UpdateWorkspace(true)
         this.OnDeploymentComplete(result, true)
+        if completion_callback {
+            this.QueueDeploymentCompletion(completion_callback, result, true)
+        }
         return result
+    }
+
+    OnDeploymentCompleteWithCallback(completion_callback, result, resumed := true) {
+        this.OnDeploymentComplete(result, resumed)
+        this.QueueDeploymentCompletion(completion_callback, result, resumed)
+    }
+
+    QueueDeploymentCompletion(completion_callback, result, resumed) {
+        SetTimer(this.RunDeploymentCompletion.Bind(this, completion_callback, result, resumed), -1)
+    }
+
+    RunDeploymentCompletion(completion_callback, result, resumed) {
+        if this.disposed {
+            return
+        }
+        try {
+            completion_callback.Call(result, resumed)
+        } catch as err {
+            this.footer_status.Opt("cRed")
+            this.footer_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
+        }
     }
 
     SubmitDictionaryMaintenance(
@@ -4493,6 +4567,39 @@ class RabbitSettingsWindow extends Gui {
         } else {
             this.dictionary_status.Value := failure_message
         }
+    }
+
+    OnInstallationDeploymentComplete(result, resumed) {
+        this.FinishInstallationDeployment(result, resumed)
+    }
+
+    FinishInstallationDeployment(result, resumed) {
+        local reloaded
+        if this.disposed {
+            return false
+        }
+        if !resumed {
+            this.UpdateApplyButton()
+            return false
+        }
+        if result != 0 {
+            this.EnsureSwitcherSettings()
+            this.footer_status.Value := RabbitI18n.Text("controls.install_error")
+            this.UpdateApplyButton()
+            return false
+        }
+        this.installing := false
+        this.navigation.Enabled := true
+        reloaded := this.EnsureSwitcherSettings()
+        this.switcher_dirty := false
+        if reloaded {
+            this.switcher_status.Value := RabbitI18n.Text("controls.schemes_saved")
+            this.footer_status.Value := RabbitI18n.Text("controls.install_done")
+        } else {
+            this.footer_status.Value := RabbitI18n.Text("controls.install_reload_error")
+        }
+        this.UpdateApplyButton()
+        return true
     }
 
     OnDeploymentComplete(result, resumed := true) {

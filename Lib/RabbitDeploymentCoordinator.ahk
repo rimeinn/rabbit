@@ -183,8 +183,10 @@ class RabbitDeploymentCoordinator {
                 return
             }
             this.state := RabbitDeploymentCoordinator.STOPPING_RUNTIME
-            this.stop_runtime_callback.Call()
+            ; Stop may finish shutting the runtime down before a cleanup error
+            ; escapes.  Recovery must still attempt to restart that runtime.
             this.runtime_stopped := true
+            this.stop_runtime_callback.Call()
             this.process := this.CreateWorkerProcess(this.operation, this.plan, this.payload)
             this.state := RabbitDeploymentCoordinator.WORKER_RUNNING
             this.SchedulePoll()

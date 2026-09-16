@@ -123,16 +123,40 @@ class RabbitApplication {
         )
     }
 
+    CreateDeploymentStartupGate() {
+        return RabbitDeploymentMutex()
+    }
+
+    WaitForDeploymentStartupGate() {
+        Sleep(100)
+    }
+
+    AcquireDeploymentStartupGate() {
+        local mutex
+        loop {
+            mutex := this.CreateDeploymentStartupGate()
+            if mutex.Create() && mutex.lasterr != ERROR_ALREADY_EXISTS {
+                return mutex
+            }
+            mutex.Close()
+            this.WaitForDeploymentStartupGate()
+        }
+    }
+
     StartFrontendRuntime(maintenance := RABBIT_NO_MAINTENANCE, first_run := false) {
+        local deployment_gate
         if this.runtime && this.runtime.started {
             return true
         }
-        this.runtime := this.CreateFrontendRuntime()
+        deployment_gate := this.AcquireDeploymentStartupGate()
         try {
+            this.runtime := this.CreateFrontendRuntime()
             return this.runtime.Start(maintenance, first_run, this.RunFirstInstallation.Bind(this))
         } catch {
             this.runtime := 0
             throw
+        } finally {
+            deployment_gate.Close()
         }
     }
 

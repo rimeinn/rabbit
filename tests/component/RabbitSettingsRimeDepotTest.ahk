@@ -24,6 +24,8 @@ RabbitSettingsRimeDepotTestMain() {
     RunTest("settings window keeps the Depot tab nested and lazy", RabbitSettingsRimeDepotTabTest.Bind())
     RunTest("settings window marks only Depot drafts dirty", RabbitSettingsRimeDepotDraftTest.Bind())
     RunTest("opening Depot saves, deploys once, then creates one child", RabbitSettingsRimeDepotOpenTest.Bind())
+    RunTest("opening Depot waits for worker completion", RabbitSettingsRimeDepotAsyncOpenTest.Bind())
+    RunTest("failed Depot worker does not open a child", RabbitSettingsRimeDepotAsyncFailureTest.Bind())
     RunTest("opening Depot isolates other dirty settings", RabbitSettingsRimeDepotIsolationTest.Bind())
     RunTest("opening Depot recovers from save and deploy failures", RabbitSettingsRimeDepotFailureTest.Bind())
     RunTest("opening Depot leaves clean state after child failure", RabbitSettingsRimeDepotChildFailureTest.Bind())
@@ -157,6 +159,44 @@ RabbitSettingsRimeDepotOpenTest() {
             "Opening unchanged downloader settings deployed again.")
         AssertEqual(1, factory.create_count, "Reopening the downloader created a duplicate child.")
         AssertEqual(2, factory.child.show_count, "Reopening the downloader did not activate the child.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+RabbitSettingsRimeDepotAsyncOpenTest() {
+    local workflow := RabbitSettingsRimeDepotAsyncWorkflowProbe()
+    local factory := RabbitSettingsRimeDepotFactoryProbe()
+    local window := RabbitSettingsRimeDepotNewWindow(workflow, factory)
+    try {
+        RabbitSettingsRimeDepotSelectTab(window)
+        RabbitSettingsRimeDepotSetDraft(window, RabbitSettingsRimeDepotDefaultValues())
+        AssertTrue(window.OpenRimeDepot(), "The async downloader transaction was rejected.")
+        AssertEqual(0, factory.create_count, "The downloader opened before deployment completed.")
+        workflow.Complete(0)
+        AssertEqual(0, factory.create_count, "The downloader opened inside the worker callback.")
+        Sleep(20)
+        AssertEqual(1, factory.create_count, "Worker success did not open the downloader.")
+    } finally {
+        window.Dispose()
+    }
+}
+
+RabbitSettingsRimeDepotAsyncFailureTest() {
+    local workflow := RabbitSettingsRimeDepotAsyncWorkflowProbe()
+    local factory := RabbitSettingsRimeDepotFactoryProbe()
+    local window := RabbitSettingsRimeDepotNewWindow(workflow, factory)
+    try {
+        RabbitSettingsRimeDepotSelectTab(window)
+        RabbitSettingsRimeDepotSetDraft(window, RabbitSettingsRimeDepotDefaultValues())
+        AssertTrue(window.OpenRimeDepot(), "The async downloader transaction was rejected.")
+        workflow.Complete(7)
+        Sleep(20)
+        AssertEqual(0, factory.create_count, "A failed deployment opened the downloader.")
+        AssertTrue(
+            InStr(window.rime_depot_status.Value, RabbitI18n.Text("controls.redeploy_error")) > 0,
+            "A failed deployment did not report the downloader error."
+        )
     } finally {
         window.Dispose()
     }
@@ -482,6 +522,21 @@ class RabbitSettingsRimeDepotWorkflowProbe {
         this.deploy_count += 1
         this.last_deployment_plan := RabbitDeploymentPlan.FullRedeploy()
         return this.deploy_result
+    }
+}
+
+class RabbitSettingsRimeDepotAsyncWorkflowProbe extends RabbitSettingsRimeDepotWorkflowProbe {
+    Submit(plan, completion_callback) {
+        this.deploy_count += 1
+        this.last_deployment_plan := plan
+        this.completion_callback := completion_callback
+        return true
+    }
+
+    Complete(result, resumed := true) {
+        local callback := this.completion_callback
+        this.completion_callback := 0
+        callback.Call(result, resumed)
     }
 }
 

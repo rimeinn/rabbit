@@ -20,6 +20,7 @@
 
 RunTest("deployment coordinator supervises a worker", TestCoordinatorWorkerLifecycle.Bind())
 RunTest("deployment coordinator restores after worker launch failure", TestCoordinatorLaunchFailure.Bind())
+RunTest("deployment coordinator restores after runtime stop failure", TestCoordinatorStopFailure.Bind())
 RunTest("deployment coordinator exposes runtime resume failure", TestCoordinatorResumeFailure.Bind())
 
 TestCoordinatorWorkerLifecycle() {
@@ -76,6 +77,31 @@ TestCoordinatorLaunchFailure() {
         JoinCoordinatorCalls(calls),
         "Worker launch failure did not restore the frontend runtime."
     )
+}
+
+TestCoordinatorStopFailure() {
+    local calls := []
+    local coordinator := RabbitDeploymentCoordinatorProbe(
+        RabbitCoordinatorSettingsProbe(calls),
+        RabbitCoordinatorFailStop.Bind(calls),
+        (*) => (calls.Push("start"), true),
+        (result, resumed) => calls.Push("result:" . result . ":" . resumed),
+        0,
+        calls
+    )
+    AssertTrue(coordinator.Submit(RabbitDeploymentPlan.RabbitConfig()), "The deployment was rejected.")
+    coordinator.BeginOperation()
+    AssertEqual(RabbitDeploymentCoordinator.IDLE, coordinator.state, "Stop failure left the coordinator busy.")
+    AssertEqual(
+        "begin:deploy,prepare,stop,start,resume:1,result:1:1",
+        JoinCoordinatorCalls(calls),
+        "A cleanup error after stopping the runtime did not trigger recovery."
+    )
+}
+
+RabbitCoordinatorFailStop(calls) {
+    calls.Push("stop")
+    throw Error("Injected runtime stop failure.")
 }
 
 TestCoordinatorResumeFailure() {

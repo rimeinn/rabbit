@@ -275,20 +275,24 @@ jobs:
         run: |
           $ahk = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\AutoHotkey64.exe"
           New-Item -ItemType Directory -Force "dist\test-results" | Out-Null
-          & $ahk /ErrorStdOut "tests\RabbitTestMain.ahk" --suite unit `
-            --junit "dist\test-results\rabbit-unit.xml"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $testProcess = Start-Process -FilePath $ahk -ArgumentList @(
+            '/ErrorStdOut', 'tests\RabbitTestMain.ahk', '--suite', 'unit',
+            '--junit', 'dist\test-results\rabbit-unit.xml'
+          ) -NoNewWindow -Wait -PassThru
+          if ($testProcess.ExitCode -ne 0) {
+            exit $testProcess.ExitCode
           }
 
       - name: Run Rabbit RimeDepot component tests
         shell: pwsh
         run: |
           $ahk = Join-Path $env:GITHUB_WORKSPACE "deps\AutoHotkey\AutoHotkey64.exe"
-          & $ahk /ErrorStdOut "tests\RabbitTestMain.ahk" --suite component `
-            --filter RimeDepot --junit "dist\test-results\rabbit-rimedepot-component.xml"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $testProcess = Start-Process -FilePath $ahk -ArgumentList @(
+            '/ErrorStdOut', 'tests\RabbitTestMain.ahk', '--suite', 'component',
+            '--filter', 'RimeDepot', '--junit', 'dist\test-results\rabbit-rimedepot-component.xml'
+          ) -NoNewWindow -Wait -PassThru
+          if ($testProcess.ExitCode -ne 0) {
+            exit $testProcess.ExitCode
           }
 
       - name: Run RimeDepot submodule tests
@@ -300,9 +304,11 @@ jobs:
             "Lib\RimeDepot\tests\integration\RimeDepotGuiSmokeTest.ahk"
           )
           foreach ($test in $tests) {
-            & $ahk /ErrorStdOut $test
-            if ($LASTEXITCODE -ne 0) {
-              exit $LASTEXITCODE
+            $testProcess = Start-Process -FilePath $ahk -ArgumentList @(
+              '/ErrorStdOut', $test
+            ) -NoNewWindow -Wait -PassThru
+            if ($testProcess.ExitCode -ne 0) {
+              exit $testProcess.ExitCode
             }
           }
 
@@ -417,15 +423,16 @@ jobs:
             exit $compileProcess.ExitCode
           }
           New-Item -ItemType Directory -Force -Path "dist\test-results" | Out-Null
-          & $base /ErrorStdOut .\tests\RabbitTestMain.ahk `
-              --suite packaging `
-              --compiler $compiler.FullName `
-              --base $base `
-              --rime-dll "deps\Rime\${{ matrix.rime }}" `
-              --architecture "${{ matrix.target }}" `
-              --junit "dist\test-results\rabbit-packaging-${{ matrix.target }}.xml"
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $testProcess = Start-Process -FilePath $base -ArgumentList @(
+              '/ErrorStdOut', '.\tests\RabbitTestMain.ahk', '--suite', 'packaging',
+              '--compiler', ('"' + $compiler.FullName + '"'),
+              '--base', ('"' + $base + '"'),
+              '--rime-dll', 'deps\Rime\${{ matrix.rime }}',
+              '--architecture', '${{ matrix.target }}',
+              '--junit', 'dist\test-results\rabbit-packaging-${{ matrix.target }}.xml'
+          ) -NoNewWindow -Wait -PassThru
+          if ($testProcess.ExitCode -ne 0) {
+            exit $testProcess.ExitCode
           }
 
       - name: Validate compiled executable

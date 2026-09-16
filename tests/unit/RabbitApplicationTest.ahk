@@ -24,6 +24,7 @@ RunTest("tray delegates deployer launch", TestTrayDelegatesDeployerLaunch.Bind()
 RunTest("tray routes unified settings", TestTrayRoutesUnifiedSettings.Bind())
 RunTest("tray routes legacy settings", TestTrayRoutesLegacySettings.Bind())
 RunTest("first install uses platform settings", TestFirstInstallUsesPlatformSettings.Bind())
+RunTest("frontend startup waits for deployment ownership", TestFrontendStartupWaitsForDeploymentOwnership.Bind())
 
 TestDeployerLaunchAfterShutdown() {
     local calls := []
@@ -230,6 +231,18 @@ class RabbitApplicationDisposeProbe {
     }
 }
 
+TestFrontendStartupWaitsForDeploymentOwnership() {
+    local calls := []
+    local application := RabbitApplicationStartupProbe(calls)
+
+    AssertTrue(application.StartFrontendRuntime(), "The frontend runtime did not start.")
+    AssertEqual(
+        "gate_create:busy,gate_close:busy,wait,gate_create:free,runtime_create,runtime_start,gate_close:free",
+        JoinApplicationCalls(calls),
+        "The frontend initialized while a deployment worker still owned Rime."
+    )
+}
+
 class RabbitApplicationStopProbe {
     __New(calls) {
         this.calls := calls
@@ -258,5 +271,59 @@ class RabbitApplicationCloseProbe {
 
     Close() {
         this.calls.Push("close")
+    }
+}
+
+class RabbitApplicationStartupProbe extends RabbitApplication {
+    __New(calls) {
+        super.__New(0)
+        this.calls := calls
+        this.gate_index := 0
+    }
+
+    CreateDeploymentStartupGate() {
+        this.gate_index += 1
+        return RabbitApplicationDeploymentGateProbe(this.calls, this.gate_index = 1)
+    }
+
+    WaitForDeploymentStartupGate() {
+        this.calls.Push("wait")
+    }
+
+    CreateFrontendRuntime() {
+        this.calls.Push("runtime_create")
+        return RabbitApplicationRuntimeStartProbe(this.calls)
+    }
+}
+
+class RabbitApplicationDeploymentGateProbe {
+    __New(calls, busy) {
+        this.calls := calls
+        this.busy := busy
+        this.lasterr := 0
+    }
+
+    Create() {
+        this.lasterr := this.busy ? ERROR_ALREADY_EXISTS : 0
+        this.calls.Push("gate_create:" . (this.busy ? "busy" : "free"))
+        return true
+    }
+
+    Close() {
+        this.calls.Push("gate_close:" . (this.busy ? "busy" : "free"))
+    }
+}
+
+class RabbitApplicationRuntimeStartProbe {
+    started := false
+
+    __New(calls) {
+        this.calls := calls
+    }
+
+    Start(*) {
+        this.calls.Push("runtime_start")
+        this.started := true
+        return true
     }
 }
