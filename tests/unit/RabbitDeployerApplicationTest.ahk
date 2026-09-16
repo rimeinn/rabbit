@@ -20,6 +20,7 @@
 
 RunTest("interactive deployer rejects modern settings", TestDeployerRejectsModernSettings.Bind())
 RunTest("interactive deployer retains legacy settings", TestDeployerRetainsLegacySettings.Bind())
+RunTest("standalone deployer releases the application startup gate", TestDeployerReleasesStartupGate.Bind())
 
 TestDeployerRejectsModernSettings() {
     local application := RabbitDeployerApplication(0)
@@ -38,4 +39,37 @@ TestDeployerRetainsLegacySettings() {
     local options := application.ParseOptions(["legacy-settings", "dictionary"])
     AssertEqual("legacy-settings", options.command, "The legacy settings command was rejected.")
     AssertEqual("dictionary", options.target, "The legacy dictionary target was changed.")
+}
+
+TestDeployerReleasesStartupGate() {
+    local calls := []
+    local application := RabbitDeployerApplication(0)
+    application.context := RabbitDeployerDisposeProbe(calls, "context")
+    application.application_gate := RabbitDeployerDisposeProbe(calls, "gate")
+    application.Shutdown()
+    application.Shutdown()
+    AssertEqual("context,gate", JoinDeployerCalls(calls), "The startup gate was not released after the context.")
+}
+
+JoinDeployerCalls(calls) {
+    local call, result := ""
+    for call in calls {
+        result .= (result ? "," : "") . call
+    }
+    return result
+}
+
+class RabbitDeployerDisposeProbe {
+    __New(calls, label) {
+        this.calls := calls
+        this.label := label
+    }
+
+    Dispose() {
+        this.calls.Push(this.label)
+    }
+
+    Close() {
+        this.calls.Push(this.label)
+    }
 }

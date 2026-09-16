@@ -21,6 +21,7 @@
 #Include RabbitCommandLine.ahk
 #Include RabbitDeploymentCoordinator.ahk
 #Include RabbitFrontendRuntime.ahk
+#Include RabbitMaintenanceIpc.ahk
 #Include RabbitSettingsController.ahk
 #Include RabbitTrayMenu.ahk
 
@@ -31,6 +32,7 @@ class RabbitApplication {
         this.keyboard_layout := 0
         this.runtime := 0
         this.coordinator := 0
+        this.ipc_server := 0
         this.tray := 0
         this.settings := 0
         this.tray_click_callback := 0
@@ -80,6 +82,7 @@ class RabbitApplication {
         if !this.StartFrontendRuntime(options.maintenance, first_run) {
             return
         }
+        this.EnsureIpcServer()
     }
 
     CreateTrayController() {
@@ -102,6 +105,13 @@ class RabbitApplication {
             this.StartFrontendRuntime.Bind(this),
             this.OnMaintenanceComplete.Bind(this)
         )
+    }
+
+    EnsureIpcServer() {
+        if !this.ipc_server {
+            this.ipc_server := RabbitMaintenanceIpcServer(this.SubmitMaintenance.Bind(this))
+        }
+        return this.ipc_server
     }
 
     CreateFrontendRuntime() {
@@ -179,6 +189,7 @@ class RabbitApplication {
             )
             return
         }
+        this.EnsureIpcServer()
         TrayTip(
             RabbitI18n.Text(result = 0 ? "frontend.maintenance_done" : "frontend.maintenance_failed", Map(
                 "detail", result,
@@ -285,6 +296,10 @@ class RabbitApplication {
         if this.tray_message_registered {
             OnMessage(AHK_NOTIFYICON, this.tray_click_callback, 0)
             this.tray_message_registered := false
+        }
+        if this.ipc_server {
+            this.ipc_server.Dispose()
+            this.ipc_server := 0
         }
         if this.coordinator {
             this.coordinator.Dispose()

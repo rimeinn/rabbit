@@ -21,11 +21,13 @@
 #Include RabbitCommandLine.ahk
 #Include RabbitDeployerContext.ahk
 #Include RabbitDeployerWorkflow.ahk
+#Include RabbitMaintenanceIpc.ahk
 #Include RabbitTrayMenu.ahk
 
 class RabbitDeployerApplication {
     __New(rime_api) {
         this.context := RabbitDeployerContext(rime_api)
+        this.application_gate := 0
         this.workflow := 0
         this.exit_callback := this.OnExit.Bind(this)
         this.shutting_down := false
@@ -37,11 +39,29 @@ class RabbitDeployerApplication {
         local options := this.ParseOptions(args)
         this.context.command := options.command
         this.context.keyboard_layout := options.keyboard_layout
+        OnExit(this.exit_callback)
+
+        if options.command = "deploy" || options.command = "sync" {
+            local ipc_result := RabbitMaintenanceIpcClient.Submit(
+                options.command,
+                options.command = "deploy" ? RabbitDeploymentPlan.FullRedeploy() : 0
+            )
+            if ipc_result.found {
+                this.context.result := ipc_result.result = RabbitMaintenanceIpcServer.ACCEPTED ? 0 : 1
+                this.ExitApplication(this.context.result)
+                return this.context.result
+            }
+            this.application_gate := RabbitAcquireApplicationStartupGate()
+            if !this.application_gate {
+                this.context.result := 1
+                this.ExitApplication(1)
+                return 1
+            }
+        }
 
         TrayTip()
         TrayTip(RabbitI18n.Text("frontend.maintenance"), RabbitI18n.Text("settings.product"))
 
-        OnExit(this.exit_callback)
         this.context.Initialize()
         RabbitI18n.LoadConfig(this.context.rime)
         RabbitSetupMaintenanceTray()
@@ -96,8 +116,8 @@ class RabbitDeployerApplication {
         Run(RabbitBuildCommandLine(command_line))
     }
 
-    ExitApplication() {
-        ExitApp()
+    ExitApplication(code := 0) {
+        ExitApp(code)
     }
 
     OnExit(reason, code) {
@@ -110,6 +130,13 @@ class RabbitDeployerApplication {
         }
         this.shutting_down := true
         TrayTip()
-        this.context.Dispose()
+        try {
+            this.context.Dispose()
+        } finally {
+            if this.application_gate {
+                this.application_gate.Close()
+                this.application_gate := 0
+            }
+        }
     }
 }
