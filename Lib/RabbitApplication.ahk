@@ -19,6 +19,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitI18n.ahk
 #Include RabbitCommandLine.ahk
+#Include RabbitDeploymentCoordinator.ahk
 #Include RabbitFrontendRuntime.ahk
 #Include RabbitSettingsController.ahk
 #Include RabbitTrayMenu.ahk
@@ -29,6 +30,7 @@ class RabbitApplication {
         this.application_mutex := RabbitApplicationMutex()
         this.keyboard_layout := 0
         this.runtime := 0
+        this.coordinator := 0
         this.tray := 0
         this.settings := 0
         this.tray_click_callback := 0
@@ -69,6 +71,7 @@ class RabbitApplication {
 
         this.settings := this.CreateSettingsController()
         this.tray := this.CreateTrayController()
+        this.coordinator := this.CreateDeploymentCoordinator()
         if !this.StartFrontendRuntime(options.maintenance, first_run) {
             return
         }
@@ -89,7 +92,16 @@ class RabbitApplication {
             0,
             this.keyboard_layout,
             this.settings.Show.Bind(this.settings),
-            this.RunDeployer.Bind(this)
+            this.SubmitMaintenance.Bind(this)
+        )
+    }
+
+    CreateDeploymentCoordinator() {
+        return RabbitDeploymentCoordinator(
+            this.settings,
+            this.StopFrontendRuntime.Bind(this),
+            this.StartFrontendRuntime.Bind(this),
+            this.OnMaintenanceComplete.Bind(this)
         )
     }
 
@@ -129,21 +141,45 @@ class RabbitApplication {
         this.ExitApplication(1)
     }
 
-    RunSettingsMaintenance(command, args*) {
-        args.Push(
-            "--return-to-rabbit",
-            "--keyboard-layout",
-            RabbitFormatKeyboardLayout(this.keyboard_layout)
-        )
-        this.RunDeployer(command, args*)
+    SubmitMaintenance(command, args*) {
+        switch command {
+            case "deploy":
+                local plan := args.Length && args[1] is RabbitDeploymentPlan
+                    ? args[1]
+                    : RabbitDeploymentPlan.FullRedeploy()
+                return this.coordinator.Submit(plan)
+            case "sync":
+                return this.coordinator.SubmitSync()
+            default:
+                this.RunDeployer(command, args*)
+                return true
+        }
     }
 
     CreateSettingsController() {
         return RabbitSettingsController(
             this.rime,
-            this.RunSettingsMaintenance.Bind(this),
+            this.SubmitMaintenance.Bind(this),
             this.OnSettingsLanguageChanged.Bind(this)
         )
+    }
+
+    OnMaintenanceComplete(result, resumed) {
+        if !resumed {
+            TrayTip(
+                RabbitI18n.Text("frontend.session_error"),
+                RabbitI18n.Text("settings.product")
+            )
+            return
+        }
+        TrayTip(
+            RabbitI18n.Text(result = 0 ? "frontend.maintenance_done" : "frontend.maintenance_failed", Map(
+                "detail", result,
+                "session", 0
+            )),
+            RabbitI18n.Text("settings.product")
+        )
+        SetTimer(TrayTip, -2000)
     }
 
     OnSettingsLanguageChanged() {
@@ -242,6 +278,10 @@ class RabbitApplication {
         if this.tray_message_registered {
             OnMessage(AHK_NOTIFYICON, this.tray_click_callback, 0)
             this.tray_message_registered := false
+        }
+        if this.coordinator {
+            this.coordinator.Dispose()
+            this.coordinator := 0
         }
         if this.settings {
             this.settings.Dispose()

@@ -22,6 +22,7 @@
 RunTest("Rabbit named command line options", TestRabbitCommandLineOptions.Bind())
 RunTest("entry point routes deployment mode", TestRabbitEntryOptions.Bind())
 RunTest("deployer named command line options", TestDeployerCommandLineOptions.Bind())
+RunTest("worker command line options", TestWorkerCommandLineOptions.Bind())
 RunTest("command line rejects invalid forms", TestCommandLineRejectsInvalidForms.Bind())
 RunTest("keyboard layout handle round trip", TestKeyboardLayoutHandleRoundTrip.Bind())
 RunTest("Windows command line quoting", TestWindowsCommandLineQuoting.Bind())
@@ -75,6 +76,29 @@ TestRabbitEntryOptions() {
     AssertThrows(
         RabbitDeployerOptions.Parse.Bind(options.application_args),
         "Rabbit accepted a duplicate deployment selector."
+    )
+
+    options := RabbitEntryOptions.Parse(["--deployer-worker", "sync"])
+    AssertTrue(options.is_worker, "The Rabbit entry point did not select worker mode.")
+    AssertTrue(!options.is_deployer, "Worker mode was confused with the interactive deployer.")
+    AssertEqual("sync", options.application_args[1], "The worker selector changed its operation.")
+}
+
+TestWorkerCommandLineOptions() {
+    local serialized := RabbitDeploymentPlan.FullRedeploy()
+        .Merge(RabbitDeploymentPlan.DefaultConfig())
+        .Merge(RabbitDeploymentPlan.SchemaConfig("demo"))
+        .Serialize()
+    local options := RabbitWorkerOptions.Parse(["deploy", "--plan", serialized])
+    AssertEqual("deploy", options.operation, "The worker parsed the wrong operation.")
+    AssertEqual(serialized, options.plan.Serialize(), "The worker changed its deployment plan.")
+
+    options := RabbitWorkerOptions.Parse(["sync"])
+    AssertEqual("sync", options.operation, "The worker rejected synchronization.")
+    AssertThrows(RabbitWorkerOptions.Parse.Bind(["deploy"]), "The worker accepted a missing plan.")
+    AssertThrows(
+        RabbitWorkerOptions.Parse.Bind(["sync", "--plan", "v1|rabbit"]),
+        "The sync worker accepted a deployment plan."
     )
 }
 

@@ -40,6 +40,7 @@ class RabbitSettingsWindow extends Gui {
     deployment_pending := false
     closed_callback := 0
     nonblocking_language_reload := false
+    maintenance_active := false
 
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 580
@@ -4391,6 +4392,84 @@ class RabbitSettingsWindow extends Gui {
         }
         this.deployment_pending := false
         this.language_reload_callback.Call(this)
+    }
+
+    BeginMaintenance(operation) {
+        if this.disposed {
+            return
+        }
+        this.footer_status.Opt("cGray")
+        this.footer_status.Value := RabbitI18n.Text("frontend.maintenance")
+    }
+
+    PrepareForMaintenance() {
+        if this.disposed || this.maintenance_active {
+            return true
+        }
+        if this.IsRimeDepotBusy() || !this.DisposeRimeDepotWindow() {
+            this.footer_status.Value := RabbitI18n.Text("depot.busy")
+            return false
+        }
+        this.maintenance_active := true
+        this.parent_operation_busy := true
+        this.Opt("+Disabled")
+        try {
+            if this.appearance_page && this.appearance_page.settings {
+                this.appearance_page.settings.Dispose()
+                this.appearance_page.settings := 0
+            }
+            this.DisposeSwitcherSettings()
+            if this.behavior_model {
+                this.behavior_model.Dispose()
+                this.behavior_model := 0
+            }
+            if this.application_model {
+                this.application_model.Dispose()
+                this.application_model := 0
+            }
+            if this.dictionary_model {
+                this.dictionary_model.Dispose()
+                this.dictionary_model := 0
+            }
+            this.appearance_preview_labels_loaded := false
+            return true
+        } catch as err {
+            this.maintenance_active := false
+            this.parent_operation_busy := false
+            this.Opt("-Disabled")
+            this.footer_status.Value := err.Message
+            return false
+        }
+    }
+
+    ResumeAfterMaintenance(workflow, result) {
+        if this.disposed {
+            return
+        }
+        this.workflow := workflow
+        if this.appearance_page {
+            this.appearance_page.workflow := workflow
+        }
+        this.maintenance_active := false
+        this.parent_operation_busy := false
+        this.Opt("-Disabled")
+        this.LoadPageSettings(this.selected_page)
+        this.footer_status.Opt(result = 0 ? "cGray" : "cRed")
+        this.footer_status.Value := result = 0
+            ? RabbitI18n.Text("frontend.maintenance_done")
+            : RabbitI18n.Text("controls.redeploy_error")
+        this.UpdateApplyButton()
+    }
+
+    RuntimeResumeFailed(err) {
+        if this.disposed {
+            return
+        }
+        this.maintenance_active := true
+        this.parent_operation_busy := true
+        this.Opt("+Disabled")
+        this.footer_status.Opt("cRed")
+        this.footer_status.Value := RabbitI18n.Text("messages.save_error", Map("reason", err.Message))
     }
 
     WaitClose() {

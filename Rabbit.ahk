@@ -26,6 +26,7 @@
 #Include <RabbitCommon>
 #Include <RabbitCommandLine>
 #Include <RabbitDeployerApplication>
+#Include <RabbitDeployerWorkerApplication>
 #Include <RabbitRimeBootstrap>
 /*@Ahk2Exe-Keep
 #Include Lib\RabbitCompiledResources.ahk
@@ -34,7 +35,9 @@
 global rabbit_entry_options := RabbitEntryOptions.Parse(A_Args)
 RabbitCompiledResourcePolicy.ExtractIfCompiled()
 global rabbit_rime_path := RabbitRimeBootstrap.Prepare()
-global rabbit_application := rabbit_entry_options.is_deployer
-    ? RabbitDeployerApplication(RimeApi(rabbit_rime_path))
-    : RabbitApplication(RimeApi(rabbit_rime_path))
+global rabbit_application := rabbit_entry_options.is_worker
+    ? RabbitDeployerWorkerApplication(RimeApi(rabbit_rime_path))
+    : (rabbit_entry_options.is_deployer
+        ? RabbitDeployerApplication(RimeApi(rabbit_rime_path))
+        : RabbitApplication(RimeApi(rabbit_rime_path)))
 rabbit_application.Run(rabbit_entry_options.application_args)

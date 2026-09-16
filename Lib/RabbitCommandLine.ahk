@@ -17,24 +17,66 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitDeploymentPlan.ahk
 #Include RabbitI18n.ahk
 
 class RabbitEntryOptions {
     __New() {
         this.is_deployer := false
+        this.is_worker := false
         this.application_args := []
     }
 
     static Parse(args) {
         local options := RabbitEntryOptions()
-        if !args.Length || args[1] != "--deployer" {
+        if !args.Length || (args[1] != "--deployer" && args[1] != "--deployer-worker") {
             options.application_args := args
             return options
         }
 
-        options.is_deployer := true
+        options.is_deployer := args[1] = "--deployer"
+        options.is_worker := args[1] = "--deployer-worker"
         Loop args.Length - 1 {
             options.application_args.Push(args[A_Index + 1])
+        }
+        return options
+    }
+}
+
+class RabbitWorkerOptions {
+    __New() {
+        this.operation := ""
+        this.plan := RabbitDeploymentPlan()
+    }
+
+    static Parse(args) {
+        local argument, index := 1, options := RabbitWorkerOptions(), seen := Map()
+        if !args.Length {
+            throw ValueError("Missing worker operation.")
+        }
+        options.operation := args[1]
+        if options.operation != "deploy" && options.operation != "sync" {
+            throw ValueError("Invalid worker operation.")
+        }
+        index := 2
+        while index <= args.Length {
+            argument := args[index]
+            switch argument {
+                case "--plan":
+                    RabbitRequireUniqueOption(seen, argument)
+                    options.plan := RabbitDeploymentPlan.Parse(
+                        RabbitRequireOptionValue(args, &index, argument)
+                    )
+                default:
+                    throw ValueError("Invalid worker option.")
+            }
+            index += 1
+        }
+        if options.operation = "deploy" && !seen.Has("--plan") {
+            throw ValueError("Missing worker deployment plan.")
+        }
+        if options.operation = "sync" && seen.Has("--plan") {
+            throw ValueError("Synchronization does not accept a deployment plan.")
         }
         return options
     }

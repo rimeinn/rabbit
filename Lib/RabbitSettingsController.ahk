@@ -107,6 +107,31 @@ class RabbitSettingsController {
         }
     }
 
+    BeginMaintenance(operation) {
+        if this.window && !this.window.disposed {
+            this.window.BeginMaintenance(operation)
+        }
+    }
+
+    PrepareForMaintenance() {
+        if !this.window || this.window.disposed {
+            return true
+        }
+        return this.window.PrepareForMaintenance()
+    }
+
+    ResumeAfterMaintenance(result) {
+        if this.window && !this.window.disposed {
+            this.window.ResumeAfterMaintenance(this.workflow, result)
+        }
+    }
+
+    RuntimeResumeFailed(err) {
+        if this.window && !this.window.disposed {
+            this.window.RuntimeResumeFailed(err)
+        }
+    }
+
     Dispose() {
         if this.disposed {
             return
@@ -137,13 +162,11 @@ class RabbitSettingsControllerWorkflow extends RabbitSettingsWorkflow {
         if plan.IsEmpty() {
             return 0
         }
-        this.maintenance_callback.Call("deploy")
-        return 0
+        return this.maintenance_callback.Call("deploy", plan) ? 0 : 1
     }
 
     SyncUserData() {
-        this.maintenance_callback.Call("sync")
-        return 0
+        return this.maintenance_callback.Call("sync") ? 0 : 1
     }
 
     DictManagement() {
