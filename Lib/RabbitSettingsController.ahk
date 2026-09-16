@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#Include RabbitDeployerWorkflow.ahk
 #Include RabbitI18n.ahk
+#Include RabbitSettingsWorkflow.ahk
 #Include RabbitSettingsWindow.ahk
 
 class RabbitSettingsController {
@@ -123,7 +123,7 @@ class RabbitSettingsController {
 ; Stage 1 keeps the existing process-handoff maintenance behavior while the
 ; settings GUI moves to the frontend. The workflow split in stage 2 removes
 ; this compatibility adapter.
-class RabbitSettingsControllerWorkflow extends RabbitDeployerWorkflow {
+class RabbitSettingsControllerWorkflow extends RabbitSettingsWorkflow {
     __New(rime_api, maintenance_callback) {
         super.__New(rime_api)
         this.maintenance_callback := maintenance_callback

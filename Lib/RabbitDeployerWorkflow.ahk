@@ -17,115 +17,57 @@
  */
 
 #Include RabbitCommon.ahk
-#Include RabbitDeploymentPlan.ahk
-#Include RabbitApplicationSettingsModel.ahk
-#Include RabbitBehaviorSettingsModel.ahk
-#Include RabbitDictionarySettingsModel.ahk
 #Include RabbitDictManagementDialog.ahk
-#Include RabbitSwitcherSettingsModel.ahk
 #Include RabbitSwitcherSettingsDialog.ahk
-#Include RabbitUIStyleSettings.ahk
 #Include RabbitUIStyleSettingsDialog.ahk
 #Include RabbitI18n.ahk
-#Include RabbitRimeDepotSettings.ahk
-#Include RabbitSchemaSettingsModel.ahk
+#Include RabbitMaintenanceWorkflow.ahk
+#Include RabbitSettingsWorkflow.ahk
 
-class RabbitDeployerWorkflow {
-    __New(rime_api) {
-        this.rime := rime_api
-        this.CreateFileIfNotExist("default.custom.yaml")
-        this.CreateFileIfNotExist("rabbit.custom.yaml")
-    }
-
-    CreateFileIfNotExist(filename) {
-        local user_data_dir, filepath
-        user_data_dir := RabbitUserDataPath() . "\"
-        if !InStr(DirExist(user_data_dir), "D") {
-            DirCreate(user_data_dir)
-        }
-        filepath := user_data_dir . filename
-        if !InStr(FileExist(filepath), "N") {
-            FileAppend("", filepath)
-        }
+class RabbitDeployerWorkflow extends RabbitMaintenanceWorkflow {
+    __New(rime_api, lock_operations := true) {
+        super.__New(rime_api, lock_operations)
+        this.settings_workflow := RabbitSettingsWorkflow(rime_api)
     }
 
     CreateLevers() {
-        return RimeLeversApi(this.rime)
+        return this.settings_workflow.CreateLevers()
     }
 
     CreateRimeDepotSettings() {
-        return RabbitRimeDepotSettings.Load(this.rime)
+        return this.settings_workflow.CreateRimeDepotSettings()
     }
 
     SaveRimeDepotSettings(values) {
-        return RabbitRimeDepotSettings.Save(this.rime, values)
+        return this.settings_workflow.SaveRimeDepotSettings(values)
     }
 
     CreateSwitcherSettingsModel() {
-        return RabbitSwitcherSettingsModel(this.CreateLevers(), this.rime)
+        return this.settings_workflow.CreateSwitcherSettingsModel()
     }
 
     CreateBehaviorSettingsModel() {
-        return RabbitBehaviorSettingsModel(this.CreateLevers(), this.rime)
+        return this.settings_workflow.CreateBehaviorSettingsModel()
     }
 
     CreateSchemaSettingsModel(schema_id) {
-        return RabbitSchemaSettingsModel(this.rime, this.CreateLevers(), schema_id)
+        return this.settings_workflow.CreateSchemaSettingsModel(schema_id)
     }
 
     ReadCandidateLabels() {
-        local api := this.CreateLevers()
-        local config, settings := 0
-        if !api {
-            throw Error(RabbitI18n.Text("frontend.settings_api"))
-        }
-        try {
-            settings := api.custom_settings_init("default", RABBIT_CUSTOMIZATION_GENERATOR_ID)
-            if !settings || !api.load_settings(settings) {
-                throw Error(RabbitI18n.Text("frontend.labels_load"))
-            }
-            if !(config := api.settings_get_config(settings)) {
-                throw Error(RabbitI18n.Text("frontend.labels_read"))
-            }
-            return RabbitBehaviorSettingsModel.ReadStringList(
-                this.rime,
-                config,
-                "menu/alternative_select_labels"
-            )
-        } finally {
-            if settings {
-                api.custom_settings_destroy(settings)
-            }
-        }
+        return this.settings_workflow.ReadCandidateLabels()
     }
 
     CreateApplicationSettingsModel() {
-        return RabbitApplicationSettingsModel(this.CreateLevers(), this.rime)
+        return this.settings_workflow.CreateApplicationSettingsModel()
     }
 
     CreateDictionarySettingsModel() {
-        return RabbitDictionarySettingsModel(
-            this.rime,
-            this.CreateLevers(),
-            this.CreateMutex.Bind(this)
-        )
+        return this.settings_workflow.CreateDictionarySettingsModel(this.CreateMutex.Bind(this))
     }
 
     CreateUIStyleSettings() {
-        local settings := UIStyleSettings(this.rime, this.CreateLevers())
-        try {
-            if !settings.Load() {
-                throw Error(RabbitI18n.Text("frontend.style_load"))
-            }
-            return settings
-        } catch {
-            settings.Dispose()
-            throw
-        }
-    }
-
-    CreateMutex() {
-        return RabbitMutex()
+        return this.settings_workflow.CreateUIStyleSettings()
     }
 
     Run(installing) {
@@ -223,60 +165,6 @@ class RabbitDeployerWorkflow {
         return false
     }
 
-    UpdateWorkspace(report_errors := false) {
-        return this.Deploy(RabbitDeploymentPlan.FullRedeploy(), report_errors)
-    }
-
-    Deploy(plan, report_errors := false) {
-        local mutex
-        if !(plan is RabbitDeploymentPlan) {
-            throw TypeError("Expected a RabbitDeploymentPlan.")
-        }
-        if plan.IsEmpty() {
-            return 0
-        }
-        mutex := this.CreateMutex()
-        if !mutex.Create() {
-            ; TODO: log error
-            return 1
-        }
-
-        try {
-            if mutex.lasterr == ERROR_ALREADY_EXISTS {
-                ; TODO: log error
-                if report_errors {
-                    MsgBox(
-                        RabbitI18n.Text("frontend.deploy_busy_deferred"),
-                        RabbitI18n.Text("about.message_title"),
-                        "Ok Iconi"
-                    )
-                }
-                return 1
-            }
-
-            if plan.full_workspace_required {
-                if !this.rime.deploy() {
-                    return 1
-                }
-            } else if plan.default_config_changed
-                && !this.rime.deploy_config_file("default.yaml", "config_version") {
-                return 1
-            }
-            if plan.rabbit_config_changed
-                && !this.rime.deploy_config_file("rabbit.yaml", "config_version") {
-                return 1
-            }
-            for schema_id in plan.schema_config_ids {
-                if !this.rime.deploy_config_file(schema_id . ".schema.yaml", "schema/version") {
-                    return 1
-                }
-            }
-            return 0
-        } finally {
-            mutex.Close()
-        }
-    }
-
     DictManagement() {
         local dialog, model, result
         model := 0
@@ -304,28 +192,4 @@ class RabbitDeployerWorkflow {
         return result
     }
 
-    SyncUserData() {
-        local mutex
-        mutex := this.CreateMutex()
-        if !mutex.Create() {
-            ; TODO: log error
-            return 1
-        }
-
-        try {
-            if mutex.lasterr == ERROR_ALREADY_EXISTS {
-                ; TODO: log error
-                MsgBox(RabbitI18n.Text("frontend.deploy_busy"), RabbitI18n.Text("about.message_title"), "Ok Iconi")
-                return 1
-            }
-
-            if !this.rime.sync_user_data() {
-                return 1
-            }
-            this.rime.join_maintenance_thread()
-            return 0
-        } finally {
-            mutex.Close()
-        }
-    }
 }

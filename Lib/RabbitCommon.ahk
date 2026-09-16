@@ -55,12 +55,17 @@ RabbitIsOldWindows() {
     return VerCompare(A_OSVersion, "< 10")
 }
 
-class RabbitMutex {
+class RabbitNamedMutex {
     handle := 0
     lasterr := 0
+
+    __New(name) {
+        this.name := name
+    }
+
     Create() {
         this.lasterr := 0
-        this.handle := DllCall("CreateMutex", "Ptr", 0, "Int", true, "Str", "RabbitDeployerMutex")
+        this.handle := DllCall("CreateMutex", "Ptr", 0, "Int", true, "Str", this.name)
         if A_LastError == ERROR_ALREADY_EXISTS {
             this.lasterr := ERROR_ALREADY_EXISTS
         }
@@ -71,6 +76,18 @@ class RabbitMutex {
             DllCall("CloseHandle", "Ptr", this.handle)
             this.handle := 0
         }
+    }
+}
+
+class RabbitApplicationMutex extends RabbitNamedMutex {
+    __New() {
+        super.__New("RabbitApplicationMutex")
+    }
+}
+
+class RabbitDeploymentMutex extends RabbitNamedMutex {
+    __New() {
+        super.__New("RabbitDeploymentMutex")
     }
 }
 

@@ -17,10 +17,12 @@
  */
 
 #Include RabbitCommon.ahk
+#Include RabbitI18n.ahk
 
 class RabbitDeployerContext {
-    __New(rime_api) {
+    __New(rime_api, mutex_instance := 0) {
         this.rime := rime_api
+        this.mutex := mutex_instance ? mutex_instance : RabbitDeploymentMutex()
         this.traits := 0
         this.command := ""
         this.keyboard_layout := 0
@@ -34,10 +36,19 @@ class RabbitDeployerContext {
         if this.rime_initialized {
             return
         }
-        this.traits := RabbitCreateTraits()
-        this.rime.setup(this.traits)
-        this.rime.deployer_initialize(0)
-        this.rime_initialized := true
+        if !this.mutex.Create() || this.mutex.lasterr == ERROR_ALREADY_EXISTS {
+            this.mutex.Close()
+            throw Error(RabbitI18n.Text("frontend.deploy_busy"))
+        }
+        try {
+            this.traits := RabbitCreateTraits()
+            this.rime.setup(this.traits)
+            this.rime.deployer_initialize(0)
+            this.rime_initialized := true
+        } catch {
+            this.mutex.Close()
+            throw
+        }
     }
 
     Dispose() {
@@ -45,10 +56,14 @@ class RabbitDeployerContext {
             return
         }
         this.disposed := true
-        if this.rime_initialized {
-            this.rime.finalize()
-            this.rime_initialized := false
+        try {
+            if this.rime_initialized {
+                this.rime.finalize()
+                this.rime_initialized := false
+            }
+            this.traits := 0
+        } finally {
+            this.mutex.Close()
         }
-        this.traits := 0
     }
 }

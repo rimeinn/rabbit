@@ -30,7 +30,10 @@ RunTest("supported Windows preview creation", TestSupportedWindowsPreviewCreatio
 
 TestDeployerContextLifecycle() {
     local calls := []
-    local context := RabbitDeployerContext(RabbitDeployerRimeProbe(calls))
+    local context := RabbitDeployerContext(
+        RabbitDeployerRimeProbe(calls),
+        RabbitDeployerMutexProbe(calls)
+    )
 
     context.Initialize()
     context.Initialize()
@@ -38,7 +41,7 @@ TestDeployerContextLifecycle() {
     context.Dispose()
 
     AssertEqual(
-        "setup,deployer_initialize,finalize",
+        "mutex_create,setup,deployer_initialize,finalize,mutex_close",
         JoinDeployerCalls(calls),
         "The deployer context did not initialize and finalize Rime exactly once."
     )
@@ -46,7 +49,10 @@ TestDeployerContextLifecycle() {
 
 TestPartialDeployerContextDisposal() {
     local calls := []
-    local context := RabbitDeployerContext(RabbitDeployerRimeProbe(calls))
+    local context := RabbitDeployerContext(
+        RabbitDeployerRimeProbe(calls),
+        RabbitDeployerMutexProbe(calls)
+    )
 
     context.Dispose()
 
@@ -163,6 +169,27 @@ class RabbitDeployerRimeProbe {
 
     finalize() {
         this.calls.Push("finalize")
+    }
+}
+
+class RabbitDeployerMutexProbe {
+    __New(calls) {
+        this.calls := calls
+        this.lasterr := 0
+        this.created := false
+    }
+
+    Create() {
+        this.created := true
+        this.calls.Push("mutex_create")
+        return true
+    }
+
+    Close() {
+        if this.created {
+            this.calls.Push("mutex_close")
+            this.created := false
+        }
     }
 }
 

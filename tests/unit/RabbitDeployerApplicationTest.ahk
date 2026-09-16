@@ -22,7 +22,7 @@
 RunTest("settings window ownership", TestSettingsWindowOwnership.Bind())
 RunTest("deployer defers the initial settings page load", TestDeployerDefersInitialSettingsLoad.Bind())
 RunTest("old Windows uses legacy deployer", TestOldWindowsUsesLegacyDeployer.Bind())
-RunTest("deployer validates settings page IDs", TestDeployerValidatesSettingsPageIds.Bind())
+RunTest("deployer only accepts bootstrap settings", TestDeployerOnlyAcceptsBootstrapSettings.Bind())
 RunTest("old Windows redirects dictionary settings", TestOldWindowsRedirectsDictionarySettings.Bind())
 
 TestSettingsWindowOwnership() {
@@ -50,16 +50,16 @@ TestDeployerDefersInitialSettingsLoad() {
     }
 }
 
-TestDeployerValidatesSettingsPageIds() {
+TestDeployerOnlyAcceptsBootstrapSettings() {
     local application := RabbitDeployerApplicationProbe([])
-    local options := application.ParseOptions([])
-    AssertEqual("settings", options.command, "No arguments did not select unified settings.")
-    AssertEqual("", options.target, "No arguments were mapped to a named page.")
-
-    options := application.ParseOptions(["settings", "about"])
-    AssertEqual("about", options.target, "A stable settings page ID was rejected.")
     AssertThrows(
-        application.ParseOptions.Bind(application, ["settings", "missing-page"]),
+        application.ParseOptions.Bind(application, []),
+        "The deployer still accepted the resident modern settings command."
+    )
+    local options := application.ParseOptions(["settings", "input-schemes", "--install"])
+    AssertEqual("input-schemes", options.target, "The bootstrap settings page was rejected.")
+    AssertThrows(
+        application.ParseOptions.Bind(application, ["settings", "missing-page", "--install"]),
         "The deployer accepted an unknown settings page."
     )
 }

@@ -31,7 +31,7 @@
 
 class RabbitApplication {
     __New(rime_api) {
-        this.context := RabbitAppContext(rime_api, RabbitMutex())
+        this.context := RabbitAppContext(rime_api, RabbitApplicationMutex())
         this.tray := 0
         this.settings := 0
         this.tray_click_callback := 0

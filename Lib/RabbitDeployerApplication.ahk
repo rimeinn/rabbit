@@ -46,7 +46,7 @@ class RabbitDeployerApplication {
         this.context.Initialize()
         RabbitI18n.LoadConfig(this.context.rime)
         RabbitSetupMaintenanceTray()
-        this.workflow := RabbitDeployerWorkflow(this.context.rime)
+        this.workflow := RabbitDeployerWorkflow(this.context.rime, false)
 
         switch options.command {
             case "deploy":
@@ -78,6 +78,9 @@ class RabbitDeployerApplication {
 
     ParseOptions(args) {
         local options := RabbitDeployerOptions.Parse(args)
+        if options.command = "settings" && !options.installing {
+            throw ValueError("Modern settings are owned by the Rabbit frontend.")
+        }
         if options.command = "settings" && options.target
             && !RabbitSettingsWindow.PageIndex(options.target) {
             throw ValueError(RabbitI18n.Text("messages.unknown_page", Map("page", options.target)))

@@ -196,10 +196,11 @@ class RabbitDeployerWorkflowProbe extends RabbitDeployerWorkflow {
     }
 }
 
-class RabbitCandidateLabelWorkflowProbe extends RabbitDeployerWorkflowProbe {
+class RabbitCandidateLabelWorkflowProbe extends RabbitSettingsWorkflow {
     __New(rime_api, calls) {
+        this.rime := rime_api
+        this.calls := calls
         this.label_api := RabbitCandidateLabelLeversProbe(calls)
-        super.__New(rime_api, calls)
     }
 
     CreateLevers() {
