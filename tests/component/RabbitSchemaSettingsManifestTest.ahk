@@ -253,22 +253,26 @@ TestBundledSchemaSettingsFallback() {
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
     local field
-    AssertEqual(20, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
-    AssertEqual(5, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
-    AssertEqual("menu", manifest.fields[1].group, "The bundled fallback did not assign its field to a group.")
-    AssertEqual("menu/page_size", manifest.fields[1].path, "The bundled fallback omitted the page-size setting.")
-    AssertEqual("list", manifest.fields[2].type, "The bundled fallback omitted candidate label support.")
-    AssertTrue(manifest.fields[2].default is Array, "The candidate label default was not parsed as an empty list.")
+    AssertEqual(21, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(6, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
+    AssertEqual("switches", manifest.groups[1].id, "The bundled fallback omitted the switches group.")
+    field := SchemaManifestFieldByPath(manifest, "switches")
+    AssertEqual("switch_list", field.type, "The bundled fallback omitted schema option support.")
+    AssertEqual(6, field.rows, "The bundled fallback did not configure switch-list rows.")
+    AssertEqual("menu", manifest.fields[2].group, "The bundled fallback did not assign its field to a group.")
+    AssertEqual("menu/page_size", manifest.fields[2].path, "The bundled fallback omitted the page-size setting.")
+    AssertEqual("list", manifest.fields[3].type, "The bundled fallback omitted candidate label support.")
+    AssertTrue(manifest.fields[3].default is Array, "The candidate label default was not parsed as an empty list.")
     AssertEqual(
         "menu/alternative_select_keys",
-        manifest.fields[3].path,
+        manifest.fields[4].path,
         "The bundled fallback omitted candidate selection-key support."
     )
-    AssertTrue(manifest.fields[3].has_default && manifest.fields[3].default = "",
+    AssertTrue(manifest.fields[4].has_default && manifest.fields[4].default = "",
         "The candidate selection-key default was not parsed.")
-    AssertEqual("boolean", manifest.fields[4].type, "The bundled fallback omitted page-cycle support.")
-    AssertTrue(!manifest.fields[4].default, "The page-cycle default was not parsed.")
-    AssertEqual("ascii_composer", manifest.groups[2].id, "The bundled fallback omitted the ASCII composer group.")
+    AssertEqual("boolean", manifest.fields[5].type, "The bundled fallback omitted page-cycle support.")
+    AssertTrue(!manifest.fields[5].default, "The page-cycle default was not parsed.")
+    AssertEqual("ascii_composer", manifest.groups[3].id, "The bundled fallback omitted the ASCII composer group.")
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/good_old_caps_lock")
     AssertEqual("boolean", field.type, "The bundled fallback omitted the Caps Lock compatibility setting.")
     AssertTrue(field.has_default && field.default, "The Caps Lock compatibility default was not parsed.")
@@ -279,33 +283,33 @@ TestBundledSchemaSettingsFallback() {
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/switch_key/Caps_Lock")
     AssertEqual(4, field.options.Length, "The Caps Lock action options were incomplete.")
     AssertEqual("clear", field.default, "The Caps Lock switch default was not parsed.")
-    AssertEqual("key_binder", manifest.groups[3].id, "The bundled fallback omitted the key binder group.")
+    AssertEqual("key_binder", manifest.groups[4].id, "The bundled fallback omitted the key binder group.")
     field := SchemaManifestFieldByPath(manifest, "key_binder/bindings")
     AssertEqual("key_binding_list", field.type, "The bundled fallback omitted key binding list support.")
     AssertEqual(5, field.rows, "The bundled fallback did not configure binding list rows.")
-    AssertEqual("punctuator_map", manifest.fields[13].type, "The bundled fallback omitted punctuation map support.")
+    AssertEqual("punctuator_map", manifest.fields[14].type, "The bundled fallback omitted punctuation map support.")
     AssertEqual(
         "punctuator/full_shape",
-        manifest.fields[13].path,
+        manifest.fields[14].path,
         "The bundled fallback omitted the full-shape punctuation map."
     )
-    AssertEqual("boolean", manifest.fields[16].type, "The bundled fallback omitted punctuation spacing support.")
-    AssertTrue(!manifest.fields[16].default, "The punctuation spacing default was not parsed.")
+    AssertEqual("boolean", manifest.fields[17].type, "The bundled fallback omitted punctuation spacing support.")
+    AssertTrue(!manifest.fields[17].default, "The punctuation spacing default was not parsed.")
     AssertEqual(
         "punctuator/digit_separators",
-        manifest.fields[17].path,
+        manifest.fields[18].path,
         "The bundled fallback omitted digit separator support."
     )
-    AssertEqual(".:", manifest.fields[17].default, "The digit separator default was not parsed.")
-    AssertEqual("enum", manifest.fields[18].type, "The bundled fallback omitted digit separator action support.")
-    AssertEqual("forward", manifest.fields[18].default, "The digit separator action default was not parsed.")
-    AssertEqual(2, manifest.fields[18].options.Length, "The digit separator action options were incomplete.")
-    AssertEqual("recognizer", manifest.groups[5].id, "The bundled fallback omitted the recognizer group.")
-    AssertEqual("boolean", manifest.fields[19].type, "The bundled fallback omitted recognizer spacing support.")
-    AssertTrue(!manifest.fields[19].default, "The recognizer spacing default was not parsed.")
-    AssertEqual("recognizer_patterns", manifest.fields[20].type,
+    AssertEqual(".:", manifest.fields[18].default, "The digit separator default was not parsed.")
+    AssertEqual("enum", manifest.fields[19].type, "The bundled fallback omitted digit separator action support.")
+    AssertEqual("forward", manifest.fields[19].default, "The digit separator action default was not parsed.")
+    AssertEqual(2, manifest.fields[19].options.Length, "The digit separator action options were incomplete.")
+    AssertEqual("recognizer", manifest.groups[6].id, "The bundled fallback omitted the recognizer group.")
+    AssertEqual("boolean", manifest.fields[20].type, "The bundled fallback omitted recognizer spacing support.")
+    AssertTrue(!manifest.fields[20].default, "The recognizer spacing default was not parsed.")
+    AssertEqual("recognizer_patterns", manifest.fields[21].type,
         "The bundled fallback omitted recognizer pattern support.")
-    AssertEqual("recognizer/patterns", manifest.fields[20].path,
+    AssertEqual("recognizer/patterns", manifest.fields[21].path,
         "The bundled fallback omitted the recognizer pattern path.")
 }
 
