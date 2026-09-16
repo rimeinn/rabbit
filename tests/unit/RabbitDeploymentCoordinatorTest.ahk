@@ -135,7 +135,7 @@ class RabbitDeploymentCoordinatorProbe extends RabbitDeploymentCoordinator {
     SchedulePoll() {
     }
 
-    CreateWorkerProcess(operation, plan) {
+    CreateWorkerProcess(operation, plan, payload := 0) {
         this.calls.Push("launch:" . operation . ":" . (plan ? plan.Serialize() : ""))
         if this.fail_launch {
             throw Error("Injected worker launch failure.")

@@ -72,15 +72,14 @@ class RabbitApplication {
         this.settings := this.CreateSettingsController()
         this.tray := this.CreateTrayController()
         this.coordinator := this.CreateDeploymentCoordinator()
-        if !this.StartFrontendRuntime(options.maintenance, first_run) {
-            return
-        }
-
         this.tray.SetupMenu()
         this.tray.UpdateIcon()
         this.tray_click_callback := this.tray.OnClick.Bind(this.tray)
         OnMessage(AHK_NOTIFYICON, this.tray_click_callback)
         this.tray_message_registered := true
+        if !this.StartFrontendRuntime(options.maintenance, first_run) {
+            return
+        }
     }
 
     CreateTrayController() {
@@ -147,9 +146,17 @@ class RabbitApplication {
                 local plan := args.Length && args[1] is RabbitDeploymentPlan
                     ? args[1]
                     : RabbitDeploymentPlan.FullRedeploy()
-                return this.coordinator.Submit(plan)
+                local completion_callback := args.Length >= 2 ? args[2] : 0
+                return this.coordinator.Submit(plan, completion_callback)
             case "sync":
-                return this.coordinator.SubmitSync()
+                return this.coordinator.SubmitSync(args.Length ? args[1] : 0)
+            case "dictionary":
+                return this.coordinator.SubmitDictionary(
+                    args.Length >= 1 ? args[1] : "",
+                    args.Length >= 2 ? args[2] : "",
+                    args.Length >= 3 ? args[3] : "",
+                    args.Length >= 4 ? args[4] : 0
+                )
             default:
                 this.RunDeployer(command, args*)
                 return true
@@ -205,18 +212,18 @@ class RabbitApplication {
     }
 
     RunFirstInstallation() {
-        local args := []
-        local command := this.UseLegacySettings() ? "legacy-settings" : "settings"
         if !this.UseLegacySettings() {
-            args.Push("input-schemes")
+            this.settings.ShowInstallation("input-schemes")
+            return false
         }
-        args.Push(
+        this.RunDeployer(
+            "legacy-settings",
             "--install",
             "--return-to-rabbit",
             "--keyboard-layout",
             RabbitFormatKeyboardLayout(this.keyboard_layout)
         )
-        this.RunDeployer(command, args*)
+        return false
     }
 
     ResolveKeyboardLayout(layout := 0) {

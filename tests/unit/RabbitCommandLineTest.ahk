@@ -95,10 +95,26 @@ TestWorkerCommandLineOptions() {
 
     options := RabbitWorkerOptions.Parse(["sync"])
     AssertEqual("sync", options.operation, "The worker rejected synchronization.")
+    options := RabbitWorkerOptions.Parse([
+        "dictionary",
+        "--action",
+        "export",
+        "--dictionary",
+        "demo",
+        "--path",
+        "C:\Temp\demo.txt"
+    ])
+    AssertEqual("export", options.dictionary_action, "The worker changed the dictionary action.")
+    AssertEqual("demo", options.dictionary_name, "The worker changed the dictionary name.")
+    AssertEqual("C:\Temp\demo.txt", options.path, "The worker changed the dictionary path.")
     AssertThrows(RabbitWorkerOptions.Parse.Bind(["deploy"]), "The worker accepted a missing plan.")
     AssertThrows(
         RabbitWorkerOptions.Parse.Bind(["sync", "--plan", "v1|rabbit"]),
         "The sync worker accepted a deployment plan."
+    )
+    AssertThrows(
+        RabbitWorkerOptions.Parse.Bind(["dictionary", "--action", "export", "--dictionary", "demo"]),
+        "The dictionary worker accepted a missing path."
     )
 }
 

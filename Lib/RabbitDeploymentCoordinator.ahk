@@ -19,7 +19,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitDeploymentPlan.ahk
 
-RabbitLaunchDeployerWorker(operation, plan := 0) {
+RabbitLaunchDeployerWorker(operation, plan := 0, payload := 0) {
     local command_line := []
     if A_IsCompiled {
         command_line.Push(A_ScriptFullPath, "/force")
@@ -32,6 +32,14 @@ RabbitLaunchDeployerWorker(operation, plan := 0) {
             throw TypeError("Expected a RabbitDeploymentPlan.")
         }
         command_line.Push("--plan", plan.Serialize())
+    } else if operation = "dictionary" {
+        command_line.Push("--action", payload.action)
+        if payload.dictionary_name {
+            command_line.Push("--dictionary", payload.dictionary_name)
+        }
+        if payload.path {
+            command_line.Push("--path", payload.path)
+        }
     }
     local pid := 0
     Run(RabbitBuildCommandLine(command_line), , "Hide", &pid)
@@ -104,6 +112,7 @@ class RabbitDeploymentCoordinator {
         this.state := RabbitDeploymentCoordinator.IDLE
         this.operation := ""
         this.plan := 0
+        this.payload := 0
         this.completion_callback := 0
         this.process := 0
         this.runtime_stopped := false
@@ -133,12 +142,22 @@ class RabbitDeploymentCoordinator {
         return this.SubmitOperation("sync", 0, completion_callback)
     }
 
-    SubmitOperation(operation, plan, completion_callback) {
+    SubmitDictionary(action, dictionary_name := "", path := "", completion_callback := 0) {
+        return this.SubmitOperation(
+            "dictionary",
+            0,
+            completion_callback,
+            {action: action, dictionary_name: dictionary_name, path: path}
+        )
+    }
+
+    SubmitOperation(operation, plan, completion_callback, payload := 0) {
         if this.disposed || this.state != RabbitDeploymentCoordinator.IDLE {
             return false
         }
         this.operation := operation
         this.plan := plan
+        this.payload := payload
         this.completion_callback := completion_callback
         this.runtime_stopped := false
         this.state := RabbitDeploymentCoordinator.PREPARING
@@ -166,7 +185,7 @@ class RabbitDeploymentCoordinator {
             this.state := RabbitDeploymentCoordinator.STOPPING_RUNTIME
             this.stop_runtime_callback.Call()
             this.runtime_stopped := true
-            this.process := this.CreateWorkerProcess(this.operation, this.plan)
+            this.process := this.CreateWorkerProcess(this.operation, this.plan, this.payload)
             this.state := RabbitDeploymentCoordinator.WORKER_RUNNING
             this.SchedulePoll()
         } catch as err {
@@ -175,8 +194,8 @@ class RabbitDeploymentCoordinator {
         }
     }
 
-    CreateWorkerProcess(operation, plan) {
-        return RabbitLaunchDeployerWorker(operation, plan)
+    CreateWorkerProcess(operation, plan, payload := 0) {
+        return RabbitLaunchDeployerWorker(operation, plan, payload)
     }
 
     SchedulePoll() {
@@ -249,6 +268,7 @@ class RabbitDeploymentCoordinator {
         this.NotifyCompletion(result, resumed)
         this.operation := ""
         this.plan := 0
+        this.payload := 0
         this.completion_callback := 0
         this.state := RabbitDeploymentCoordinator.IDLE
     }

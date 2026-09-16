@@ -21,7 +21,6 @@
 #Include RabbitCommandLine.ahk
 #Include RabbitDeployerContext.ahk
 #Include RabbitDeployerWorkflow.ahk
-#Include RabbitSettingsWindow.ahk
 #Include RabbitTrayMenu.ahk
 
 class RabbitDeployerApplication {
@@ -55,9 +54,6 @@ class RabbitDeployerApplication {
             case "sync":
                 this.context.result := this.workflow.SyncUserData()
                 this.context.maintenance_mode := RABBIT_PARTIAL_MAINTENANCE
-            case "settings":
-                this.context.result := this.ShowSettings(options.target, options.installing)
-                this.context.maintenance_mode := RABBIT_NO_MAINTENANCE
             case "legacy-settings":
                 if options.target = "dictionary" {
                     this.context.result := this.workflow.DictManagement()
@@ -78,79 +74,10 @@ class RabbitDeployerApplication {
 
     ParseOptions(args) {
         local options := RabbitDeployerOptions.Parse(args)
-        if options.command = "settings" && !options.installing {
+        if options.command = "settings" {
             throw ValueError("Modern settings are owned by the Rabbit frontend.")
         }
-        if options.command = "settings" && options.target
-            && !RabbitSettingsWindow.PageIndex(options.target) {
-            throw ValueError(RabbitI18n.Text("messages.unknown_page", Map("page", options.target)))
-        }
         return options
-    }
-
-    CreateSettingsWindow(page_id := "", installing := false) {
-        return RabbitSettingsWindow(
-            this.workflow,
-            false,
-            RabbitAppearancePreview,
-            0,
-            page_id,
-            installing,
-            RabbitWindowThemeController,
-            true
-        )
-    }
-
-    UseLegacySettings() {
-        return RabbitIsOldWindows()
-    }
-
-    ShowSettings(page_id := "", installing := false) {
-        if this.UseLegacySettings() {
-            if page_id = "dictionary" {
-                return this.workflow.DictManagement()
-            }
-            return this.workflow.Run(installing)
-        }
-
-        local window, state := 0
-        loop {
-            window := this.CreateSettingsWindow(page_id, installing)
-            window.language_reload_callback := this.ReloadSettingsLanguage.Bind(this)
-            try {
-                if state {
-                    window.RestoreLanguageReloadState(state)
-                }
-                window.Show(state ? Format("x{} y{}", state.x, state.y) : "Center")
-                window.WaitClose()
-                state := window.language_reload_state
-            } finally {
-                window.Dispose()
-            }
-            if !state {
-                break
-            }
-            page_id := state.page_id
-            installing := state.installing
-        }
-        return 0
-    }
-
-    ReloadSettingsLanguage(window) {
-        local preference := RabbitI18n.ReadPreference(this.context.rime)
-        if RabbitI18n.ResolveLocale(preference) = RabbitI18n.locale {
-            return false
-        }
-        local state := window.CaptureLanguageReloadState()
-        this.ActivateSettingsLanguage(preference)
-        window.language_reload_state := state
-        window.Dispose()
-        return true
-    }
-
-    ActivateSettingsLanguage(preference) {
-        RabbitI18n.Initialize(A_ScriptDir . "\Locales", preference)
-        RabbitSetupMaintenanceTray()
     }
 
     RestartRabbit(maintenance_mode) {

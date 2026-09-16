@@ -17,6 +17,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitDeploymentPlan.ahk
+#Include RabbitDictionarySettingsModel.ahk
 #Include RabbitI18n.ahk
 
 class RabbitMaintenanceWorkflow {
@@ -110,5 +111,48 @@ class RabbitMaintenanceWorkflow {
         }
         this.rime.join_maintenance_thread()
         return 0
+    }
+
+    RunDictionary(action, dictionary_name := "", path := "") {
+        local model := 0, result := false
+        try {
+            model := this.CreateDictionarySettingsModel()
+            switch action {
+                case "backup":
+                    result := model.Backup(dictionary_name)
+                case "restore":
+                    result := model.Restore(path)
+                case "export":
+                    result := model.Export(dictionary_name, path) >= 0
+                case "import":
+                    result := model.Import(dictionary_name, path) >= 0
+                default:
+                    throw ValueError("Invalid dictionary action.")
+            }
+            return result ? 0 : 1
+        } finally {
+            if model {
+                model.Dispose()
+            }
+        }
+    }
+
+    CreateDictionarySettingsModel() {
+        return RabbitDictionarySettingsModel(
+            this.rime,
+            RimeLeversApi(this.rime),
+            (*) => RabbitMaintenanceOwnedMutex()
+        )
+    }
+}
+
+class RabbitMaintenanceOwnedMutex {
+    lasterr := 0
+
+    Create() {
+        return true
+    }
+
+    Close() {
     }
 }

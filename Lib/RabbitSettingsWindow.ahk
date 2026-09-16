@@ -41,6 +41,8 @@ class RabbitSettingsWindow extends Gui {
     closed_callback := 0
     nonblocking_language_reload := false
     maintenance_active := false
+    activation_pending := false
+    deploying := false
 
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 580
@@ -190,6 +192,8 @@ class RabbitSettingsWindow extends Gui {
         this.rime_depot_busy := false
         this.parent_operation_busy := false
         this.parent_operation_restore_enabled := true
+        this.pending_plan := RabbitDeploymentPlan()
+        this.maintenance_draft := 0
         this.disposed := false
         this.selected_page := 0
         this.window_shown := false
@@ -2164,7 +2168,8 @@ class RabbitSettingsWindow extends Gui {
             return this.CompleteInstallation()
         }
         if !this.HasUnsavedSettings() {
-            return true
+            return !this.activation_pending || this.deploying
+                || this.Deploy(this.pending_plan) = 0
         }
 
         if this.switcher_dirty {
@@ -2368,7 +2373,8 @@ class RabbitSettingsWindow extends Gui {
             return
         }
         this.apply_button.Text := RabbitI18n.Text("settings.apply")
-        this.apply_button.Enabled := this.HasUnsavedSettings()
+        this.apply_button.Enabled := (this.HasUnsavedSettings() || this.activation_pending)
+            && !this.deploying
             && !this.IsRimeDepotBusy() && !this.parent_operation_busy
     }
 
@@ -3949,6 +3955,16 @@ class RabbitSettingsWindow extends Gui {
             }
             file := path . "\" . dict_name . ".userdb.txt"
             this.dictionary_status.Value := RabbitI18n.Text("controls.backing_up")
+            if HasMethod(this.workflow, "RunDictionaryMaintenance") {
+                return this.SubmitDictionaryMaintenance(
+                    "backup",
+                    dict_name,
+                    "",
+                    RabbitI18n.Text("controls.backup_done"),
+                    RabbitI18n.Text("controls.backup_error"),
+                    file
+                )
+            }
             if !this.dictionary_model.Backup(dict_name) {
                 throw Error(RabbitI18n.Text("controls.backup_error"))
             }
@@ -3980,6 +3996,15 @@ class RabbitSettingsWindow extends Gui {
         }
         try {
             this.dictionary_status.Value := RabbitI18n.Text("controls.restoring")
+            if HasMethod(this.workflow, "RunDictionaryMaintenance") {
+                return this.SubmitDictionaryMaintenance(
+                    "restore",
+                    "",
+                    selected_path,
+                    RabbitI18n.Text("controls.restore_done"),
+                    RabbitI18n.Text("controls.restore_error")
+                )
+            }
             if !this.dictionary_model.Restore(selected_path) {
                 throw Error(RabbitI18n.Text("controls.restore_error"))
             }
@@ -4009,6 +4034,16 @@ class RabbitSettingsWindow extends Gui {
         }
         try {
             this.dictionary_status.Value := RabbitI18n.Text("controls.exporting")
+            if HasMethod(this.workflow, "RunDictionaryMaintenance") {
+                return this.SubmitDictionaryMaintenance(
+                    "export",
+                    dict_name,
+                    selected_path,
+                    RabbitI18n.Text("frontend.maintenance_done"),
+                    RabbitI18n.Text("controls.export_error"),
+                    selected_path
+                )
+            }
             result := this.dictionary_model.Export(dict_name, selected_path)
             if result < 0 {
                 throw Error(RabbitI18n.Text("controls.export_error"))
@@ -4040,6 +4075,15 @@ class RabbitSettingsWindow extends Gui {
         }
         try {
             this.dictionary_status.Value := RabbitI18n.Text("controls.importing")
+            if HasMethod(this.workflow, "RunDictionaryMaintenance") {
+                return this.SubmitDictionaryMaintenance(
+                    "import",
+                    dict_name,
+                    selected_path,
+                    RabbitI18n.Text("frontend.maintenance_done"),
+                    RabbitI18n.Text("controls.import_error")
+                )
+            }
             result := this.dictionary_model.Import(dict_name, selected_path)
             if result < 0 {
                 throw Error(RabbitI18n.Text("controls.import_error"))
@@ -4076,6 +4120,10 @@ class RabbitSettingsWindow extends Gui {
         if this.installing {
             return this.CompleteInstallation()
         }
+        if this.workflow && HasMethod(this.workflow, "Submit") {
+            this.operation_status.Value := RabbitI18n.Text("controls.working")
+            return this.UpdateWorkspace() = 0
+        }
         return this.RunMaintenanceAction(
             (*) => this.UpdateWorkspace(),
             RabbitI18n.Text("controls.deploy_done"),
@@ -4088,11 +4136,28 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := RabbitI18n.Text("depot.busy")
             return false
         }
+        if this.workflow && HasMethod(this.workflow, "SubmitSync") {
+            this.operation_status.Value := RabbitI18n.Text("controls.working")
+            if !this.workflow.SubmitSync(this.OnSyncComplete.Bind(this)) {
+                this.operation_status.Value := RabbitI18n.Text("models.maintenance_busy")
+                return false
+            }
+            return true
+        }
         return this.RunMaintenanceAction(
             (*) => this.workflow.SyncUserData(),
             RabbitI18n.Text("controls.sync_done"),
             RabbitI18n.Text("controls.sync_error")
         )
+    }
+
+    OnSyncComplete(result, resumed) {
+        if this.disposed {
+            return
+        }
+        this.operation_status.Value := result = 0 && resumed
+            ? RabbitI18n.Text("controls.sync_done")
+            : RabbitI18n.Text("controls.sync_error")
     }
 
     RunMaintenanceAction(action, success_message, failure_message) {
@@ -4359,15 +4424,86 @@ class RabbitSettingsWindow extends Gui {
             this.footer_status.Value := RabbitI18n.Text("depot.busy")
             return 1
         }
-        this.deployment_pending := false
         if plan.IsEmpty() {
             return 0
         }
-        local result := HasMethod(this.workflow, "Deploy")
+        this.pending_plan.Merge(plan)
+        this.activation_pending := true
+        this.deployment_pending := false
+        local result
+        if HasMethod(this.workflow, "Submit") {
+            if this.deploying {
+                return 1
+            }
+            this.deploying := true
+            if !this.workflow.Submit(
+                RabbitDeploymentPlan.Parse(this.pending_plan.Serialize()),
+                this.OnDeploymentComplete.Bind(this)
+            ) {
+                this.deploying := false
+                this.UpdateApplyButton()
+                return 1
+            }
+            this.deployment_pending := true
+            this.UpdateApplyButton()
+            return 0
+        }
+        result := HasMethod(this.workflow, "Deploy")
             ? this.workflow.Deploy(plan, true)
             : this.workflow.UpdateWorkspace(true)
-        this.deployment_pending := result = 0
-        if result = 0 {
+        this.OnDeploymentComplete(result, true)
+        return result
+    }
+
+    SubmitDictionaryMaintenance(
+        action,
+        dictionary_name,
+        path,
+        success_message,
+        failure_message,
+        reveal_path := ""
+    ) {
+        local completion_callback := this.OnDictionaryMaintenanceComplete.Bind(
+            this,
+            success_message,
+            failure_message,
+            reveal_path
+        )
+        if !this.workflow.RunDictionaryMaintenance(
+            action,
+            dictionary_name,
+            path,
+            completion_callback
+        ) {
+            this.dictionary_status.Value := RabbitI18n.Text("models.maintenance_busy")
+            return false
+        }
+        return true
+    }
+
+    OnDictionaryMaintenanceComplete(success_message, failure_message, reveal_path, result, resumed) {
+        if this.disposed {
+            return
+        }
+        if result = 0 && resumed {
+            this.dictionary_status.Value := success_message
+            if reveal_path && FileExist(reveal_path) {
+                Run("explorer.exe /select,`"" . reveal_path . "`"")
+            }
+        } else {
+            this.dictionary_status.Value := failure_message
+        }
+    }
+
+    OnDeploymentComplete(result, resumed := true) {
+        if this.disposed {
+            return
+        }
+        this.deploying := false
+        this.deployment_pending := result = 0 && resumed
+        if result = 0 && resumed {
+            this.activation_pending := false
+            this.pending_plan := RabbitDeploymentPlan()
             if IsObject(this.rime_depot_window)
                 && (!HasProp(this.rime_depot_window, "disposed") || !this.rime_depot_window.disposed) {
                 ; Parent settings operations hold the child host lock until
@@ -4381,12 +4517,25 @@ class RabbitSettingsWindow extends Gui {
             if this.language_reload_callback && this.nonblocking_language_reload {
                 SetTimer(this.language_reload_timer, -50)
             }
+            if HasProp(this, "operation_status") {
+                this.operation_status.Value := RabbitI18n.Text("controls.deploy_done")
+            }
+        } else {
+            this.activation_pending := true
+            this.footer_status.Opt("cRed")
+            this.footer_status.Value := resumed
+                ? RabbitI18n.Text("controls.redeploy_error")
+                : RabbitI18n.Text("frontend.session_error")
+            if HasProp(this, "operation_status") {
+                this.operation_status.Value := RabbitI18n.Text("controls.deploy_error")
+            }
         }
-        return result
+        this.UpdateApplyButton()
     }
 
     RunLanguageReload() {
-        if this.disposed || !this.deployment_pending || this.HasUnsavedSettings()
+        if this.disposed || !this.deployment_pending || this.activation_pending
+            || this.HasUnsavedSettings()
             || !this.language_reload_callback {
             return
         }
@@ -4414,11 +4563,21 @@ class RabbitSettingsWindow extends Gui {
         this.parent_operation_busy := true
         this.Opt("+Disabled")
         try {
+            this.maintenance_draft := {
+                appearance_dirty: this.appearance_page.dirty,
+                switcher_dirty: this.switcher_dirty,
+                behavior_dirty: this.behavior_dirty,
+                application_dirty: this.application_dirty,
+                rime_depot_dirty: this.rime_depot_dirty
+            }
             if this.appearance_page && this.appearance_page.settings {
                 this.appearance_page.settings.Dispose()
                 this.appearance_page.settings := 0
             }
-            this.DisposeSwitcherSettings()
+            if this.switcher_model {
+                this.switcher_model.Dispose()
+                this.switcher_model := 0
+            }
             if this.behavior_model {
                 this.behavior_model.Dispose()
                 this.behavior_model := 0
@@ -4453,7 +4612,35 @@ class RabbitSettingsWindow extends Gui {
         this.maintenance_active := false
         this.parent_operation_busy := false
         this.Opt("-Disabled")
-        this.LoadPageSettings(this.selected_page)
+        local draft := this.maintenance_draft
+        this.maintenance_draft := 0
+        try {
+            if draft && draft.appearance_dirty && this.appearance_page {
+                this.appearance_page.settings := workflow.CreateUIStyleSettings()
+            }
+            if draft && draft.switcher_dirty {
+                this.switcher_model := workflow.CreateSwitcherSettingsModel()
+            }
+            if draft && draft.behavior_dirty {
+                this.behavior_model := workflow.CreateBehaviorSettingsModel()
+            }
+            if draft && draft.application_dirty {
+                this.application_model := workflow.CreateApplicationSettingsModel()
+            }
+            local current_dirty := draft && (
+                (this.selected_page = 1 && draft.appearance_dirty)
+                || (this.selected_page = 2 && draft.switcher_dirty)
+                || (this.selected_page = 3 && draft.behavior_dirty)
+                || (this.selected_page = 4 && draft.application_dirty)
+                || (this.selected_page = 2 && draft.rime_depot_dirty)
+            )
+            if !current_dirty {
+                this.LoadPageSettings(this.selected_page)
+            }
+        } catch as err {
+            this.footer_status.Opt("cRed")
+            this.footer_status.Value := err.Message
+        }
         this.footer_status.Opt(result = 0 ? "cGray" : "cRed")
         this.footer_status.Value := result = 0
             ? RabbitI18n.Text("frontend.maintenance_done")

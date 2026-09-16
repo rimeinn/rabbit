@@ -20,6 +20,7 @@
 
 RunTest("deployer worker owns its complete lifecycle", TestWorkerLifecycle.Bind())
 RunTest("deployer worker reports synchronization failure", TestWorkerFailureResult.Bind())
+RunTest("deployer worker routes dictionary maintenance", TestWorkerDictionaryMaintenance.Bind())
 
 TestWorkerLifecycle() {
     local calls := []
@@ -45,6 +46,29 @@ TestWorkerFailureResult() {
         "initialize,workflow,sync,dispose,exit:7",
         JoinWorkerCalls(calls),
         "The failed worker did not release its deployment context."
+    )
+}
+
+TestWorkerDictionaryMaintenance() {
+    local calls := []
+    local application := RabbitWorkerApplicationProbe(calls, 0)
+    AssertEqual(
+        0,
+        application.Run([
+            "dictionary",
+            "--action",
+            "import",
+            "--dictionary",
+            "demo",
+            "--path",
+            "C:\Temp\demo.txt"
+        ]),
+        "The dictionary worker returned the wrong result."
+    )
+    AssertEqual(
+        "initialize,workflow,dictionary:import:demo:C:\Temp\demo.txt,dispose,exit:0",
+        JoinWorkerCalls(calls),
+        "The worker did not route dictionary maintenance."
     )
 }
 
@@ -102,6 +126,11 @@ class RabbitWorkerWorkflowProbe {
 
     SyncUserData() {
         this.calls.Push("sync")
+        return this.result
+    }
+
+    RunDictionary(action, dictionary_name, path) {
+        this.calls.Push("dictionary:" . action . ":" . dictionary_name . ":" . path)
         return this.result
     }
 }

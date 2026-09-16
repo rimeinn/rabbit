@@ -38,6 +38,12 @@ class RabbitDeployerWorkerApplication {
                     result := this.workflow.Deploy(options.plan)
                 case "sync":
                     result := this.workflow.SyncUserData()
+                case "dictionary":
+                    result := this.workflow.RunDictionary(
+                        options.dictionary_action,
+                        options.dictionary_name,
+                        options.path
+                    )
             }
         } catch as err {
             RabbitError(

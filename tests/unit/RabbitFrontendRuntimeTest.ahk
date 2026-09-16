@@ -20,6 +20,7 @@
 
 RunTest("frontend runtime supports repeated replacement", TestFrontendRuntimeReplacement.Bind())
 RunTest("frontend runtime rolls back startup failures", TestFrontendRuntimeStartupRollback.Bind())
+RunTest("frontend runtime can defer first installation", TestFrontendRuntimeDefersInstallation.Bind())
 
 TestFrontendRuntimeReplacement() {
     local calls := []
@@ -56,6 +57,22 @@ TestFrontendRuntimeStartupRollback() {
     AssertEqual(1, CountRuntimeCalls(calls, "finalize"), "Failed startup cleanup was not idempotent.")
 }
 
+TestFrontendRuntimeDefersInstallation() {
+    local calls := []
+    local runtime := RabbitDeferredFrontendRuntimeProbe(
+        RabbitFrontendRuntimeRimeProbe(calls),
+        RabbitFrontendRuntimeTrayProbe(calls),
+        calls
+    )
+    AssertTrue(
+        !runtime.Start(RABBIT_PARTIAL_MAINTENANCE, true, (*) => (calls.Push("install"), false)),
+        "First installation continued into a normal input session."
+    )
+    AssertEqual(0, CountRuntimeCalls(calls, "create_session"), "Deferred installation created an input session.")
+    runtime.Stop()
+    AssertEqual(1, CountRuntimeCalls(calls, "finalize"), "Deferred installation did not release Rime.")
+}
+
 CountRuntimeCalls(calls, expected) {
     local call, count := 0
     for call in calls {
@@ -77,6 +94,7 @@ class RabbitFrontendRuntimeProbe extends RabbitFrontendRuntime {
     }
 
     RunStartupMaintenance(*) {
+        return true
     }
 
     PrepareRuntimeFiles() {
@@ -111,6 +129,12 @@ class RabbitFrontendRuntimeProbe extends RabbitFrontendRuntime {
 
     CreateAppearanceController(*) {
         return RabbitFrontendRuntimeAppearanceProbe(this.calls)
+    }
+}
+
+class RabbitDeferredFrontendRuntimeProbe extends RabbitFrontendRuntimeProbe {
+    RunStartupMaintenance(maintenance, first_run, first_install_callback) {
+        return first_install_callback.Call()
     }
 }
 

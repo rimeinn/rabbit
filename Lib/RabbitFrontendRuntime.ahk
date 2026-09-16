@@ -58,7 +58,9 @@ class RabbitFrontendRuntime {
                 ),
                 Format("RabbitFrontendRuntime.ahk:{}", A_LineNumber)
             )
-            this.RunStartupMaintenance(maintenance, first_run, first_install_callback)
+            if !this.RunStartupMaintenance(maintenance, first_run, first_install_callback) {
+                return false
+            }
             if this.stopped {
                 return false
             }
@@ -138,7 +140,7 @@ class RabbitFrontendRuntime {
         if maintenance != RABBIT_NO_MAINTENANCE {
             RabbitUpdateMaintenanceTrayIcon()
             if first_run && first_install_callback {
-                first_install_callback.Call()
+                return first_install_callback.Call()
             } else if this.rime.start_maintenance(maintenance == RABBIT_FULL_MAINTENANCE) {
                 this.rime.join_maintenance_thread()
             }
@@ -147,6 +149,7 @@ class RabbitFrontendRuntime {
             TrayTip(RabbitI18n.Text("frontend.maintenance_done"), RabbitI18n.Text("settings.product"))
             SetTimer(TrayTip, -2000)
         }
+        return true
     }
 
     PrepareRuntimeFiles() {

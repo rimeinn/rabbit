@@ -47,6 +47,9 @@ class RabbitWorkerOptions {
     __New() {
         this.operation := ""
         this.plan := RabbitDeploymentPlan()
+        this.dictionary_action := ""
+        this.dictionary_name := ""
+        this.path := ""
     }
 
     static Parse(args) {
@@ -55,7 +58,8 @@ class RabbitWorkerOptions {
             throw ValueError("Missing worker operation.")
         }
         options.operation := args[1]
-        if options.operation != "deploy" && options.operation != "sync" {
+        if options.operation != "deploy" && options.operation != "sync"
+            && options.operation != "dictionary" {
             throw ValueError("Invalid worker operation.")
         }
         index := 2
@@ -67,6 +71,15 @@ class RabbitWorkerOptions {
                     options.plan := RabbitDeploymentPlan.Parse(
                         RabbitRequireOptionValue(args, &index, argument)
                     )
+                case "--action":
+                    RabbitRequireUniqueOption(seen, argument)
+                    options.dictionary_action := RabbitRequireOptionValue(args, &index, argument)
+                case "--dictionary":
+                    RabbitRequireUniqueOption(seen, argument)
+                    options.dictionary_name := RabbitRequireOptionValue(args, &index, argument)
+                case "--path":
+                    RabbitRequireUniqueOption(seen, argument)
+                    options.path := RabbitRequireOptionValue(args, &index, argument)
                 default:
                     throw ValueError("Invalid worker option.")
             }
@@ -78,7 +91,35 @@ class RabbitWorkerOptions {
         if options.operation = "sync" && seen.Has("--plan") {
             throw ValueError("Synchronization does not accept a deployment plan.")
         }
+        if options.operation != "dictionary"
+            && (seen.Has("--action") || seen.Has("--dictionary") || seen.Has("--path")) {
+            throw ValueError("Dictionary options require a dictionary worker.")
+        }
+        if options.operation = "dictionary" {
+            options.ValidateDictionary()
+        }
         return options
+    }
+
+    ValidateDictionary() {
+        if this.dictionary_action != "backup" && this.dictionary_action != "restore"
+            && this.dictionary_action != "export" && this.dictionary_action != "import" {
+            throw ValueError("Invalid dictionary action.")
+        }
+        if this.dictionary_name && RegExMatch(this.dictionary_name, '[\x00-\x1f\\/:*?"<>|]') {
+            throw ValueError("Invalid dictionary name.")
+        }
+        if (this.dictionary_action = "backup" || this.dictionary_action = "export"
+            || this.dictionary_action = "import") && !this.dictionary_name {
+            throw ValueError("Missing dictionary name.")
+        }
+        if (this.dictionary_action = "restore" || this.dictionary_action = "export"
+            || this.dictionary_action = "import") && !this.path {
+            throw ValueError("Missing dictionary path.")
+        }
+        if this.dictionary_action = "backup" && this.path {
+            throw ValueError("Dictionary backup does not accept a path.")
+        }
     }
 }
 

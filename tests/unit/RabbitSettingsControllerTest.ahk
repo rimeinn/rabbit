@@ -21,6 +21,7 @@
 RunTest("settings controller owns one window", TestSettingsControllerOwnsOneWindow.Bind())
 RunTest("settings controller releases a closed window", TestSettingsControllerReleasesClosedWindow.Bind())
 RunTest("settings controller rebuilds for language changes", TestSettingsControllerLanguageReload.Bind())
+RunTest("settings controller owns first installation", TestSettingsControllerInstallation.Bind())
 
 TestSettingsControllerOwnsOneWindow() {
     local calls := []
@@ -67,6 +68,22 @@ TestSettingsControllerLanguageReload() {
         )
     } finally {
         RabbitI18n.locale := previous
+        controller.Dispose()
+    }
+}
+
+TestSettingsControllerInstallation() {
+    local calls := []
+    local controller := RabbitSettingsControllerProbe(calls)
+    try {
+        AssertTrue(controller.ShowInstallation(), "The resident installation window was rejected.")
+        AssertTrue(controller.window.installing, "The resident settings window lost install mode.")
+        AssertEqual(
+            "create:input-schemes,show:Center",
+            JoinSettingsControllerCalls(calls),
+            "First installation did not use the resident settings controller."
+        )
+    } finally {
         controller.Dispose()
     }
 }

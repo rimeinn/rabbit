@@ -62,6 +62,17 @@ class RabbitSettingsController {
         return this.CreateAndShow(page_id)
     }
 
+    ShowInstallation(page_id := "input-schemes") {
+        if this.disposed {
+            return false
+        }
+        if this.window && !this.window.disposed {
+            this.ActivateWindow(this.window)
+            return true
+        }
+        return this.CreateAndShow(page_id, true)
+    }
+
     CreateAndShow(page_id := "", installing := false, state := 0) {
         local window := this.CreateWindow(page_id, installing)
         this.window := window
@@ -159,14 +170,35 @@ class RabbitSettingsControllerWorkflow extends RabbitSettingsWorkflow {
     }
 
     Deploy(plan, report_errors := false) {
-        if plan.IsEmpty() {
-            return 0
-        }
-        return this.maintenance_callback.Call("deploy", plan) ? 0 : 1
+        return this.Submit(plan)
     }
 
-    SyncUserData() {
-        return this.maintenance_callback.Call("sync") ? 0 : 1
+    Submit(plan, completion_callback := 0) {
+        if plan.IsEmpty() {
+            if completion_callback {
+                completion_callback.Call(0, true)
+            }
+            return true
+        }
+        return !!this.maintenance_callback.Call("deploy", plan, completion_callback)
+    }
+
+    SyncUserData(completion_callback := 0) {
+        return this.SubmitSync(completion_callback) ? 0 : 1
+    }
+
+    SubmitSync(completion_callback := 0) {
+        return !!this.maintenance_callback.Call("sync", completion_callback)
+    }
+
+    RunDictionaryMaintenance(action, dictionary_name := "", path := "", completion_callback := 0) {
+        return !!this.maintenance_callback.Call(
+            "dictionary",
+            action,
+            dictionary_name,
+            path,
+            completion_callback
+        )
     }
 
     DictManagement() {

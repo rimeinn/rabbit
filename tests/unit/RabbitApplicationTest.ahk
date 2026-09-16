@@ -119,11 +119,12 @@ TestFirstInstallUsesPlatformSettings() {
     local modern_calls := []
     local modern := RabbitApplicationInstallProbe(modern_calls, false)
     modern.keyboard_layout := 1033
+    modern.settings := RabbitApplicationSettingsProbe(modern_calls)
     modern.RunFirstInstallation()
     AssertEqual(
-        "settings:input-schemes:--install:--return-to-rabbit:--keyboard-layout:0x0409",
+        "install:input-schemes",
         JoinApplicationCalls(modern_calls),
-        "Modern first install did not open the unified input-schemes page."
+        "Modern first install did not stay in the resident frontend."
     )
 
     local legacy_calls := []
@@ -236,6 +237,17 @@ class RabbitApplicationStopProbe {
 
     Stop() {
         this.calls.Push("runtime_stop")
+    }
+}
+
+class RabbitApplicationSettingsProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    ShowInstallation(page_id) {
+        this.calls.Push("install:" . page_id)
+        return true
     }
 }
 
