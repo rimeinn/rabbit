@@ -66,6 +66,56 @@ class RabbitDeploymentPlan {
             && !this.schema_config_ids.Count
     }
 
+    Serialize() {
+        local schema_id, schema_ids := "", serialized := "v1"
+        if this.rabbit_config_changed {
+            serialized .= "|rabbit"
+        }
+        if this.default_config_changed {
+            serialized .= "|default"
+        }
+        if this.full_workspace_required {
+            serialized .= "|workspace"
+        }
+        for schema_id in this.schema_config_ids {
+            schema_ids .= (schema_ids ? "`n" : "") . schema_id
+        }
+        if schema_ids {
+            schema_ids := Sort(schema_ids, "D`n")
+            Loop Parse schema_ids, "`n" {
+                serialized .= "|schema:" . A_LoopField
+            }
+        }
+        return serialized
+    }
+
+    static Parse(serialized) {
+        local index, part, plan := RabbitDeploymentPlan()
+        local parts := StrSplit(String(serialized), "|")
+        if !parts.Length || parts[1] != "v1" {
+            throw ValueError("Unsupported deployment plan version.")
+        }
+        for index, part in parts {
+            if index = 1 {
+                continue
+            }
+            switch part {
+                case "rabbit":
+                    plan.RequireRabbitConfig()
+                case "default":
+                    plan.RequireDefaultConfig()
+                case "workspace":
+                    plan.RequireWorkspace()
+                default:
+                    if SubStr(part, 1, 7) != "schema:" || StrLen(part) = 7 {
+                        throw ValueError("Invalid deployment plan entry.")
+                    }
+                    plan.RequireSchemaConfig(SubStr(part, 8))
+            }
+        }
+        return plan
+    }
+
     static RabbitConfig() {
         return RabbitDeploymentPlan().RequireRabbitConfig()
     }
