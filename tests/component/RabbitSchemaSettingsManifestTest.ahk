@@ -25,11 +25,13 @@ RunTest("schema settings parse manifest groups", TestSchemaSettingsManifestGroup
 RunTest("schema settings parse ordered list fields", TestSchemaSettingsListManifest.Bind())
 RunTest("punctuator maps validate and use a dedicated editor", TestPunctuatorMapEditor.Bind())
 RunTest("recognizer patterns validate and use a dedicated editor", TestRecognizerPatternEditor.Bind())
+RunTest("switch lists validate and use inline state editing", TestSwitchListEditor.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
 RunTest("schema settings save menu values", TestSchemaSettingsMenuPersistence.Bind())
 RunTest("schema settings save punctuation scalar values", TestSchemaSettingsPunctuatorScalarPersistence.Bind())
 RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
+RunTest("schema settings save switch lists", TestSchemaSettingsSwitchListPersistence.Bind())
 RunTest("schema settings save punctuation maps", TestSchemaSettingsPunctuatorMapPersistence.Bind())
 RunTest("schema settings save recognizer patterns", TestSchemaSettingsRecognizerPatternPersistence.Bind())
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
@@ -39,6 +41,7 @@ RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDi
 RunTest("schema settings dialog supports librime binding values", TestSchemaSettingsDialogBindingValues.Bind())
 RunTest("schema settings dialog exposes punctuation map fields", TestSchemaSettingsDialogPunctuatorMaps.Bind())
 RunTest("schema settings dialog exposes recognizer pattern fields", TestSchemaSettingsDialogRecognizerPatterns.Bind())
+RunTest("schema settings dialog exposes switch list fields", TestSchemaSettingsDialogSwitchLists.Bind())
 RunTest("schema settings dialog sizes configured list rows", TestSchemaSettingsDialogListRows.Bind())
 RunTest("schema settings dialog fits short described list groups", TestSchemaSettingsDialogDescribedLists.Bind())
 RunTest("schema settings dialog reveals the final described list field", TestSchemaSettingsDialogLongDescribedLists.Bind())
@@ -132,13 +135,15 @@ TestSchemaSettingsListManifest() {
         DirCreate(root)
         FileAppend(
             "[meta]`nformat=1`n[field.processors]`npath=engine/processors`ntype=list`nlabel=Processors`n"
-                . "[field.bindings]`npath=key_binder/bindings`ntype=key_binding_list`nlabel=Bindings`n",
+                . "[field.bindings]`npath=key_binder/bindings`ntype=key_binding_list`nlabel=Bindings`n"
+                . "[field.switches]`npath=switches`ntype=switch_list`nlabel=Switches`n",
             path,
             "UTF-8"
         )
         manifest := RabbitSchemaSettingsManifest.Parse(path)
         AssertEqual("list", manifest.fields[1].type, "The string list type was not retained.")
         AssertEqual("key_binding_list", manifest.fields[2].type, "The binding-list type was not retained.")
+        AssertEqual("switch_list", manifest.fields[3].type, "The switch-list type was not retained.")
         AssertEqual(
             RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
             manifest.fields[1].rows,
@@ -149,6 +154,11 @@ TestSchemaSettingsListManifest() {
             manifest.fields[2].rows,
             "A missing binding-list row count did not use the default."
         )
+        AssertEqual(
+            RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
+            manifest.fields[3].rows,
+            "A missing switch-list row count did not use the default."
+        )
 
         FileDelete(path)
         FileAppend(
@@ -156,13 +166,16 @@ TestSchemaSettingsListManifest() {
                 . "[field.processors]" . newline . "path=engine/processors" . newline . "type=list" . newline
                 . "label=Processors" . newline . "rows=1" . newline
                 . "[field.bindings]" . newline . "path=key_binder/bindings" . newline
-                . "type=key_binding_list" . newline . "label=Bindings" . newline . "rows=10" . newline,
+                . "type=key_binding_list" . newline . "label=Bindings" . newline . "rows=10" . newline
+                . "[field.switches]" . newline . "path=switches" . newline
+                . "type=switch_list" . newline . "label=Switches" . newline . "rows=6" . newline,
             path,
             "UTF-8"
         )
         manifest := RabbitSchemaSettingsManifest.Parse(path)
         AssertEqual(1, manifest.fields[1].rows, "The string-list row count was not retained.")
         AssertEqual(10, manifest.fields[2].rows, "The binding-list row count was not retained.")
+        AssertEqual(6, manifest.fields[3].rows, "The switch-list row count was not retained.")
 
         FileDelete(path)
         FileAppend(
@@ -205,6 +218,17 @@ TestSchemaSettingsListManifest() {
         AssertThrows(
             RabbitSchemaSettingsManifest.Parse.Bind(path),
             "The binding-list type accepted an unrelated path."
+        )
+
+        FileDelete(path)
+        FileAppend(
+            "[meta]`nformat=1`n[field.switches]`npath=menu/switches`ntype=switch_list`nlabel=Switches`n",
+            path,
+            "UTF-8"
+        )
+        AssertThrows(
+            RabbitSchemaSettingsManifest.Parse.Bind(path),
+            "The switch-list type accepted an unrelated path."
         )
 
         FileDelete(path)
@@ -375,6 +399,57 @@ TestRecognizerPatternEditor() {
         }
         owner.Destroy()
     }
+}
+
+TestSwitchListEditor() {
+    local normalized, value := [
+        Map(
+            "name", "ascii_mode",
+            "states", ["未指定", "ABC"],
+            "abbrev", ["中", "Ａ"],
+            "reset", 0,
+            "custom", "keep"
+        ),
+        Map(
+            "options", ["zh_trad", "zh_simp"],
+            "states", ["繁体", "简体"],
+            "reset", 1
+        ),
+    ]
+    value := RabbitSwitchList.Validate(value)
+    AssertEqual(RabbitSwitchList.TOGGLE, RabbitSwitchList.Kind(value[1]),
+        "The switch-list validator did not recognize a toggle.")
+    AssertEqual(RabbitSwitchList.RADIO, RabbitSwitchList.Kind(value[2]),
+        "The switch-list validator did not recognize an option group.")
+    AssertEqual("keep", value[1]["custom"], "The switch-list validator dropped an unknown field.")
+    AssertEqual("ascii_mode", RabbitSwitchList.OptionSummary(value[1]),
+        "The switch-list summary changed a toggle name.")
+    AssertEqual("繁体 / 简体", RabbitSwitchList.StateSummary(value[2]),
+        "The switch-list summary changed state labels.")
+    AssertEqual("简体", RabbitSwitchList.ResetSummary(value[2]),
+        "The switch-list summary changed the default state.")
+    AssertEqual("—", RabbitSwitchList.ResetSummary(Map(
+        "name", "ascii_mode",
+        "states", ["未指定", "ABC"]
+    )), "An unspecified reset state was confused with a state label.")
+    normalized := RabbitSwitchList.ValidateItem(Map(
+        "name", "ascii_mode",
+        "states", ["中文", "ABC"],
+        "reset", "0"
+    ))
+    AssertEqual(0, normalized["reset"], "The switch-list validator did not normalize an API integer string.")
+    AssertEqual(
+        2,
+        RabbitSwitchList.Validate([
+            Map("name", "ascii_mode"),
+            Map("options", ["ascii_mode"]),
+        ]).Length,
+        "The switch-list validator rejected an option shared by separate switch entries."
+    )
+    AssertThrows(
+        RabbitSwitchList.ValidateItem.Bind(Map("options", ["a", "a"])),
+        "The switch-list validator accepted duplicate options in a group."
+    )
 }
 
 TestSchemaSettingsModelPersistence() {
@@ -788,6 +863,54 @@ TestSchemaSettingsDialogBindingValues() {
     }
 }
 
+TestSchemaSettingsSwitchListPersistence() {
+    local calls := [], values, model
+    local rime := RabbitSchemaSettingsListRimeProbe(Map(
+        "switches", [
+            Map("name", "ascii_mode", "states", ["中文", "ABC"], "reset", 0, "custom", "keep"),
+            Map("options", ["zh_trad", "zh_simp"], "states", ["繁体", "简体"], "reset", 1),
+        ]
+    ), [
+        "switches/+",
+        "switches/@legacy",
+    ], calls)
+    model := RabbitSchemaSettingsModelProbe(
+        rime,
+        RabbitSchemaSettingsListLeversProbe(calls),
+        "demo",
+        SchemaSettingsSwitchListManifest()
+    )
+    AssertTrue(model.Load(), "The schema settings model could not read switch lists.")
+    AssertEqual("keep", model.values["switches"][1]["custom"],
+        "Loading switch lists dropped an unknown field.")
+    AssertEqual("简体", RabbitSwitchList.ResetSummary(model.values["switches"][2]),
+        "Loading switch lists changed the radio default.")
+
+    values := RabbitConfigValue.Clone(model.values)
+    values["switches"][1]["states"][2] := "English"
+    AssertTrue(model.Save(values), "The schema settings model failed to save switch lists.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:switches/+"),
+        "Replacing switch lists did not clear an appended patch.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:switches/@legacy"),
+        "Replacing switch lists did not clear an ordered patch.")
+    AssertTrue(SchemaSettingsCallsContain(calls, "item:switches:", '"custom": "keep"'),
+        "Replacing switch lists dropped an unknown entry field.")
+    AssertTrue(SchemaSettingsCallsContain(calls, "item:switches:", '"English"'),
+        "Replacing switch lists did not write the updated state.")
+
+    calls.Length := 0
+    AssertTrue(
+        model.Save(RabbitConfigValue.Clone(model.values), Map("switches", true)),
+        "The model failed to restore switch-list defaults."
+    )
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:switches"),
+        "Restoring switch lists did not remove the full-list override.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:switches/+"),
+        "Restoring switch lists did not remove an appended patch.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:switches/@legacy"),
+        "Restoring switch lists did not remove an ordered patch.")
+}
+
 TestSchemaSettingsPunctuatorMapPersistence() {
     local calls := [], manifest := SchemaSettingsPunctuatorManifest(), values, model
     local rime := RabbitSchemaSettingsListRimeProbe(Map(
@@ -936,6 +1059,119 @@ TestSchemaSettingsDialogRecognizerPatterns() {
             "The schema dialog could not stage a recognizer reset."
         )
         AssertTrue(dialog.reset_fields.Has("patterns"), "The recognizer reset was not retained.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogSwitchLists() {
+    local calls := [], controls, dialog := 0, editor, left_bottom, left_y, owner := Gui(), model
+    local notice_width, notice_x, notice_y, reset_width, reset_x, right_bottom, right_height, right_y, reset_y
+    local state_button_height
+    local state_list_bottom, state_list_height, state_list_y, state_label_y
+    model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsSwitchListManifest(10)
+    )
+    try {
+        model.values := Map(
+            "switches", [
+                Map("name", "ascii_mode", "states", ["中文", "ABC"], "reset", 0),
+                Map("options", ["zh_trad", "zh_simp"], "states", ["繁体", "简体"], "reset", 1),
+            ]
+        )
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        AssertTrue(dialog.field_controls.Has("switches"), "The schema dialog did not create a switch-list editor.")
+        controls := dialog.field_controls["switches"]
+        AssertTrue(controls.HasOwnProp("editor"), "The schema dialog kept the switch-list editor in a child dialog.")
+        editor := controls.editor
+        AssertEqual(2, editor.list.GetCount(), "The embedded switch-list editor lost entries.")
+        AssertTrue(InStr(editor.list.GetText(1, 1), "ascii_mode"), "The embedded editor changed entry order.")
+        AssertTrue(!dialog.content_scroll_max, "The compact embedded editor unexpectedly needed scrolling.")
+        AssertTrue(editor.list_column_width < editor.list_width,
+            "The switch list did not reserve room for a vertical scrollbar.")
+        AssertEqual(
+            editor.state_list_client_width,
+            editor.state_option_column_width + editor.state_state_column_width + editor.state_abbrev_column_width,
+            "The state-list columns did not reserve room for a vertical scrollbar."
+        )
+        AssertEqual("名称", editor.name_label.Value, "A toggle did not label its switch name as a name.")
+        AssertTrue(!HasProp(editor, "apply_state_button"), "The inline state editor still requires an apply button.")
+        AssertEqual("demo · switches/@0", RabbitConfigToolTip.GetText(editor.kind_choice),
+            "The switch type did not expose its YAML path.")
+        AssertEqual("demo · switches/@0/name", RabbitConfigToolTip.GetText(editor.name_edit),
+            "The switch name did not expose its YAML path.")
+        AssertEqual("demo · switches/@0/states/@0", RabbitConfigToolTip.GetText(editor.state_value_edit),
+            "The current toggle state did not expose its YAML path.")
+        AssertEqual("demo · switches/@0/reset", RabbitConfigToolTip.GetText(editor.reset_choice),
+            "The reset selector did not expose its YAML path.")
+        editor.down_button.GetPos(, &left_y, , &left_bottom)
+        left_bottom += left_y
+        editor.state_abbrev_edit.GetPos(, &right_y, , &right_height)
+        right_bottom := right_y + right_height
+        AssertTrue(Abs(right_bottom - left_bottom) <= 1,
+            "The switch list and its controls did not align with the current-state fields.")
+        editor.status.GetPos(&notice_x, &notice_y, &notice_width)
+        editor.reset_button.GetPos(&reset_x, &reset_y, &reset_width)
+        AssertTrue(reset_y > right_bottom, "Restoring the schema default was not separated from switch editing.")
+        AssertEqual(reset_y + 4, notice_y, "The validation notice did not share the restore row.")
+        AssertTrue(notice_x + notice_width < reset_x, "The validation notice overlapped the restore button.")
+        AssertTrue(reset_width < editor.width, "The restore button did not use a compact width.")
+        editor.state_list.GetPos(, &state_list_y, , &state_list_height)
+        state_list_bottom := state_list_y + state_list_height
+        editor.current_state_label.GetPos(, &state_label_y)
+        AssertTrue(state_label_y - state_list_bottom >= 32,
+            "Hidden state-list actions did not retain their layout space for a toggle.")
+        editor.add_state_button.GetPos(, , , &state_button_height)
+        AssertEqual(28, state_button_height, "State-list actions did not retain their standard height.")
+        AssertTrue(!editor.add_state_button.Visible, "Toggle state-list actions were unexpectedly visible.")
+        AssertEqual(2, editor.state_list.GetCount(), "The embedded toggle editor did not show two states.")
+        AssertEqual("DDL", editor.reset_choice.Type, "The reset state selector remained editable.")
+        AssertTrue(editor.reset_enabled.Value, "An existing reset value was not enabled.")
+        AssertEqual("中文", editor.reset_choice.Text, "The reset state selector changed a state label.")
+        editor.reset_enabled.Value := false
+        editor.OnResetEnabledChanged()
+        AssertTrue(!editor.reset_choice.Enabled, "Disabling the reset state did not disable its selector.")
+        AssertEqual(-1, editor.reset_value, "Disabling the reset state did not clear the reset value.")
+        AssertTrue(!editor.BuildValue().Has("reset"), "Disabling the reset state did not remove the reset property.")
+        editor.reset_enabled.Value := true
+        editor.OnResetEnabledChanged()
+        AssertTrue(editor.reset_choice.Enabled, "Enabling the reset state did not enable its selector.")
+        editor.state_value_edit.Value := "汉字"
+        editor.MarkStateEditorDirty()
+        AssertEqual("汉字", editor.state_list.GetText(1, 2), "The inline state editor did not update its list.")
+        AssertTrue(editor.CommitStateEditor(), "The inline state editor could not retain a toggle state.")
+        AssertTrue(editor.CommitEntry(), "The embedded editor could not retain an edited toggle.")
+        AssertEqual("汉字", dialog.draft_values["switches"][1]["states"][1],
+            "The embedded editor did not update the schema draft.")
+        AssertTrue(editor.MoveEntry(1), "The embedded editor could not move a switch entry.")
+        AssertTrue(InStr(editor.list.GetText(1, 1), "zh_trad, zh_simp"),
+            "Moving an entry did not update the list.")
+        editor.OnEntrySelected(1)
+        AssertTrue(editor.add_state_button.Visible, "Option-group state-list actions were unexpectedly hidden.")
+        AssertTrue(editor.state_option_edit.Enabled, "The embedded radio editor did not enable option editing.")
+        AssertEqual("zh_trad", editor.state_option_edit.Value, "The radio editor did not load its first option.")
+        AssertEqual("demo · switches/@0/options/@0", RabbitConfigToolTip.GetText(editor.state_option_edit),
+            "The current radio option did not expose its YAML path.")
+        editor.state_option_edit.Value := "traditionalization"
+        editor.MarkStateEditorDirty()
+        AssertEqual("traditionalization", editor.state_list.GetText(1, 1),
+            "The inline radio editor did not update its list.")
+        AssertTrue(editor.CommitStateEditor(), "The inline radio editor could not retain an option edit.")
+        AssertTrue(editor.AddEntry(), "The embedded editor could not add a new switch entry.")
+        AssertEqual(3, editor.list.GetCount(), "Adding an entry did not update the embedded list.")
+        editor.SetStatus("Invalid switch")
+        AssertTrue(editor.status.Visible, "A validation error did not show beside the restore button.")
+        AssertTrue(!editor.reset_hint.Visible, "A validation error did not hide the reset notice.")
+        AssertTrue(editor.RestoreDefault(), "The embedded editor could not stage a switch-list reset.")
+        AssertTrue(dialog.reset_fields.Has("switches"), "The switch-list reset was not retained.")
+        AssertTrue(editor.reset_hint.Visible, "A pending reset did not use the left-side notice area.")
+        AssertTrue(dialog.CaptureCurrentGroupValues(), "A pending reset did not discard an incomplete new entry.")
     } finally {
         if dialog {
             dialog.Dispose()
@@ -1228,6 +1464,26 @@ SchemaSettingsListManifest(processor_rows := "", binding_rows := "", group_descr
                 rows: binding_rows,
             },
         ],
+    }
+}
+
+SchemaSettingsSwitchListManifest(rows := "") {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "general", label: "General", description: "" }],
+        fields: [{
+            id: "switches",
+            group: "general",
+            path: "switches",
+            type: "switch_list",
+            label: "Schema options",
+            description: "",
+            min: "",
+            max: "",
+            options: [],
+            rows: rows,
+        }],
     }
 }
 

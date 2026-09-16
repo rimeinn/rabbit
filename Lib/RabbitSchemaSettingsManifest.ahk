@@ -18,6 +18,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
+#Include RabbitSwitchList.ahk
 
 #Include RabbitI18n.ahk
 
@@ -153,7 +154,7 @@ class RabbitSchemaSettingsManifest {
         }
         if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "enum"
             && type != "list" && type != "key_binding_list" && type != "punctuator_map"
-            && type != "recognizer_patterns" {
+            && type != "recognizer_patterns" && type != "switch_list" {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
         if type = "key_binding_list" && properties["path"] != "key_binder/bindings" {
@@ -165,7 +166,10 @@ class RabbitSchemaSettingsManifest {
         if type = "recognizer_patterns" && properties["path"] != RabbitRecognizerPatterns.PATH {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
-        if type = "list" || type = "key_binding_list" {
+        if type = "switch_list" && properties["path"] != RabbitSwitchList.PATH {
+            throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+        }
+        if type = "list" || type = "key_binding_list" || type = "switch_list" {
             rows := this.ParseListRows(properties)
         }
         if type = "integer" || type = "number" {

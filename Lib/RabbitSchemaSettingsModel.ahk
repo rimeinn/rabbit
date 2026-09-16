@@ -21,6 +21,7 @@
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
 #Include RabbitSchemaSettingsManifest.ahk
+#Include RabbitSwitchList.ahk
 
 #Include RabbitI18n.ahk
 
@@ -81,6 +82,8 @@ class RabbitSchemaSettingsModel {
                 return RabbitPunctuatorMap.Read(this.rime, config, field.path)
             case "recognizer_patterns":
                 return RabbitRecognizerPatterns.Read(this.rime, config, field.path)
+            case "switch_list":
+                return RabbitSwitchList.Read(this.rime, config, field.path)
             default:
                 if this.rime.config_test_get_string(config, field.path, &value) {
                     return value
@@ -180,6 +183,12 @@ class RabbitSchemaSettingsModel {
                 } catch {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
+            case "switch_list":
+                try {
+                    normalized := RabbitSwitchList.Validate(value)
+                } catch {
+                    throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+                }
             case "string":
                 normalized := field.path = RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH
                     ? RabbitMenuSettings.ValidateAlternativeSelectKeys(String(value))
@@ -256,7 +265,8 @@ class RabbitSchemaSettingsModel {
                 }
             }
             if !matched || matched.type != "list" && matched.type != "key_binding_list"
-                && matched.type != "punctuator_map" && matched.type != "recognizer_patterns" {
+                && matched.type != "punctuator_map" && matched.type != "recognizer_patterns"
+                && matched.type != "switch_list" {
                 throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", reset_id)))
             }
             resets[reset_id] := true
@@ -307,6 +317,7 @@ class RabbitSchemaSettingsModel {
             case "list", "key_binding_list": return this.CustomizeListField(settings, field, value)
             case "punctuator_map": return this.CustomizePunctuatorMapField(settings, field, value)
             case "recognizer_patterns": return this.CustomizeRecognizerPatternsField(settings, field, value)
+            case "switch_list": return this.CustomizeListField(settings, field, value)
             default: return !!this.api.customize_string(settings, field.path, value)
         }
     }

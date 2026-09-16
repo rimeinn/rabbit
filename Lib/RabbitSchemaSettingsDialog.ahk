@@ -23,6 +23,7 @@
 #Include RabbitRecognizerPatternsDialog.ahk
 #Include RabbitSchemaSettingsModel.ahk
 #Include RabbitStringListItemDialog.ahk
+#Include RabbitSwitchListEditor.ahk
 #Include RabbitWindowTheme.ahk
 
 #Include RabbitI18n.ahk
@@ -84,6 +85,7 @@ class RabbitSchemaSettingsDialog extends Gui {
         this.disposed := false
         this.visible := false
         this.current_group_index := 1
+        this.restoring_group := false
         this.group_list := 0
         this.content_anchor := 0
         this.field_controls := Map()
@@ -231,6 +233,9 @@ class RabbitSchemaSettingsDialog extends Gui {
         if field.type = "recognizer_patterns" {
             return 96
         }
+        if field.type = "switch_list" {
+            return RabbitSwitchListEditor.ESTIMATED_HEIGHT
+        }
         return 30
     }
 
@@ -267,6 +272,9 @@ class RabbitSchemaSettingsDialog extends Gui {
     }
 
     OnGroupChanged() {
+        if this.restoring_group {
+            return false
+        }
         return this.SelectGroup(this.group_list.Value)
     }
 
@@ -274,7 +282,12 @@ class RabbitSchemaSettingsDialog extends Gui {
         if index < 1 || index > this.groups.Length {
             return false
         }
-        this.CaptureCurrentGroupValues()
+        if !this.CaptureCurrentGroupValues() {
+            this.restoring_group := true
+            try this.group_list.Choose(this.current_group_index)
+            finally this.restoring_group := false
+            return false
+        }
         this.current_group_index := index
         if this.group_list && this.group_list.Value != index {
             this.group_list.Choose(index)
@@ -361,6 +374,8 @@ class RabbitSchemaSettingsDialog extends Gui {
             y := this.AddPunctuatorMapField(field, y)
         } else if field.type = "recognizer_patterns" {
             y := this.AddRecognizerPatternsField(field, y)
+        } else if field.type = "switch_list" {
+            y := this.AddSwitchListField(field, y)
         } else {
             label := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
             this.TrackContentControl(label)
@@ -535,6 +550,16 @@ class RabbitSchemaSettingsDialog extends Gui {
         return y + 80
     }
 
+    AddSwitchListField(field, y) {
+        local controls := { type: field.type }
+        controls.editor := RabbitSwitchListEditor(this, field, this.draft_values[field.id], y)
+        controls.label := controls.editor.label
+        controls.list := controls.editor.list
+        controls.reset_hint := controls.editor.reset_hint
+        this.field_controls[field.id] := controls
+        return controls.editor.bottom
+    }
+
     AddKeyBindingListHeaders(controls, y) {
         local surface_options := " c" . RabbitWindowThemeController.DARK_TEXT
             . " Background" . RabbitWindowThemeController.DARK_SURFACE
@@ -639,6 +664,20 @@ class RabbitSchemaSettingsDialog extends Gui {
             : RabbitRecognizerPatterns.Summary(this.draft_values[field.id])
         controls.reset_hint.Value := this.reset_fields.Has(field.id)
             ? RabbitI18n.Text("punctuator.restore_default_pending") : ""
+    }
+
+    RestoreSwitchListDefault(field) {
+        this.reset_fields[field.id] := true
+        if this.field_controls.Has(field.id) {
+            this.field_controls[field.id].editor.RefreshResetState()
+        }
+        return true
+    }
+
+    CancelSwitchListReset(field) {
+        if this.reset_fields.Has(field.id) {
+            this.reset_fields.Delete(field.id)
+        }
     }
 
     ListValueText(value) {
@@ -819,10 +858,16 @@ class RabbitSchemaSettingsDialog extends Gui {
     CaptureCurrentGroupValues() {
         local control, field
         if !this.field_controls.Count {
-            return
+            return true
         }
         for field in this.model.manifest.fields {
             if field.group != this.groups[this.current_group_index].id {
+                continue
+            }
+            if field.type = "switch_list" {
+                if !this.reset_fields.Has(field.id) && !this.field_controls[field.id].editor.CommitEntry() {
+                    return false
+                }
                 continue
             }
             if field.type = "list" || field.type = "key_binding_list" || field.type = "punctuator_map"
@@ -833,6 +878,7 @@ class RabbitSchemaSettingsDialog extends Gui {
             this.draft_values[field.id] := field.type = "boolean" ? !!control.Value
                 : field.type = "enum" ? control.Text : control.Value
         }
+        return true
     }
 
     ContentPanelOptions() {
@@ -1096,7 +1142,9 @@ class RabbitSchemaSettingsDialog extends Gui {
     SaveSettings() {
         local normalized
         try {
-            this.CaptureCurrentGroupValues()
+            if !this.CaptureCurrentGroupValues() {
+                return false
+            }
             normalized := this.model.NormalizeValues(this.draft_values)
             this.result := this.model.HasNormalizedChanges(normalized, this.reset_fields)
                 ? { values: normalized, reset_fields: this.reset_fields.Clone() } : 0
