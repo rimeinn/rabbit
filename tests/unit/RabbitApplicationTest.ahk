@@ -59,7 +59,7 @@ TestDeployerLaunchAfterShutdown() {
 TestTrayDelegatesDeployerLaunch() {
     local calls := []
     local callback := (args*) => calls.Push(JoinApplicationArguments(args))
-    local tray := RabbitTrayController(0, 0, 0, 0, 0, 1033, callback)
+    local tray := RabbitTrayController(0, 0, 0, 0, 0, 1033, (*) => 0, callback)
 
     tray.StartDeployer("deploy")
 
@@ -72,28 +72,40 @@ TestTrayDelegatesDeployerLaunch() {
 
 TestTrayRoutesUnifiedSettings() {
     local calls := []
-    local tray := RabbitModernTrayProbe(0, 0, 0, 0, 0, 1033, (args*) => calls.Push(
-        JoinApplicationArguments(args)
-    ))
+    local tray := RabbitModernTrayProbe(
+        0,
+        0,
+        0,
+        0,
+        0,
+        1033,
+        (page_id := "") => calls.Push("settings:" . page_id),
+        (*) => calls.Push("maintenance")
+    )
 
     tray.StartSettings()
     tray.StartSettings("dictionary")
     tray.StartSettings("maintenance")
 
     AssertEqual(
-        "settings:--return-to-rabbit:--keyboard-layout:0x0409," .
-            "settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409," .
-            "settings:maintenance:--return-to-rabbit:--keyboard-layout:0x0409",
+        "settings:,settings:dictionary,settings:maintenance",
         JoinApplicationCalls(calls),
-        "The modern tray did not route settings pages through the unified window."
+        "The modern tray did not route settings pages to the resident controller."
     )
 }
 
 TestTrayRoutesLegacySettings() {
     local calls := []
-    local tray := RabbitLegacyTrayProbe(0, 0, 0, 0, 0, 1033, (args*) => calls.Push(
-        JoinApplicationArguments(args)
-    ))
+    local tray := RabbitLegacyTrayProbe(
+        0,
+        0,
+        0,
+        0,
+        0,
+        1033,
+        (*) => calls.Push("settings"),
+        (args*) => calls.Push(JoinApplicationArguments(args))
+    )
 
     tray.StartSettings()
     tray.StartSettings("dictionary")

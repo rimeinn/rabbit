@@ -25,7 +25,7 @@ RunTest("tray about opens a standalone window", TestTrayAboutOpensStandaloneWind
 
 TestStatusTipFollowsTrayIcon() {
     local config := RabbitConfigSnapshot(Map("schema_icon", Map("custom", "custom.ico")))
-    local tray := RabbitTrayStatusTipProbe(0, 0, 0, config, 0, 0, (*) => 0)
+    local tray := RabbitTrayStatusTipProbe(0, 0, 0, config, 0, 0, (*) => 0, (*) => 0)
 
     tray.UpdateSchemaIcon("custom")
     AssertEqual("custom.ico", tray.GetStatusIconPath(), "The schema status tip lost its configured icon.")
@@ -60,7 +60,7 @@ class RabbitTrayAboutProbe extends RabbitTrayController {
     __New() {
         this.about_created := false
         this.about_shown := false
-        super.__New(0, 0, 0, 0, 0, 0, (*) => 0)
+        super.__New(0, 0, 0, 0, 0, 0, (*) => 0, (*) => 0)
     }
 
     UseLegacySettings() {
@@ -93,7 +93,7 @@ TestTranslatedTrayTip() {
     try {
         RabbitI18n.Initialize(directory, "en-US")
         runtime := RabbitRuntimeState(0, 0, RabbitConfigSnapshot())
-        tray := RabbitTrayController(0, 0, 0, 0, runtime, 0, (*) => 0)
+        tray := RabbitTrayController(0, 0, 0, 0, runtime, 0, (*) => 0, (*) => 0)
         tray.UpdateTip("Test", false, false, false)
         AssertTrue(InStr(A_IconTip, "Left-click"), "Tray instructions were not translated.")
         AssertTrue(InStr(A_IconTip, "Chinese | Half-width"), "Default status labels were not translated.")

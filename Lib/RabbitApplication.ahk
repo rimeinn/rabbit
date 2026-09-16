@@ -24,6 +24,7 @@
 #Include RabbitConfig.ahk
 #Include RabbitInput.ahk
 #Include RabbitRuntimeState.ahk
+#Include RabbitSettingsController.ahk
 #Include RabbitStatusTip.ahk
 #Include RabbitTrayMenu.ahk
 #Include RabbitUIStyle.ahk
@@ -32,6 +33,7 @@ class RabbitApplication {
     __New(rime_api) {
         this.context := RabbitAppContext(rime_api, RabbitMutex())
         this.tray := 0
+        this.settings := 0
         this.tray_click_callback := 0
         this.rime_message_callback := this.OnRimeMessage.Bind(this)
         this.exit_callback := this.OnExit.Bind(this)
@@ -129,6 +131,7 @@ class RabbitApplication {
             this.context.session_id,
             this.context.config
         )
+        this.settings := this.CreateSettingsController()
         this.tray := RabbitTrayController(
             this.context.rime,
             this.context.session_id,
@@ -136,6 +139,7 @@ class RabbitApplication {
             this.context.config,
             this.context.runtime_state,
             this.context.keyboard_layout,
+            this.settings.Show.Bind(this.settings),
             this.RunDeployer.Bind(this),
             this.context.status_tip
         )
@@ -183,6 +187,31 @@ class RabbitApplication {
         this.Shutdown(1)
         this.LaunchDeployer(command, args*)
         this.ExitApplication(1)
+    }
+
+    RunSettingsMaintenance(command, args*) {
+        args.Push(
+            "--return-to-rabbit",
+            "--keyboard-layout",
+            RabbitFormatKeyboardLayout(this.context.keyboard_layout)
+        )
+        this.RunDeployer(command, args*)
+    }
+
+    CreateSettingsController() {
+        return RabbitSettingsController(
+            this.context.rime,
+            this.RunSettingsMaintenance.Bind(this),
+            this.OnSettingsLanguageChanged.Bind(this)
+        )
+    }
+
+    OnSettingsLanguageChanged() {
+        if this.tray {
+            this.tray.SetupMenu()
+            this.context.runtime_state.UpdateStateLabels()
+            this.tray.UpdateTip()
+        }
     }
 
     LaunchDeployer(command, args*) {
@@ -271,6 +300,10 @@ class RabbitApplication {
         if this.tray_message_registered {
             OnMessage(AHK_NOTIFYICON, this.tray_click_callback, 0)
             this.tray_message_registered := false
+        }
+        if this.settings {
+            this.settings.Dispose()
+            this.settings := 0
         }
         if this.tray && HasMethod(this.tray, "Dispose") {
             this.tray.Dispose()

@@ -63,7 +63,8 @@ class RabbitTrayController {
         config,
         runtime_state,
         keyboard_layout,
-        deployer_callback,
+        settings_callback,
+        maintenance_callback,
         status_tip := 0
     ) {
         this.rime := rime_api
@@ -72,7 +73,8 @@ class RabbitTrayController {
         this.config := config
         this.runtime_state := runtime_state
         this.keyboard_layout := keyboard_layout
-        this.deployer_callback := deployer_callback
+        this.settings_callback := settings_callback
+        this.maintenance_callback := maintenance_callback
         this.status_tip := status_tip
         this.schema_name := ""
         this.ascii_mode := false
@@ -197,9 +199,9 @@ class RabbitTrayController {
             return this.StartDeployer("legacy-settings")
         }
         if page_id {
-            return this.StartDeployer("settings", page_id)
+            return this.settings_callback.Call(page_id)
         }
-        return this.StartDeployer("settings")
+        return this.settings_callback.Call()
     }
 
     StartDeployer(command, args*) {
@@ -208,7 +210,7 @@ class RabbitTrayController {
             "--keyboard-layout",
             RabbitFormatKeyboardLayout(this.keyboard_layout)
         )
-        this.deployer_callback.Call(command, args*)
+        this.maintenance_callback.Call(command, args*)
     }
 
     ToggleSuspend() {

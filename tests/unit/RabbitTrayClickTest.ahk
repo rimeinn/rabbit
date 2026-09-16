@@ -35,6 +35,7 @@ TestTrayClickUpdatesAscii() {
         RabbitConfigSnapshot(Map("show_tips", false)),
         runtime_state,
         0,
+        (*) => 0,
         (*) => 0
     )
 
@@ -58,6 +59,7 @@ TestTrayClickReleasesStateAfterError() {
         RabbitConfigSnapshot(Map("show_tips", false)),
         runtime_state,
         0,
+        (*) => 0,
         (*) => 0
     )
 

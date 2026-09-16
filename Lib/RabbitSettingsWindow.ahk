@@ -38,6 +38,8 @@ class RabbitSettingsWindow extends Gui {
     language_reload_callback := 0
     language_reload_state := 0
     deployment_pending := false
+    closed_callback := 0
+    nonblocking_language_reload := false
 
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 580
@@ -192,6 +194,7 @@ class RabbitSettingsWindow extends Gui {
         this.window_shown := false
         this.initial_page_load_pending := !!load_after_show
         this.initial_page_load_callback := this.LoadInitialPage.Bind(this)
+        this.language_reload_timer := this.RunLanguageReload.Bind(this)
         this.initial_dark_mode := initial_dark_mode
         this.rime_depot_factory := rime_depot_factory
             ? rime_depot_factory
@@ -4374,8 +4377,20 @@ class RabbitSettingsWindow extends Gui {
                     this.SyncRimeDepotWindowSettings()
                 }
             }
+            if this.language_reload_callback && this.nonblocking_language_reload {
+                SetTimer(this.language_reload_timer, -50)
+            }
         }
         return result
+    }
+
+    RunLanguageReload() {
+        if this.disposed || !this.deployment_pending || this.HasUnsavedSettings()
+            || !this.language_reload_callback {
+            return
+        }
+        this.deployment_pending := false
+        this.language_reload_callback.Call(this)
     }
 
     WaitClose() {
@@ -4478,6 +4493,7 @@ class RabbitSettingsWindow extends Gui {
         }
         this.disposed := true
         SetTimer(this.initial_page_load_callback, 0)
+        SetTimer(this.language_reload_timer, 0)
         if this.rime_depot_window {
             try this.rime_depot_window.Dispose()
             this.rime_depot_window := 0
@@ -4516,6 +4532,11 @@ class RabbitSettingsWindow extends Gui {
                                 }
                             } finally {
                                 try this.Destroy()
+                                finally {
+                                    if this.closed_callback {
+                                        this.closed_callback.Call(this)
+                                    }
+                                }
                             }
                         }
                     }
