@@ -1,7 +1,9 @@
 # 架构概览
 
 本文按当前源码说明入口、生命周期和模块边界。类名和文件名以 `Lib/` 中的实现为准；
-`Docs/runtime-architecture-refactoring.md` 是较完整的实现记录，但其中的阶段描述不应替代当前代码。
+`Docs/design/runtime-architecture-refactoring.md` 是较完整的实现记录，但其中的阶段描述不应替代当前代码。
+控制面板迁入常驻进程及异步部署 worker 的后续方案见
+`Docs/design/control-panel-runtime-refactoring.md`。
 
 ## 入口与模式分流
 
@@ -93,4 +95,6 @@ Rabbit.ahk
 
 每个模块必须声明直接 `#Include` 依赖，不要依赖入口脚本的包含顺序。实质性的新类单独放置文件；跨模块协作优先通过构造函数传递 Rime、模型或窗口依赖，避免新增隐式全局状态。涉及配置字段时，沿着“源配置／快照／设置读写／部署计划／测试／文档”整条链路检查；涉及资源时，确认异常、取消、重复打开和退出路径都能释放资源。
 
-更细的所有权、生命周期和缺陷记录见[运行时架构重构记录](../runtime-architecture-refactoring.md)。这些记录描述实现过程，不是面向普通用户的 API 承诺。
+更细的所有权、生命周期和缺陷记录见[运行时架构重构记录](../design/runtime-architecture-refactoring.md)。
+后续控制面板和部署边界的计划见[控制面板与部署运行时重构](../design/control-panel-runtime-refactoring.md)。
+这些记录描述实现过程或设计计划，不是面向普通用户的 API 承诺。

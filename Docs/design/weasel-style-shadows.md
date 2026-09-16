@@ -126,7 +126,7 @@ preset_color_schemes:
 
 | 无阴影 | 窗口阴影 | 窗口与内部色块阴影 |
 | --- | --- | --- |
-| ![无阴影](images/shadow-disabled.png) | ![窗口阴影](images/shadow-window.png) | ![全部阴影](images/shadow-all.png) |
+| ![无阴影](../images/shadow-disabled.png) | ![窗口阴影](../images/shadow-window.png) | ![全部阴影](../images/shadow-all.png) |
 
 可通过 `AutoHotkey64.exe /ErrorStdOut tests/component/RabbitShadowRendererTests.ahk export` 重新生成示例。
 

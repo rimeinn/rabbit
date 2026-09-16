@@ -3,6 +3,9 @@
 Status: Phase 5 implemented; post-Phase 5 nightly validation in progress
 Last updated: 2026-07-31
 
+> 后续“控制面板常驻主进程、部署 worker 异步交接”的设计见
+> [控制面板与部署运行时重构](control-panel-runtime-refactoring.md)。本文保留此前运行时所有权重构的实现记录。
+
 ## 1. Purpose
 
 This document records the current runtime ownership, UI lifecycles, mutable state, dependency direction, and staged

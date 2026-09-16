@@ -38,8 +38,9 @@ nav:
       - 构建与发布: contributor/release-process.md
       - 架构概览: contributor/architecture.md
       - 设计记录:
-          - 运行时架构重构: runtime-architecture-refactoring.md
-          - 阴影支持: weasel-style-shadows.md
+          - 控制面板与部署运行时重构: design/control-panel-runtime-refactoring.md
+          - 运行时架构重构: design/runtime-architecture-refactoring.md
+          - 阴影支持: design/weasel-style-shadows.md
   - 参考:
       - 兼容性: reference/compatibility.md
       - 术语表: reference/glossary.md
