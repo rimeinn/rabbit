@@ -41,7 +41,7 @@ class RabbitSettingsWindow extends Gui {
 
     static WINDOW_WIDTH := 820
     static APPEARANCE_HEIGHT := 580
-    static BEHAVIOR_HEIGHT := 692
+    static BEHAVIOR_HEIGHT := 666
     ; Leave a padded action row below the switcher tab control.  The nested
     ; downloader tab remains inside the existing input-schemes page so the
     ; root navigation and its persisted page indices stay stable.
@@ -467,12 +467,9 @@ class RabbitSettingsWindow extends Gui {
                     this.switcher_option_source_header
                 )
             case 3:
-                this.window_theme.RegisterMuted(this.menu_help, this.binding_help, this.language_help, this.punctuator_help)
+                this.window_theme.RegisterMuted(this.menu_help, this.binding_help)
                 for path in RabbitPunctuatorMap.PATHS {
-                    this.window_theme.RegisterMuted(
-                        this.punctuator_control_map[path].summary,
-                        this.punctuator_control_map[path].hint
-                    )
+                    this.window_theme.RegisterMuted(this.punctuator_control_map[path].summary)
                 }
                 this.window_theme.RegisterMuted(this.recognizer_control_map.patterns.summary)
                 this.window_theme.RegisterSurface(
@@ -729,7 +726,7 @@ class RabbitSettingsWindow extends Gui {
         local controls, key
         local surface_options := this.initial_dark_mode ? " cF0F0F0 Background2B2B2B" : ""
         this.behavior_tabs := this.AddTab3(
-            "x230 y136 w570 h482 Hidden"
+            "x230 y136 w570 h456 Hidden"
                 . (this.initial_dark_mode ? " cF0F0F0 Background202020" : ""),
             [RabbitI18n.Text("controls.general"), RabbitI18n.Text("controls.key_bindings"),
                 RabbitI18n.Text("menu.tab"), RabbitI18n.Text("punctuator.tab"),
@@ -743,59 +740,58 @@ class RabbitSettingsWindow extends Gui {
         this.language_choice := this.AddDropDownList("x366 y170 w250 Hidden")
         this.PopulateLanguageChoices()
         this.language_choice.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.language_help := this.AddText("x260 y208 w506 h22 Hidden cGray", RabbitI18n.Text("language.hint"))
-        this.behavior_rabbit_group := this.AddGroupBox("x246 y248 w538 h190 Hidden",
+        this.behavior_rabbit_group := this.AddGroupBox("x246 y210 w538 h190 Hidden",
             RabbitI18n.Text("controls.rabbit_behavior"))
-        this.show_tips := this.AddCheckbox("x260 y274 w190 h24 Hidden", RabbitI18n.Text("controls.show_tips"))
+        this.show_tips := this.AddCheckbox("x260 y236 w190 h24 Hidden", RabbitI18n.Text("controls.show_tips"))
         this.show_tips.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.show_tips_time_label := this.AddText("x478 y276 w130 h22 Hidden", RabbitI18n.Text("controls.tip_duration"))
-        this.show_tips_time := this.AddEdit("x612 y272 w80 r1 Number -Multi Hidden")
+        this.show_tips_time_label := this.AddText("x478 y238 w130 h22 Hidden", RabbitI18n.Text("controls.tip_duration"))
+        this.show_tips_time := this.AddEdit("x612 y234 w80 r1 Number -Multi Hidden")
         this.show_tips_time.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.suspend_hotkey_label := this.AddText("x260 y306 w132 h22 Hidden",
+        this.suspend_hotkey_label := this.AddText("x260 y268 w132 h22 Hidden",
             RabbitI18n.Text("controls.suspend_hotkey"))
-        this.suspend_hotkey := this.AddEdit("x394 y302 w372 r1 -Multi Hidden")
+        this.suspend_hotkey := this.AddEdit("x394 y264 w372 r1 -Multi Hidden")
         this.SetEditCue(this.suspend_hotkey, RabbitI18n.Text("controls.suspend_example"))
         this.suspend_hotkey.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.clipboard_mode_label := this.AddText("x260 y338 w96 h22 Hidden", RabbitI18n.Text("controls.clipboard"))
+        this.clipboard_mode_label := this.AddText("x260 y300 w96 h22 Hidden", RabbitI18n.Text("controls.clipboard"))
         this.clipboard_mode := this.AddDropDownList(
-            "x358 y334 w164 Choose3 Hidden",
+            "x358 y296 w164 Choose3 Hidden",
             [RabbitI18n.Text("controls.clipboard_never"), RabbitI18n.Text("controls.clipboard_always"), RabbitI18n.Text("controls.clipboard_threshold")]
         )
         this.clipboard_mode.OnEvent("Change", (*) => this.OnClipboardModeChanged())
-        this.clipboard_length_label := this.AddText("x536 y338 w110 h22 Hidden",
+        this.clipboard_length_label := this.AddText("x536 y300 w110 h22 Hidden",
             RabbitI18n.Text("controls.clipboard_length"))
-        this.clipboard_length := this.AddEdit("x648 y334 w118 r1 Number -Multi Hidden")
+        this.clipboard_length := this.AddEdit("x648 y296 w118 r1 Number -Multi Hidden")
         this.clipboard_length.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.global_ascii := this.AddCheckbox("x260 y364 w490 h24 Hidden", RabbitI18n.Text("controls.global_ascii"))
+        this.global_ascii := this.AddCheckbox("x260 y326 w490 h24 Hidden", RabbitI18n.Text("controls.global_ascii"))
         this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.fix_candidate_box := this.AddCheckbox("x260 y390 w238 h24 Hidden",
+        this.fix_candidate_box := this.AddCheckbox("x260 y352 w238 h24 Hidden",
             RabbitI18n.Text("controls.fixed_candidate"))
         this.fix_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.use_legacy_candidate_box := this.AddCheckbox("x510 y390 w238 h24 Hidden",
+        this.use_legacy_candidate_box := this.AddCheckbox("x510 y352 w238 h24 Hidden",
             RabbitI18n.Text("controls.legacy_candidates"))
         this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.bypass_password_fields := this.AddCheckbox("x260 y414 w490 h24 Hidden",
+        this.bypass_password_fields := this.AddCheckbox("x260 y376 w490 h24 Hidden",
             RabbitI18n.Text("controls.password_bypass"))
         this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
 
-        this.ascii_switch_group := this.AddGroupBox("x246 y444 w538 h142 Hidden",
+        this.ascii_switch_group := this.AddGroupBox("x246 y406 w538 h142 Hidden",
             RabbitI18n.Text("controls.ascii_keys"))
         this.ascii_switch_controls := Map()
-        this.AddAsciiSwitchControl("Shift_L", RabbitI18n.Text("controls.left_shift"), 260, 470)
-        this.AddAsciiSwitchControl("Shift_R", RabbitI18n.Text("controls.right_shift"), 432, 470)
-        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 470)
-        this.AddAsciiSwitchControl("Control_L", RabbitI18n.Text("controls.left_ctrl"), 260, 510)
-        this.AddAsciiSwitchControl("Control_R", RabbitI18n.Text("controls.right_ctrl"), 432, 510)
-        this.AddAsciiSwitchControl("Eisu_toggle", RabbitI18n.Text("controls.eisu"), 604, 510)
+        this.AddAsciiSwitchControl("Shift_L", RabbitI18n.Text("controls.left_shift"), 260, 432)
+        this.AddAsciiSwitchControl("Shift_R", RabbitI18n.Text("controls.right_shift"), 432, 432)
+        this.AddAsciiSwitchControl("Caps_Lock", "Caps Lock：", 604, 432)
+        this.AddAsciiSwitchControl("Control_L", RabbitI18n.Text("controls.left_ctrl"), 260, 472)
+        this.AddAsciiSwitchControl("Control_R", RabbitI18n.Text("controls.right_ctrl"), 432, 472)
+        this.AddAsciiSwitchControl("Eisu_toggle", RabbitI18n.Text("controls.eisu"), 604, 472)
         this.good_old_caps_lock := this.AddCheckbox(
-            "x260 y542 w310 h24 Hidden",
+            "x260 y504 w310 h24 Hidden",
             RabbitI18n.Text("controls.caps_lock")
         )
         this.good_old_caps_lock.OnEvent("Click", (*) => this.OnBehaviorChanged())
 
         this.behavior_tabs.UseTab(2)
         this.binding_list := this.AddListView(
-            (this.initial_dark_mode ? "x250 y198 w530 h302 -Hdr" : "x250 y174 w530 h326")
+            (this.initial_dark_mode ? "x250 y198 w530 h276 -Hdr" : "x250 y174 w530 h300")
                 . " -Multi NoSort Hidden",
             [RabbitI18n.Text("controls.accept"), RabbitI18n.Text("controls.when"), RabbitI18n.Text("controls.action")]
         )
@@ -812,18 +808,18 @@ class RabbitSettingsWindow extends Gui {
             "  " . RabbitI18n.Text("controls.action")
         )
         this.binding_list.OnEvent("DoubleClick", (ctrl, row) => this.EditBinding(row))
-        this.binding_add := this.AddButton("x250 y510 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.add"))
+        this.binding_add := this.AddButton("x250 y484 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.add"))
         this.binding_add.OnEvent("Click", (*) => this.AddBinding())
-        this.binding_edit := this.AddButton("x344 y510 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.edit"))
+        this.binding_edit := this.AddButton("x344 y484 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.edit"))
         this.binding_edit.OnEvent("Click", (*) => this.EditBinding())
-        this.binding_delete := this.AddButton("x438 y510 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.delete"))
+        this.binding_delete := this.AddButton("x438 y484 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.delete"))
         this.binding_delete.OnEvent("Click", (*) => this.DeleteBinding())
-        this.binding_up := this.AddButton("x532 y510 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.move_up"))
+        this.binding_up := this.AddButton("x532 y484 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.move_up"))
         this.binding_up.OnEvent("Click", (*) => this.MoveBinding(-1))
-        this.binding_down := this.AddButton("x626 y510 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.move_down"))
+        this.binding_down := this.AddButton("x626 y484 w86 h32 Hidden +0x2000", RabbitI18n.Text("controls.move_down"))
         this.binding_down.OnEvent("Click", (*) => this.MoveBinding(1))
         this.binding_help := this.AddText(
-            "x250 y552 w530 h48 cGray Hidden",
+            "x250 y526 w530 h48 cGray Hidden",
             RabbitI18n.Text("messages.binding_list_hint")
         )
         this.behavior_tabs.UseTab(3)
@@ -885,43 +881,39 @@ class RabbitSettingsWindow extends Gui {
         ]
 
         this.behavior_tabs.UseTab(4)
-        this.punctuator_help := this.AddText(
-            "x260 y178 w506 h38 cGray Hidden",
-            RabbitI18n.Text("punctuator.page_hint")
-        )
         this.punctuator_controls := []
         this.AddPunctuatorMapCard(
             RabbitPunctuatorMap.FULL_SHAPE_PATH,
-            218,
+            178,
             RabbitI18n.Text("punctuator.full_shape")
         )
         this.AddPunctuatorMapCard(
             RabbitPunctuatorMap.HALF_SHAPE_PATH,
-            334,
+            258,
             RabbitI18n.Text("punctuator.half_shape")
         )
         this.AddPunctuatorMapCard(
             RabbitPunctuatorMap.SYMBOLS_PATH,
-            450,
+            338,
             RabbitI18n.Text("punctuator.symbols")
         )
         this.punctuator_use_space := this.AddCheckbox(
-            "x260 y566 w104 h24 Hidden",
+            "x260 y430 w104 h24 Hidden",
             RabbitI18n.Text("punctuator.use_space")
         )
         this.punctuator_use_space.OnEvent("Click", (*) => this.OnBehaviorChanged())
         this.punctuator_digit_separators_label := this.AddText(
-            "x374 y570 w94 h22 Hidden",
+            "x374 y434 w94 h22 Hidden",
             RabbitI18n.Text("punctuator.digit_separators")
         )
-        this.punctuator_digit_separators := this.AddEdit("x472 y566 w72 r1 -Multi Hidden")
+        this.punctuator_digit_separators := this.AddEdit("x472 y430 w72 r1 -Multi Hidden")
         this.punctuator_digit_separators.OnEvent("Change", (*) => this.OnBehaviorChanged())
         this.punctuator_digit_separator_action_label := this.AddText(
-            "x550 y570 w110 h22 Hidden",
+            "x550 y434 w110 h22 Hidden",
             RabbitI18n.Text("punctuator.digit_separator_action")
         )
         this.punctuator_digit_separator_action := this.AddDropDownList(
-            "x666 y566 w110 Hidden",
+            "x666 y430 w110 Hidden",
             RabbitPunctuatorMap.DIGIT_SEPARATOR_ACTIONS
         )
         this.punctuator_digit_separator_action.OnEvent("Change", (*) => this.OnBehaviorChanged())
@@ -948,7 +940,6 @@ class RabbitSettingsWindow extends Gui {
         this.behavior_common_controls := [
             this.language_label,
             this.language_choice,
-            this.language_help,
             this.behavior_rabbit_group,
             this.show_tips,
             this.show_tips_time_label,
@@ -987,8 +978,7 @@ class RabbitSettingsWindow extends Gui {
                 this.binding_action_header
             )
         }
-        this.behavior_punctuator_controls.InsertAt(1, this.punctuator_help)
-        this.behavior_status := this.AddText("x230 y620 w570 h24 Hidden", "")
+        this.behavior_status := this.AddText("x230 y594 w570 h24 Hidden", "")
         this.ApplyBehaviorConfigToolTips()
     }
 
@@ -1021,8 +1011,7 @@ class RabbitSettingsWindow extends Gui {
             this.menu_labels_delete, this.menu_labels_up, this.menu_labels_down, this.menu_labels_restore)
         for path in RabbitPunctuatorMap.PATHS {
             controls := this.punctuator_control_map[path]
-            RabbitConfigToolTip.Apply("default", path, controls.group, controls.summary, controls.hint,
-                controls.edit, controls.reset)
+            RabbitConfigToolTip.Apply("default", path, controls.group, controls.summary, controls.edit, controls.reset)
         }
         RabbitConfigToolTip.Apply("default", RabbitPunctuatorMap.USE_SPACE_PATH, this.punctuator_use_space)
         RabbitConfigToolTip.Apply("default", RabbitPunctuatorMap.DIGIT_SEPARATORS_PATH,
@@ -1036,7 +1025,7 @@ class RabbitSettingsWindow extends Gui {
     }
 
     AddPunctuatorMapCard(path, y, label) {
-        local card := this.AddGroupBox("x246 y" . y . " w538 h104 Hidden", label)
+        local card := this.AddGroupBox("x246 y" . y . " w538 h68 Hidden", label)
         local edit_button := this.AddButton(
             "x560 y" . (y + 24) . " w88 h30 Hidden +0x2000",
             RabbitI18n.Text("controls.edit")
@@ -1046,17 +1035,15 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("punctuator.restore_default")
         )
         local summary := this.AddText("x260 y" . (y + 28) . " w286 h24 Hidden +0x200", "")
-        local hint := this.AddText("x260 y" . (y + 64) . " w506 h20 Hidden cGray", "")
         edit_button.OnEvent("Click", (*) => this.EditPunctuatorMap(path))
         reset_button.OnEvent("Click", (*) => this.RestorePunctuatorMap(path))
-        this.punctuator_controls.Push(card, summary, hint, edit_button, reset_button)
+        this.punctuator_controls.Push(card, summary, edit_button, reset_button)
         if !HasProp(this, "punctuator_control_map") {
             this.punctuator_control_map := Map()
         }
         this.punctuator_control_map[path] := {
             group: card,
             summary: summary,
-            hint: hint,
             edit: edit_button,
             reset: reset_button,
         }
@@ -1064,7 +1051,7 @@ class RabbitSettingsWindow extends Gui {
 
     AddRecognizerPatternsCard(y) {
         local card := this.AddGroupBox(
-            "x246 y" . y . " w538 h104 Hidden",
+            "x246 y" . y . " w538 h68 Hidden",
             RabbitI18n.Text("recognizer.patterns")
         )
         local edit_button := this.AddButton(
@@ -4280,10 +4267,8 @@ class RabbitSettingsWindow extends Gui {
         local controls := this.punctuator_control_map[path]
         if this.punctuator_reset_fields.Has(path) {
             controls.summary.Value := RabbitI18n.Text("punctuator.restore_default_pending")
-            controls.hint.Value := RabbitI18n.Text("punctuator.restore_default_pending")
         } else {
             controls.summary.Value := RabbitPunctuatorMap.Summary(this.punctuator_maps[path])
-            controls.hint.Value := RabbitI18n.Text("punctuator.card_hint")
         }
     }
 

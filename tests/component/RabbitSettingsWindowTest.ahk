@@ -118,11 +118,11 @@ TestSettingsWindowUsesPageSpecificHeights() {
         AssertEqual(452, footer_y, "The compact layout misplaced the footer status.")
 
         window.SelectPage(3)
-        AssertEqual(692, window.GetPageWindowHeight(), "The behavior page used the wrong window height.")
+        AssertEqual(666, window.GetPageWindowHeight(), "The behavior page used the wrong window height.")
         AssertTrue(window.behavior_tabs.Visible, "The behavior page did not show its tabs.")
         AssertEqual(1, window.behavior_tabs.Value, "The behavior page did not select the general tab.")
         window.behavior_tabs.GetPos(, , , &tabs_height)
-        AssertEqual(482, tabs_height, "The behavior tab did not grow with its page.")
+        AssertEqual(456, tabs_height, "The behavior tab did not use its compact height.")
 
         window.SelectPage(1)
         AssertEqual(580, window.GetPageWindowHeight(), "Returning to appearance did not restore its height.")
@@ -782,14 +782,13 @@ TestSettingsWindowSavesBehaviorSettings() {
         window.behavior_tabs.Choose(1)
         window.OnBehaviorTabChanged()
         AssertTrue(window.language_choice.Visible, "Language control is hidden on the general tab.")
-        local language_y, language_choice_y, language_help_height, behavior_y
+        AssertTrue(!HasProp(window, "language_help"), "The general tab retained the language behavior hint.")
+        local language_y, language_choice_y, behavior_y
         window.language_label.GetPos(, &language_y)
         window.language_choice.GetPos(, &language_choice_y)
-        window.language_help.GetPos(, , , &language_help_height)
         window.behavior_rabbit_group.GetPos(, &behavior_y)
         AssertTrue(Abs(language_y - language_choice_y) <= 4,
             "Language label and picker were not placed on the same row.")
-        AssertEqual(22, language_help_height, "The language hint reserved more than one line.")
         AssertTrue(language_choice_y < behavior_y, "The language picker was placed below Rabbit behavior controls.")
         AssertTrue(language_y < behavior_y, "Language controls were not placed before Rabbit behavior controls.")
         AssertEqual(1, window.language_choice.Value, "Language did not default to follow system.")
@@ -1548,6 +1547,11 @@ TestSettingsWindowPunctuatorControls() {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
         window.behavior_tabs.Choose(4)
         window.OnBehaviorTabChanged()
+        AssertTrue(!HasProp(window, "punctuator_help"), "The punctuation tab retained its ownership hint.")
+        AssertTrue(
+            !HasProp(window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH], "hint"),
+            "The full-shape punctuation card retained its ownership hint."
+        )
         AssertTrue(
             window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH].edit.Visible,
             "The full-shape punctuation editor stayed hidden."
@@ -1597,12 +1601,17 @@ TestSettingsWindowPunctuatorControls() {
 }
 
 TestSettingsWindowRecognizerControls() {
-    local calls := [], values, window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
+    local calls := [], pattern_card_height, punctuator_card_height, values
+    local window := RabbitSettingsWindow(RabbitSettingsBehaviorWorkflowProbe(calls))
     try {
         AssertTrue(window.SelectPage(3), "The settings window rejected the behavior page.")
         window.behavior_tabs.Choose(5)
         window.OnBehaviorTabChanged()
         AssertTrue(window.recognizer_use_space.Visible, "The recognizer spacing control stayed hidden.")
+        window.recognizer_control_map.patterns.group.GetPos(, , , &pattern_card_height)
+        window.punctuator_control_map[RabbitPunctuatorMap.FULL_SHAPE_PATH].group.GetPos(, , , &punctuator_card_height)
+        AssertEqual(punctuator_card_height, pattern_card_height,
+            "The recognizer-pattern card did not match the punctuation-map card height.")
         AssertEqual("识别空格", window.recognizer_use_space.Text,
             "The recognizer space setting label is unclear.")
         AssertEqual("default · recognizer/use_space", RabbitConfigToolTip.GetText(window.recognizer_use_space),
