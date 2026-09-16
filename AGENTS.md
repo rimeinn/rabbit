@@ -8,9 +8,9 @@ The rules in this section bind every agent run of this repository's scripts and 
 
 An uncaught AutoHotkey exception pops up a native error dialog on the machine running the script. No agent tool can see that dialog; it can leave the process hanging, exiting with a misleading status, or failing silently while the GUI waits for a click. Therefore:
 
-- `Rabbit.ahk` and `RabbitDeployer.ahk` are the only exceptions: their shipped top-level startup MUST NOT catch exceptions. Preserve AutoHotkey's default error dialog so users can report complete error details.
+- `Rabbit.ahk` is the only exception: its shipped top-level startup MUST NOT catch exceptions. Preserve AutoHotkey's default error dialog so users can report complete error details.
 - For all other AutoHotkey scripts, MUST wrap the top-level startup or test entry point in `try/catch` and print the exception details (message, location, stack) to standard output.
-- When an agent needs to exercise either application entry point, use a separate test harness with an observable exception boundary; do not add a catch to either shipped entry script.
+- When an agent needs to exercise the application entry point in normal or `--deployer` mode, use a separate test harness with an observable exception boundary; do not add a catch to the shipped entry script.
 - MUST NOT rely on the default error dialog as the record of a failure — the dialog is invisible to the agent, so the failure must be observable on stdout and in the exit status.
 - MUST NOT treat `/ErrorStdOut` as the exception boundary; it only covers startup and load diagnostics, and destructor or callback-thread errors can still surface as dialogs.
 - If a run hangs or ends with an unclear status, suspect an invisible dialog first and re-run through the wrapper below.
@@ -39,7 +39,7 @@ Release tags are part of the repository's release identity and must not be silen
 
 ## Project Structure & Module Organization
 
-Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the main entry point; `RabbitDeployer.ahk` handles installation and maintenance workflows. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml` defines the bundled Rime schema, while `assets/` contains source SVG icons. `Data/` and `Rime/` are generated or runtime data and are intentionally ignored.
+Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the single application entry point; its normal mode runs the frontend and its `--deployer` mode handles settings, installation, and maintenance workflows. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml` defines the bundled Rime schema, while `assets/` contains source SVG icons. `Docs/` contains the MkDocs site, with implementation plans and historical design records under `Docs/design/`. `Data/` and `Rime/` are generated or runtime data and are intentionally ignored.
 
 Three directories are Git submodules: `Lib/librime-ahk`, `Lib/RimeDepot`, and `plum`. Avoid mixing upstream submodule
 changes with application changes. `Lib/Direct2D` and `Lib/GetCaretPosEx` are Rabbit-maintained copies of third-party
@@ -56,10 +56,11 @@ Run commands from PowerShell on Windows:
 ```powershell
 git submodule update --init --recursive
 AutoHotkey.exe Rabbit.ahk
-AutoHotkey.exe RabbitDeployer.ahk
+AutoHotkey.exe Rabbit.ahk --deployer
+AutoHotkey.exe Rabbit.ahk --deployer deploy
 ```
 
-The first command obtains required dependencies. The latter commands launch the frontend and deployer directly from source with AutoHotkey v2.0.19, the version pinned by CI.
+The first command obtains required dependencies. The latter commands launch the frontend, open settings in deployer mode, and run a full deployment directly from source with AutoHotkey v2.0.19, the version pinned by CI.
 
 For a distributable executable, use Ahk2Exe as described in `README.md`; GitHub Actions generates icons with ImageMagick, prepares x86/x64 Rime DLLs, and packages releases. Treat `.github/workflows/ci.yaml` as the authoritative release recipe.
 
@@ -83,23 +84,25 @@ Match surrounding YAML indentation and comments. No formatter or linter is curre
 
 There is no CI-enforced coverage threshold. Run focused tests directly or use the unit test runner. Always use `/ErrorStdOut` for startup and load diagnostics, but do not treat it as an exception boundary: each test body must run through `RunTest`, which catches callback exceptions and prints the test name, error, location, and stack to standard output. Test scripts use explicit relative includes and must remain runnable without a root-level test launcher.
 
-AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. Agent tests must run through the top-level `try/catch` boundary required by Agent Operating Rules above (use a separate harness for the two exempt application entry scripts); `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for that boundary.
+AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. Agent tests must run through the top-level `try/catch` boundary required by Agent Operating Rules above (use a separate harness for the exempt application entry script); `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for that boundary.
 
 ```powershell
-AutoHotkey.exe /ErrorStdOut tests\unit\RabbitTests.ahk
+AutoHotkey.exe /ErrorStdOut tests\RabbitTestMain.ahk
 ```
 
-`tests\integration\RabbitDeployerDialogTests.ahk` and `tests\integration\RabbitUIStylePreviewTests.ahk` are separate integration smoke tests. They initialize the real Rime deployer, require a matching `rime.dll` and local Rime data, and create native/Direct2D dialog resources; do not include them in `tests\unit\RabbitTests.ahk`. Run either one explicitly with `/ErrorStdOut` when changing its dialog or preview path.
+`tests\RabbitTestMain.ahk` discovers tests by suite and launches each file in an isolated AutoHotkey process. It defaults to the unit suite; use `--suite component`, `--suite integration`, or a focused `--filter` as appropriate. `tests\unit\RabbitTests.ahk` remains only as a compatibility aggregate and does not need to be updated when adding tests.
 
-Before submitting, launch both scripts and manually exercise affected input, tray, candidate-window, configuration, and deployment paths on Windows. For binding-level changes, run:
+`tests\integration\RabbitDeployerDialogTests.ahk` and `tests\integration\RabbitUIStylePreviewTests.ahk` are integration smoke tests. They initialize the real Rime deployer, require a matching `rime.dll` and local Rime data, and create native/Direct2D dialog resources. Run the integration suite or either file explicitly with `/ErrorStdOut` when changing its dialog or preview path.
+
+Before submitting, launch `Rabbit.ahk` in the affected normal and/or `--deployer` modes and manually exercise affected input, tray, candidate-window, configuration, and deployment paths on Windows. For binding-level changes, run:
 
 ```powershell
-AutoHotkey.exe Lib/librime-ahk/tests/rime_test_main.ahk
+AutoHotkey.exe /ErrorStdOut Lib/librime-ahk/tests/rime_test_main.ahk
 ```
 
 Ensure the matching `rime.dll` and test data are available. Add focused regression tests to the closest test directory when practical.
 
-Testing must not leave temporary safety overrides in the diff. In particular, if caret-hook use is forced off for local antivirus compatibility, restore `RabbitConfig.use_caret_hook` before staging or committing.
+Testing must not leave temporary safety overrides in the diff or active user configuration. In particular, if caret-hook use is forced off for local antivirus compatibility, restore the prior `use_caret_hook` value in the active `rabbit.custom.yaml` before staging or committing.
 
 ## Commit & Pull Request Guidelines
 

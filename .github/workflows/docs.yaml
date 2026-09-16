@@ -3,8 +3,6 @@ name: Documentation
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
     paths:
       - 'Docs/**'
       - 'README.md'
@@ -48,11 +46,11 @@ jobs:
         run: mkdocs build --strict
 
       - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/configure-pages@v6
 
       - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist/docs
