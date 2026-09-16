@@ -783,14 +783,22 @@ TestSettingsWindowSavesBehaviorSettings() {
         window.OnBehaviorTabChanged()
         AssertTrue(window.language_choice.Visible, "Language control is hidden on the general tab.")
         AssertTrue(!HasProp(window, "language_help"), "The general tab retained the language behavior hint.")
+        local bypass_x, bypass_y, global_ascii_width, global_ascii_x, global_ascii_y
         local language_y, language_choice_y, behavior_y
         window.language_label.GetPos(, &language_y)
         window.language_choice.GetPos(, &language_choice_y)
         window.behavior_rabbit_group.GetPos(, &behavior_y)
+        window.global_ascii.GetPos(&global_ascii_x, &global_ascii_y, &global_ascii_width)
+        window.bypass_password_fields.GetPos(&bypass_x, &bypass_y)
         AssertTrue(Abs(language_y - language_choice_y) <= 4,
             "Language label and picker were not placed on the same row.")
         AssertTrue(language_choice_y < behavior_y, "The language picker was placed below Rabbit behavior controls.")
         AssertTrue(language_y < behavior_y, "Language controls were not placed before Rabbit behavior controls.")
+        AssertEqual(global_ascii_y, bypass_y, "The password bypass control did not share the global-ASCII row.")
+        AssertTrue(global_ascii_x + global_ascii_width < bypass_x,
+            "The password bypass control overlapped the global-ASCII control.")
+        AssertEqual("密码输入时绕过 Rime", window.bypass_password_fields.Text,
+            "The password bypass label was not shortened.")
         AssertEqual(1, window.language_choice.Value, "Language did not default to follow system.")
         window.language_choice.Choose(3)
         AssertEqual("en-US", window.GetBehaviorValues().language, "Language selection used the wrong code.")

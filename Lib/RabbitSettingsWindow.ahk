@@ -762,7 +762,7 @@ class RabbitSettingsWindow extends Gui {
             RabbitI18n.Text("controls.clipboard_length"))
         this.clipboard_length := this.AddEdit("x648 y296 w118 r1 Number -Multi Hidden")
         this.clipboard_length.OnEvent("Change", (*) => this.OnBehaviorChanged())
-        this.global_ascii := this.AddCheckbox("x260 y326 w490 h24 Hidden", RabbitI18n.Text("controls.global_ascii"))
+        this.global_ascii := this.AddCheckbox("x260 y326 w238 h24 Hidden", RabbitI18n.Text("controls.global_ascii"))
         this.global_ascii.OnEvent("Click", (*) => this.OnBehaviorChanged())
         this.fix_candidate_box := this.AddCheckbox("x260 y352 w238 h24 Hidden",
             RabbitI18n.Text("controls.fixed_candidate"))
@@ -770,7 +770,7 @@ class RabbitSettingsWindow extends Gui {
         this.use_legacy_candidate_box := this.AddCheckbox("x510 y352 w238 h24 Hidden",
             RabbitI18n.Text("controls.legacy_candidates"))
         this.use_legacy_candidate_box.OnEvent("Click", (*) => this.OnBehaviorChanged())
-        this.bypass_password_fields := this.AddCheckbox("x260 y376 w490 h24 Hidden",
+        this.bypass_password_fields := this.AddCheckbox("x510 y326 w256 h24 Hidden",
             RabbitI18n.Text("controls.password_bypass"))
         this.bypass_password_fields.OnEvent("Click", (*) => this.OnBehaviorChanged())
 

@@ -151,7 +151,7 @@ class RabbitLocaleFallback {
         catalog["controls.global_ascii"] := "在所有程序之间共享中西文状态"
         catalog["controls.fixed_candidate"] := "组字时保持候选窗位置不变"
         catalog["controls.legacy_candidates"] := "使用旧版候选窗"
-        catalog["controls.password_bypass"] := "在密码输入框中绕过 Rime"
+        catalog["controls.password_bypass"] := "密码输入时绕过 Rime"
         catalog["controls.ascii_keys"] := "中西文切换键"
         catalog["controls.left_shift"] := "左 Shift："
         catalog["controls.right_shift"] := "右 Shift："
