@@ -484,8 +484,9 @@ TestSwitchListEditor() {
 }
 
 TestEngineListsEditor() {
-    local calls := [], dialog := 0, editor, long_dialog := 0, long_editor, long_height, long_model, model, owner := Gui()
-    local short_height
+    local button_height, button_width, button_x, button_y, calls := [], dialog := 0, editor
+    local label_width, label_x, label_y, list_width, list_x, list_y
+    local long_dialog := 0, long_editor, long_height, long_model, model, owner := Gui(), short_height
     try {
         model := RabbitSchemaSettingsModelProbe(
             RabbitSchemaSettingsRimeProbe(Map(), calls),
@@ -513,15 +514,43 @@ TestEngineListsEditor() {
             "The segmentor list did not expose its YAML path.")
         AssertTrue(dialog.content_list_hwnds.Has(editor.cards["filters"].list.Hwnd),
             "The engine-list editor was not registered for native wheel scrolling.")
+        editor.cards["processors"].label.GetPos(&label_x, &label_y, &label_width)
+        editor.cards["processors"].reset_button.GetPos(&button_x, &button_y, &button_width, &button_height)
+        editor.cards["processors"].list.GetPos(&list_x, &list_y, &list_width)
+        AssertEqual(label_y, button_y, "The processor restore action was not aligned with its title.")
+        AssertTrue(label_x + label_width < button_x, "The processor title overlapped its restore action.")
+        AssertTrue(button_x + button_width <= list_x + list_width,
+            "The processor restore action extended beyond its card.")
+        AssertTrue(button_y + button_height <= list_y,
+            "The processor restore action overlapped its list.")
         editor.cards["processors"].list.Choose(2)
         AssertTrue(editor.MoveItem("processors", -1), "The engine-list editor could not move a processor.")
         AssertEqual("recognizer", dialog.draft_values["engines"]["processors"][1],
             "Moving a processor changed the engine-list draft incorrectly.")
-        AssertTrue(editor.RestoreDefault(), "The engine-list editor could not stage a reset.")
-        AssertTrue(dialog.reset_fields.Has("engines"), "The engine-list reset was not retained.")
+        AssertTrue(editor.RestoreDefault("processors"), "The engine-list editor could not stage a processor reset.")
+        AssertTrue(dialog.reset_fields.Has("engines") && dialog.reset_fields["engines"].Has("processors"),
+            "The processor reset was not retained.")
+        AssertTrue(!dialog.reset_fields["engines"].Has("segmentors"),
+            "Resetting processors also staged a segmentor reset.")
+        AssertTrue(!editor.cards["processors"].reset_button.Enabled,
+            "A pending processor reset did not update its card action.")
+        AssertEqual(RabbitI18n.Text("engine_lists.restore_pending"), editor.cards["processors"].reset_button.Text,
+            "A pending processor reset did not identify its state.")
+        AssertTrue(editor.cards["segmentors"].reset_button.Enabled,
+            "A processor reset disabled another card action.")
+        AssertTrue(editor.RestoreDefault("filters"), "The engine-list editor could not stage a filter reset.")
         editor.cards["processors"].list.Choose(1)
         AssertTrue(editor.MoveItem("processors", 1), "The engine-list editor could not edit after a pending reset.")
-        AssertTrue(!dialog.reset_fields.Has("engines"), "Editing engine lists did not cancel the pending reset.")
+        AssertTrue(!dialog.reset_fields["engines"].Has("processors"),
+            "Editing processors did not cancel the processor reset.")
+        AssertTrue(dialog.reset_fields["engines"].Has("filters"),
+            "Editing processors canceled an unrelated filter reset.")
+        AssertTrue(editor.cards["processors"].reset_button.Enabled,
+            "Canceling the processor reset did not restore its card action.")
+        AssertEqual(RabbitI18n.Text("engine_lists.restore"), editor.cards["processors"].reset_button.Text,
+            "Canceling the processor reset did not restore its action label.")
+        AssertTrue(!editor.cards["filters"].reset_button.Enabled,
+            "Canceling the processor reset changed the filter card action.")
         dialog.Dispose()
         dialog := 0
 
@@ -763,30 +792,36 @@ TestSchemaSettingsEngineListsPersistence() {
     values := RabbitConfigValue.Clone(model.values)
     values["engines"]["translators"].InsertAt(1, "table_translator@custom_phrase")
     AssertTrue(model.Save(values), "The schema settings model failed to save engine lists.")
-    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/processors/+"),
-        "Saving engine lists did not clear a processor patch.")
-    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/segmentors/@legacy"),
-        "Saving engine lists did not clear a segmentor patch.")
     AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/translators/-"),
         "Saving engine lists did not clear a translator patch.")
-    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/filters/@2"),
-        "Saving engine lists did not clear a filter patch.")
     AssertTrue(SchemaSettingsCallsContain(calls, "item:engine/translators:", '"table_translator@custom_phrase"'),
         "Saving engine lists did not write the changed translator list.")
+    AssertTrue(!SchemaSettingsCallsHave(calls, "reset:engine/processors/+"),
+        "Saving translators also cleared a processor patch.")
+    AssertTrue(!SchemaSettingsCallsHave(calls, "reset:engine/segmentors/@legacy"),
+        "Saving translators also cleared a segmentor patch.")
+    AssertTrue(!SchemaSettingsCallsHave(calls, "reset:engine/filters/@2"),
+        "Saving translators also cleared a filter patch.")
 
     calls.Length := 0
+    values := RabbitConfigValue.Clone(model.values)
+    values["engines"]["filters"].Push("reverse_lookup_filter")
     AssertTrue(
-        model.Save(RabbitConfigValue.Clone(model.values), Map("engines", true)),
-        "The schema settings model failed to restore engine-list defaults."
+        model.Save(values, Map("engines", Map("processors", true))),
+        "The schema settings model failed to restore one engine-list default."
     )
     AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/processors"),
-        "Restoring engine lists did not remove the processor override.")
-    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/segmentors"),
-        "Restoring engine lists did not remove the segmentor override.")
-    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/translators"),
-        "Restoring engine lists did not remove the translator override.")
-    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/filters"),
-        "Restoring engine lists did not remove the filter override.")
+        "Restoring processors did not remove the processor override.")
+    AssertTrue(!SchemaSettingsCallsHave(calls, "reset:engine/segmentors"),
+        "Restoring processors also removed the segmentor override.")
+    AssertTrue(!SchemaSettingsCallsHave(calls, "reset:engine/translators"),
+        "Restoring processors also removed the translator override.")
+    AssertTrue(!SchemaSettingsCallsHave(calls, "reset:engine/filters"),
+        "Editing filters while restoring processors removed the filter override.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/filters/@2"),
+        "Editing filters while restoring processors did not clear the filter patch.")
+    AssertTrue(SchemaSettingsCallsContain(calls, "item:engine/filters:", '"reverse_lookup_filter"'),
+        "Editing filters while restoring processors did not write the filter list.")
     values := RabbitConfigValue.Clone(model.values)
     values["engines"].Delete("filters")
     AssertThrows(model.NormalizeValues.Bind(model, values),

@@ -255,7 +255,7 @@ class RabbitSchemaSettingsModel {
     }
 
     NormalizeResetFields(reset_fields) {
-        local field, matched, reset_id, resets := Map()
+        local field, matched, reset_id, reset_lists, resets := Map()
         if !reset_fields {
             return resets
         }
@@ -278,13 +278,42 @@ class RabbitSchemaSettingsModel {
                 && matched.type != "switch_list" && matched.type != "engine_lists" {
                 throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", reset_id)))
             }
+            if matched.type = "engine_lists" {
+                reset_lists := this.NormalizeEngineListResets(value)
+                if reset_lists.Count {
+                    resets[reset_id] := reset_lists
+                }
+                continue
+            }
             resets[reset_id] := true
         }
         return resets
     }
 
+    NormalizeEngineListResets(value) {
+        local name, reset, resets := Map()
+        if !(value is Map) {
+            if value = true {
+                for name in RabbitEngineLists.NAMES {
+                    resets[name] := true
+                }
+                return resets
+            }
+            throw TypeError("Expected a map of engine-list resets.")
+        }
+        for name, reset in value {
+            if !reset {
+                continue
+            }
+            RabbitEngineLists.ListPath(name)
+            resets[name] := true
+        }
+        return resets
+    }
+
     Save(values, reset_fields := 0) {
-        local field, normalized := this.NormalizeValues(values), resets := this.NormalizeResetFields(reset_fields)
+        local field, field_resets, normalized := this.NormalizeValues(values)
+        local resets := this.NormalizeResetFields(reset_fields)
         local settings := 0
         this.last_save_changed := this.HasNormalizedChanges(normalized, resets)
         if !this.last_save_changed {
@@ -297,6 +326,13 @@ class RabbitSchemaSettingsModel {
                 return false
             }
             for field in this.manifest.fields {
+                if field.type = "engine_lists" {
+                    field_resets := resets.Has(field.id) ? resets[field.id] : 0
+                    if !this.SaveEngineListsField(settings, field, normalized[field.id], field_resets) {
+                        return false
+                    }
+                    continue
+                }
                 if resets.Has(field.id) {
                     if !this.ResetField(settings, field) {
                         return false
@@ -344,21 +380,45 @@ class RabbitSchemaSettingsModel {
     }
 
     CustomizeEngineListsField(settings, value) {
-        local name, path
+        local name
         for name in RabbitEngineLists.NAMES {
-            path := RabbitEngineLists.ListPath(name)
-            if !this.ClearListPatchOperations(settings, path) || !this.CustomizeYamlItem(settings, path, value[name]) {
+            if !this.CustomizeEngineListField(settings, name, value[name]) {
                 return false
             }
         }
         return true
     }
 
-    ResetEngineListsField(settings) {
+    CustomizeEngineListField(settings, name, value) {
+        local path := RabbitEngineLists.ListPath(name)
+        return this.ClearListPatchOperations(settings, path) && this.CustomizeYamlItem(settings, path, value)
+    }
+
+    ResetEngineListsField(settings, reset_lists := 0) {
         local name
         for name in RabbitEngineLists.NAMES {
+            if reset_lists is Map && !reset_lists.Has(name) {
+                continue
+            }
             if !this.ClearListPatchOperations(settings, RabbitEngineLists.ListPath(name), true) {
                 return false
+            }
+        }
+        return true
+    }
+
+    SaveEngineListsField(settings, field, value, reset_lists := 0) {
+        local current := this.values.Has(field.id) ? this.values[field.id] : 0
+        local name
+        for name in RabbitEngineLists.NAMES {
+            if reset_lists is Map && reset_lists.Has(name) {
+                if !this.ClearListPatchOperations(settings, RabbitEngineLists.ListPath(name), true) {
+                    return false
+                }
+            } else if !current || !RabbitConfigValue.ValuesEqual(value[name], current[name]) {
+                if !this.CustomizeEngineListField(settings, name, value[name]) {
+                    return false
+                }
             }
         }
         return true

@@ -570,7 +570,6 @@ class RabbitSchemaSettingsDialog extends Gui {
         local controls := { type: field.type }
         controls.editor := RabbitEngineListsEditor(this, field, y)
         controls.label := controls.editor.label
-        controls.reset_hint := controls.editor.reset_hint
         this.field_controls[field.id] := controls
         return controls.editor.bottom
     }
@@ -695,16 +694,34 @@ class RabbitSchemaSettingsDialog extends Gui {
         }
     }
 
-    RestoreEngineListsDefault(field) {
-        this.reset_fields[field.id] := true
+    RestoreEngineListDefault(field, name) {
+        local reset_lists := this.reset_fields.Has(field.id) ? this.reset_fields[field.id] : Map()
+        RabbitEngineLists.ListPath(name)
+        if !(reset_lists is Map) {
+            reset_lists := Map()
+        }
+        reset_lists[name] := true
+        this.reset_fields[field.id] := reset_lists
         if this.field_controls.Has(field.id) {
-            this.field_controls[field.id].editor.RefreshResetState()
+            this.field_controls[field.id].editor.RefreshResetState(name)
         }
         return true
     }
 
-    CancelEngineListsReset(field) {
-        if this.reset_fields.Has(field.id) {
+    CancelEngineListReset(field, name) {
+        local reset_lists
+        if !this.reset_fields.Has(field.id) {
+            return
+        }
+        reset_lists := this.reset_fields[field.id]
+        if !(reset_lists is Map) {
+            this.reset_fields.Delete(field.id)
+            return
+        }
+        if reset_lists.Has(name) {
+            reset_lists.Delete(name)
+        }
+        if !reset_lists.Count {
             this.reset_fields.Delete(field.id)
         }
     }

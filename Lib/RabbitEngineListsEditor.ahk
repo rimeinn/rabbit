@@ -27,11 +27,11 @@ class RabbitEngineListsEditor {
         local control, list_height
         control := owner.AddListBox("x0 y0 w100 r" . owner.GetListRows(field) . " Hidden", [])
         control.GetPos(, , , &list_height)
-        return 190 + list_height * 2
+        return 166 + list_height * 2
     }
 
     __New(owner, field, y) {
-        local card_height, card_width, footer_y, list_height, right_x, second_row_y
+        local card_height, card_width, list_height, right_x, second_row_y
         this.owner := owner
         this.field := field
         this.width := owner.content_width - 24
@@ -46,41 +46,37 @@ class RabbitEngineListsEditor {
         right_x := 12 + card_width + 12
         this.AddCard("processors", 12, y, card_width)
         this.cards["processors"].list.GetPos(, , , &list_height)
-        card_height := 22 + list_height + 4 + 28
+        card_height := 28 + list_height + 4 + 28
         this.AddCard("segmentors", right_x, y, card_width)
         second_row_y := y + card_height + 10
         this.AddCard("translators", 12, second_row_y, card_width)
         this.AddCard("filters", right_x, second_row_y, card_width)
 
-        footer_y := second_row_y + card_height + 10
-        this.reset_hint := owner.AddContentMutedText(
-            "x12 y" . footer_y . " w" . (this.width - 132) . " h28 +0x200",
-            ""
-        )
-        this.reset_button := owner.AddListButton(
-            "x" . (12 + this.width - 110) . " y" . footer_y . " w110 h28 +0x2000",
-            RabbitI18n.Text("engine_lists.restore_default"),
-            (*) => this.RestoreDefault()
-        )
-        RabbitConfigToolTip.Apply(owner.ConfigId(), field.path, this.label, this.reset_hint, this.reset_button)
-        this.bottom := footer_y + 36
+        RabbitConfigToolTip.Apply(owner.ConfigId(), field.path, this.label)
+        this.bottom := second_row_y + card_height + 10
         this.Refresh()
     }
 
     AddCard(name, x, y, width) {
         local button_gap := 4, button_width, buttons_y, card := { name: name }, list_height
+        local reset_gap := 8, reset_width := 76
         card.label := this.owner.AddContentText(
-            "x" . x . " y" . y . " w" . width . " h22 +0x200",
+            "x" . x . " y" . y . " w" . (width - reset_width - reset_gap) . " h24 +0x200",
             RabbitI18n.Text("engine_lists." . name)
         )
+        card.reset_button := this.owner.AddListButton(
+            "x" . (x + width - reset_width) . " y" . y . " w" . reset_width . " h24 +0x2000",
+            RabbitI18n.Text("engine_lists.restore"),
+            (*) => this.RestoreDefault(name)
+        )
         card.list := this.owner.content_gui.AddListBox(
-            "x" . x . " y" . (y + 22) . " w" . width . " r" . this.rows,
+            "x" . x . " y" . (y + 28) . " w" . width . " r" . this.rows,
             []
         )
         this.owner.TrackScrollableContentControl(card.list)
         card.list.OnEvent("DoubleClick", (*) => this.EditItem(name))
         card.list.GetPos(, , , &list_height)
-        buttons_y := y + 22 + list_height + 4
+        buttons_y := y + 28 + list_height + 4
         button_width := Floor((width - button_gap * 3) / 4)
         card.add_button := this.owner.AddListButton(
             "x" . x . " y" . buttons_y . " w" . button_width . " h28 +0x2000",
@@ -107,6 +103,7 @@ class RabbitEngineListsEditor {
             this.owner.ConfigId(),
             RabbitEngineLists.ListPath(name),
             card.label,
+            card.reset_button,
             card.list,
             card.add_button,
             card.delete_button,
@@ -169,14 +166,14 @@ class RabbitEngineListsEditor {
     }
 
     CommitChange(name, selected_row := 0) {
-        this.owner.CancelEngineListsReset(this.field)
+        this.owner.CancelEngineListReset(this.field, name)
         this.owner.draft_values[this.field.id] := RabbitConfigValue.Clone(this.values)
         this.RefreshList(name, selected_row)
-        this.RefreshResetState()
+        this.RefreshResetState(name)
     }
 
-    RestoreDefault() {
-        return this.owner.RestoreEngineListsDefault(this.field)
+    RestoreDefault(name) {
+        return this.owner.RestoreEngineListDefault(this.field, name)
     }
 
     Refresh() {
@@ -198,8 +195,18 @@ class RabbitEngineListsEditor {
         }
     }
 
-    RefreshResetState() {
-        this.reset_hint.Value := this.owner.reset_fields.Has(this.field.id)
-            ? RabbitI18n.Text("controls.restore_schema_default_pending") : ""
+    RefreshResetState(name := "") {
+        local card, pending, reset_lists
+        reset_lists := this.owner.reset_fields.Has(this.field.id) ? this.owner.reset_fields[this.field.id] : 0
+        for card_name, card in this.cards {
+            if name && card_name != name {
+                continue
+            }
+            pending := reset_lists is Map && reset_lists.Has(card_name)
+            card.reset_button.Text := RabbitI18n.Text(
+                pending ? "engine_lists.restore_pending" : "engine_lists.restore"
+            )
+            card.reset_button.Enabled := !pending
+        }
     }
 }
