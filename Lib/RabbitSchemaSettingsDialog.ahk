@@ -17,6 +17,7 @@
 
 #Include RabbitDialogPlacement.ahk
 #Include RabbitConfigToolTip.ahk
+#Include RabbitEngineListsEditor.ahk
 #Include RabbitKeyBindingDialog.ahk
 #Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMapDialog.ahk
@@ -236,6 +237,9 @@ class RabbitSchemaSettingsDialog extends Gui {
         if field.type = "switch_list" {
             return RabbitSwitchListEditor.ESTIMATED_HEIGHT
         }
+        if field.type = "engine_lists" {
+            return RabbitEngineListsEditor.MeasureHeight(this, field)
+        }
         return 30
     }
 
@@ -376,6 +380,8 @@ class RabbitSchemaSettingsDialog extends Gui {
             y := this.AddRecognizerPatternsField(field, y)
         } else if field.type = "switch_list" {
             y := this.AddSwitchListField(field, y)
+        } else if field.type = "engine_lists" {
+            y := this.AddEngineListsField(field, y)
         } else {
             label := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
             this.TrackContentControl(label)
@@ -560,6 +566,15 @@ class RabbitSchemaSettingsDialog extends Gui {
         return controls.editor.bottom
     }
 
+    AddEngineListsField(field, y) {
+        local controls := { type: field.type }
+        controls.editor := RabbitEngineListsEditor(this, field, y)
+        controls.label := controls.editor.label
+        controls.reset_hint := controls.editor.reset_hint
+        this.field_controls[field.id] := controls
+        return controls.editor.bottom
+    }
+
     AddKeyBindingListHeaders(controls, y) {
         local surface_options := " c" . RabbitWindowThemeController.DARK_TEXT
             . " Background" . RabbitWindowThemeController.DARK_SURFACE
@@ -675,6 +690,20 @@ class RabbitSchemaSettingsDialog extends Gui {
     }
 
     CancelSwitchListReset(field) {
+        if this.reset_fields.Has(field.id) {
+            this.reset_fields.Delete(field.id)
+        }
+    }
+
+    RestoreEngineListsDefault(field) {
+        this.reset_fields[field.id] := true
+        if this.field_controls.Has(field.id) {
+            this.field_controls[field.id].editor.RefreshResetState()
+        }
+        return true
+    }
+
+    CancelEngineListsReset(field) {
         if this.reset_fields.Has(field.id) {
             this.reset_fields.Delete(field.id)
         }
@@ -871,7 +900,7 @@ class RabbitSchemaSettingsDialog extends Gui {
                 continue
             }
             if field.type = "list" || field.type = "key_binding_list" || field.type = "punctuator_map"
-                || field.type = "recognizer_patterns" {
+                || field.type = "recognizer_patterns" || field.type = "engine_lists" {
                 continue
             }
             control := this.field_controls[field.id]

@@ -33,13 +33,13 @@
 - `punctuator_map`：仅用于 `punctuator/full_shape`、`punctuator/half_shape` 和 `punctuator/symbols`，使用标点映射编辑器；
 - `recognizer_patterns`：仅用于 `recognizer/patterns`，使用识别模式编辑器，每项由标签和正则表达式组成。
 - `switch_list`：仅用于 `switches`，使用方案选项编辑器。每项可以是一个开关，或一组互斥选项。
+- `engine_lists`：仅用于 `engine`，在同一页编辑处理器、分段器、翻译器和过滤器四条列表。
 
 候选选单常用字段包括 `menu/page_size`（整数）、`menu/alternative_select_labels`（字符串列表）、
 `menu/alternative_select_keys`（可打印 ASCII 字符组成的字符串）和 `menu/page_down_cycle`（布尔值）。
 
 没有 `<schema_id>.rabbit.ini` 时，玉兔毫提供的通用 fallback 包含所有适合作为方案覆盖的通用输入配置，
-按“开关”“候选选单”“中西文切换”“按键绑定”“标点”和“识别器”分组。全局 `switcher` 设置不属于方案设置；
-`engine` 管线列表属于方案实现，仍应由方案作者在自己的声明中提供。
+按“开关”“引擎”“候选选单”“中西文切换”“按键绑定”“标点”和“识别器”分组。全局 `switcher` 设置不属于方案设置。
 
 专用映射字段由玉兔毫整体维护：编辑后写入完整映射表，并清除同路径的精确覆盖及嵌套补丁；“还原方案默认”会移除完整覆盖和所有嵌套补丁。
 `recognizer_patterns` 不在玉兔毫中预先校验正则表达式，最终语法由 librime 的 Boost.Regex 处理。
@@ -55,17 +55,25 @@ group = translator
 path = switches
 type = switch_list
 label = 方案选项
-rows = 6
 ~~~
 
-列表字段可选 `rows = N` 来指定显示的条目行数。玉兔毫仅接受 1 到 10；未设置、非整数或超出范围时都使用默认的
-3 行。
+`list`、`key_binding_list` 和 `engine_lists` 字段可选 `rows = N` 来指定显示的条目行数。玉兔毫仅接受 1 到 10；未设置、
+非整数或超出范围时都使用默认的 3 行。`engine_lists` 会将该行数同步应用到四个列表，并按实际高度调整页面。`switch_list`
+的左右两栏高度由专用编辑器自动计算，不支持 `rows`。
 
-`engine/processors`、`engine/segmentors`、`engine/translators` 和 `engine/filters` 应声明为 `list`。
-列表的每一项都是 `string`，并可使用 Rime 的 `<engine_type>@<engine_name>` 表达式。
+`engine_lists` 将 `engine/processors`、`engine/segmentors`、`engine/translators` 和 `engine/filters` 作为一个完整配置项。
+每一项都是 `string`，并可使用 Rime 的 `<engine_type>@<engine_name>` 表达式。例如：
+
+~~~ini
+[field.engines]
+group = engines
+path = engine
+type = engine_lists
+label = 引擎列表
+~~~
 
 列表由玉兔毫整体维护：仅在用户实际修改后写入完整列表；“还原方案默认”会移除该列表的完整覆盖及同路径的
-`+`、`-`、`@…` 增量补丁。方案作者不应为同一路径同时声明列表和其子字段，也不应让两个字段的路径互为祖先或后代；
+`+`、`-`、`@…` 增量补丁。`engine_lists` 的还原操作会同时恢复四条引擎列表。方案作者不应为同一路径同时声明列表和其子字段，也不应让两个字段的路径互为祖先或后代；
 这些冲突会使 custom 配置的所有权不明确。
 
 字段路径不能使用 `+`、`-`、`@after`、`@N` 等顺序型补丁语法。`record_list` 保留给未来支持的通用记录列表，

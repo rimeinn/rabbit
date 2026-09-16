@@ -25,12 +25,13 @@
 ; no longer needs its own list dialog followed by a second entry dialog.
 class RabbitSwitchListEditor {
     static ESTIMATED_HEIGHT := 410
+    static INITIAL_ENTRY_LIST_ROWS := 3
     static STATE_LIST_ROWS := 4
 
     __New(owner, field, value, y) {
         local bottom_offset, button_height, button_width, dark_mode := owner.window_theme.dark_mode
         local entry_bottom, entry_height, entry_y, left_bottom_y, list_height, right_bottom
-        local rows, state_list_height
+        local state_list_height
         local action_y, left_bottom, notice_width, reset_width, state_button_y, state_editor_y, target_list_height
         if !(value is Array) {
             value := []
@@ -72,9 +73,9 @@ class RabbitSwitchListEditor {
             field.label
         )
         this.list_y := y + 24
-        rows := owner.GetListRows(field)
         this.list := owner.content_gui.AddListView(
-            "x" . this.x . " y" . this.list_y . " w" . this.list_width . " r" . rows . " -Hdr -Multi NoSort",
+            "x" . this.x . " y" . this.list_y . " w" . this.list_width . " r"
+                . RabbitSwitchListEditor.INITIAL_ENTRY_LIST_ROWS . " -Hdr -Multi NoSort",
             [""]
         )
         owner.TrackScrollableContentControl(this.list)

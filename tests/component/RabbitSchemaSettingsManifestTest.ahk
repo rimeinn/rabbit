@@ -26,11 +26,13 @@ RunTest("schema settings parse ordered list fields", TestSchemaSettingsListManif
 RunTest("punctuator maps validate and use a dedicated editor", TestPunctuatorMapEditor.Bind())
 RunTest("recognizer patterns validate and use a dedicated editor", TestRecognizerPatternEditor.Bind())
 RunTest("switch lists validate and use inline state editing", TestSwitchListEditor.Bind())
+RunTest("engine lists validate and use a compact editor", TestEngineListsEditor.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
 RunTest("schema settings save menu values", TestSchemaSettingsMenuPersistence.Bind())
 RunTest("schema settings save punctuation scalar values", TestSchemaSettingsPunctuatorScalarPersistence.Bind())
 RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
+RunTest("schema settings save engine lists", TestSchemaSettingsEngineListsPersistence.Bind())
 RunTest("schema settings save switch lists", TestSchemaSettingsSwitchListPersistence.Bind())
 RunTest("schema settings save punctuation maps", TestSchemaSettingsPunctuatorMapPersistence.Bind())
 RunTest("schema settings save recognizer patterns", TestSchemaSettingsRecognizerPatternPersistence.Bind())
@@ -136,7 +138,8 @@ TestSchemaSettingsListManifest() {
         FileAppend(
             "[meta]`nformat=1`n[field.processors]`npath=engine/processors`ntype=list`nlabel=Processors`n"
                 . "[field.bindings]`npath=key_binder/bindings`ntype=key_binding_list`nlabel=Bindings`n"
-                . "[field.switches]`npath=switches`ntype=switch_list`nlabel=Switches`n",
+                . "[field.switches]`npath=switches`ntype=switch_list`nlabel=Switches`n"
+                . "[field.engines]`npath=engine`ntype=engine_lists`nlabel=Engines`n",
             path,
             "UTF-8"
         )
@@ -144,6 +147,7 @@ TestSchemaSettingsListManifest() {
         AssertEqual("list", manifest.fields[1].type, "The string list type was not retained.")
         AssertEqual("key_binding_list", manifest.fields[2].type, "The binding-list type was not retained.")
         AssertEqual("switch_list", manifest.fields[3].type, "The switch-list type was not retained.")
+        AssertEqual("engine_lists", manifest.fields[4].type, "The engine-list type was not retained.")
         AssertEqual(
             RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
             manifest.fields[1].rows,
@@ -154,10 +158,11 @@ TestSchemaSettingsListManifest() {
             manifest.fields[2].rows,
             "A missing binding-list row count did not use the default."
         )
+        AssertEqual("", manifest.fields[3].rows, "A switch-list unexpectedly accepted a row count.")
         AssertEqual(
             RabbitSchemaSettingsManifest.DEFAULT_LIST_ROWS,
-            manifest.fields[3].rows,
-            "A missing switch-list row count did not use the default."
+            manifest.fields[4].rows,
+            "A missing engine-list row count did not use the default."
         )
 
         FileDelete(path)
@@ -168,14 +173,17 @@ TestSchemaSettingsListManifest() {
                 . "[field.bindings]" . newline . "path=key_binder/bindings" . newline
                 . "type=key_binding_list" . newline . "label=Bindings" . newline . "rows=10" . newline
                 . "[field.switches]" . newline . "path=switches" . newline
-                . "type=switch_list" . newline . "label=Switches" . newline . "rows=6" . newline,
+                . "type=switch_list" . newline . "label=Switches" . newline . "rows=6" . newline
+                . "[field.engines]" . newline . "path=engine" . newline
+                . "type=engine_lists" . newline . "label=Engines" . newline . "rows=6" . newline,
             path,
             "UTF-8"
         )
         manifest := RabbitSchemaSettingsManifest.Parse(path)
         AssertEqual(1, manifest.fields[1].rows, "The string-list row count was not retained.")
         AssertEqual(10, manifest.fields[2].rows, "The binding-list row count was not retained.")
-        AssertEqual(6, manifest.fields[3].rows, "The switch-list row count was not retained.")
+        AssertEqual("", manifest.fields[3].rows, "The switch-list row count was not ignored.")
+        AssertEqual(6, manifest.fields[4].rows, "The engine-list row count was not retained.")
 
         FileDelete(path)
         FileAppend(
@@ -233,6 +241,17 @@ TestSchemaSettingsListManifest() {
 
         FileDelete(path)
         FileAppend(
+            "[meta]`nformat=1`n[field.engines]`npath=engine/processors`ntype=engine_lists`nlabel=Engines`n",
+            path,
+            "UTF-8"
+        )
+        AssertThrows(
+            RabbitSchemaSettingsManifest.Parse.Bind(path),
+            "The engine-list type accepted an unrelated path."
+        )
+
+        FileDelete(path)
+        FileAppend(
             "[meta]`nformat=1`n[field.records]`npath=menu/records`ntype=record_list`nlabel=Records`n",
             path,
             "UTF-8"
@@ -253,26 +272,34 @@ TestBundledSchemaSettingsFallback() {
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
     local field
-    AssertEqual(21, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
-    AssertEqual(6, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
+    AssertEqual(22, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(7, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
     AssertEqual("switches", manifest.groups[1].id, "The bundled fallback omitted the switches group.")
     field := SchemaManifestFieldByPath(manifest, "switches")
     AssertEqual("switch_list", field.type, "The bundled fallback omitted schema option support.")
-    AssertEqual(6, field.rows, "The bundled fallback did not configure switch-list rows.")
-    AssertEqual("menu", manifest.fields[2].group, "The bundled fallback did not assign its field to a group.")
-    AssertEqual("menu/page_size", manifest.fields[2].path, "The bundled fallback omitted the page-size setting.")
-    AssertEqual("list", manifest.fields[3].type, "The bundled fallback omitted candidate label support.")
-    AssertTrue(manifest.fields[3].default is Array, "The candidate label default was not parsed as an empty list.")
+    AssertEqual("", field.rows, "The bundled fallback unexpectedly configured switch-list rows.")
+    AssertEqual("engines", manifest.groups[2].id, "The bundled fallback omitted the engines group.")
+    field := SchemaManifestFieldByPath(manifest, "engine")
+    AssertEqual("engine_lists", field.type, "The bundled fallback omitted engine list support.")
+    AssertEqual(
+        8,
+        field.rows,
+        "The bundled fallback did not configure the engine-list row count."
+    )
+    AssertEqual("menu", manifest.fields[3].group, "The bundled fallback did not assign its field to a group.")
+    AssertEqual("menu/page_size", manifest.fields[3].path, "The bundled fallback omitted the page-size setting.")
+    AssertEqual("list", manifest.fields[4].type, "The bundled fallback omitted candidate label support.")
+    AssertTrue(manifest.fields[4].default is Array, "The candidate label default was not parsed as an empty list.")
     AssertEqual(
         "menu/alternative_select_keys",
-        manifest.fields[4].path,
+        manifest.fields[5].path,
         "The bundled fallback omitted candidate selection-key support."
     )
-    AssertTrue(manifest.fields[4].has_default && manifest.fields[4].default = "",
+    AssertTrue(manifest.fields[5].has_default && manifest.fields[5].default = "",
         "The candidate selection-key default was not parsed.")
-    AssertEqual("boolean", manifest.fields[5].type, "The bundled fallback omitted page-cycle support.")
-    AssertTrue(!manifest.fields[5].default, "The page-cycle default was not parsed.")
-    AssertEqual("ascii_composer", manifest.groups[3].id, "The bundled fallback omitted the ASCII composer group.")
+    AssertEqual("boolean", manifest.fields[6].type, "The bundled fallback omitted page-cycle support.")
+    AssertTrue(!manifest.fields[6].default, "The page-cycle default was not parsed.")
+    AssertEqual("ascii_composer", manifest.groups[4].id, "The bundled fallback omitted the ASCII composer group.")
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/good_old_caps_lock")
     AssertEqual("boolean", field.type, "The bundled fallback omitted the Caps Lock compatibility setting.")
     AssertTrue(field.has_default && field.default, "The Caps Lock compatibility default was not parsed.")
@@ -283,33 +310,33 @@ TestBundledSchemaSettingsFallback() {
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/switch_key/Caps_Lock")
     AssertEqual(4, field.options.Length, "The Caps Lock action options were incomplete.")
     AssertEqual("clear", field.default, "The Caps Lock switch default was not parsed.")
-    AssertEqual("key_binder", manifest.groups[4].id, "The bundled fallback omitted the key binder group.")
+    AssertEqual("key_binder", manifest.groups[5].id, "The bundled fallback omitted the key binder group.")
     field := SchemaManifestFieldByPath(manifest, "key_binder/bindings")
     AssertEqual("key_binding_list", field.type, "The bundled fallback omitted key binding list support.")
     AssertEqual(5, field.rows, "The bundled fallback did not configure binding list rows.")
-    AssertEqual("punctuator_map", manifest.fields[14].type, "The bundled fallback omitted punctuation map support.")
+    AssertEqual("punctuator_map", manifest.fields[15].type, "The bundled fallback omitted punctuation map support.")
     AssertEqual(
         "punctuator/full_shape",
-        manifest.fields[14].path,
+        manifest.fields[15].path,
         "The bundled fallback omitted the full-shape punctuation map."
     )
-    AssertEqual("boolean", manifest.fields[17].type, "The bundled fallback omitted punctuation spacing support.")
-    AssertTrue(!manifest.fields[17].default, "The punctuation spacing default was not parsed.")
+    AssertEqual("boolean", manifest.fields[18].type, "The bundled fallback omitted punctuation spacing support.")
+    AssertTrue(!manifest.fields[18].default, "The punctuation spacing default was not parsed.")
     AssertEqual(
         "punctuator/digit_separators",
-        manifest.fields[18].path,
+        manifest.fields[19].path,
         "The bundled fallback omitted digit separator support."
     )
-    AssertEqual(".:", manifest.fields[18].default, "The digit separator default was not parsed.")
-    AssertEqual("enum", manifest.fields[19].type, "The bundled fallback omitted digit separator action support.")
-    AssertEqual("forward", manifest.fields[19].default, "The digit separator action default was not parsed.")
-    AssertEqual(2, manifest.fields[19].options.Length, "The digit separator action options were incomplete.")
-    AssertEqual("recognizer", manifest.groups[6].id, "The bundled fallback omitted the recognizer group.")
-    AssertEqual("boolean", manifest.fields[20].type, "The bundled fallback omitted recognizer spacing support.")
-    AssertTrue(!manifest.fields[20].default, "The recognizer spacing default was not parsed.")
-    AssertEqual("recognizer_patterns", manifest.fields[21].type,
+    AssertEqual(".:", manifest.fields[19].default, "The digit separator default was not parsed.")
+    AssertEqual("enum", manifest.fields[20].type, "The bundled fallback omitted digit separator action support.")
+    AssertEqual("forward", manifest.fields[20].default, "The digit separator action default was not parsed.")
+    AssertEqual(2, manifest.fields[20].options.Length, "The digit separator action options were incomplete.")
+    AssertEqual("recognizer", manifest.groups[7].id, "The bundled fallback omitted the recognizer group.")
+    AssertEqual("boolean", manifest.fields[21].type, "The bundled fallback omitted recognizer spacing support.")
+    AssertTrue(!manifest.fields[21].default, "The recognizer spacing default was not parsed.")
+    AssertEqual("recognizer_patterns", manifest.fields[22].type,
         "The bundled fallback omitted recognizer pattern support.")
-    AssertEqual("recognizer/patterns", manifest.fields[21].path,
+    AssertEqual("recognizer/patterns", manifest.fields[22].path,
         "The bundled fallback omitted the recognizer pattern path.")
 }
 
@@ -454,6 +481,74 @@ TestSwitchListEditor() {
         RabbitSwitchList.ValidateItem.Bind(Map("options", ["a", "a"])),
         "The switch-list validator accepted duplicate options in a group."
     )
+}
+
+TestEngineListsEditor() {
+    local calls := [], dialog := 0, editor, long_dialog := 0, long_editor, long_height, long_model, model, owner := Gui()
+    local short_height
+    try {
+        model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsEngineListsManifest(1)
+        )
+        model.values := Map("engines", Map(
+            "processors", ["ascii_composer", "recognizer"],
+            "segmentors", ["ascii_segmentor", "matcher"],
+            "translators", ["table_translator", "script_translator"],
+            "filters", ["simplifier", "uniquifier"]
+        ))
+        dialog := RabbitSchemaSettingsDialog(owner, model, "Demo", (*) => true)
+        AssertTrue(dialog.field_controls.Has("engines"), "The schema dialog did not create an engine-list editor.")
+        editor := dialog.field_controls["engines"].editor
+        AssertEqual(4, editor.cards.Count, "The engine-list editor omitted an engine list.")
+        AssertEqual(2, dialog.draft_values["engines"]["processors"].Length,
+            "The engine-list editor lost processors.")
+        AssertTrue(!dialog.content_scroll_max, "The compact engine-list editor unexpectedly needed scrolling.")
+        editor.cards["processors"].list.GetPos(, , , &short_height)
+        editor.cards["filters"].list.GetPos(, , , &long_height)
+        AssertEqual(short_height, long_height, "Engine-list rows were not kept in sync.")
+        AssertEqual("demo · engine/segmentors", RabbitConfigToolTip.GetText(editor.cards["segmentors"].list),
+            "The segmentor list did not expose its YAML path.")
+        AssertTrue(dialog.content_list_hwnds.Has(editor.cards["filters"].list.Hwnd),
+            "The engine-list editor was not registered for native wheel scrolling.")
+        editor.cards["processors"].list.Choose(2)
+        AssertTrue(editor.MoveItem("processors", -1), "The engine-list editor could not move a processor.")
+        AssertEqual("recognizer", dialog.draft_values["engines"]["processors"][1],
+            "Moving a processor changed the engine-list draft incorrectly.")
+        AssertTrue(editor.RestoreDefault(), "The engine-list editor could not stage a reset.")
+        AssertTrue(dialog.reset_fields.Has("engines"), "The engine-list reset was not retained.")
+        editor.cards["processors"].list.Choose(1)
+        AssertTrue(editor.MoveItem("processors", 1), "The engine-list editor could not edit after a pending reset.")
+        AssertTrue(!dialog.reset_fields.Has("engines"), "Editing engine lists did not cancel the pending reset.")
+        dialog.Dispose()
+        dialog := 0
+
+        long_model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsEngineListsManifest(8)
+        )
+        long_model.values := RabbitConfigValue.Clone(model.values)
+        long_dialog := RabbitSchemaSettingsDialog(owner, long_model, "Demo", (*) => true)
+        long_editor := long_dialog.field_controls["engines"].editor
+        long_editor.cards["processors"].list.GetPos(, , , &long_height)
+        AssertTrue(long_height > short_height, "The engine-list row count did not enlarge every list.")
+        long_editor.cards["filters"].list.GetPos(, , , &short_height)
+        AssertEqual(long_height, short_height, "A configured engine-list row count did not stay synchronized.")
+        AssertTrue(!long_dialog.content_scroll_max,
+            "The engine-list layout did not account for its configured row count.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        if long_dialog {
+            long_dialog.Dispose()
+        }
+        owner.Destroy()
+    }
 }
 
 TestSchemaSettingsModelPersistence() {
@@ -639,6 +734,63 @@ TestSchemaSettingsListPersistence() {
         SchemaSettingsCallsHave(calls, "reset:engine/processors"),
         "Restoring a list default did not remove its full-list override."
     )
+}
+
+TestSchemaSettingsEngineListsPersistence() {
+    local calls := [], model, values
+    local rime := RabbitSchemaSettingsListRimeProbe(Map(
+        "engine/processors", ["ascii_composer", "recognizer"],
+        "engine/segmentors", ["ascii_segmentor", "matcher"],
+        "engine/translators", ["table_translator", "script_translator"],
+        "engine/filters", ["simplifier", "uniquifier"]
+    ), [
+        "engine/processors/+",
+        "engine/segmentors/@legacy",
+        "engine/translators/-",
+        "engine/filters/@2",
+    ], calls)
+    model := RabbitSchemaSettingsModelProbe(
+        rime,
+        RabbitSchemaSettingsListLeversProbe(calls),
+        "demo",
+        SchemaSettingsEngineListsManifest()
+    )
+    AssertTrue(model.Load(), "The schema settings model could not read engine lists.")
+    AssertEqual("matcher", model.values["engines"]["segmentors"][2],
+        "Loading engine lists changed a segmentor.")
+
+    calls.Length := 0
+    values := RabbitConfigValue.Clone(model.values)
+    values["engines"]["translators"].InsertAt(1, "table_translator@custom_phrase")
+    AssertTrue(model.Save(values), "The schema settings model failed to save engine lists.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/processors/+"),
+        "Saving engine lists did not clear a processor patch.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/segmentors/@legacy"),
+        "Saving engine lists did not clear a segmentor patch.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/translators/-"),
+        "Saving engine lists did not clear a translator patch.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/filters/@2"),
+        "Saving engine lists did not clear a filter patch.")
+    AssertTrue(SchemaSettingsCallsContain(calls, "item:engine/translators:", '"table_translator@custom_phrase"'),
+        "Saving engine lists did not write the changed translator list.")
+
+    calls.Length := 0
+    AssertTrue(
+        model.Save(RabbitConfigValue.Clone(model.values), Map("engines", true)),
+        "The schema settings model failed to restore engine-list defaults."
+    )
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/processors"),
+        "Restoring engine lists did not remove the processor override.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/segmentors"),
+        "Restoring engine lists did not remove the segmentor override.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/translators"),
+        "Restoring engine lists did not remove the translator override.")
+    AssertTrue(SchemaSettingsCallsHave(calls, "reset:engine/filters"),
+        "Restoring engine lists did not remove the filter override.")
+    values := RabbitConfigValue.Clone(model.values)
+    values["engines"].Delete("filters")
+    AssertThrows(model.NormalizeValues.Bind(model, values),
+        "The schema settings model accepted incomplete engine lists.")
 }
 
 TestSchemaSettingsDialogDarkAppearance() {
@@ -1482,6 +1634,26 @@ SchemaSettingsSwitchListManifest(rows := "") {
             path: "switches",
             type: "switch_list",
             label: "Schema options",
+            description: "",
+            min: "",
+            max: "",
+            options: [],
+            rows: rows,
+        }],
+    }
+}
+
+SchemaSettingsEngineListsManifest(rows := "") {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "engines", label: "Engines", description: "" }],
+        fields: [{
+            id: "engines",
+            group: "engines",
+            path: "engine",
+            type: "engine_lists",
+            label: "Engine lists",
             description: "",
             min: "",
             max: "",

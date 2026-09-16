@@ -17,6 +17,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitConfigValue.ahk
+#Include RabbitEngineLists.ahk
 #Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
@@ -84,6 +85,8 @@ class RabbitSchemaSettingsModel {
                 return RabbitRecognizerPatterns.Read(this.rime, config, field.path)
             case "switch_list":
                 return RabbitSwitchList.Read(this.rime, config, field.path)
+            case "engine_lists":
+                return this.ReadEngineLists(config)
             default:
                 if this.rime.config_test_get_string(config, field.path, &value) {
                     return value
@@ -189,6 +192,12 @@ class RabbitSchemaSettingsModel {
                 } catch {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
+            case "engine_lists":
+                try {
+                    normalized := RabbitEngineLists.Validate(value)
+                } catch {
+                    throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+                }
             case "string":
                 normalized := field.path = RabbitMenuSettings.ALTERNATIVE_SELECT_KEYS_PATH
                     ? RabbitMenuSettings.ValidateAlternativeSelectKeys(String(value))
@@ -266,7 +275,7 @@ class RabbitSchemaSettingsModel {
             }
             if !matched || matched.type != "list" && matched.type != "key_binding_list"
                 && matched.type != "punctuator_map" && matched.type != "recognizer_patterns"
-                && matched.type != "switch_list" {
+                && matched.type != "switch_list" && matched.type != "engine_lists" {
                 throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", reset_id)))
             }
             resets[reset_id] := true
@@ -318,6 +327,7 @@ class RabbitSchemaSettingsModel {
             case "punctuator_map": return this.CustomizePunctuatorMapField(settings, field, value)
             case "recognizer_patterns": return this.CustomizeRecognizerPatternsField(settings, field, value)
             case "switch_list": return this.CustomizeListField(settings, field, value)
+            case "engine_lists": return this.CustomizeEngineListsField(settings, value)
             default: return !!this.api.customize_string(settings, field.path, value)
         }
     }
@@ -333,9 +343,31 @@ class RabbitSchemaSettingsModel {
         return this.ClearListPatchOperations(settings, field.path, true)
     }
 
+    CustomizeEngineListsField(settings, value) {
+        local name, path
+        for name in RabbitEngineLists.NAMES {
+            path := RabbitEngineLists.ListPath(name)
+            if !this.ClearListPatchOperations(settings, path) || !this.CustomizeYamlItem(settings, path, value[name]) {
+                return false
+            }
+        }
+        return true
+    }
+
+    ResetEngineListsField(settings) {
+        local name
+        for name in RabbitEngineLists.NAMES {
+            if !this.ClearListPatchOperations(settings, RabbitEngineLists.ListPath(name), true) {
+                return false
+            }
+        }
+        return true
+    }
+
     ResetField(settings, field) {
         return field.type = "punctuator_map" ? this.ResetPunctuatorMapField(settings, field)
             : field.type = "recognizer_patterns" ? this.ResetRecognizerPatternsField(settings, field)
+            : field.type = "engine_lists" ? this.ResetEngineListsField(settings)
             : this.ResetListField(settings, field)
     }
 
@@ -403,6 +435,20 @@ class RabbitSchemaSettingsModel {
             this.rime.config_close(config)
         }
         return result
+    }
+
+    ReadEngineLists(config) {
+        local field, name, result := Map()
+        for name in RabbitEngineLists.NAMES {
+            field := {
+                type: "list",
+                path: RabbitEngineLists.ListPath(name),
+                label: name,
+                has_default: false,
+            }
+            result[name] := this.ReadListField(config, field)
+        }
+        return RabbitEngineLists.Validate(result)
     }
 
     ClearPunctuatorMapPatchOperations(settings, path, reset_value := false) {
