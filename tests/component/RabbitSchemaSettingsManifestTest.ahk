@@ -321,7 +321,7 @@ TestBundledSchemaSettingsFallback() {
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
     local field
-    AssertEqual(23, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(24, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
     AssertEqual(8, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
     AssertEqual("general", manifest.groups[1].id, "The bundled fallback omitted the general group.")
     field := SchemaManifestFieldByPath(manifest, "schema/icon")
@@ -340,19 +340,19 @@ TestBundledSchemaSettingsFallback() {
         field.rows,
         "The bundled fallback did not configure the engine-list row count."
     )
-    AssertEqual("menu", manifest.fields[4].group, "The bundled fallback did not assign its field to a group.")
-    AssertEqual("menu/page_size", manifest.fields[4].path, "The bundled fallback omitted the page-size setting.")
-    AssertEqual("list", manifest.fields[5].type, "The bundled fallback omitted candidate label support.")
-    AssertTrue(manifest.fields[5].default is Array, "The candidate label default was not parsed as an empty list.")
+    AssertEqual("menu", manifest.fields[5].group, "The bundled fallback did not assign its field to a group.")
+    AssertEqual("menu/page_size", manifest.fields[5].path, "The bundled fallback omitted the page-size setting.")
+    AssertEqual("list", manifest.fields[6].type, "The bundled fallback omitted candidate label support.")
+    AssertTrue(manifest.fields[6].default is Array, "The candidate label default was not parsed as an empty list.")
     AssertEqual(
         "menu/alternative_select_keys",
-        manifest.fields[6].path,
+        manifest.fields[7].path,
         "The bundled fallback omitted candidate selection-key support."
     )
-    AssertTrue(manifest.fields[6].has_default && manifest.fields[6].default = "",
+    AssertTrue(manifest.fields[7].has_default && manifest.fields[7].default = "",
         "The candidate selection-key default was not parsed.")
-    AssertEqual("boolean", manifest.fields[7].type, "The bundled fallback omitted page-cycle support.")
-    AssertTrue(!manifest.fields[7].default, "The page-cycle default was not parsed.")
+    AssertEqual("boolean", manifest.fields[8].type, "The bundled fallback omitted page-cycle support.")
+    AssertTrue(!manifest.fields[8].default, "The page-cycle default was not parsed.")
     AssertEqual("ascii_composer", manifest.groups[5].id, "The bundled fallback omitted the ASCII composer group.")
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/good_old_caps_lock")
     AssertEqual("boolean", field.type, "The bundled fallback omitted the Caps Lock compatibility setting.")
@@ -368,29 +368,29 @@ TestBundledSchemaSettingsFallback() {
     field := SchemaManifestFieldByPath(manifest, "key_binder/bindings")
     AssertEqual("key_binding_list", field.type, "The bundled fallback omitted key binding list support.")
     AssertEqual(5, field.rows, "The bundled fallback did not configure binding list rows.")
-    AssertEqual("punctuator_map", manifest.fields[16].type, "The bundled fallback omitted punctuation map support.")
+    AssertEqual("punctuator_map", manifest.fields[17].type, "The bundled fallback omitted punctuation map support.")
     AssertEqual(
         "punctuator/full_shape",
-        manifest.fields[16].path,
+        manifest.fields[17].path,
         "The bundled fallback omitted the full-shape punctuation map."
     )
-    AssertEqual("boolean", manifest.fields[19].type, "The bundled fallback omitted punctuation spacing support.")
-    AssertTrue(!manifest.fields[19].default, "The punctuation spacing default was not parsed.")
+    AssertEqual("boolean", manifest.fields[20].type, "The bundled fallback omitted punctuation spacing support.")
+    AssertTrue(!manifest.fields[20].default, "The punctuation spacing default was not parsed.")
     AssertEqual(
         "punctuator/digit_separators",
-        manifest.fields[20].path,
+        manifest.fields[21].path,
         "The bundled fallback omitted digit separator support."
     )
-    AssertEqual(".:", manifest.fields[20].default, "The digit separator default was not parsed.")
-    AssertEqual("enum", manifest.fields[21].type, "The bundled fallback omitted digit separator action support.")
-    AssertEqual("forward", manifest.fields[21].default, "The digit separator action default was not parsed.")
-    AssertEqual(2, manifest.fields[21].options.Length, "The digit separator action options were incomplete.")
+    AssertEqual(".:", manifest.fields[21].default, "The digit separator default was not parsed.")
+    AssertEqual("enum", manifest.fields[22].type, "The bundled fallback omitted digit separator action support.")
+    AssertEqual("forward", manifest.fields[22].default, "The digit separator action default was not parsed.")
+    AssertEqual(2, manifest.fields[22].options.Length, "The digit separator action options were incomplete.")
     AssertEqual("recognizer", manifest.groups[8].id, "The bundled fallback omitted the recognizer group.")
-    AssertEqual("boolean", manifest.fields[22].type, "The bundled fallback omitted recognizer spacing support.")
-    AssertTrue(!manifest.fields[22].default, "The recognizer spacing default was not parsed.")
-    AssertEqual("recognizer_patterns", manifest.fields[23].type,
+    AssertEqual("boolean", manifest.fields[23].type, "The bundled fallback omitted recognizer spacing support.")
+    AssertTrue(!manifest.fields[23].default, "The recognizer spacing default was not parsed.")
+    AssertEqual("recognizer_patterns", manifest.fields[24].type,
         "The bundled fallback omitted recognizer pattern support.")
-    AssertEqual("recognizer/patterns", manifest.fields[23].path,
+    AssertEqual("recognizer/patterns", manifest.fields[24].path,
         "The bundled fallback omitted the recognizer pattern path.")
 }
 
@@ -865,7 +865,22 @@ TestSchemaSettingsListPersistence() {
 }
 
 TestSchemaSettingsEngineListsPersistence() {
-    local calls := [], model, values
+    local calls := [], missing_model, model, values
+    missing_model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsListRimeProbe(Map(
+            "engine/processors", ["ascii_composer", "recognizer"],
+            "engine/segmentors", ["ascii_segmentor", "matcher"],
+            "engine/translators", ["table_translator", "script_translator"]
+        ), [], calls),
+        RabbitSchemaSettingsListLeversProbe(calls),
+        "demo",
+        SchemaSettingsEngineListsManifest()
+    )
+    AssertTrue(missing_model.Load(), "The schema settings model rejected an omitted engine component list.")
+    AssertEqual(0, missing_model.values["engines"]["filters"].Length,
+        "A missing engine component list was not loaded as empty.")
+
+    calls.Length := 0
     local rime := RabbitSchemaSettingsListRimeProbe(Map(
         "engine/processors", ["ascii_composer", "recognizer"],
         "engine/segmentors", ["ascii_segmentor", "matcher"],

@@ -30,6 +30,7 @@
 RunTest("switcher settings persist through generic customization", TestSwitcherHotkeyPersistence.Bind())
 RunTest("shared rabbit settings preserve earlier saves", TestSharedRabbitSettingsPersistence.Bind())
 RunTest("schema lists replace incremental custom patches", TestSchemaListPersistence.Bind())
+RunTest("generic schema settings fallback loads a real schema", TestSchemaFallbackLoad.Bind())
 ExitApp()
 
 TestSwitcherHotkeyPersistence() {
@@ -279,6 +280,43 @@ TestSchemaListPersistence() {
             !InStr(saved, "engine/processors/+"),
             "The replacement list retained an incremental processor patch."
         )
+    } finally {
+        if rime {
+            rime.finalize()
+        }
+        if DirExist(test_dir) {
+            DirDelete(test_dir, true)
+        }
+    }
+}
+
+TestSchemaFallbackLoad() {
+    local model := 0
+    local rime := 0
+    local test_dir := RabbitSettingsPersistenceTestDirectory("schema-fallback")
+    try {
+        FileAppend(
+            "patch:`n  engine/filters: null`n",
+            test_dir . "\luna_pinyin_simp.custom.yaml",
+            "UTF-8"
+        )
+        rime := RabbitSettingsPersistenceRime(test_dir)
+        AssertTrue(
+            rime.deploy_schema(A_ScriptDir . "\..\..\Data\luna_pinyin_simp.schema.yaml"),
+            "The schema test data could not be deployed."
+        )
+        model := RabbitSchemaSettingsIntegrationModel(
+            rime,
+            RimeLeversApi(rime),
+            "luna_pinyin_simp",
+            RabbitSchemaSettingsManifest.Parse(
+                A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
+            ),
+            test_dir
+        )
+        AssertTrue(model.Load(), "The generic fallback could not load a real schema.")
+        AssertEqual(0, model.values["engines"]["filters"].Length,
+            "The generic fallback did not represent an omitted engine list as empty.")
     } finally {
         if rime {
             rime.finalize()

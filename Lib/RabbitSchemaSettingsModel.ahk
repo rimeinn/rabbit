@@ -517,7 +517,9 @@ class RabbitSchemaSettingsModel {
                 type: "list",
                 path: RabbitEngineLists.ListPath(name),
                 label: name,
-                has_default: false,
+                ; Rime schemas may omit an unused engine component list.
+                has_default: true,
+                default: [],
             }
             result[name] := this.ReadListField(config, field)
         }
