@@ -25,6 +25,7 @@ RunTest("deploy workflow deploys requested schemas", TestDeployWorkflowSchemaCon
 RunTest("sync workflow ownership", TestSyncWorkflowOwnership.Bind())
 RunTest("deploy workflow failure cleanup", TestDeployWorkflowFailureCleanup.Bind())
 RunTest("deploy workflow checks librime results", TestDeployWorkflowChecksLibrimeResults.Bind())
+RunTest("deployer dictionary workflow reuses outer mutex ownership", TestDictionaryWorkflowMutexOwnership.Bind())
 RunTest("settings workflow reads candidate labels without a behavior model", TestWorkflowReadsCandidateLabels.Bind())
 
 TestDeployWorkflowOwnership() {
@@ -150,6 +151,42 @@ TestDeployWorkflowChecksLibrimeResults() {
     )
 }
 
+TestDictionaryWorkflowMutexOwnership() {
+    local calls := []
+    local workflow := RabbitDeployerWorkflowProbe(
+        RabbitDeployerWorkflowRimeProbe(calls),
+        calls,
+        false,
+        ERROR_ALREADY_EXISTS
+    )
+    workflow.settings_workflow := RabbitDictionarySettingsWorkflowProbe(calls)
+
+    local model := workflow.CreateDictionarySettingsModel()
+    try {
+        AssertEqual(
+            "dictionary_load",
+            JoinWorkflowCalls(calls),
+            "The deployer tried to reacquire the deployment mutex already owned by its context."
+        )
+    } finally {
+        model.Dispose()
+    }
+
+    calls.Length := 0
+    workflow := RabbitDeployerWorkflowProbe(RabbitDeployerWorkflowRimeProbe(calls), calls)
+    workflow.settings_workflow := RabbitDictionarySettingsWorkflowProbe(calls)
+    model := workflow.CreateDictionarySettingsModel()
+    try {
+        AssertEqual(
+            "mutex_create,dictionary_load,mutex_close",
+            JoinWorkflowCalls(calls),
+            "A standalone dictionary workflow stopped acquiring the deployment mutex."
+        )
+    } finally {
+        model.Dispose()
+    }
+}
+
 TestWorkflowReadsCandidateLabels() {
     local calls := []
     local workflow := RabbitCandidateLabelWorkflowProbe(RabbitCandidateLabelRimeProbe(calls), calls)
@@ -178,9 +215,10 @@ WorkflowCallsHave(calls, expected) {
 }
 
 class RabbitDeployerWorkflowProbe extends RabbitDeployerWorkflow {
-    __New(rime_api, calls) {
+    __New(rime_api, calls, lock_operations := true, mutex_lasterr := 0) {
         this.calls := calls
-        super.__New(rime_api)
+        this.mutex_lasterr := mutex_lasterr
+        super.__New(rime_api, lock_operations)
     }
 
     CreateFileIfNotExist(filename) {
@@ -192,7 +230,38 @@ class RabbitDeployerWorkflowProbe extends RabbitDeployerWorkflow {
     }
 
     CreateMutex() {
-        return RabbitDeployerWorkflowMutexProbe(this.calls)
+        return RabbitDeployerWorkflowMutexProbe(this.calls, this.mutex_lasterr)
+    }
+}
+
+class RabbitDictionarySettingsWorkflowProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    CreateDictionarySettingsModel(mutex_factory) {
+        return RabbitDictionarySettingsModel(
+            RabbitDictionaryWorkflowRimeProbe(),
+            RabbitDictionaryWorkflowLeversProbe(this.calls),
+            mutex_factory
+        )
+    }
+}
+
+class RabbitDictionaryWorkflowRimeProbe {
+    api_available(name) {
+        return false
+    }
+}
+
+class RabbitDictionaryWorkflowLeversProbe {
+    __New(calls) {
+        this.calls := calls
+    }
+
+    user_dict_iterator_init() {
+        this.calls.Push("dictionary_load")
+        return 0
     }
 }
 
@@ -266,9 +335,9 @@ class RabbitCandidateLabelRimeProbe {
 }
 
 class RabbitDeployerWorkflowMutexProbe {
-    __New(calls) {
+    __New(calls, lasterr := 0) {
         this.calls := calls
-        this.lasterr := 0
+        this.lasterr := lasterr
     }
 
     Create() {

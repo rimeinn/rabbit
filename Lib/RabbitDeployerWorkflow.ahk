@@ -63,7 +63,10 @@ class RabbitDeployerWorkflow extends RabbitMaintenanceWorkflow {
     }
 
     CreateDictionarySettingsModel() {
-        return this.settings_workflow.CreateDictionarySettingsModel(this.CreateMutex.Bind(this))
+        local mutex_factory := this.lock_operations
+            ? this.CreateMutex.Bind(this)
+            : (*) => RabbitMaintenanceOwnedMutex()
+        return this.settings_workflow.CreateDictionarySettingsModel(mutex_factory)
     }
 
     CreateUIStyleSettings() {
