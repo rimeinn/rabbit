@@ -18,6 +18,7 @@
 #Include RabbitDialogPlacement.ahk
 #Include RabbitConfigToolTip.ahk
 #Include RabbitEngineListsEditor.ahk
+#Include RabbitFileField.ahk
 #Include RabbitKeyBindingDialog.ahk
 #Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMapDialog.ahk
@@ -59,7 +60,9 @@ class RabbitSchemaSettingsDialog extends Gui {
         model,
         schema_name := "",
         dark_mode_reader := RabbitIsUserDarkMode,
-        theme_factory := RabbitWindowThemeController
+        theme_factory := RabbitWindowThemeController,
+        file_selector := FileSelect,
+        user_data_dir_reader := RabbitUserDataPath
     ) {
         local groups, labels := [], initial_dark_mode := false, maximum_dialog_height
         local content_x, content_width, content_y := 18, header_height := 0
@@ -82,6 +85,8 @@ class RabbitSchemaSettingsDialog extends Gui {
         this.groups := groups
         this.theme_factory := theme_factory
         this.dark_mode_reader := dark_mode_reader
+        this.file_selector := file_selector
+        this.user_data_dir_reader := user_data_dir_reader
         this.result := 0
         this.disposed := false
         this.visible := false
@@ -382,6 +387,8 @@ class RabbitSchemaSettingsDialog extends Gui {
             y := this.AddSwitchListField(field, y)
         } else if field.type = "engine_lists" {
             y := this.AddEngineListsField(field, y)
+        } else if field.type = "file" {
+            y := this.AddFileField(field, y)
         } else {
             label := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
             this.TrackContentControl(label)
@@ -406,6 +413,94 @@ class RabbitSchemaSettingsDialog extends Gui {
             y += this.AddContentDescription(y, field.description) + 4
         }
         return y + 6
+    }
+
+    AddFileField(field, y) {
+        local button_gap := 6, button_width := 72, edit_width, label
+        local controls := { type: field.type }
+        label := this.content_gui.AddText("x12 y" . y . " w170 h24 +0x200", field.label)
+        this.TrackContentControl(label)
+        edit_width := this.content_width - 196 - button_width * 2 - button_gap * 2
+        controls.edit := this.content_gui.AddEdit(
+            "x184 y" . y . " w" . edit_width . " r1 -Multi ReadOnly",
+            this.draft_values[field.id]
+        )
+        this.TrackContentControl(controls.edit)
+        controls.browse_button := this.AddListButton(
+            "x" . (184 + edit_width + button_gap) . " y" . y . " w" . button_width . " h24 +0x2000",
+            RabbitI18n.Text("controls.browse"),
+            (*) => this.SelectFileField(field)
+        )
+        controls.clear_button := this.AddListButton(
+            "x" . (184 + edit_width + button_gap * 2 + button_width) . " y" . y
+                . " w" . button_width . " h24 +0x2000",
+            RabbitI18n.Text("controls.clear_input"),
+            (*) => this.ClearFileField(field)
+        )
+        controls.label := label
+        this.field_controls[field.id] := controls
+        RabbitConfigToolTip.Apply(
+            this.ConfigId(),
+            field.path,
+            label,
+            controls.edit,
+            controls.browse_button,
+            controls.clear_button
+        )
+        return y + 30
+    }
+
+    SelectFileField(field) {
+        local filter := this.FileFilter(field), initial_path, selected_path, user_data_dir
+        user_data_dir := this.user_data_dir_reader.Call()
+        initial_path := user_data_dir
+        if this.draft_values[field.id] {
+            selected_path := user_data_dir . "\" . StrReplace(this.draft_values[field.id], "/", "\")
+            if FileExist(selected_path) {
+                initial_path := selected_path
+            }
+        }
+        this.Opt("+OwnDialogs")
+        try {
+            selected_path := this.file_selector.Call("1", initial_path, field.label, filter)
+        } catch as err {
+            this.status.Value := err.Message
+            return false
+        } finally {
+            this.Opt("-OwnDialogs")
+        }
+        if !selected_path {
+            return false
+        }
+        try {
+            this.draft_values[field.id] := RabbitFileField.SelectionToValue(user_data_dir, selected_path)
+        } catch {
+            this.status.Value := RabbitI18n.Text("models.schema_settings_value", Map("field", field.label))
+            return false
+        }
+        this.field_controls[field.id].edit.Value := this.draft_values[field.id]
+        this.status.Value := ""
+        return true
+    }
+
+    ClearFileField(field) {
+        this.draft_values[field.id] := ""
+        this.field_controls[field.id].edit.Value := ""
+        this.status.Value := ""
+        return true
+    }
+
+    FileFilter(field) {
+        local extension, patterns := ""
+        if HasProp(field, "extensions") {
+            for extension in field.extensions {
+                patterns .= (patterns ? ";" : "") . "*." . extension
+            }
+        }
+        if !patterns {
+            return ""
+        }
+        return RabbitI18n.Text("controls.suggested_files") . " (" . patterns . ")"
     }
 
     AddListField(field, y) {
@@ -921,6 +1016,10 @@ class RabbitSchemaSettingsDialog extends Gui {
                 continue
             }
             control := this.field_controls[field.id]
+            if field.type = "file" {
+                this.draft_values[field.id] := control.edit.Value
+                continue
+            }
             this.draft_values[field.id] := field.type = "boolean" ? !!control.Value
                 : field.type = "enum" ? control.Text : control.Value
         }

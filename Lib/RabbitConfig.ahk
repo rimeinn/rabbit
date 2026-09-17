@@ -18,6 +18,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitConfigSnapshot.ahk
+#Include RabbitFileField.ahk
 #Include RabbitInputHotkeys.ahk
 #Include RabbitUIStyle.ahk
 #Include RabbitUIStyleSnapshot.ahk
@@ -101,15 +102,9 @@ class RabbitConfigLoader {
                     continue
                 }
                 values["input_hotkeys"].AddConfig(rime_api, schema, item.schema_id)
-                if rime_api.config_test_get_string(schema, "schema/icon", &icon) {
-                    icon_path := RabbitUserDataPath() . "\" . LTrim(icon, "\")
-                    if !FileExist(icon_path) {
-                        icon_path := RabbitSharedDataPath() . "\" . LTrim(icon, "\")
-                    }
-                    values["schema_icon"][item.schema_id] := FileExist(icon_path) ? icon_path : ""
-                } else {
-                    values["schema_icon"][item.schema_id] := ""
-                }
+                icon_path := rime_api.config_test_get_string(schema, "schema/icon", &icon)
+                    ? RabbitFileField.ResolveExisting(icon, [RabbitUserDataPath(), RabbitSharedDataPath()]) : ""
+                values["schema_icon"][item.schema_id] := icon_path
                 rime_api.config_close(schema)
             }
             rime_api.free_schema_list(schema_list)

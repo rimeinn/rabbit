@@ -17,6 +17,7 @@
 
 #Include RabbitCommon.ahk
 #Include RabbitEngineLists.ahk
+#Include RabbitFileField.ahk
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
 #Include RabbitSwitchList.ahk
@@ -145,7 +146,7 @@ class RabbitSchemaSettingsManifest {
 
     static ParseField(field_id, group_id, properties, path) {
         local type := StrLower(properties.Get("type", ""))
-        local minimum := "", maximum := "", options := []
+        local minimum := "", maximum := "", options := [], extensions := []
         local rows := ""
         local option, seen := Map()
         local has_default := properties.Has("default"), default_value := ""
@@ -153,7 +154,8 @@ class RabbitSchemaSettingsManifest {
             || !this.IsSafeConfigPath(properties["path"]) {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
         }
-        if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "enum"
+        if type != "boolean" && type != "integer" && type != "number" && type != "string" && type != "file"
+            && type != "enum"
             && type != "list" && type != "key_binding_list" && type != "punctuator_map"
             && type != "recognizer_patterns" && type != "switch_list" && type != "engine_lists" {
             throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
@@ -196,6 +198,10 @@ class RabbitSchemaSettingsManifest {
                 options.Push(option)
             }
         }
+        if type = "file" && properties.Has("extensions")
+            && !RabbitFileField.TryParseExtensions(properties["extensions"], &extensions) {
+            throw Error(RabbitI18n.Text("models.schema_settings_manifest_invalid", Map("file", path)))
+        }
         if has_default {
             default_value := this.ParseDefault(properties["default"], type, options, path)
         }
@@ -209,6 +215,7 @@ class RabbitSchemaSettingsManifest {
             min: minimum,
             max: maximum,
             options: options,
+            extensions: extensions,
             rows: rows,
             has_default: has_default,
             default: default_value,
@@ -241,6 +248,10 @@ class RabbitSchemaSettingsManifest {
                 }
             case "string":
                 return value
+            case "file":
+                if RabbitFileField.IsValidValue(value) {
+                    return value
+                }
             case "list":
                 if !value {
                     return []

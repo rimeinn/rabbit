@@ -18,6 +18,7 @@
 #Include RabbitCommon.ahk
 #Include RabbitConfigValue.ahk
 #Include RabbitEngineLists.ahk
+#Include RabbitFileField.ahk
 #Include RabbitMenuSettings.ahk
 #Include RabbitPunctuatorMap.ahk
 #Include RabbitRecognizerPatterns.ahk
@@ -71,6 +72,13 @@ class RabbitSchemaSettingsModel {
             case "number":
                 if this.rime.config_test_get_double(config, field.path, &value) {
                     return value
+                }
+            case "file":
+                if this.rime.config_test_get_string(config, field.path, &value) {
+                    if RabbitFileField.IsValidValue(value) {
+                        return value
+                    }
+                    throw Error(RabbitI18n.Text("models.schema_settings_read", Map("schema", this.schema_id)))
                 }
             case "enum":
                 if this.rime.config_test_get_string(config, field.path, &value) {
@@ -196,6 +204,11 @@ class RabbitSchemaSettingsModel {
                 try {
                     normalized := RabbitEngineLists.Validate(value)
                 } catch {
+                    throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
+                }
+            case "file":
+                normalized := String(value)
+                if !RabbitFileField.IsValidValue(normalized) {
                     throw ValueError(RabbitI18n.Text("models.schema_settings_value", Map("field", field.label)))
                 }
             case "string":

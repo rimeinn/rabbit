@@ -119,6 +119,8 @@ class RabbitLocaleFallback {
         catalog["controls.scheme_settings_saved"] := "已保存“{schema}”的方案设置。"
         catalog["controls.restore_schema_default"] := "还原方案默认"
         catalog["controls.restore_schema_default_pending"] := "保存后将还原方案默认。"
+        catalog["controls.browse"] := "浏览…"
+        catalog["controls.suggested_files"] := "建议的文件"
         catalog["controls.move_up"] := "上移"
         catalog["controls.move_down"] := "下移"
         catalog["controls.always_first"] := "启动时始终使用第一个方案"

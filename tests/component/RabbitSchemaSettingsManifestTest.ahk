@@ -22,6 +22,7 @@
 RunTest("schema settings resolve manifests by data precedence", TestSchemaSettingsManifestPrecedence.Bind())
 RunTest("schema settings validate manifest fields", TestSchemaSettingsManifestValidation.Bind())
 RunTest("schema settings parse manifest groups", TestSchemaSettingsManifestGroups.Bind())
+RunTest("schema settings parse file fields", TestSchemaSettingsFileManifest.Bind())
 RunTest("schema settings parse ordered list fields", TestSchemaSettingsListManifest.Bind())
 RunTest("punctuator maps validate and use a dedicated editor", TestPunctuatorMapEditor.Bind())
 RunTest("recognizer patterns validate and use a dedicated editor", TestRecognizerPatternEditor.Bind())
@@ -29,6 +30,7 @@ RunTest("switch lists validate and use inline state editing", TestSwitchListEdit
 RunTest("engine lists validate and use a compact editor", TestEngineListsEditor.Bind())
 RunTest("bundled schema settings fallback is valid", TestBundledSchemaSettingsFallback.Bind())
 RunTest("schema settings load and save scalar values", TestSchemaSettingsModelPersistence.Bind())
+RunTest("schema settings load and save file values", TestSchemaSettingsFilePersistence.Bind())
 RunTest("schema settings save menu values", TestSchemaSettingsMenuPersistence.Bind())
 RunTest("schema settings save punctuation scalar values", TestSchemaSettingsPunctuatorScalarPersistence.Bind())
 RunTest("schema settings save changed ordered lists", TestSchemaSettingsListPersistence.Bind())
@@ -38,6 +40,7 @@ RunTest("schema settings save punctuation maps", TestSchemaSettingsPunctuatorMap
 RunTest("schema settings save recognizer patterns", TestSchemaSettingsRecognizerPatternPersistence.Bind())
 RunTest("schema settings dialog honors dark appearance", TestSchemaSettingsDialogDarkAppearance.Bind())
 RunTest("schema settings dialog exposes menu controls", TestSchemaSettingsDialogMenuControls.Bind())
+RunTest("schema settings dialog selects user-data files", TestSchemaSettingsDialogFiles.Bind())
 RunTest("schema settings dialog switches groups", TestSchemaSettingsDialogGroups.Bind())
 RunTest("schema settings dialog reorders and resets lists", TestSchemaSettingsDialogLists.Bind())
 RunTest("schema settings dialog supports librime binding values", TestSchemaSettingsDialogBindingValues.Bind())
@@ -122,6 +125,52 @@ TestSchemaSettingsManifestGroups() {
             RabbitSchemaSettingsManifest.Parse.Bind(path),
             "The manifest accepted a field from an undeclared group."
         )
+    } finally {
+        if DirExist(root) {
+            DirDelete(root, true)
+        }
+    }
+}
+
+TestSchemaSettingsFileManifest() {
+    local root := A_Temp . "\rabbit-schema-settings-files-" . A_TickCount
+    local path := root . "\files.ini", manifest
+    try {
+        DirCreate(root)
+        FileAppend(
+            "[meta]`nformat=1`n[field.icon]`npath=schema/icon`ntype=file`nlabel=Icon`n"
+                . "default=`nextensions=ico|png`n",
+            path,
+            "UTF-8"
+        )
+        manifest := RabbitSchemaSettingsManifest.Parse(path)
+        AssertEqual("file", manifest.fields[1].type, "The manifest did not retain the file type.")
+        AssertTrue(manifest.fields[1].has_default && manifest.fields[1].default = "",
+            "The file field did not retain its empty default.")
+        AssertEqual(2, manifest.fields[1].extensions.Length, "The file field lost extension hints.")
+        AssertEqual("ico", manifest.fields[1].extensions[1], "The file field changed its first extension hint.")
+        AssertEqual("png", manifest.fields[1].extensions[2], "The file field changed its second extension hint.")
+
+        for invalid in [
+            "default=C:/icons/schema.ico",
+            "default=icons/../schema.ico",
+            "default=icons\schema.ico",
+            "default=icons//schema.ico",
+            "extensions=.ico|png",
+            "extensions=png|PNG",
+            "extensions=",
+        ] {
+            FileDelete(path)
+            FileAppend(
+                "[meta]`nformat=1`n[field.icon]`npath=schema/icon`ntype=file`nlabel=Icon`n" . invalid . "`n",
+                path,
+                "UTF-8"
+            )
+            AssertThrows(
+                RabbitSchemaSettingsManifest.Parse.Bind(path),
+                "The manifest accepted an invalid file field: " . invalid
+            )
+        }
     } finally {
         if DirExist(root) {
             DirDelete(root, true)
@@ -272,13 +321,18 @@ TestBundledSchemaSettingsFallback() {
         A_ScriptDir . "\..\..\schemas\schema.rabbit-fallback.ini"
     )
     local field
-    AssertEqual(22, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
-    AssertEqual(7, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
-    AssertEqual("switches", manifest.groups[1].id, "The bundled fallback omitted the switches group.")
+    AssertEqual(23, manifest.fields.Length, "The bundled fallback unexpectedly changed its field set.")
+    AssertEqual(8, manifest.groups.Length, "The bundled fallback unexpectedly has the wrong groups.")
+    AssertEqual("general", manifest.groups[1].id, "The bundled fallback omitted the general group.")
+    field := SchemaManifestFieldByPath(manifest, "schema/icon")
+    AssertEqual("file", field.type, "The bundled fallback omitted schema icon selection.")
+    AssertTrue(field.has_default && field.default = "", "The schema icon default was not parsed.")
+    AssertEqual(2, field.extensions.Length, "The schema icon extension hints were not parsed.")
+    AssertEqual("switches", manifest.groups[2].id, "The bundled fallback omitted the switches group.")
     field := SchemaManifestFieldByPath(manifest, "switches")
     AssertEqual("switch_list", field.type, "The bundled fallback omitted schema option support.")
     AssertEqual("", field.rows, "The bundled fallback unexpectedly configured switch-list rows.")
-    AssertEqual("engines", manifest.groups[2].id, "The bundled fallback omitted the engines group.")
+    AssertEqual("engines", manifest.groups[3].id, "The bundled fallback omitted the engines group.")
     field := SchemaManifestFieldByPath(manifest, "engine")
     AssertEqual("engine_lists", field.type, "The bundled fallback omitted engine list support.")
     AssertEqual(
@@ -286,20 +340,20 @@ TestBundledSchemaSettingsFallback() {
         field.rows,
         "The bundled fallback did not configure the engine-list row count."
     )
-    AssertEqual("menu", manifest.fields[3].group, "The bundled fallback did not assign its field to a group.")
-    AssertEqual("menu/page_size", manifest.fields[3].path, "The bundled fallback omitted the page-size setting.")
-    AssertEqual("list", manifest.fields[4].type, "The bundled fallback omitted candidate label support.")
-    AssertTrue(manifest.fields[4].default is Array, "The candidate label default was not parsed as an empty list.")
+    AssertEqual("menu", manifest.fields[4].group, "The bundled fallback did not assign its field to a group.")
+    AssertEqual("menu/page_size", manifest.fields[4].path, "The bundled fallback omitted the page-size setting.")
+    AssertEqual("list", manifest.fields[5].type, "The bundled fallback omitted candidate label support.")
+    AssertTrue(manifest.fields[5].default is Array, "The candidate label default was not parsed as an empty list.")
     AssertEqual(
         "menu/alternative_select_keys",
-        manifest.fields[5].path,
+        manifest.fields[6].path,
         "The bundled fallback omitted candidate selection-key support."
     )
-    AssertTrue(manifest.fields[5].has_default && manifest.fields[5].default = "",
+    AssertTrue(manifest.fields[6].has_default && manifest.fields[6].default = "",
         "The candidate selection-key default was not parsed.")
-    AssertEqual("boolean", manifest.fields[6].type, "The bundled fallback omitted page-cycle support.")
-    AssertTrue(!manifest.fields[6].default, "The page-cycle default was not parsed.")
-    AssertEqual("ascii_composer", manifest.groups[4].id, "The bundled fallback omitted the ASCII composer group.")
+    AssertEqual("boolean", manifest.fields[7].type, "The bundled fallback omitted page-cycle support.")
+    AssertTrue(!manifest.fields[7].default, "The page-cycle default was not parsed.")
+    AssertEqual("ascii_composer", manifest.groups[5].id, "The bundled fallback omitted the ASCII composer group.")
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/good_old_caps_lock")
     AssertEqual("boolean", field.type, "The bundled fallback omitted the Caps Lock compatibility setting.")
     AssertTrue(field.has_default && field.default, "The Caps Lock compatibility default was not parsed.")
@@ -310,33 +364,33 @@ TestBundledSchemaSettingsFallback() {
     field := SchemaManifestFieldByPath(manifest, "ascii_composer/switch_key/Caps_Lock")
     AssertEqual(4, field.options.Length, "The Caps Lock action options were incomplete.")
     AssertEqual("clear", field.default, "The Caps Lock switch default was not parsed.")
-    AssertEqual("key_binder", manifest.groups[5].id, "The bundled fallback omitted the key binder group.")
+    AssertEqual("key_binder", manifest.groups[6].id, "The bundled fallback omitted the key binder group.")
     field := SchemaManifestFieldByPath(manifest, "key_binder/bindings")
     AssertEqual("key_binding_list", field.type, "The bundled fallback omitted key binding list support.")
     AssertEqual(5, field.rows, "The bundled fallback did not configure binding list rows.")
-    AssertEqual("punctuator_map", manifest.fields[15].type, "The bundled fallback omitted punctuation map support.")
+    AssertEqual("punctuator_map", manifest.fields[16].type, "The bundled fallback omitted punctuation map support.")
     AssertEqual(
         "punctuator/full_shape",
-        manifest.fields[15].path,
+        manifest.fields[16].path,
         "The bundled fallback omitted the full-shape punctuation map."
     )
-    AssertEqual("boolean", manifest.fields[18].type, "The bundled fallback omitted punctuation spacing support.")
-    AssertTrue(!manifest.fields[18].default, "The punctuation spacing default was not parsed.")
+    AssertEqual("boolean", manifest.fields[19].type, "The bundled fallback omitted punctuation spacing support.")
+    AssertTrue(!manifest.fields[19].default, "The punctuation spacing default was not parsed.")
     AssertEqual(
         "punctuator/digit_separators",
-        manifest.fields[19].path,
+        manifest.fields[20].path,
         "The bundled fallback omitted digit separator support."
     )
-    AssertEqual(".:", manifest.fields[19].default, "The digit separator default was not parsed.")
-    AssertEqual("enum", manifest.fields[20].type, "The bundled fallback omitted digit separator action support.")
-    AssertEqual("forward", manifest.fields[20].default, "The digit separator action default was not parsed.")
-    AssertEqual(2, manifest.fields[20].options.Length, "The digit separator action options were incomplete.")
-    AssertEqual("recognizer", manifest.groups[7].id, "The bundled fallback omitted the recognizer group.")
-    AssertEqual("boolean", manifest.fields[21].type, "The bundled fallback omitted recognizer spacing support.")
-    AssertTrue(!manifest.fields[21].default, "The recognizer spacing default was not parsed.")
-    AssertEqual("recognizer_patterns", manifest.fields[22].type,
+    AssertEqual(".:", manifest.fields[20].default, "The digit separator default was not parsed.")
+    AssertEqual("enum", manifest.fields[21].type, "The bundled fallback omitted digit separator action support.")
+    AssertEqual("forward", manifest.fields[21].default, "The digit separator action default was not parsed.")
+    AssertEqual(2, manifest.fields[21].options.Length, "The digit separator action options were incomplete.")
+    AssertEqual("recognizer", manifest.groups[8].id, "The bundled fallback omitted the recognizer group.")
+    AssertEqual("boolean", manifest.fields[22].type, "The bundled fallback omitted recognizer spacing support.")
+    AssertTrue(!manifest.fields[22].default, "The recognizer spacing default was not parsed.")
+    AssertEqual("recognizer_patterns", manifest.fields[23].type,
         "The bundled fallback omitted recognizer pattern support.")
-    AssertEqual("recognizer/patterns", manifest.fields[22].path,
+    AssertEqual("recognizer/patterns", manifest.fields[23].path,
         "The bundled fallback omitted the recognizer pattern path.")
 }
 
@@ -618,6 +672,51 @@ TestSchemaSettingsModelPersistence() {
     )
 }
 
+TestSchemaSettingsFilePersistence() {
+    local calls := [], invalid_model, missing_model, values
+    local model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map("schema/icon", "icons/old.ico"), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsFileManifest()
+    )
+    AssertTrue(model.Load(), "The schema settings model could not load a file value.")
+    AssertEqual("icons/old.ico", model.values["icon"], "The schema settings model changed a file value.")
+    values := RabbitConfigValue.Clone(model.values)
+    values["icon"] := "icons/new.png"
+    AssertTrue(model.Save(values), "The schema settings model failed to save a file value.")
+    AssertTrue(
+        SchemaSettingsCallsHave(calls, "string:schema/icon:icons/new.png"),
+        "The schema settings model did not save a file value as a string."
+    )
+    for invalid in ["C:/icons/new.png", "icons/../new.png", "icons\new.png", "icons:new.png"] {
+        AssertThrows(
+            model.NormalizeValues.Bind(model, Map("icon", invalid)),
+            "The schema settings model accepted an unsafe file value: " . invalid
+        )
+    }
+    AssertEqual("", model.NormalizeValues(Map("icon", ""))["icon"],
+        "The schema settings model rejected an empty file value.")
+    AssertEqual("icons/new.txt", model.NormalizeValues(Map("icon", "icons/new.txt"))["icon"],
+        "The schema settings model treated extension hints as validation.")
+    missing_model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map(), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsFileManifest()
+    )
+    AssertTrue(missing_model.Load(), "The schema settings model could not load an empty file default.")
+    AssertEqual("", missing_model.values["icon"], "The schema settings model changed an empty file default.")
+    invalid_model := RabbitSchemaSettingsModelProbe(
+        RabbitSchemaSettingsRimeProbe(Map("schema/icon", "../outside.ico"), calls),
+        RabbitSchemaSettingsLeversProbe(calls),
+        "demo",
+        SchemaSettingsFileManifest()
+    )
+    AssertThrows(invalid_model.Load.Bind(invalid_model),
+        "The schema settings model loaded an unsafe effective file value.")
+}
+
 TestSchemaSettingsMenuPersistence() {
     local calls := [], values, model
     local manifest := SchemaSettingsMenuManifest()
@@ -892,6 +991,100 @@ TestSchemaSettingsDialogMenuControls() {
             dialog.Dispose()
         }
         owner.Destroy()
+    }
+}
+
+TestSchemaSettingsDialogFiles() {
+    local calls := [], dialog := 0, field, model, owner := Gui()
+    local user_data_dir := A_Temp . "\rabbit-file-field-" . A_TickCount
+    local shared_data_dir := A_Temp . "\rabbit-file-field-shared-" . A_TickCount
+    local selected_path := user_data_dir . "\icons\schema.png"
+    local shared_path := shared_data_dir . "\icons\schema.png"
+    local shared_only_path := shared_data_dir . "\icons\shared.png"
+    local shared_directory_shadow_path := shared_data_dir . "\icons\directory-shadow"
+    try {
+        DirCreate(user_data_dir . "\icons")
+        DirCreate(user_data_dir . "\icons\directory-shadow")
+        DirCreate(shared_data_dir . "\icons")
+        FileAppend("icon", selected_path, "UTF-8")
+        FileAppend("shared icon", shared_path, "UTF-8")
+        FileAppend("shared only", shared_only_path, "UTF-8")
+        FileAppend("shared after directory", shared_directory_shadow_path, "UTF-8")
+        model := RabbitSchemaSettingsModelProbe(
+            RabbitSchemaSettingsRimeProbe(Map(), calls),
+            RabbitSchemaSettingsLeversProbe(calls),
+            "demo",
+            SchemaSettingsFileManifest()
+        )
+        model.values := Map("icon", "icons/shared.png")
+        dialog := RabbitSchemaSettingsDialog(
+            owner,
+            model,
+            "Demo",
+            (*) => true,
+            RabbitWindowThemeController,
+            SchemaSettingsFileSelector.Bind(calls, selected_path),
+            () => user_data_dir
+        )
+        field := model.manifest.fields[1]
+        AssertTrue(dialog.field_controls.Has("icon"), "The schema dialog omitted the file field.")
+        AssertEqual(
+            "icons/shared.png",
+            dialog.field_controls["icon"].edit.Value,
+            "The file field did not display an effective shared-data path."
+        )
+        AssertTrue(
+            WinGetStyle("ahk_id " . dialog.field_controls["icon"].edit.Hwnd) & 0x800,
+            "The file field allowed direct path editing."
+        )
+        AssertTrue(dialog.SelectFileField(field), "The file field rejected a user-data selection.")
+        AssertEqual("icons/schema.png", dialog.draft_values["icon"],
+            "The file field did not store a normalized relative path.")
+        AssertEqual("icons/schema.png", dialog.field_controls["icon"].edit.Value,
+            "The file field did not display the selected relative path.")
+        AssertEqual("1", calls[1].options, "The file picker did not require an existing selection.")
+        AssertEqual(user_data_dir, calls[1].initial_path, "The file picker did not start in user data.")
+        AssertTrue(InStr(calls[1].filter, "*.ico;*.png"), "The file picker omitted extension hints.")
+        AssertTrue(!InStr(calls[1].filter, "|"), "The file picker redundantly added an all-files option.")
+        AssertTrue(dialog.ClearFileField(field), "The file field could not clear its selection.")
+        AssertEqual("", dialog.draft_values["icon"], "Clearing a file field retained its value.")
+
+        dialog.file_selector := (*) => shared_only_path
+        AssertTrue(!dialog.SelectFileField(field), "The file field accepted a shared-data selection.")
+        AssertEqual("", dialog.draft_values["icon"], "A rejected selection changed the file field value.")
+        AssertEqual(
+            "links/schema.ico",
+            RabbitFileField.SelectionToValue(user_data_dir, user_data_dir . "\links\schema.ico"),
+            "The file field resolved a lexical user-data path unexpectedly."
+        )
+        AssertEqual(
+            selected_path,
+            RabbitFileField.ResolveExisting("icons/schema.png", [user_data_dir, shared_data_dir]),
+            "The file field did not prefer user data over a shared file."
+        )
+        AssertEqual(
+            shared_only_path,
+            RabbitFileField.ResolveExisting("icons/shared.png", [user_data_dir, shared_data_dir]),
+            "The file field did not fall back to an existing shared file."
+        )
+        AssertEqual(
+            shared_directory_shadow_path,
+            RabbitFileField.ResolveExisting("icons/directory-shadow", [user_data_dir, shared_data_dir]),
+            "A user-data directory incorrectly shadowed a shared file."
+        )
+        AssertEqual("", RabbitFileField.ResolveExisting("../outside-schema.png", [user_data_dir, shared_data_dir]),
+            "The file field resolved an unsafe relative path.")
+    } finally {
+        if dialog {
+            dialog.Dispose()
+        }
+        owner.Destroy()
+        if DirExist(user_data_dir) {
+            DirDelete(user_data_dir, true)
+        }
+        if DirExist(shared_data_dir) {
+            DirDelete(shared_data_dir, true)
+        }
     }
 }
 
@@ -1546,6 +1739,28 @@ SchemaSettingsDialogManifest() {
     }
 }
 
+SchemaSettingsFileManifest() {
+    return {
+        title: "Settings",
+        description: "",
+        groups: [{ id: "general", label: "General", description: "" }],
+        fields: [{
+            id: "icon",
+            group: "general",
+            path: "schema/icon",
+            type: "file",
+            label: "Schema icon",
+            description: "",
+            min: "",
+            max: "",
+            options: [],
+            extensions: ["ico", "png"],
+            has_default: true,
+            default: "",
+        }],
+    }
+}
+
 SchemaSettingsGroupedDialogManifest() {
     return {
         title: "Settings",
@@ -1877,6 +2092,11 @@ SchemaSettingsEditCue(ctrl) {
         "Ptr"
     )
     return StrGet(buf, "UTF-16")
+}
+
+SchemaSettingsFileSelector(calls, selected_path, options, initial_path, title, filter) {
+    calls.Push({ options: options, initial_path: initial_path, title: title, filter: filter })
+    return selected_path
 }
 
 JoinSchemaSettingsCalls(calls) {
