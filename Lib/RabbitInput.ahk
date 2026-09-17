@@ -313,14 +313,18 @@ class RabbitInputController {
     RegisterHotKey(name, callback, options, update_existing := false) {
         if this.registered_hotkey_names.Has(name) {
             if update_existing {
-                Hotkey(name, callback, options)
+                this.ApplyHotKey(name, callback, options . " On")
             }
             return false
         }
-        Hotkey(name, callback, options)
+        this.ApplyHotKey(name, callback, options . " On")
         this.registered_hotkeys.Push(name)
         this.registered_hotkey_names[name] := true
         return true
+    }
+
+    ApplyHotKey(name, callback, options) {
+        Hotkey(name, callback, options)
     }
 
     RegisterInputHotKey(name, callback, options) {

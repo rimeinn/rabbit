@@ -26,6 +26,7 @@ if A_Args.Length && A_Args[1] = "floating-preedit-placement" {
 }
 
 RunTest("input hotkey ownership", TestInputHotkeyOwnership.Bind())
+RunTest("replacement input owner re-enables hotkeys", TestReplacementInputOwnerEnablesHotkeys.Bind())
 RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.Bind())
 RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind())
 RunTest("Caps Lock ASCII switch registration", TestCapsLockAsciiSwitchRegistration.Bind())
@@ -91,6 +92,46 @@ TestInputHotkeyOwnership() {
     input.Dispose()
     Persistent(false)
     AssertEqual(0, input.registered_hotkeys.Length, "The input owner did not release its hotkeys.")
+}
+
+TestReplacementInputOwnerEnablesHotkeys() {
+    local first := RabbitHotKeyRegistrationProbe()
+    local replacement := RabbitHotKeyRegistrationProbe()
+    local callback := (*) => 0
+
+    first.RegisterHotKey("$A", callback, "S0")
+    first.Dispose()
+    replacement.RegisterHotKey("$A", callback, "S0")
+
+    AssertEqual(1, first.hotkey_options.Length, "The initial input owner did not register its hotkey.")
+    AssertTrue(
+        RegExMatch(first.hotkey_options[1], "i)(^|\s)On($|\s)"),
+        "The initial input owner did not explicitly enable its hotkey."
+    )
+    AssertEqual(1, replacement.hotkey_options.Length, "The replacement input owner did not register its hotkey.")
+    AssertTrue(
+        RegExMatch(replacement.hotkey_options[1], "i)(^|\s)On($|\s)"),
+        "The replacement input owner left the previous owner's hotkey disabled."
+    )
+}
+
+class RabbitHotKeyRegistrationProbe extends RabbitInputController {
+    __New() {
+        this.registered_hotkeys := []
+        this.registered_hotkey_names := Map()
+        this.registered_input_hotkeys := []
+        this.focus_timer_running := false
+        this.focus_event_hook := 0
+        this.hotkey_options := []
+        this.replayed_down := Map()
+    }
+
+    ApplyHotKey(name, callback, options) {
+        this.hotkey_options.Push(options)
+    }
+
+    UnregisterFocusEventHook() {
+    }
 }
 
 TestConfiguredInputHotkeySelection() {
