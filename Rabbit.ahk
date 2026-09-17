@@ -17,6 +17,7 @@
  */
 #Requires AutoHotkey v2.0
 #SingleInstance Ignore
+#NoTrayIcon
 
 ;@Ahk2Exe-SetInternalName rabbit
 ;@Ahk2Exe-SetProductName 玉兔毫
@@ -33,6 +34,9 @@
 */
 
 global rabbit_entry_options := RabbitEntryOptions.Parse(A_Args)
+if !rabbit_entry_options.is_worker {
+    A_IconHidden := false
+}
 RabbitCompiledResourcePolicy.ExtractIfCompiled()
 global rabbit_rime_path := RabbitRimeBootstrap.Prepare()
 global rabbit_application := rabbit_entry_options.is_worker
