@@ -39,7 +39,13 @@ Release tags are part of the repository's release identity and must not be silen
 
 ## Project Structure & Module Organization
 
-Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the single application entry point; its normal mode runs the frontend and its `--deployer` mode handles settings, installation, and maintenance workflows. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml` defines the bundled Rime schema, while `assets/` contains source SVG icons. `Docs/` contains the MkDocs site, with implementation plans and historical design records under `Docs/design/`. `Data/` and `Rime/` are generated or runtime data and are intentionally ignored.
+Rabbit is a Windows Rime frontend written for AutoHotkey v2. `Rabbit.ahk` is the single application entry point. Its
+normal mode owns the frontend and modern settings window, `--deployer` provides legacy settings and standalone
+maintenance entry points, and the internal `--deployer-worker` mode performs isolated maintenance requested by the
+resident frontend. First-party modules live in `Lib/` and use the `Rabbit*.ahk` naming pattern. `schemas/rabbit.yaml`
+defines the bundled Rime schema, while `assets/` contains source SVG icons. `Docs/` contains the MkDocs site, with
+implementation plans and historical design records under `Docs/design/`. `Data/` and `Rime/` are generated or runtime
+data and are intentionally ignored.
 
 Three directories are Git submodules: `Lib/librime-ahk`, `Lib/RimeDepot`, and `plum`. Avoid mixing upstream submodule
 changes with application changes. `Lib/Direct2D` and `Lib/GetCaretPosEx` are Rabbit-maintained copies of third-party
@@ -56,11 +62,14 @@ Run commands from PowerShell on Windows:
 ```powershell
 git submodule update --init --recursive
 AutoHotkey.exe Rabbit.ahk
-AutoHotkey.exe Rabbit.ahk --deployer
 AutoHotkey.exe Rabbit.ahk --deployer deploy
+AutoHotkey.exe Rabbit.ahk --deployer sync
 ```
 
-The first command obtains required dependencies. The latter commands launch the frontend, open settings in deployer mode, and run a full deployment directly from source with AutoHotkey v2.0.19, the version pinned by CI.
+The first command obtains required dependencies. The latter commands launch the frontend, request a full deployment,
+and request user-data synchronization directly from source with AutoHotkey v2.0.19, the version pinned by CI. Open the
+modern settings window from the running frontend's tray menu. Bare `--deployer` and `--deployer settings` no longer open
+modern settings; `--deployer-worker` is an internal protocol and must not be invoked manually.
 
 For a distributable executable, use Ahk2Exe as described in `README.md`; GitHub Actions generates icons with ImageMagick, prepares x86/x64 Rime DLLs, and packages releases. Treat `.github/workflows/ci.yaml` as the authoritative release recipe.
 
@@ -83,6 +92,18 @@ Match surrounding YAML indentation and comments. No formatter or linter is curre
 ## Testing Guidelines
 
 There is no CI-enforced coverage threshold. Run focused tests directly or use the unit test runner. Always use `/ErrorStdOut` for startup and load diagnostics, but do not treat it as an exception boundary: each test body must run through `RunTest`, which catches callback exceptions and prints the test name, error, location, and stack to standard output. Test scripts use explicit relative includes and must remain runnable without a root-level test launcher.
+
+Build the documentation in a repository-local virtual environment rather than relying on globally installed Python
+packages. Create and prepare the environment from the repository root, then run the strict build through its Python
+interpreter:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install --requirement requirements-docs.txt
+.venv\Scripts\python.exe -m mkdocs build --strict
+```
+
+Reuse the existing `.venv` when it is already prepared. The directory is ignored by Git and must not be committed.
 
 AutoHotkey exceptions are not guaranteed to appear on stdout or stderr; runtime failures, including destructor errors, may be shown directly in a dialog. Agent tests must run through the top-level `try/catch` boundary required by Agent Operating Rules above (use a separate harness for the exempt application entry script); `/ErrorStdOut` only covers startup and load diagnostics and is not a substitute for that boundary.
 

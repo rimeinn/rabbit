@@ -2,12 +2,13 @@
 
 本文按当前源码说明入口、生命周期和模块边界。类名和文件名以 `Lib/` 中的实现为准；
 `Docs/design/runtime-architecture-refactoring.md` 是较完整的实现记录，但其中的阶段描述不应替代当前代码。
-控制面板迁入常驻进程及异步部署 worker 的后续方案见
+控制面板迁入常驻进程及异步部署 worker 的设计与实施记录见
 `Docs/design/control-panel-runtime-refactoring.md`。
 
 ## 入口与模式分流
 
-`Rabbit.ahk` 是唯一的顶层启动脚本。它不直接实现输入或界面，而是依次完成参数解析、编译资源释放、Rime 动态库准备，再选择普通前端或部署器应用：
+`Rabbit.ahk` 是唯一的顶层启动脚本。它不直接实现输入或界面，而是依次完成参数解析、编译资源释放、Rime 动态库
+准备，再选择常驻前端、兼容部署器或隔离维护 worker：
 
 ```text
 Rabbit.ahk
@@ -15,11 +16,15 @@ Rabbit.ahk
   -> RabbitCompiledResourcePolicy.ExtractIfCompiled()
   -> RabbitRimeBootstrap.Prepare()
   -> RimeApi(rime_path)
-       +-- normal       -> RabbitApplication
-       +-- --deployer   -> RabbitDeployerApplication
+       +-- normal               -> RabbitApplication
+       +-- --deployer           -> RabbitDeployerApplication
+       +-- --deployer-worker    -> RabbitDeployerWorkerApplication
 ```
 
-只有第一个参数是 `--deployer` 时才进入部署器模式；该参数会从传给应用的参数中移除。普通模式和部署器模式因此共享同一个启动入口，但拥有各自的应用对象、Rime 生命周期和参数解析器。
+`RabbitEntryOptions` 只识别首个参数中的 `--deployer` 和 `--deployer-worker`，并把其余参数交给对应应用解析。
+普通模式持有现代设置和输入运行时；`--deployer` 保留旧版设置及外部 `deploy`／`sync` 入口；
+`--deployer-worker` 只由 `RabbitDeploymentCoordinator` 启动，不是公开命令行界面。三个模式共享启动入口，
+但使用各自的应用对象和参数模型。
 
 `RabbitRimeBootstrap` 的源码模式直接使用 `Lib/librime-ahk/rime.dll`。编译模式会检查 DLL 的文件版本、PE 位数和 API 版本，按顺序尝试程序目录、`LIBRIME_LIB_DIR`、小狼毫安装目录，最后释放内嵌 DLL。修改绑定或编译资源时，应同时查看 `RabbitRimeBootstrapTest.ahk` 和编译资源测试。
 
@@ -28,21 +33,31 @@ Rabbit.ahk
 ```text
 Rabbit.ahk
   -> RabbitApplication
-       -> RabbitCreateTraits
-       -> Rime.setup / initialize
-       -> RabbitConfigLoader.Load
-       -> RabbitCandidateBoxFactory.Create
-       -> RabbitInputController
-       -> RabbitRuntimeState
+       -> RabbitSettingsController
        -> RabbitTrayController
-       -> RabbitAppearanceController
+       -> RabbitDeploymentCoordinator
+       -> RabbitMaintenanceIpcServer
+       -> RabbitFrontendRuntime
+            -> RabbitCreateTraits / Rime.setup / initialize
+            -> RabbitConfigLoader.Load
+            -> RabbitCandidateBoxFactory.Create
+            -> RabbitInputController
+            -> RabbitRuntimeState
+            -> RabbitAppearanceController
 ```
 
-`RabbitApplication.Run()` 先解析维护级别和键盘布局，创建互斥体并初始化 Rime；随后加载 `rabbit`、`default` 及各输入方案配置，构建配置快照和候选窗。候选窗、输入控制器、运行时状态、托盘和外观控制器都在这里组装，但具体行为属于各自模块。
+`RabbitApplication.Run()` 解析维护级别和键盘布局并取得应用互斥体，然后创建设置控制器、托盘、部署协调器，
+再启动一个 `RabbitFrontendRuntime`。运行时负责初始化 Rime、加载 `rabbit`、`default` 及各输入方案配置，
+并组装候选窗、输入控制器、运行时状态和外观控制器。设置窗口、托盘和部署协调器属于常驻应用，输入运行时则可在
+维护前停止、完成后以新配置重建。
 
-首次运行时，如果用户目录缺少必要的配置，主程序会启动同一个 `Rabbit.ahk` 的 `--deployer` 模式完成安装设置；部署器结束后按维护级别和键盘布局参数重新启动普通模式。托盘中的设置、词典和部署动作也采用相同的独立进程交接路径。
+首次运行时，现代 Windows 直接由 `RabbitSettingsController.ShowInstallation()` 在常驻进程中打开安装页面；
+旧版 Windows 才交给 `--deployer legacy-settings` 兼容流程。托盘中的现代设置、词典和同步入口都打开常驻设置窗口。
+设置保存、重新部署、同步和现代词典操作交给 `RabbitDeploymentCoordinator`，不退出顶层窗口。
 
-`RabbitAppContext` 保存普通前端的进程级资源。退出时由 `RabbitApplication` 先解除托盘消息和托盘对象，再由上下文释放输入热键、运行时定时器、外观消息、候选窗、状态提示、Rime 会话、Rime 实例和互斥体。新增资源必须有明确的所有者和幂等的 `Dispose()` 路径，不能依赖全局析构顺序。
+`RabbitAppContext` 保存一次输入运行时的资源。停止运行时时，它依次释放输入热键、定时器、外观消息、候选窗、
+状态提示、Rime 会话和 Rime 生命周期，并从常驻托盘解绑。进程退出时，`RabbitApplication` 还会释放 IPC、部署协调器、
+设置窗口、托盘和应用互斥体。新增资源必须有明确的所有者和幂等的 `Dispose()` 路径，不能依赖全局析构顺序。
 
 ## 候选窗
 
@@ -63,22 +78,31 @@ Rabbit.ahk
 
 `RabbitConfigLoader` 从 Rime 读取前端配置、默认按键和各方案按键，生成 `RabbitConfigSnapshot` 与 `RabbitUIStyleSnapshot`。普通运行时控制器读取快照，不应在输入回调中随意修改共享配置对象。Windows 主题变化由 `RabbitAppearanceController` 重新读取样式并更新候选窗和状态提示。
 
-设置窗口通过 Rime Levers 的自定义设置接口读写用户配置，而不是修改程序目录中的共享 `Data/`。`RabbitDeploymentPlan` 将变更分为 `rabbit.yaml`、`default.yaml` 和完整工作区三种部署范围；设置页面只提交自己负责的变更，部署工作由 `RabbitDeployerWorkflow` 统一执行。
+设置窗口通过 Rime Levers 的自定义设置接口读写用户配置，而不是修改程序目录中的共享 `Data/`。
+`RabbitDeploymentPlan` 将变更分为 `rabbit.yaml`、`default.yaml`、单个方案和完整工作区等部署范围；设置页面只提交
+自己负责的变更。`RabbitSettingsController` 在维护前释放后端配置句柄，`RabbitDeploymentCoordinator` 停止输入运行时、
+启动隔离 worker，完成后重建运行时并刷新仍然打开的设置窗口。
 
-## 部署器
+## 设置与维护进程
 
-`Rabbit.ahk --deployer` 创建 `RabbitDeployerApplication`，再创建独立的 `RabbitDeployerContext` 和 `RabbitDeployerWorkflow`。部署器负责设置页面、重新部署、词典管理、资料同步和方案管理；它不复用普通前端的会话、托盘或上下文全局状态。
+现代设置窗口由 `RabbitApplication` 中的 `RabbitSettingsController` 持有。重复打开时会激活同一个窗口并切换页面；
+维护期间窗口保留 HWND 和草稿，但暂时释放 Rime／Levers 后端模型，运行时恢复后重新绑定。
 
-部署器的主要路径如下：
+维护和兼容路径如下：
 
-| 命令 | 工作流 |
+| 入口 | 工作流 |
 | --- | --- |
-| `settings [page]` | 打开现代设置窗口；页面包括外观、输入方案、行为、应用、词典、维护和关于 |
-| `legacy-settings [dictionary]` | 使用兼容设置流程，或打开旧版词典管理 |
-| `deploy` | 创建完整工作区部署计划并调用 Rime 部署 |
-| `sync` | 同步用户数据并等待维护线程结束 |
+| 常驻设置窗口 | 编辑配置并向 `RabbitDeploymentCoordinator` 提交部署、同步或词典操作 |
+| `--deployer-worker deploy` | 按序列化的 `RabbitDeploymentPlan` 在隔离 Rime 生命周期中部署 |
+| `--deployer-worker sync` | 在隔离 Rime 生命周期中同步用户资料 |
+| `--deployer-worker dictionary` | 执行备份、恢复、导入或导出词典 |
+| `--deployer deploy`／`sync` | 通过 IPC 优先委托常驻前端；没有常驻端点时独立执行维护 |
+| `--deployer legacy-settings [dictionary]` | 使用旧版 Windows 的兼容设置或词典管理流程 |
 
-设置窗口内部按页面懒加载模型和对话框；外观预览、输入方案下载和 RimeDepot 子窗口都有自己的资源释放路径。部署器完成后若要求返回主程序，会退出当前进程，再以普通模式启动 `Rabbit.ahk --maintenance ... --keyboard-layout ...`。
+worker 由 `RabbitDeployerWorkerApplication` 和 `RabbitMaintenanceWorkflow` 执行，不创建现代设置 GUI 或普通托盘。
+协调器通过进程句柄轮询完成状态；worker 退出后，无论操作成功与否都尝试恢复输入运行时。外部 `deploy`／`sync`
+使用带请求 ID、随机令牌和发送者 PID 校验的 `RabbitMaintenanceIpcServer`，避免与活动前端并发初始化 Rime。
+`RabbitDeployerApplication` 只保留兼容流程和无常驻前端时的独立维护回退；`settings` 命令已不再有效。
 
 ## 模块边界与扩展方式
 
@@ -86,15 +110,16 @@ Rabbit.ahk
 
 | 功能 | 入口模块 | 相关实现 |
 | --- | --- | --- |
-| 启动与退出 | `Rabbit.ahk`、`RabbitApplication.ahk` | 参数、互斥体、Rime 初始化、退出清理 |
+| 启动与退出 | `Rabbit.ahk`、`RabbitApplication.ahk`、`RabbitFrontendRuntime.ahk` | 参数、互斥体、可重启输入运行时和退出清理 |
 | 输入处理 | `RabbitInput.ahk` | 热键、焦点监视、密码框绕过、提交和候选更新 |
 | 托盘与状态 | `RabbitTrayMenu.ahk`、`RabbitRuntimeState.ahk`、`RabbitStatusTip.ahk` | 菜单、状态标签、维护提示和状态窗口 |
-| 设置与部署 | `RabbitSettingsWindow.ahk`、`RabbitDeployerWorkflow.ahk` | 设置页面、Levers、自定义配置和部署计划 |
+| 设置与部署 | `RabbitSettingsController.ahk`、`RabbitDeploymentCoordinator.ahk`、`RabbitMaintenanceWorkflow.ahk` | 常驻设置、Levers、自定义配置、部署计划和 worker 协调 |
+| 跨进程维护 | `RabbitMaintenanceIpc.ahk`、`RabbitDeployerWorkerApplication.ahk` | 外部请求、worker 参数、隔离维护和结果回传 |
 | Rime 与资源 | `RabbitRimeBootstrap.ahk`、`RabbitCompiledResourcePolicy.ahk` | DLL 选择、编译资源释放和版本标记 |
 | 外观与绘制 | `RabbitUIStyle*.ahk`、`RabbitDirect2D.ahk`、`RabbitFontSpec.ahk` | 样式快照、配色、字体、DPI 和绘制资源 |
 
 每个模块必须声明直接 `#Include` 依赖，不要依赖入口脚本的包含顺序。实质性的新类单独放置文件；跨模块协作优先通过构造函数传递 Rime、模型或窗口依赖，避免新增隐式全局状态。涉及配置字段时，沿着“源配置／快照／设置读写／部署计划／测试／文档”整条链路检查；涉及资源时，确认异常、取消、重复打开和退出路径都能释放资源。
 
 更细的所有权、生命周期和缺陷记录见[运行时架构重构记录](../design/runtime-architecture-refactoring.md)。
-后续控制面板和部署边界的计划见[控制面板与部署运行时重构](../design/control-panel-runtime-refactoring.md)。
+控制面板和部署边界的设计与实施记录见[控制面板与部署运行时重构](../design/control-panel-runtime-refactoring.md)。
 这些记录描述实现过程或设计计划，不是面向普通用户的 API 承诺。

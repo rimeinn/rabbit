@@ -2,7 +2,8 @@
 
 ## 文档目录
 
-公开文档源文件位于 `Docs/`，按读者分为 `user/`、`scheme/`、`contributor/` 和 `reference/`。现有的架构重构、功能实现记录保留在根目录，作为贡献者的设计记录。
+公开文档源文件位于 `Docs/`，按读者分为 `user/`、`scheme/`、`contributor/` 和 `reference/`。
+架构重构和功能实现记录保留在 `Docs/design/`，作为贡献者的设计记录。
 
 文档页面使用 Markdown。用户可见的说明使用中文；代码标识、配置路径、命令和上游 API 保留原文。
 
@@ -26,13 +27,13 @@
 ```powershell
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements-docs.txt
-.venv\Scripts\mkdocs.exe serve
+.venv\Scripts\python.exe -m mkdocs serve
 ```
 
 浏览 `http://127.0.0.1:8000/`。提交前运行严格构建，检查导航引用和构建警告：
 
 ```powershell
-.venv\Scripts\mkdocs.exe build --strict
+.venv\Scripts\python.exe -m mkdocs build --strict
 ```
 
 构建目录是 `dist/docs`，已由仓库的 `dist` 忽略规则排除，不应提交生成文件。
@@ -65,7 +66,8 @@ AutoHotkey.exe /ErrorStdOut scripts\generate_locale_fallback.ahk
 
 `.github/workflows/docs.yaml` 只监听文档目录、文档配置和文档依赖。推送到 `master` 后，它会构建静态站并部署到 GitHub Pages；文档 Pull Request 只执行构建检查，不部署。
 
-应用工作流对同一批文件使用 `paths-ignore`。因此仅文档改动不会构建程序、运行应用测试或更新 nightly；同一提交若同时修改程序文件，应用 CI 仍会运行。
+应用工作流在 `paths` 中用排除模式过滤同一批文件。因此仅文档改动不会构建程序、运行应用测试或更新 nightly；
+同一提交若同时修改程序文件，应用 CI 仍会运行。
 
 ## 提交前检查
 

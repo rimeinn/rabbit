@@ -3,14 +3,16 @@
 状态：已实施（阶段 0 - 6）
 最后更新：2026-09-16
 
+下文的“背景”和“现状”描述重构前的实现；最终结构与差异以“实施说明”为准。
+
 ## 1. 背景
 
-当前现代控制面板运行在 `Rabbit.ahk --deployer settings` 进程中。用户从托盘打开设置时，
+重构前，现代控制面板运行在 `Rabbit.ahk --deployer settings` 进程中。用户从托盘打开设置时，
 `RabbitApplication` 会先释放输入热键、Rime 会话、候选窗和托盘运行时，再启动
 `RabbitDeployerApplication`。部署器使用 `deployer_initialize()`，不创建输入会话，因此控制面板打开期间
 Rabbit 本身不能输入文字。这会直接影响需要文本输入的设置项。
 
-当前实现还把以下职责放在同一条 deployer 生命周期中：
+当时的实现还把以下职责放在同一条 deployer 生命周期中：
 
 - 设置窗口和设置模型；
 - 完整工作区部署和细粒度配置部署；

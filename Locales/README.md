@@ -104,7 +104,7 @@ AutoHotkey.exe /ErrorStdOut scripts/generate_locale_fallback.ahk
 ```
 
 The unit suite verifies exact key and value parity with the Chinese source.
-Python is needed only for regeneration, not for running Rabbit.
+The generator runs with AutoHotkey and does not require Python.
 Keep layout dimensions out of catalogs. Add translator context with comments.
 Plural selection is not implemented; do not build English-only plural rules into
 call sites. Add a dedicated plural API when a real count-dependent message needs it.

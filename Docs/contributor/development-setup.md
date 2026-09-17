@@ -31,26 +31,32 @@ git submodule status --recursive
 
 ```powershell
 AutoHotkey.exe Rabbit.ahk
-AutoHotkey.exe Rabbit.ahk --deployer
 AutoHotkey.exe Rabbit.ahk --deployer deploy
+AutoHotkey.exe Rabbit.ahk --deployer sync
 ```
 
-`Rabbit.ahk` 是唯一的顶层入口。不带参数时启动普通前端；第一个参数是 `--deployer` 时进入部署器模式，后续参数再由部署器解析。常用形式如下：
+`Rabbit.ahk` 是唯一的顶层入口。不带参数时启动常驻前端，现代设置窗口也由这个进程持有；从托盘菜单打开设置。
+第一个参数是 `--deployer` 时进入兼容部署器或独立维护入口。`--deployer-worker` 是常驻前端启动的内部维护协议，
+不作为人工运行入口。常用形式如下：
 
 | 命令 | 作用 |
 | --- | --- |
 | `Rabbit.ahk` | 启动普通前端；默认执行部分维护 |
 | `Rabbit.ahk --maintenance none` | 启动普通前端，但跳过启动维护 |
 | `Rabbit.ahk --maintenance full` | 启动普通前端并执行完整维护 |
-| `Rabbit.ahk --deployer` | 打开设置窗口 |
-| `Rabbit.ahk --deployer settings appearance` | 打开设置窗口的指定页面 |
-| `Rabbit.ahk --deployer deploy` | 执行完整 Rime 部署后退出 |
-| `Rabbit.ahk --deployer sync` | 同步 Rime 用户数据后退出 |
-| `Rabbit.ahk --deployer legacy-settings` | 显式使用兼容设置流程；普通 `settings` 在旧版 Windows 上也会自动降级到该流程 |
+| `Rabbit.ahk --deployer deploy` | 请求完整 Rime 部署；优先交给常驻前端，无常驻端点时独立执行 |
+| `Rabbit.ahk --deployer sync` | 请求同步 Rime 用户数据；优先交给常驻前端，无常驻端点时独立执行 |
+| `Rabbit.ahk --deployer legacy-settings` | 显式使用兼容设置流程 |
+| `Rabbit.ahk --deployer legacy-settings dictionary` | 打开旧版用户词典管理 |
 
-设置页面标识包括 `appearance`、`input-schemes`、`behavior`、`applications`、`dictionary`、`maintenance` 和 `about`。`legacy-settings` 还可以带 `dictionary` 打开旧版词典管理。`--keyboard-layout <数字>` 用于显式传入键盘布局标识；`--install` 只用于首次安装设置流程，`--return-to-rabbit` 用于部署器完成后返回主程序，通常由主程序内部传入。
+现代页面标识 `appearance`、`input-schemes`、`behavior`、`applications`、`dictionary`、`maintenance` 和 `about`
+由 `RabbitSettingsController` 在常驻前端内部使用，不再是 `--deployer settings [page]` 命令行参数。
+`--keyboard-layout <数字>` 用于显式传入键盘布局标识；`--install` 与 `--return-to-rabbit` 只用于旧版 Windows
+首次安装和兼容设置的内部进程交接。
 
-命令行解析集中在 `Lib/RabbitCommandLine.ahk`。新增参数时要同步更新普通模式和部署器模式的测试，并明确参数属于哪一种模式；`deploy`、`sync` 不能再附加页面标识。
+命令行解析集中在 `Lib/RabbitCommandLine.ahk`。新增参数时要同步更新普通前端、兼容部署器和 worker 的测试，
+并明确参数属于哪一种模式；`deploy`、`sync` 不能附加页面标识。worker 当前只接受 `deploy`、`sync` 和
+`dictionary`，由 `RabbitDeploymentCoordinator` 生成带部署计划或词典操作参数的命令行。
 
 ## 运行时目录与依赖
 

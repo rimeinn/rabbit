@@ -17,7 +17,9 @@
 
 ### 通过发布页面下载
 
-正式发行版会在 [Release](https://github.com/rimeinn/rabbit/releases) 页面的 Assets 中，下载最新的 `rabbit-v<版本号>.zip`，解压到一个新建文件夹，运行 `Rabbit.exe` 即可。
+正式发行版会在 [Release](https://github.com/rimeinn/rabbit/releases) 页面的 Assets 中提供
+`rabbit-v<版本号>-x64.zip` 和 `rabbit-v<版本号>-x86.zip`。下载与系统架构匹配的压缩包，解压到一个新建文件夹，
+运行 `Rabbit.exe` 即可。
 
 编译版提供 `rabbit-v<版本号>-compiled-x64.exe` 和 `rabbit-v<版本号>-compiled-x86.exe` 单文件下载，将 EXE 放进可写的独立文件夹后运行即可。编译版首次运行时，会向 EXE 所在目录释放资源文件。
 

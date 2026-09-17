@@ -3,7 +3,8 @@
 
 config_version: "0.1"
 
-# 界面语言：auto、zh-CN、en-US、zh-HK 或 zh-TW；重新部署后生效
+# 界面语言：auto 或 Locales 中可用的语言代码
+# 内置含 zh-CN、en-US、zh-HK、zh-TW、ja-JP；重新部署后生效
 language: auto
 
 # 方案下载器的来源设置；用户自定义内容应使用下列斜线路径，

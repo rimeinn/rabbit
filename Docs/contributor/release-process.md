@@ -16,7 +16,8 @@ prepare-dependency ───────────┴─> build-rabbit-compile
 其中：
 
 - `prepare-autohotkey-binaries` 准备 AutoHotkey v2.0.19 的 x86/x64 解释器、Ahk2Exe 和图标；
-- `prepare-dependency` 准备 x86/x64 的 librime DLL，并用东风破生成 `Data/`，再复制仓库源配置 `schemas/rabbit.yaml`；
+- `prepare-dependency` 准备 x86/x64 的 librime DLL，并用东风破生成 `Data/`，再复制仓库源配置
+  `schemas/rabbit.yaml` 和 `schemas/schema.rabbit-fallback.ini`；
 - `build-rabbit` 生成脚本版 Rabbit 和包含 `Data/` 的完整压缩包；
 - `test-rabbit` 使用 x64 AutoHotkey 运行 Rabbit 单元测试和 RimeDepot 测试；
 - `build-rabbit-compiled` 按 x86/x64 矩阵生成编译资源、编译 `Rabbit.ahk` 并验证编译版的资源和 DLL 启动路径。
@@ -62,8 +63,9 @@ GitHub Pages 的发布来源需要在仓库设置中选择 GitHub Actions。构�
 资源清单中的 `destination` 是运行时释放后的路径。README 中的截图路径必须与这里保持一致，否则 GitHub 页面、
 完整包和编译版会出现不同结果。
 
-`Data/` 不属于仓库中的稳定源目录，而是依赖准备作业生成的发布数据目录。源配置改动应修改 `schemas/rabbit.yaml`，
-再由 CI 重新生成并打包 `Data/rabbit.yaml`；不要把本地生成的 `Data/` 或 Rime 用户目录提交回来。
+`Data/` 不属于仓库中的稳定源目录，而是依赖准备作业生成的发布数据目录。前端默认配置应修改
+`schemas/rabbit.yaml`，通用方案设置声明应修改 `schemas/schema.rabbit-fallback.ini`；CI 会把它们分别复制为
+`Data/rabbit.yaml` 和 `Data/schema.rabbit-fallback.ini`。不要把本地生成的 `Data/` 或 Rime 用户目录提交回来。
 
 新增资源时，先判断它属于哪一类：
 

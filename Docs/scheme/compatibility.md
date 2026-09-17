@@ -25,7 +25,21 @@
 方案作者可随方案提供 `<schema_id>.rabbit.ini`，声明玉兔毫“方案设置”窗口可编辑的字段。它仅描述界面，
 不包含 custom 补丁；用户修改后由玉兔毫写入用户目录的 `<schema_id>.custom.yaml`。
 
-声明可定义 `boolean`、`integer`、`number`、`string` 和 `enum` 标量字段，以及有序列表和专用结构字段：
+声明可定义 `boolean`、`integer`、`number`、`string`、`file` 和 `enum` 标量字段，以及有序列表和专用结构字段。
+`file` 保存相对于 Rime 用户目录的正斜线路径；文件选择器只接受用户目录内已有的文件，不保存绝对路径或 `..`。
+可选的 `extensions = ico|png` 用作选择器过滤提示，不限制已有配置值的扩展名。例如：
+
+~~~ini
+[field.tray_icon]
+group = general
+path = schema/icon
+type = file
+label = 托盘图标
+default =
+extensions = ico|png
+~~~
+
+有序列表和专用结构字段包括：
 
 - `list`：仅包含字符串的有序列表；
 - `key_binding_list`：仅用于 `key_binder/bindings`，使用玉兔毫的专用按键绑定编辑器。
@@ -39,7 +53,8 @@
 `menu/alternative_select_keys`（可打印 ASCII 字符组成的字符串）和 `menu/page_down_cycle`（布尔值）。
 
 没有 `<schema_id>.rabbit.ini` 时，玉兔毫提供的通用 fallback 包含所有适合作为方案覆盖的通用输入配置，
-按“开关”“引擎”“候选选单”“中西文切换”“按键绑定”“标点”和“识别器”分组。全局 `switcher` 设置不属于方案设置。
+按“常规”“开关”“引擎”“候选选单”“中西文切换”“按键绑定”“标点”和“识别器”分组。
+“常规”包含方案名称和托盘图标；全局 `switcher` 设置不属于方案设置。
 
 专用映射字段由玉兔毫整体维护：编辑后写入完整映射表，并清除同路径的精确覆盖及嵌套补丁；“还原方案默认”会移除完整覆盖和所有嵌套补丁。
 `recognizer_patterns` 不在玉兔毫中预先校验正则表达式，最终语法由 librime 的 Boost.Regex 处理。

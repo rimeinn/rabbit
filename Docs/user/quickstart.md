@@ -6,7 +6,7 @@
 
 在 [Releases](https://github.com/rimeinn/rabbit/releases/latest) 中选择一种发行包：
 
-- `rabbit-v<版本号>.zip`：完整目录，适合源码资源和运行文件一起使用；
+- `rabbit-v<版本号>-x64.zip` 或 `-x86.zip`：完整目录，适合源码资源和运行文件一起使用；
 - `rabbit-v<版本号>-compiled-x64.exe` 或 `x86.exe`：单文件编译版；
 - `latest`：每夜构建版，包含开发中的改动。
 
