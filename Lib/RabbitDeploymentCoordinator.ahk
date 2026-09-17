@@ -125,6 +125,7 @@ class RabbitDeploymentCoordinator {
         if !(plan is RabbitDeploymentPlan) {
             throw TypeError("Expected a RabbitDeploymentPlan.")
         }
+        this.ValidateCompletionCallback(completion_callback)
         if plan.IsEmpty() {
             if completion_callback {
                 completion_callback.Call(0, true)
@@ -155,6 +156,7 @@ class RabbitDeploymentCoordinator {
         if this.disposed || this.state != RabbitDeploymentCoordinator.IDLE {
             return false
         }
+        this.ValidateCompletionCallback(completion_callback)
         this.operation := operation
         this.plan := plan
         this.payload := payload
@@ -166,6 +168,12 @@ class RabbitDeploymentCoordinator {
         }
         this.ScheduleBegin()
         return true
+    }
+
+    ValidateCompletionCallback(completion_callback) {
+        if completion_callback && !HasMethod(completion_callback, "Call") {
+            throw TypeError("Expected a callable completion callback.")
+        }
     }
 
     ScheduleBegin() {
@@ -208,24 +216,22 @@ class RabbitDeploymentCoordinator {
         if this.disposed || this.state != RabbitDeploymentCoordinator.WORKER_RUNNING || !this.process {
             return
         }
+        local result
         try {
             if this.process.IsRunning() {
                 return
             }
-            local result := this.process.ExitCode()
-            SetTimer(this.poll_callback, 0)
-            this.process.Close()
-            this.process := 0
-            this.ResumeRuntime(result)
+            result := this.process.ExitCode()
         } catch as err {
             RabbitError(err.Message, Format("RabbitDeploymentCoordinator.ahk:{}", A_LineNumber))
-            SetTimer(this.poll_callback, 0)
-            if this.process {
-                this.process.Close()
-                this.process := 0
-            }
-            this.ResumeRuntime(1)
+            result := 1
         }
+        SetTimer(this.poll_callback, 0)
+        if this.process {
+            try this.process.Close()
+            this.process := 0
+        }
+        this.ResumeRuntime(result)
     }
 
     FinishWithoutWorker(result) {
@@ -246,15 +252,16 @@ class RabbitDeploymentCoordinator {
             if this.settings && HasMethod(this.settings, "ResumeAfterMaintenance") {
                 this.settings.ResumeAfterMaintenance(result)
             }
-            this.Finish(result, true)
         } catch as err {
             RabbitError(err.Message, Format("RabbitDeploymentCoordinator.ahk:{}", A_LineNumber))
             this.state := RabbitDeploymentCoordinator.FAILED_TO_RESUME
             if this.settings && HasMethod(this.settings, "RuntimeResumeFailed") {
                 this.settings.RuntimeResumeFailed(err)
             }
-            this.NotifyCompletion(result, false)
+            this.NotifyCompletion(this.completion_callback, result, false)
+            return
         }
+        this.Finish(result, true)
     }
 
     RetryResume() {
@@ -267,20 +274,24 @@ class RabbitDeploymentCoordinator {
     }
 
     Finish(result, resumed) {
-        this.NotifyCompletion(result, resumed)
+        local completion_callback := this.completion_callback
         this.operation := ""
         this.plan := 0
         this.payload := 0
         this.completion_callback := 0
         this.state := RabbitDeploymentCoordinator.IDLE
+        this.NotifyCompletion(completion_callback, result, resumed)
     }
 
-    NotifyCompletion(result, resumed) {
-        if this.completion_callback {
-            this.completion_callback.Call(result, resumed)
-        }
-        if this.result_callback {
-            this.result_callback.Call(result, resumed)
+    NotifyCompletion(completion_callback, result, resumed) {
+        try {
+            if completion_callback {
+                completion_callback.Call(result, resumed)
+            }
+        } finally {
+            if this.result_callback {
+                this.result_callback.Call(result, resumed)
+            }
         }
     }
 

@@ -226,12 +226,15 @@ class RabbitTrayController {
     }
 
     StartDeployer(command, args*) {
+        if command = "deploy" || command = "sync" {
+            return this.maintenance_callback.Call(command, args*)
+        }
         args.Push(
             "--return-to-rabbit",
             "--keyboard-layout",
             RabbitFormatKeyboardLayout(this.keyboard_layout)
         )
-        this.maintenance_callback.Call(command, args*)
+        return this.maintenance_callback.Call(command, args*)
     }
 
     ToggleSuspend() {

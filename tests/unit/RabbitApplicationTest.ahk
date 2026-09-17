@@ -20,7 +20,7 @@
 #Include ..\..\Lib\RabbitApplication.ahk
 
 RunTest("deployer launch after application shutdown", TestDeployerLaunchAfterShutdown.Bind())
-RunTest("tray delegates deployer launch", TestTrayDelegatesDeployerLaunch.Bind())
+RunTest("tray separates resident maintenance from deployer launch", TestTraySeparatesMaintenance.Bind())
 RunTest("tray routes unified settings", TestTrayRoutesUnifiedSettings.Bind())
 RunTest("tray routes legacy settings", TestTrayRoutesLegacySettings.Bind())
 RunTest("first install uses platform settings", TestFirstInstallUsesPlatformSettings.Bind())
@@ -52,17 +52,19 @@ TestDeployerLaunchAfterShutdown() {
     )
 }
 
-TestTrayDelegatesDeployerLaunch() {
+TestTraySeparatesMaintenance() {
     local calls := []
     local callback := (args*) => calls.Push(JoinApplicationArguments(args))
     local tray := RabbitTrayController(0, 0, 0, 0, 0, 1033, (*) => 0, callback)
 
     tray.StartDeployer("deploy")
+    tray.StartDeployer("sync")
+    tray.StartDeployer("legacy-settings", "dictionary")
 
     AssertEqual(
-        "deploy:--return-to-rabbit:--keyboard-layout:0x0409",
+        "deploy,sync,legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409",
         JoinApplicationCalls(calls),
-        "The tray did not delegate deployment through the application owner."
+        "The tray mixed resident maintenance arguments with the legacy deployer protocol."
     )
 }
 
@@ -110,7 +112,7 @@ TestTrayRoutesLegacySettings() {
     AssertEqual(
         "legacy-settings:--return-to-rabbit:--keyboard-layout:0x0409," .
             "legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409," .
-            "sync:--return-to-rabbit:--keyboard-layout:0x0409",
+            "sync",
         JoinApplicationCalls(calls),
         "The old-Windows tray did not use legacy settings and direct synchronization."
     )

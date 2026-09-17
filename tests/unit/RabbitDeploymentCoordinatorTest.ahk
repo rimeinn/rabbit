@@ -22,6 +22,8 @@ RunTest("deployment coordinator supervises a worker", TestCoordinatorWorkerLifec
 RunTest("deployment coordinator restores after worker launch failure", TestCoordinatorLaunchFailure.Bind())
 RunTest("deployment coordinator restores after runtime stop failure", TestCoordinatorStopFailure.Bind())
 RunTest("deployment coordinator exposes runtime resume failure", TestCoordinatorResumeFailure.Bind())
+RunTest("deployment coordinator rejects invalid completion callbacks", TestCoordinatorRejectsInvalidCallback.Bind())
+RunTest("deployment coordinator cleans up before completion callbacks", TestCoordinatorCompletionFailure.Bind())
 
 TestCoordinatorWorkerLifecycle() {
     local calls := []
@@ -127,6 +129,63 @@ TestCoordinatorResumeFailure() {
     AssertEqual(RabbitDeploymentCoordinator.IDLE, coordinator.state, "Recovery retry did not return to idle.")
     AssertEqual(2, CountCoordinatorCalls(calls, "start"), "Runtime recovery was not retried exactly once.")
     AssertEqual(1, CountCoordinatorCalls(calls, "resume_failed"), "The settings UI did not receive the failure.")
+}
+
+TestCoordinatorRejectsInvalidCallback() {
+    local calls := []
+    local coordinator := RabbitDeploymentCoordinatorProbe(
+        RabbitCoordinatorSettingsProbe(calls),
+        (*) => calls.Push("stop"),
+        (*) => (calls.Push("start"), true),
+        (result, resumed) => calls.Push("result:" . result . ":" . resumed),
+        0,
+        calls
+    )
+
+    AssertThrows(
+        coordinator.Submit.Bind(coordinator, RabbitDeploymentPlan.RabbitConfig(), "not-callable"),
+        "The coordinator accepted a non-callable completion callback."
+    )
+    AssertEqual(RabbitDeploymentCoordinator.IDLE, coordinator.state, "Invalid input changed coordinator state.")
+    AssertEqual(0, calls.Length, "Invalid input began a maintenance operation.")
+}
+
+TestCoordinatorCompletionFailure() {
+    local calls := [], completion_error := 0
+    local coordinator := RabbitDeploymentCoordinatorProbe(
+        RabbitCoordinatorSettingsProbe(calls),
+        (*) => calls.Push("stop"),
+        (*) => (calls.Push("start"), true),
+        (result, resumed) => calls.Push("result:" . result . ":" . resumed),
+        RabbitCoordinatorProcessProbe(calls, [false], 0),
+        calls
+    )
+    local completion_callback := (*) => (calls.Push("completion"), ThrowCoordinatorCompletionError())
+
+    AssertTrue(
+        coordinator.Submit(RabbitDeploymentPlan.RabbitConfig(), completion_callback),
+        "The deployment was rejected."
+    )
+    coordinator.BeginOperation()
+    try {
+        coordinator.PollWorker()
+    } catch as err {
+        completion_error := err
+    }
+
+    AssertTrue(completion_error is Error, "The completion failure was swallowed.")
+    AssertEqual(
+        RabbitDeploymentCoordinator.IDLE,
+        coordinator.state,
+        "A completion failure left the coordinator busy."
+    )
+    AssertEqual(1, CountCoordinatorCalls(calls, "start"), "A completion failure restarted the runtime twice.")
+    AssertEqual(1, CountCoordinatorCalls(calls, "completion"), "A completion failure invoked the callback twice.")
+    AssertEqual(1, CountCoordinatorCalls(calls, "result:0:1"), "The global result callback was skipped.")
+}
+
+ThrowCoordinatorCompletionError() {
+    throw Error("Injected completion failure.")
 }
 
 JoinCoordinatorCalls(calls) {
