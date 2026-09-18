@@ -19,6 +19,9 @@
 - 根级行为项：输入状态、候选位置、剪贴板上屏和密码框处理。
 
 这些设置应通过 `rabbit.custom.yaml` 的 `patch` 节点覆盖，不要直接修改程序目录中的默认 `Data/rabbit.yaml`。
+当共享目录与用户目录不同时，`default.yaml` 和 `rabbit.yaml` 由 librime 与玉兔毫分别在共享目录中维护；用户应通过
+`default.custom.yaml` 和 `rabbit.custom.yaml` 定制。玉兔毫会在启动时以及下载方案后检查用户目录，若发现这两个完整配置文件，
+会将其保留并重命名为 `<name>.yaml.<timestamp>`，避免覆盖共享目录中的配置。
 
 ## 方案设置声明
 

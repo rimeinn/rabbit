@@ -210,22 +210,41 @@ RabbitCleanOldLogs() {
     }
 }
 
-RabbitCleanMisplacedConfigs() {
-    local shared, user
-    shared := RabbitSharedDataPath()
-    user := RabbitUserDataPath()
+RabbitCleanMisplacedConfigs(shared_data_dir := "", user_data_dir := "", timestamp := "") {
+    local shared := shared_data_dir != "" ? shared_data_dir : RabbitSharedDataPath()
+    local user := user_data_dir != "" ? user_data_dir : RabbitUserDataPath()
+    local renamed := [], filename, source, destination
+    shared := RTrim(shared, "\/")
+    user := RTrim(user, "\/")
+    if StrCompare(shared, user, false) = 0 {
+        return renamed
+    }
+    if timestamp = "" {
+        timestamp := FormatTime(, "yyyyMMddHHmmss") . Format("{:03}", A_MSec)
+    }
+    for filename in ["default.yaml", "rabbit.yaml"] {
+        source := user . "\" . filename
+        if !FileExist(source) || DirExist(source) {
+            continue
+        }
+        destination := RabbitMisplacedConfigBackupPath(source, timestamp)
+        RabbitWarn(
+            Format("renaming unnecessary file {} to {}", source, destination),
+            Format("RabbitCommon.ahk:{}", A_LineNumber)
+        )
+        FileMove(source, destination)
+        renamed.Push(destination)
+    }
+    return renamed
+}
 
-    if shared == user {
-        return
+RabbitMisplacedConfigBackupPath(source, timestamp) {
+    local destination := source . "." . timestamp, suffix := 0
+    while FileExist(destination) || DirExist(destination) {
+        suffix += 1
+        destination := source . "." . timestamp . Format("{:03}", suffix)
     }
-    if FileExist(user . "\default.yaml") {
-        RabbitWarn(Format("renaming unnecessary file {}\default.yaml", user), Format("RabbitCommon.ahk:{}", A_LineNumber))
-        FileMove(user . "\default.yaml", user . "\default.yaml.old", 1)
-    }
-    if FileExist(user . "\rabbit.yaml") {
-        RabbitWarn(Format("renaming unnecessary file {}\rabbit.yaml", user), Format("RabbitCommon.ahk:{}", A_LineNumber))
-        FileMove(user . "\rabbit.yaml", user . "\rabbit.yaml.old", 1)
-    }
+    return destination
 }
 
 RabbitLog(text) {

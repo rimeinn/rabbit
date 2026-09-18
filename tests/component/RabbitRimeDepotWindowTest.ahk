@@ -28,10 +28,19 @@ RabbitRimeDepotWindowTestMain() {
     RunTest("Rabbit Depot loads catalog and filters hierarchy", RabbitRimeDepotWindowCatalogTest.Bind())
     RunTest("Rabbit Depot forwards a direct-install request", RabbitRimeDepotWindowDirectTest.Bind())
     RunTest("Rabbit Depot keeps RPPI and direct installs separate", RabbitRimeDepotWindowRppiInstallTest.Bind())
+    RunTest("Rabbit Depot cleans misplaced configs before refreshing", RabbitRimeDepotWindowCleanupCallbackTest.Bind())
     RunTest("Rabbit Depot cancels and ignores stale callbacks", RabbitRimeDepotWindowLifecycleTest.Bind())
     RunTest("Rabbit Depot uses compact mode geometry", RabbitRimeDepotWindowGeometryTest.Bind())
     RunTest("Rabbit Depot opens with the real dark theme controller", RabbitRimeDepotWindowDarkThemeTest.Bind())
     ExitApp(0)
+}
+
+RabbitRimeDepotWindowCleanupCallbackTest() {
+    local events := [], owner := RabbitRimeDepotWindowInstallOwnerProbe(events)
+    local callback := RabbitRimeDepotInstallCallback(owner, (*) => events.Push("cleanup"))
+    AssertTrue(callback.Call(), "The install callback did not return the switcher refresh result.")
+    AssertEqual("cleanup,refresh", RabbitRimeDepotWindowJoin(events, ","),
+        "The install callback did not clean misplaced configs before refreshing schemes.")
 }
 
 RabbitRimeDepotWindowConstructionTest() {
@@ -52,6 +61,8 @@ RabbitRimeDepotWindowConstructionTest() {
             "The accepted proxy was not forwarded to the service config.")
         AssertTrue(window.service.Config.UseGit && window.service.Config.GitPath = "C:\\Tools\\git.exe",
             "The accepted Git settings were not forwarded to the service config.")
+        AssertTrue(window.install_callback is RabbitRimeDepotInstallCallback,
+            "The Rabbit-owned Depot window did not install the misplaced-config cleanup callback.")
         AssertTrue(expected_ini != "" && !FileExist(expected_ini) && !DirExist(expected_ini),
             "The service did not receive a non-existent sentinel INI path.")
         AssertTrue(!HasProp(window, "settings_group") && !HasProp(window, "rppi_url_edit")
@@ -666,5 +677,16 @@ class RabbitRimeDepotWindowOwnerProbe {
 
     SetRimeDepotBusy(busy) {
         this.busy := !!busy
+    }
+}
+
+class RabbitRimeDepotWindowInstallOwnerProbe {
+    __New(events) {
+        this.events := events
+    }
+
+    RefreshSwitcherAfterRimeDepotInstall() {
+        this.events.Push("refresh")
+        return true
     }
 }

@@ -56,7 +56,7 @@ class RabbitRimeDepotWindow extends Gui {
             owner,
             service,
             settings,
-            ObjBindMethod(owner, "RefreshSwitcherAfterRimeDepotInstall")
+            RabbitRimeDepotInstallCallback(owner)
         )
     }
 
@@ -1348,5 +1348,18 @@ class RabbitRimeDepotWindow extends Gui {
         this.complete_callback := 0
         this.error_callback := 0
         try this.Destroy()
+    }
+}
+
+/** Keep Rabbit-owned shared configuration authoritative after a Depot install. */
+class RabbitRimeDepotInstallCallback {
+    __New(owner, cleanup_callback := RabbitCleanMisplacedConfigs) {
+        this.owner := owner
+        this.cleanup_callback := cleanup_callback
+    }
+
+    Call() {
+        this.cleanup_callback.Call()
+        return this.owner.RefreshSwitcherAfterRimeDepotInstall()
     }
 }
