@@ -6,6 +6,10 @@
 
 一个方案通常包含 `schema.yaml`、词典和其他资源。玉兔毫的窗口和交互设置不应写入方案逻辑，而应写入用户目录中的 `rabbit.custom.yaml`。
 
+方案作者不要在方案中提供 `default.yaml` 或 `rabbit.yaml`。这两个完整配置分别由 librime 和玉兔毫维护，会影响所有方案；
+确需修改全局默认设置时，应按补丁方式提供或指导用户创建 `default.custom.yaml`、`rabbit.custom.yaml`，不要复制、覆盖完整配置。
+通过玉兔毫下载方案时，误装入用户目录的 `default.yaml` 和 `rabbit.yaml` 会被重命名为带时间戳的备份，不会参与部署。
+
 方案可以提供 `schema/name`、`schema/schema_id`、`schema/icon` 等元数据；用户是否启用它，则由玉兔毫的方案选单设置决定。
 
 ## 前端专属设置
