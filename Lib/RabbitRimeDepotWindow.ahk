@@ -247,27 +247,15 @@ class RabbitRimeDepotWindow extends Gui {
         )
 
         this.direct_group := this.AddGroupBox(
-            "x12 y62 w1016 h220",
+            "x12 y62 w1016 h180",
             RabbitI18n.Text("depot.direct_source")
         )
         this.direct_source_label := this.AddText("x28 y94 w64 h24 +0x200", RabbitI18n.Text("depot.source"))
         this.direct_source_edit := this.AddEdit("x98 y90 w912 r1 -Multi")
-        this.direct_ref_kind_label := this.AddText("x28 y134 w64 h24 +0x200", RabbitI18n.Text("depot.ref_kind"))
-        this.direct_ref_kind := this.AddDropDownList(
-            "x98 y130 w180 R4 Choose1",
-            [
-                RabbitI18n.Text("depot.ref_default"),
-                RabbitI18n.Text("depot.ref_branch"),
-                RabbitI18n.Text("depot.ref_tag"),
-                RabbitI18n.Text("depot.ref_commit"),
-            ]
-        )
-        this.direct_ref_label := this.AddText("x298 y134 w40 h24 +0x200", RabbitI18n.Text("depot.ref"))
-        this.direct_ref_edit := this.AddEdit("x344 y130 w666 r1 -Multi")
-        this.direct_recipe_label := this.AddText("x28 y174 w64 h24 +0x200", RabbitI18n.Text("depot.recipe"))
-        this.direct_recipe_edit := this.AddEdit("x98 y170 w912 r1 -Multi")
+        this.direct_ref_label := this.AddText("x28 y134 w64 h24 +0x200", RabbitI18n.Text("depot.ref"))
+        this.direct_ref_edit := this.AddEdit("x98 y130 w912 r1 -Multi")
         this.direct_hint := this.AddText(
-            "x28 y208 w982 h42 cGray",
+            "x28 y168 w982 h48 cGray",
             RabbitI18n.Text("depot.direct_hint")
         )
 
@@ -307,12 +295,8 @@ class RabbitRimeDepotWindow extends Gui {
             this.direct_group,
             this.direct_source_label,
             this.direct_source_edit,
-            this.direct_ref_kind_label,
-            this.direct_ref_kind,
             this.direct_ref_label,
             this.direct_ref_edit,
-            this.direct_recipe_label,
-            this.direct_recipe_edit,
             this.direct_hint,
         ]
 
@@ -614,7 +598,7 @@ class RabbitRimeDepotWindow extends Gui {
             ))
             callbacks := this.CreateCallbacks(token, "install")
             this.SetBusy(true)
-            job := this.service.InstallEntry(entry, this.OperationOptions(false), callbacks)
+            job := this.service.InstallEntry(entry, callbacks)
             if !IsObject(job) {
                 throw Error(RabbitI18n.Text("depot.job_missing"))
             }
@@ -636,8 +620,8 @@ class RabbitRimeDepotWindow extends Gui {
     }
 
     InstallDirect() {
-        local source := Trim(this.direct_source_edit.Value), kind_index, kind, ref, recipe
-        local target, token, callbacks, job
+        local source := Trim(this.direct_source_edit.Value), ref := Trim(this.direct_ref_edit.Value)
+        local request, token, callbacks, job
         if this.disposed || this.busy || this.host_busy {
             return false
         }
@@ -645,27 +629,13 @@ class RabbitRimeDepotWindow extends Gui {
             this.SetStatus(RabbitI18n.Text("depot.source_required"), true)
             return false
         }
-        kind_index := this.direct_ref_kind.Value
-        kind := ["default", "branch", "tag", "sha"][kind_index]
-        ref := Trim(this.direct_ref_edit.Value)
-        recipe := Trim(this.direct_recipe_edit.Value)
-        if kind = "default" && ref != "" {
-            this.SetStatus(RabbitI18n.Text("depot.ref_kind_required"), true)
-            return false
-        }
-        if kind != "default" && ref = "" {
-            this.SetStatus(RabbitI18n.Text("depot.ref_required"), true)
-            return false
-        }
-        target := Map("repo", source, "ref_kind", kind)
-        if ref != "" {
-            target["ref"] := ref
-        }
-        if recipe != "" {
-            target["recipe"] := recipe
-        }
+        request := Map(
+            "locator", source,
+            "ref", ref,
+            "transport", this.settings.use_git ? "git" : "archive"
+        )
         try {
-            RimeDepotTarget(target)
+            RimeDepotDirectInstallRequest(request)
             token := ++this.operation_token
             this.active_kind := "install"
             this.SetProgressMarquee(true)
@@ -673,7 +643,7 @@ class RabbitRimeDepotWindow extends Gui {
             this.SetStatus(RabbitI18n.Text("depot.installing_direct"))
             callbacks := this.CreateCallbacks(token, "install")
             this.SetBusy(true)
-            job := this.service.InstallTarget(target, this.OperationOptions(!!this.settings.use_git), callbacks)
+            job := this.service.InstallDirect(request, callbacks)
             if !IsObject(job) {
                 throw Error(RabbitI18n.Text("depot.job_missing"))
             }

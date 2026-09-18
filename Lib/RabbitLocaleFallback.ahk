@@ -668,7 +668,7 @@ class RabbitLocaleFallback {
         catalog["depot.ref_tag"] := "标签"
         catalog["depot.ref_commit"] := "提交"
         catalog["depot.recipe"] := "配方"
-        catalog["depot.direct_hint"] := "直接安装不会自动部署；完成后请返回 Rabbit 设置并应用、重新部署。"
+        catalog["depot.direct_hint"] := "粘贴 GitHub 仓库或 recipe 链接；版本可留空。仓库安装只检查根目录 recipe.yaml。安装后请返回设置并重新部署。"
         catalog["depot.ready"] := "就绪"
         catalog["depot.loading"] := "正在加载 RPPI 索引…"
         catalog["depot.refreshing"] := "正在刷新 RPPI 索引…"

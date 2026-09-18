@@ -26,8 +26,8 @@ RabbitRimeDepotWindowTestMain() {
     RunTest("Rabbit Depot treats case-only RPPI URL changes as stale", RabbitRimeDepotWindowCaseSensitiveUrlTest.Bind())
     RunTest("Rabbit Depot rejects reconfiguration while busy", RabbitRimeDepotWindowBusySettingsTest.Bind())
     RunTest("Rabbit Depot loads catalog and filters hierarchy", RabbitRimeDepotWindowCatalogTest.Bind())
-    RunTest("Rabbit Depot forwards six direct-install options", RabbitRimeDepotWindowDirectTest.Bind())
-    RunTest("Rabbit Depot forces archive installs away from Git", RabbitRimeDepotWindowRppiInstallTest.Bind())
+    RunTest("Rabbit Depot forwards a direct-install request", RabbitRimeDepotWindowDirectTest.Bind())
+    RunTest("Rabbit Depot keeps RPPI and direct installs separate", RabbitRimeDepotWindowRppiInstallTest.Bind())
     RunTest("Rabbit Depot cancels and ignores stale callbacks", RabbitRimeDepotWindowLifecycleTest.Bind())
     RunTest("Rabbit Depot uses compact mode geometry", RabbitRimeDepotWindowGeometryTest.Bind())
     RunTest("Rabbit Depot opens with the real dark theme controller", RabbitRimeDepotWindowDarkThemeTest.Bind())
@@ -239,27 +239,23 @@ RabbitRimeDepotWindowDirectTest() {
         ObjBindMethod(owner, "RefreshSwitcherAfterRimeDepotInstall"),
         RabbitRimeDepotWindowTestTheme
     )
-    local call, target, options, job
+    local call, request, job
     try {
         AssertTrue(window.SetMode("direct"), "The window did not switch to direct mode.")
         window.direct_source_edit.Value := "https://github.com/example/direct"
-        window.direct_ref_kind.Choose(2)
         window.direct_ref_edit.Value := "feature/rppi"
-        window.direct_recipe_edit.Value := "custom"
         AssertTrue(window.InstallSelected(), "The direct install job did not start.")
         call := service.calls[service.calls.Length]
-        target := call["target"]
-        options := call["options"]
-        AssertTrue(target is Map && target["repo"] = "https://github.com/example/direct"
-            && target["ref_kind"] = "branch" && target["ref"] = "feature/rppi"
-            && target["recipe"] = "custom",
-            "The direct install did not pass a structured target.")
-        AssertTrue(options.Count = 6 && options["UseGit"] && options["Proxy"] = "http://proxy.invalid:3128"
-            && options["GitPath"] = "C:\\Tools\\git.exe"
-            && options["RppiIndexUrl"] = "https://example.invalid/index.json"
-            && options["CachePath"] = RimeDepotUtil.JoinPath(RabbitUserDataPath(), "depot")
-            && options["RimeDirectory"] = RabbitUserDataPath(),
-            "The direct install did not forward the complete six-option map.")
+        request := call["request"]
+        AssertTrue(request is Map && request["locator"] = "https://github.com/example/direct"
+            && request["ref"] = "feature/rppi" && request["transport"] = "git",
+            "The direct install did not pass a structured request.")
+        AssertTrue(service.Config.UseGit && service.Config.Proxy = "http://proxy.invalid:3128"
+            && service.Config.GitPath = "C:\\Tools\\git.exe"
+            && service.Config.RppiIndexUrl = "https://example.invalid/index.json"
+            && service.Config.CachePath = RimeDepotUtil.JoinPath(RabbitUserDataPath(), "depot")
+            && service.Config.RimeDirectory = RabbitUserDataPath(),
+            "The direct install did not retain the configured service paths and transport settings.")
         job := service.last_job
         job.callbacks.ReportProgress(job, Map("phase", "recipe", "state", "downloading"))
         AssertTrue(RabbitRimeDepotWindowProgressHasMarquee(window.progress_bar)
@@ -298,9 +294,6 @@ RabbitRimeDepotWindowRppiInstallTest() {
         AssertTrue(window.InstallSelected(), "The RPPI install job did not start.")
         call := service.calls[service.calls.Length]
         AssertEqual("entry", call["kind"], "RPPI mode called direct install.")
-        AssertTrue(call["options"].Count = 6 && !call["options"]["UseGit"]
-            && call["options"]["Proxy"] = "http://proxy.invalid:8080",
-            "RPPI mode did not force archive install while forwarding all options.")
         job := service.last_job
         job.DeliverInstall()
         AssertTrue(owner.refresh_count = 1 && !owner.busy,
@@ -360,8 +353,8 @@ RabbitRimeDepotWindowGeometryTest() {
         RabbitRimeDepotWindowTestTheme
     )
     local x, y, width, height, direct_height, rppi_height
-    local mode_closed_height, category_closed_height, ref_closed_height
-    local mode_popup_height, category_popup_height, ref_popup_height
+    local mode_closed_height, category_closed_height
+    local mode_popup_height, category_popup_height
     try {
         window.initial_load_started := true
         window.Show("Hide")
@@ -380,10 +373,6 @@ RabbitRimeDepotWindowGeometryTest() {
         window.GetClientPos(&x, &y, &width, &direct_height)
         AssertTrue(direct_height < rppi_height && direct_height <= 350,
             "Direct mode did not compact the package window.")
-        window.direct_ref_kind.GetPos(&x, &y, &width, &ref_closed_height)
-        ref_popup_height := RabbitRimeDepotWindowDropdownHeight(window.direct_ref_kind)
-        AssertTrue(ref_popup_height > mode_popup_height && ref_popup_height > ref_closed_height,
-            "The Direct ref-kind drop-down height did not reflect its R4 row setting.")
         window.direct_source_edit.GetPos(&x, &y, &width, &height)
         AssertTrue(y >= 90, "The Direct source field overlaps its group title.")
         window.install_button.GetPos(&x, &y, &width, &height)
@@ -546,14 +535,14 @@ class RabbitRimeDepotWindowFakeService {
         return this.LoadCatalog(options, callbacks)
     }
 
-    InstallEntry(entry, options, callbacks) {
-        this.calls.Push(Map("kind", "entry", "entry", entry, "options", RabbitRimeDepotWindowCopy(options)))
+    InstallEntry(entry, callbacks) {
+        this.calls.Push(Map("kind", "entry", "entry", entry))
         this.last_job := RabbitRimeDepotWindowFakeJob(callbacks, "install")
         return this.last_job
     }
 
-    InstallTarget(target, options, callbacks) {
-        this.calls.Push(Map("kind", "target", "target", target, "options", RabbitRimeDepotWindowCopy(options)))
+    InstallDirect(request, callbacks) {
+        this.calls.Push(Map("kind", "direct", "request", RabbitRimeDepotWindowCopy(request)))
         this.last_job := RabbitRimeDepotWindowFakeJob(callbacks, "install")
         return this.last_job
     }
