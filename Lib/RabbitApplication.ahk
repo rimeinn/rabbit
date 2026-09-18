@@ -181,7 +181,11 @@ class RabbitApplication {
                     ? args[1]
                     : RabbitDeploymentPlan.FullRedeploy()
                 local completion_callback := args.Length >= 2 ? args[2] : 0
-                return this.coordinator.Submit(plan, completion_callback)
+                local accepted := this.coordinator.Submit(plan, completion_callback)
+                if accepted && !plan.IsEmpty() {
+                    this.ShowMaintenanceIndicator()
+                }
+                return accepted
             case "sync":
                 return this.coordinator.SubmitSync(args.Length ? args[1] : 0)
             case "dictionary":
@@ -207,13 +211,40 @@ class RabbitApplication {
 
     OnMaintenanceComplete(result, resumed) {
         if !resumed {
+            this.ShowMaintenanceResult(result, resumed)
+            return
+        }
+        this.EnsureIpcServer()
+        this.RestoreTrayAfterMaintenance()
+        this.ShowMaintenanceResult(result, resumed)
+    }
+
+    ShowMaintenanceIndicator() {
+        if this.tray {
+            this.tray.last_icon_key := ""
+        }
+        RabbitUpdateMaintenanceTrayIcon()
+        TrayTip()
+        TrayTip(RabbitI18n.Text("frontend.maintenance"), RabbitI18n.Text("settings.product"))
+    }
+
+    RestoreTrayAfterMaintenance() {
+        if !this.tray || !this.runtime || !this.runtime.started {
+            return
+        }
+        this.tray.last_icon_key := ""
+        this.tray.UpdateTip()
+        this.tray.UpdateIcon()
+    }
+
+    ShowMaintenanceResult(result, resumed) {
+        if !resumed {
             TrayTip(
                 RabbitI18n.Text("frontend.session_error"),
                 RabbitI18n.Text("settings.product")
             )
             return
         }
-        this.EnsureIpcServer()
         TrayTip(
             RabbitI18n.Text(result = 0 ? "frontend.maintenance_done" : "frontend.maintenance_failed", Map(
                 "detail", result,

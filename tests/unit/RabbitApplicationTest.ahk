@@ -25,6 +25,8 @@ RunTest("tray routes unified settings", TestTrayRoutesUnifiedSettings.Bind())
 RunTest("tray routes legacy settings", TestTrayRoutesLegacySettings.Bind())
 RunTest("first install uses platform settings", TestFirstInstallUsesPlatformSettings.Bind())
 RunTest("frontend startup waits for deployment ownership", TestFrontendStartupWaitsForDeploymentOwnership.Bind())
+RunTest("accepted deployment shows maintenance indicator", TestDeploymentShowsMaintenanceIndicator.Bind())
+RunTest("maintenance completion restores tray after runtime resumes", TestMaintenanceCompletionRestoresTray.Bind())
 
 TestDeployerLaunchAfterShutdown() {
     local calls := []
@@ -141,6 +143,56 @@ TestFirstInstallUsesPlatformSettings() {
     )
 }
 
+TestDeploymentShowsMaintenanceIndicator() {
+    local calls := []
+    local application := RabbitApplicationMaintenanceProbe(calls)
+    application.coordinator := RabbitApplicationCoordinatorProbe(calls, true)
+
+    AssertTrue(
+        application.SubmitMaintenance("deploy", RabbitDeploymentPlan.FullRedeploy()),
+        "The deployment request was not accepted."
+    )
+    AssertEqual(
+        "submit,indicator",
+        JoinApplicationCalls(calls),
+        "An accepted deployment did not switch the tray to maintenance state."
+    )
+
+    calls := []
+    application := RabbitApplicationMaintenanceProbe(calls)
+    application.coordinator := RabbitApplicationCoordinatorProbe(calls, false)
+    AssertTrue(
+        !application.SubmitMaintenance("deploy", RabbitDeploymentPlan.FullRedeploy()),
+        "A rejected deployment request was reported as accepted."
+    )
+    AssertEqual(
+        "submit",
+        JoinApplicationCalls(calls),
+        "A rejected deployment switched the tray to maintenance state."
+    )
+}
+
+TestMaintenanceCompletionRestoresTray() {
+    local calls := []
+    local application := RabbitApplicationMaintenanceProbe(calls)
+
+    application.OnMaintenanceComplete(0, true)
+    AssertEqual(
+        "ipc,restore,result:0:1",
+        JoinApplicationCalls(calls),
+        "The tray was not restored after the frontend runtime resumed."
+    )
+
+    calls := []
+    application := RabbitApplicationMaintenanceProbe(calls)
+    application.OnMaintenanceComplete(1, false)
+    AssertEqual(
+        "result:1:0",
+        JoinApplicationCalls(calls),
+        "The maintenance indicator was cleared after the frontend failed to resume."
+    )
+}
+
 JoinApplicationArguments(args) {
     local argument, result := ""
     for argument in args {
@@ -193,6 +245,41 @@ class RabbitApplicationInstallProbe extends RabbitApplication {
             all_args.Push(argument)
         }
         this.calls.Push(JoinApplicationArguments(all_args))
+    }
+}
+
+class RabbitApplicationMaintenanceProbe extends RabbitApplication {
+    __New(calls) {
+        super.__New(0)
+        this.calls := calls
+    }
+
+    ShowMaintenanceIndicator() {
+        this.calls.Push("indicator")
+    }
+
+    EnsureIpcServer() {
+        this.calls.Push("ipc")
+    }
+
+    RestoreTrayAfterMaintenance() {
+        this.calls.Push("restore")
+    }
+
+    ShowMaintenanceResult(result, resumed) {
+        this.calls.Push(Format("result:{}:{}", result, resumed))
+    }
+}
+
+class RabbitApplicationCoordinatorProbe {
+    __New(calls, accepted) {
+        this.calls := calls
+        this.accepted := accepted
+    }
+
+    Submit(plan, completion_callback := 0) {
+        this.calls.Push("submit")
+        return this.accepted
     }
 }
 

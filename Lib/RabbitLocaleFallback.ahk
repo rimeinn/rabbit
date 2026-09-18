@@ -242,7 +242,7 @@ class RabbitLocaleFallback {
         catalog["controls.schemes_saved"] := "输入方案设置已保存。"
         catalog["controls.behavior_saved"] := "输入与行为设置已保存。"
         catalog["controls.applications_saved"] := "应用适配设置已保存。"
-        catalog["controls.all_saved"] := "所有更改均已保存并部署。"
+        catalog["controls.all_saved"] := "所有更改均已保存并开始部署…"
         catalog["controls.install_saving"] := "正在保存输入方案并完成首次部署…"
         catalog["controls.install_error"] := "首次部署失败，请重试。"
         catalog["controls.install_done"] := "首次部署完成，其他设置页面已解锁。"
