@@ -86,7 +86,7 @@ CountRuntimeCalls(calls, expected) {
 class RabbitFrontendRuntimeProbe extends RabbitFrontendRuntime {
     __New(rime_api, tray, calls) {
         this.calls := calls
-        super.__New(rime_api, tray, 1033, (*) => 0)
+        super.__New(rime_api, tray, (*) => 0)
     }
 
     CreateTraits() {

@@ -126,7 +126,6 @@ class RabbitWorkerOptions {
 class RabbitApplicationOptions {
     __New() {
         this.maintenance := RABBIT_PARTIAL_MAINTENANCE
-        this.keyboard_layout := 0
     }
 
     static Parse(args) {
@@ -140,11 +139,6 @@ class RabbitApplicationOptions {
                 case "--maintenance":
                     RabbitRequireUniqueOption(seen, argument)
                     options.maintenance := RabbitParseMaintenanceMode(
-                        RabbitRequireOptionValue(args, &index, argument)
-                    )
-                case "--keyboard-layout":
-                    RabbitRequireUniqueOption(seen, argument)
-                    options.keyboard_layout := RabbitParseKeyboardLayout(
                         RabbitRequireOptionValue(args, &index, argument)
                     )
                 default:
@@ -162,8 +156,6 @@ class RabbitDeployerOptions {
         this.target := ""
         this.installing := false
         this.return_to_rabbit := false
-        this.keyboard_layout := 0
-        this.keyboard_layout_provided := false
     }
 
     static Parse(args) {
@@ -181,12 +173,6 @@ class RabbitDeployerOptions {
                 case "--return-to-rabbit":
                     RabbitRequireUniqueOption(seen, argument)
                     options.return_to_rabbit := true
-                case "--keyboard-layout":
-                    RabbitRequireUniqueOption(seen, argument)
-                    options.keyboard_layout := RabbitParseKeyboardLayout(
-                        RabbitRequireOptionValue(args, &index, argument)
-                    )
-                    options.keyboard_layout_provided := true
                 default:
                     if SubStr(argument, 1, 2) = "--" {
                         throw ValueError(RabbitI18n.Text("frontend.cli_deployer", Map("value", argument)))
@@ -235,9 +221,6 @@ class RabbitDeployerOptions {
                 throw ValueError(RabbitI18n.Text("frontend.cli_install_only"))
             }
         }
-        if this.return_to_rabbit && !this.keyboard_layout_provided {
-            throw ValueError(RabbitI18n.Text("frontend.cli_return_layout"))
-        }
     }
 }
 
@@ -280,24 +263,6 @@ RabbitMaintenanceModeName(value) {
         default:
             throw ValueError(RabbitI18n.Text("frontend.cli_invalid_maintenance", Map("value", value)))
     }
-}
-
-RabbitParseKeyboardLayout(value) {
-    local layout
-    try {
-        layout := Number(value)
-    } catch {
-        throw ValueError(RabbitI18n.Text("frontend.cli_layout", Map("value", value)))
-    }
-    if Type(layout) != "Integer" || layout <= 0 {
-        throw ValueError(RabbitI18n.Text("frontend.cli_layout", Map("value", value)))
-    }
-    return layout
-}
-
-RabbitFormatKeyboardLayout(layout) {
-    ; Legacy IME HKLs may be sign-extended; command-line layout IDs use the low 32 bits.
-    return Format("0x{:04X}", layout & 0xffffffff)
 }
 
 RabbitQuoteCommandLineArgument(argument) {

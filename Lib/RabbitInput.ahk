@@ -684,6 +684,11 @@ class RabbitInputController {
                 }
             } else {
                 this.replayed_down[key] := true
+                if !processing_switcher && new_ascii_mode && input_target != RabbitInputTarget.NO
+                    && code >= 0x20 && code <= 0x7E
+                    && !(mask & (KeyDef.mask["Ctrl"] | KeyDef.mask["Alt"] | KeyDef.mask["Win"])) {
+                    this.CloseSystemImeForReplay(foreground_hwnd)
+                }
                 this.ReplayInput(key, mask)
             }
         }
@@ -753,6 +758,34 @@ class RabbitInputController {
             Send(fallback)
         } else {
             SendInput(fallback)
+        }
+    }
+
+    CloseSystemImeForReplay(foreground_hwnd) {
+        static WM_IME_CONTROL := 0x0283
+        static IMC_SETOPENSTATUS := 0x0006
+        static SMTO_ABORTIFHUNG := 0x0002
+        static IME_CONTROL_TIMEOUT_MS := 30
+
+        local windows := RabbitInputTarget.GetThreadWindows(0)
+        if !windows || !windows.focus_hwnd || windows.active_hwnd != foreground_hwnd {
+            return
+        }
+        local ime_hwnd := DllCall("Imm32\ImmGetDefaultIMEWnd", "Ptr", windows.focus_hwnd, "Ptr")
+        if ime_hwnd && this.GetForegroundWindow() = foreground_hwnd {
+            ; Wait for the close request before replaying the first character. A failed
+            ; request still leaves the caller free to replay the key normally.
+            DllCall(
+                "SendMessageTimeoutW",
+                "Ptr", ime_hwnd,
+                "UInt", WM_IME_CONTROL,
+                "UPtr", IMC_SETOPENSTATUS,
+                "Ptr", 0,
+                "UInt", SMTO_ABORTIFHUNG,
+                "UInt", IME_CONTROL_TIMEOUT_MS,
+                "Ptr", 0,
+                "Ptr"
+            )
         }
     }
 

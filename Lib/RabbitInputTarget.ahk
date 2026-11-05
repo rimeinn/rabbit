@@ -63,7 +63,7 @@ class RabbitInputTarget {
     }
 
     static Describe(foreground_hwnd) {
-        local thread_id, gui_info, active_hwnd, focus_hwnd, target_hwnd
+        local thread_id, active_hwnd, focus_hwnd, target_hwnd
         local process_id := 0
         if !foreground_hwnd {
             return 0
@@ -79,15 +79,13 @@ class RabbitInputTarget {
             return 0
         }
 
-        local buffer_size := 8 + A_PtrSize * 6 + 16
-        gui_info := Buffer(buffer_size, 0)
-        NumPut("UInt", buffer_size, gui_info, 0)
-        if !DllCall("GetGUIThreadInfo", "UInt", thread_id, "Ptr", gui_info.Ptr, "Int") {
+        local windows := this.GetThreadWindows(thread_id)
+        if !windows {
             return 0
         }
 
-        active_hwnd := NumGet(gui_info, 8, "Ptr")
-        focus_hwnd := NumGet(gui_info, 8 + A_PtrSize, "Ptr")
+        active_hwnd := windows.active_hwnd
+        focus_hwnd := windows.focus_hwnd
         target_hwnd := focus_hwnd ? focus_hwnd : active_hwnd
         if !target_hwnd {
             return 0
@@ -108,6 +106,19 @@ class RabbitInputTarget {
             process_name: StrLower(process_name),
             focus_classes: this.GetClassChain(target_hwnd),
             active_classes: active_hwnd ? this.GetClassChain(active_hwnd) : []
+        }
+    }
+
+    static GetThreadWindows(thread_id) {
+        local buffer_size := 8 + A_PtrSize * 6 + 16
+        local gui_info := Buffer(buffer_size, 0)
+        NumPut("UInt", buffer_size, gui_info, 0)
+        if !DllCall("GetGUIThreadInfo", "UInt", thread_id, "Ptr", gui_info, "Int") {
+            return 0
+        }
+        return {
+            active_hwnd: NumGet(gui_info, 8, "Ptr"),
+            focus_hwnd: NumGet(gui_info, 8 + A_PtrSize, "Ptr")
         }
     }
 

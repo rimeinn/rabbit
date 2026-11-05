@@ -32,6 +32,7 @@ RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind
 RunTest("Caps Lock ASCII switch registration", TestCapsLockAsciiSwitchRegistration.Bind())
 RunTest("Caps Lock forwards its lock state", TestCapsLockRimeMask.Bind())
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
+RunTest("ASCII character replay closes the system IME", TestAsciiCharacterReplayClosesSystemIme.Bind())
 RunTest("up replay pairs with a replayed down", TestUpReplayPairsWithReplayedDown.Bind())
 RunTest("up is not replayed when down was handled", TestUpNotReplayedWhenDownHandled.Bind())
 RunTest("pass-through keys do not set replay marks", TestPassThroughKeyNotMarked.Bind())
@@ -1065,6 +1066,35 @@ class RabbitPasswordBypassControllerProbe extends RabbitInputController {
     }
 }
 
+TestAsciiCharacterReplayClosesSystemIme() {
+    local rime := RabbitKeyReplayRimeProbe([false, false, false, false, false, false, true, false])
+    local target := RabbitInputTargetSwitchProbe(RabbitInputTarget.UNKNOWN)
+    local input := RabbitKeyReplayControllerProbe(
+        rime, RabbitInputCandidateProbe(), RabbitSwitcherStatusRuntimeProbe(), RabbitSwitcherStatusTrayProbe(), target
+    )
+
+    input.ProcessTextKey("h", 0)
+    AssertEqual(0, input.ime_close_requests.Length, "Chinese mode replay closed the system IME.")
+
+    rime.status.is_ascii_mode := true
+    input.ProcessTextKey("H", KeyDef.mask["Shift"])
+    AssertEqual(100, input.ime_close_requests[1], "The close request did not target the foreground window.")
+    AssertEqual(1, input.replayed_keys[2].ime_close_count, "The character was replayed before closing the IME.")
+
+    input.ProcessTextKey("H", KeyDef.mask["Shift"] | KeyDef.mask["Up"])
+    input.ProcessTextKey("Enter", 0)
+    input.ProcessConfiguredKey("h", KeyDef.mask["Ctrl"])
+    input.ProcessConfiguredKey("h", 0, true)
+    input.ProcessTextKey("h", 0)
+    target.result := RabbitInputTarget.NO
+    input.ProcessTextKey("h", 0)
+    AssertEqual(1, input.ime_close_requests.Length, "An unrelated key closed the system IME.")
+
+    target.result := RabbitInputTarget.YES
+    input.ProcessTextKey("Space", 0)
+    AssertEqual(2, input.ime_close_requests.Length, "An unhandled space did not close the system IME.")
+}
+
 TestUpReplayPairsWithReplayedDown() {
     local rime := RabbitKeyReplayRimeProbe([false, false])
     local candidate_box := RabbitInputCandidateProbe()
@@ -1175,17 +1205,23 @@ class RabbitKeyReplayControllerProbe extends RabbitInputController {
             input_target ? input_target : RabbitInputTargetProbe(RabbitInputTarget.UNKNOWN)
         )
         this.replayed_keys := []
+        this.ime_close_requests := []
     }
 
     GetForegroundWindow() {
         return 100
     }
 
+    CloseSystemImeForReplay(foreground_hwnd) {
+        this.ime_close_requests.Push(foreground_hwnd)
+    }
+
     ReplayInput(key, mask, pass_through := false) {
         this.replayed_keys.Push({
             key: key,
             mask: mask,
-            pass_through: pass_through
+            pass_through: pass_through,
+            ime_close_count: this.ime_close_requests.Length
         })
     }
 }

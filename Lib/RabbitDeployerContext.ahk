@@ -25,7 +25,6 @@ class RabbitDeployerContext {
         this.mutex := mutex_instance ? mutex_instance : RabbitDeploymentMutex()
         this.traits := 0
         this.command := ""
-        this.keyboard_layout := 0
         this.result := 0
         this.maintenance_mode := RABBIT_NO_MAINTENANCE
         this.rime_initialized := false

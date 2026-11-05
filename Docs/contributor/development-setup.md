@@ -51,7 +51,7 @@ AutoHotkey.exe Rabbit.ahk --deployer sync
 
 现代页面标识 `appearance`、`input-schemes`、`behavior`、`applications`、`dictionary`、`maintenance` 和 `about`
 由 `RabbitSettingsController` 在常驻前端内部使用，不再是 `--deployer settings [page]` 命令行参数。
-`--keyboard-layout <数字>` 用于显式传入键盘布局标识；`--install` 与 `--return-to-rabbit` 只用于旧版 Windows
+`--install` 与 `--return-to-rabbit` 用于旧版 Windows
 首次安装和兼容设置的内部进程交接。
 
 命令行解析集中在 `Lib/RabbitCommandLine.ahk`。新增参数时要同步更新普通前端、兼容部署器和 worker 的测试，

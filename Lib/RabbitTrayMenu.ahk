@@ -62,12 +62,10 @@ class RabbitTrayController {
         candidate_box,
         config,
         runtime_state,
-        keyboard_layout,
         settings_callback,
         maintenance_callback,
         status_tip := 0
     ) {
-        this.keyboard_layout := keyboard_layout
         this.settings_callback := settings_callback
         this.maintenance_callback := maintenance_callback
         this.schema_name := ""
@@ -226,14 +224,9 @@ class RabbitTrayController {
     }
 
     StartDeployer(command, args*) {
-        if command = "deploy" || command = "sync" {
-            return this.maintenance_callback.Call(command, args*)
+        if command != "deploy" && command != "sync" {
+            args.Push("--return-to-rabbit")
         }
-        args.Push(
-            "--return-to-rabbit",
-            "--keyboard-layout",
-            RabbitFormatKeyboardLayout(this.keyboard_layout)
-        )
         return this.maintenance_callback.Call(command, args*)
     }
 

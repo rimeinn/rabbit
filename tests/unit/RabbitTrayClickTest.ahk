@@ -34,7 +34,6 @@ TestTrayClickUpdatesAscii() {
         RabbitTrayClickCandidateProbe(calls),
         RabbitConfigSnapshot(Map("show_tips", false)),
         runtime_state,
-        0,
         (*) => 0,
         (*) => 0
     )
@@ -58,7 +57,6 @@ TestTrayClickReleasesStateAfterError() {
         RabbitTrayClickCandidateProbe(calls),
         RabbitConfigSnapshot(Map("show_tips", false)),
         runtime_state,
-        0,
         (*) => 0,
         (*) => 0
     )

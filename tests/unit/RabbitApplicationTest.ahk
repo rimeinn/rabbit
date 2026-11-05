@@ -37,18 +37,11 @@ TestDeployerLaunchAfterShutdown() {
     application.runtime := RabbitApplicationStopProbe(calls)
     application.application_mutex := RabbitApplicationCloseProbe(calls)
 
-    application.RunDeployer(
-        "legacy-settings",
-        "dictionary",
-        "--return-to-rabbit",
-        "--keyboard-layout",
-        "0x0409"
-    )
+    application.RunDeployer("legacy-settings", "dictionary", "--return-to-rabbit")
     application.OnExit("Exit", 1)
 
     AssertEqual(
-        "runtime_stop,close,"
-            . "launch:legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409,exit:1",
+        "runtime_stop,close,launch:legacy-settings:dictionary:--return-to-rabbit,exit:1",
         JoinApplicationCalls(calls),
         "The deployer started before the main application released Rime."
     )
@@ -57,14 +50,14 @@ TestDeployerLaunchAfterShutdown() {
 TestTraySeparatesMaintenance() {
     local calls := []
     local callback := (args*) => calls.Push(JoinApplicationArguments(args))
-    local tray := RabbitTrayController(0, 0, 0, 0, 0, 1033, (*) => 0, callback)
+    local tray := RabbitTrayController(0, 0, 0, 0, 0, (*) => 0, callback)
 
     tray.StartDeployer("deploy")
     tray.StartDeployer("sync")
     tray.StartDeployer("legacy-settings", "dictionary")
 
     AssertEqual(
-        "deploy,sync,legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409",
+        "deploy,sync,legacy-settings:dictionary:--return-to-rabbit",
         JoinApplicationCalls(calls),
         "The tray mixed resident maintenance arguments with the legacy deployer protocol."
     )
@@ -78,7 +71,6 @@ TestTrayRoutesUnifiedSettings() {
         0,
         0,
         0,
-        1033,
         (page_id := "") => calls.Push("settings:" . page_id),
         (*) => calls.Push("maintenance")
     )
@@ -102,7 +94,6 @@ TestTrayRoutesLegacySettings() {
         0,
         0,
         0,
-        1033,
         (*) => calls.Push("settings"),
         (args*) => calls.Push(JoinApplicationArguments(args))
     )
@@ -112,9 +103,7 @@ TestTrayRoutesLegacySettings() {
     tray.StartSettings("maintenance")
 
     AssertEqual(
-        "legacy-settings:--return-to-rabbit:--keyboard-layout:0x0409," .
-            "legacy-settings:dictionary:--return-to-rabbit:--keyboard-layout:0x0409," .
-            "sync",
+        "legacy-settings:--return-to-rabbit,legacy-settings:dictionary:--return-to-rabbit,sync",
         JoinApplicationCalls(calls),
         "The old-Windows tray did not use legacy settings and direct synchronization."
     )
@@ -123,7 +112,6 @@ TestTrayRoutesLegacySettings() {
 TestFirstInstallUsesPlatformSettings() {
     local modern_calls := []
     local modern := RabbitApplicationInstallProbe(modern_calls, false)
-    modern.keyboard_layout := 1033
     modern.settings := RabbitApplicationSettingsProbe(modern_calls)
     modern.RunFirstInstallation()
     AssertEqual(
@@ -134,10 +122,9 @@ TestFirstInstallUsesPlatformSettings() {
 
     local legacy_calls := []
     local legacy := RabbitApplicationInstallProbe(legacy_calls, true)
-    legacy.keyboard_layout := 1033
     legacy.RunFirstInstallation()
     AssertEqual(
-        "legacy-settings:--install:--return-to-rabbit:--keyboard-layout:0x0409",
+        "legacy-settings:--install:--return-to-rabbit",
         JoinApplicationCalls(legacy_calls),
         "Old-Windows first install did not open the legacy settings flow."
     )

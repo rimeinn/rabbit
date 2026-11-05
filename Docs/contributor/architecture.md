@@ -46,7 +46,7 @@ Rabbit.ahk
             -> RabbitAppearanceController
 ```
 
-`RabbitApplication.Run()` 解析维护级别和键盘布局并取得应用互斥体，然后创建设置控制器、托盘、部署协调器，
+`RabbitApplication.Run()` 解析维护级别并取得应用互斥体，然后创建设置控制器、托盘、部署协调器，
 再启动一个 `RabbitFrontendRuntime`。运行时负责初始化 Rime、加载 `rabbit`、`default` 及各输入方案配置，
 并组装候选窗、输入控制器、运行时状态和外观控制器。设置窗口、托盘和部署协调器属于常驻应用，输入运行时则可在
 维护前停止、完成后以新配置重建。

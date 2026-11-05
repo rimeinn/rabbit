@@ -29,7 +29,6 @@ class RabbitApplication {
     __New(rime_api) {
         this.rime := rime_api
         this.application_mutex := RabbitApplicationMutex()
-        this.keyboard_layout := 0
         this.runtime := 0
         this.coordinator := 0
         this.ipc_server := 0
@@ -47,8 +46,6 @@ class RabbitApplication {
         RabbitI18n.LoadStartupConfig(this.rime, RabbitUserDataPath() . "\build\rabbit.yaml")
         A_IconTip := RabbitI18n.Text("tray.maintenance")
         local options := RabbitApplicationOptions.Parse(args)
-        this.keyboard_layout := this.ResolveKeyboardLayout(options.keyboard_layout)
-        this.SetDefaultKeyboard()
         OnExit(this.exit_callback)
         this.exit_registered := true
 
@@ -92,7 +89,6 @@ class RabbitApplication {
             0,
             0,
             0,
-            this.keyboard_layout,
             this.settings.Show.Bind(this.settings),
             this.SubmitMaintenance.Bind(this)
         )
@@ -118,7 +114,6 @@ class RabbitApplication {
         return RabbitFrontendRuntime(
             this.rime,
             this.tray,
-            this.keyboard_layout,
             this.rime_message_callback
         )
     }
@@ -169,7 +164,7 @@ class RabbitApplication {
     }
 
     RunDeployer(command, args*) {
-        this.Shutdown(1)
+        this.Shutdown()
         this.LaunchDeployer(command, args*)
         this.ExitApplication(1)
     }
@@ -282,36 +277,8 @@ class RabbitApplication {
             this.settings.ShowInstallation("input-schemes")
             return false
         }
-        this.RunDeployer(
-            "legacy-settings",
-            "--install",
-            "--return-to-rabbit",
-            "--keyboard-layout",
-            RabbitFormatKeyboardLayout(this.keyboard_layout)
-        )
+        this.RunDeployer("legacy-settings", "--install", "--return-to-rabbit")
         return false
-    }
-
-    ResolveKeyboardLayout(layout := 0) {
-        if layout == 0 {
-            layout := DllCall("GetKeyboardLayout", "UInt", 0, "Ptr")
-        }
-        return layout
-    }
-
-    SetDefaultKeyboard(locale_id := 0x0409) {
-        local lang, WM_INPUTLANGCHANGEREQUEST, HWND_BROADCAST
-        if FileExist(RabbitUserDataPath() . "\.lang") {
-            return
-        }
-        local locale_id_hex := Format("{:08x}", locale_id & 0xffff)
-        lang := DllCall("LoadKeyboardLayout", "Str", locale_id_hex, "Int", 0)
-        PostMessage(
-            WM_INPUTLANGCHANGEREQUEST := 0x0050,
-            0,
-            lang,
-            HWND_BROADCAST := 0xffff
-        )
     }
 
     OnRimeMessage(context_object, session_id, message_type, message_value) {
@@ -335,17 +302,14 @@ class RabbitApplication {
     }
 
     OnExit(reason, code) {
-        this.Shutdown(code)
+        this.Shutdown()
     }
 
-    Shutdown(code := 0) {
+    Shutdown() {
         if this.shutting_down {
             return
         }
         this.shutting_down := true
-        if code == 0 {
-            this.SetDefaultKeyboard(this.keyboard_layout)
-        }
         TrayTip()
         ToolTip(, , , STATUS_TOOLTIP)
         if this.tray_message_registered {

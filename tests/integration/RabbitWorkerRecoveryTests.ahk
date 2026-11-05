@@ -124,7 +124,7 @@ CleanupWorkerRecovery() {
     global worker_recovery_application
     global worker_recovery_pid_path
     if worker_recovery_application {
-        try worker_recovery_application.Shutdown(1)
+        try worker_recovery_application.Shutdown()
         worker_recovery_application := 0
     }
     if worker_recovery_launcher {

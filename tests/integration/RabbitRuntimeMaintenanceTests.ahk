@@ -141,7 +141,7 @@ ReportRuntimeMaintenanceFailure(err) {
         "*"
     )
     if runtime_maintenance_application {
-        try runtime_maintenance_application.Shutdown(1)
+        try runtime_maintenance_application.Shutdown()
     }
     if runtime_maintenance_client {
         try runtime_maintenance_client.Close()

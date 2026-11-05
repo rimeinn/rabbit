@@ -24,33 +24,19 @@ RunTest("entry point routes deployment mode", TestRabbitEntryOptions.Bind())
 RunTest("deployer named command line options", TestDeployerCommandLineOptions.Bind())
 RunTest("worker command line options", TestWorkerCommandLineOptions.Bind())
 RunTest("command line rejects invalid forms", TestCommandLineRejectsInvalidForms.Bind())
-RunTest("keyboard layout handle round trip", TestKeyboardLayoutHandleRoundTrip.Bind())
 RunTest("Windows command line quoting", TestWindowsCommandLineQuoting.Bind())
 
 TestRabbitCommandLineOptions() {
     local defaults := RabbitApplicationOptions.Parse([])
     AssertEqual(RABBIT_PARTIAL_MAINTENANCE, defaults.maintenance, "Rabbit changed its default maintenance mode.")
-    AssertEqual(0, defaults.keyboard_layout, "Rabbit invented a default keyboard layout argument.")
-
-    local options := RabbitApplicationOptions.Parse([
-        "--maintenance",
-        "none",
-        "--keyboard-layout",
-        "0x0409",
-    ])
+    local options := RabbitApplicationOptions.Parse(["--maintenance", "none"])
     AssertEqual(RABBIT_NO_MAINTENANCE, options.maintenance, "Rabbit parsed the wrong maintenance mode.")
-    AssertEqual(0x0409, options.keyboard_layout, "Rabbit parsed the wrong keyboard layout.")
 }
 
 TestRabbitEntryOptions() {
-    local options := RabbitEntryOptions.Parse([
-        "--maintenance",
-        "none",
-        "--keyboard-layout",
-        "0x0409",
-    ])
+    local options := RabbitEntryOptions.Parse(["--maintenance", "none"])
     AssertTrue(!options.is_deployer, "The Rabbit entry point misrouted frontend arguments.")
-    AssertEqual(4, options.application_args.Length, "The Rabbit entry point changed frontend arguments.")
+    AssertEqual(2, options.application_args.Length, "The Rabbit entry point changed frontend arguments.")
     AssertEqual("--maintenance", options.application_args[1], "The Rabbit entry point dropped a frontend option.")
 
     options := RabbitEntryOptions.Parse([
@@ -123,19 +109,14 @@ TestDeployerCommandLineOptions() {
     AssertEqual("settings", defaults.command, "The deployer did not default to unified settings.")
     AssertEqual("", defaults.target, "The deployer mapped its default command to a named page.")
 
-    local options := RabbitDeployerOptions.Parse([
-        "settings",
-        "input-schemes",
-        "--install",
-        "--return-to-rabbit",
-        "--keyboard-layout",
-        "0x0409",
-    ])
-    AssertEqual("settings", options.command, "The deployer parsed the wrong command.")
-    AssertEqual("input-schemes", options.target, "The deployer parsed the wrong page.")
+    local modern := RabbitDeployerOptions.Parse(["settings", "input-schemes", "--install"])
+    AssertEqual("input-schemes", modern.target, "The deployer parsed the wrong page.")
+    AssertTrue(modern.installing, "The deployer omitted install mode for the settings page.")
+
+    local options := RabbitDeployerOptions.Parse(["legacy-settings", "--install", "--return-to-rabbit"])
+    AssertEqual("legacy-settings", options.command, "The deployer parsed the wrong command.")
     AssertTrue(options.installing, "The deployer omitted install mode.")
     AssertTrue(options.return_to_rabbit, "The deployer omitted its return handoff.")
-    AssertEqual(0x0409, options.keyboard_layout, "The deployer parsed the wrong keyboard layout.")
 
     options := RabbitDeployerOptions.Parse(["legacy-settings", "dictionary"])
     AssertEqual("dictionary", options.target, "The deployer rejected the legacy dictionary subcommand.")
@@ -145,7 +126,7 @@ TestCommandLineRejectsInvalidForms() {
     for args in [
         ["--maintenance", "fast"],
         ["--maintenance", "none", "--maintenance", "full"],
-        ["--keyboard-layout"],
+        ["--keyboard-layout", "0x0409"],
         ["obsolete"],
     ] {
         AssertThrows(
@@ -161,34 +142,14 @@ TestCommandLineRejectsInvalidForms() {
         ["settings", "behavior", "--install"],
         ["legacy-settings", "dictionary", "--install"],
         ["deploy", "extra"],
-        ["sync", "--return-to-rabbit"],
-        ["sync", "--keyboard-layout", "0x0409", "--keyboard-layout", "0x0411"],
+        ["legacy-settings", "--return-to-rabbit", "--return-to-rabbit"],
+        ["legacy-settings", "--return-to-rabbit", "--keyboard-layout", "0x0409"],
     ] {
         AssertThrows(
             RabbitDeployerOptions.Parse.Bind(args),
             "RabbitDeployer accepted an invalid command line."
         )
     }
-}
-
-TestKeyboardLayoutHandleRoundTrip() {
-    local sign_extended_layout := 0xE0200804 - 0x100000000
-    local formatted := RabbitFormatKeyboardLayout(sign_extended_layout)
-    AssertEqual(
-        "0xE0200804",
-        formatted,
-        "A sign-extended keyboard layout handle was not normalized for the command line."
-    )
-
-    local options := RabbitApplicationOptions.Parse([
-        "--keyboard-layout",
-        formatted,
-    ])
-    AssertEqual(
-        0xE0200804,
-        options.keyboard_layout,
-        "Rabbit did not preserve a keyboard layout with the high bit set."
-    )
 }
 
 TestWindowsCommandLineQuoting() {

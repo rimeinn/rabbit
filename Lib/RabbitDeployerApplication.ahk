@@ -38,7 +38,6 @@ class RabbitDeployerApplication {
         A_IconTip := RabbitI18n.Text("tray.maintenance")
         local options := this.ParseOptions(args)
         this.context.command := options.command
-        this.context.keyboard_layout := options.keyboard_layout
         OnExit(this.exit_callback)
 
         if options.command = "deploy" || options.command = "sync" {
@@ -107,12 +106,7 @@ class RabbitDeployerApplication {
         } else {
             command_line.Push(A_AhkPath, A_ScriptFullPath)
         }
-        command_line.Push(
-            "--maintenance",
-            RabbitMaintenanceModeName(maintenance_mode),
-            "--keyboard-layout",
-            RabbitFormatKeyboardLayout(this.context.keyboard_layout)
-        )
+        command_line.Push("--maintenance", RabbitMaintenanceModeName(maintenance_mode))
         Run(RabbitBuildCommandLine(command_line))
     }
 

@@ -27,13 +27,11 @@
 #Include RabbitUIStyle.ahk
 
 class RabbitFrontendRuntime {
-    __New(rime_api, tray, keyboard_layout, notification_callback) {
+    __New(rime_api, tray, notification_callback) {
         this.rime := rime_api
         this.tray := tray
-        this.keyboard_layout := keyboard_layout
         this.notification_callback := notification_callback
         this.context := RabbitAppContext(rime_api, 0)
-        this.context.keyboard_layout := keyboard_layout
         this.started := false
         this.stopped := false
     }
@@ -50,12 +48,7 @@ class RabbitFrontendRuntime {
             this.context.rime_initialized := true
 
             RabbitDebug(
-                Format(
-                    "runtime startup: keyboard_layout=0x{:04x} maintenance={} first_run={}",
-                    this.keyboard_layout & 0xffff,
-                    maintenance,
-                    first_run
-                ),
+                Format("runtime startup: maintenance={} first_run={}", maintenance, first_run),
                 Format("RabbitFrontendRuntime.ahk:{}", A_LineNumber)
             )
             if !this.RunStartupMaintenance(maintenance, first_run, first_install_callback) {
