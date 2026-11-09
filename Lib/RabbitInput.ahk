@@ -463,7 +463,7 @@ class RabbitInputController {
     ProcessKey(key, mask, pass_through := false, this_hotkey := "", requires_text_target := false) {
         local check_key, check_code, caps, status, processed, commit, context, good_old_caps_lock
         local candidate_revision, foreground_hwnd, hide_candidate := false
-        local input_target, mygo_editor := 0
+        local input_target, editor := 0, force_direct := false
         local code := 0
         local previous_critical, rime_mask, commit_text := ""
         Loop 5 {
@@ -496,7 +496,7 @@ class RabbitInputController {
             return
         }
         foreground_hwnd := this.GetForegroundWindow()
-        input_target := this.input_target.Classify(foreground_hwnd, &mygo_editor)
+        input_target := this.input_target.Classify(foreground_hwnd, &editor, &force_direct)
         if input_target = RabbitInputTarget.NO {
             ; Serialize the Rime cleanup against other key sequences; the
             ; replay itself stays outside the critical section.
@@ -644,7 +644,7 @@ class RabbitInputController {
         ; Send committed text outside the critical section: SendText and the
         ; clipboard path block (ClipWait) and would hold up all input.
         if commit_text != "" {
-            this.SendCommittedText(commit_text, input_target, !!mygo_editor)
+            this.SendCommittedText(commit_text, input_target, force_direct)
         }
         if this.suspend_hotkey && this.suspend_hotkey_mask
             && (key = this.suspend_hotkey || SubStr(key, 2) = this.suspend_hotkey)
@@ -662,7 +662,7 @@ class RabbitInputController {
                 try {
                     this.UpdateCompositionOwner(context, foreground_hwnd)
                     if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
-                        this.UpdateCandidate(context, candidate_revision, hide_candidate, mygo_editor)
+                        this.UpdateCandidate(context, candidate_revision, hide_candidate, editor)
                     }
                 } finally {
                     this.rime.free_context(context)
@@ -918,16 +918,16 @@ class RabbitInputController {
         }
     }
 
-    UpdateCandidate(context, candidate_revision, hide_candidate, mygo_editor := 0) {
+    UpdateCandidate(context, candidate_revision, hide_candidate, editor := 0) {
         local info, caret_x, caret_y, caret_w, caret_h
         local backup_mouse_ref, mouse_x, mouse_y, placement, start_menu_info, start_menu_caret
         local editor_bounds := 0
         if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
             placement := { mode: "hide" }
         } else {
-            if mygo_editor && HasMethod(this.candidate_box, "BuildFloatingPresentation")
+            if editor && HasMethod(this.candidate_box, "BuildFloatingPresentation")
                 && this.candidate_box.style.floating_preedit {
-                editor_bounds := RabbitGetEditorBounds(mygo_editor)
+                editor_bounds := RabbitGetEditorBounds(editor)
             }
             start_menu_info := RabbitPopupPlacement.GetActiveStartMenuInfo()
             if start_menu_info {

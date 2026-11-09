@@ -49,9 +49,10 @@ class RabbitInputTarget {
     static native_list_view_detector := RabbitNativeListViewDetector()
     static mygo_combo := 0
 
-    static Classify(foreground_hwnd, &mygo_editor := 0) {
-        local result, is_browser, mygo_hwnd
-        mygo_editor := 0
+    static Classify(foreground_hwnd, &editor := 0, &force_direct := false) {
+        local result, is_browser, mygo_hwnd, is_explorer_xaml
+        editor := 0
+        force_direct := false
         if !(descriptor := this.Describe(foreground_hwnd)) {
             this.native_list_view_detector.Reset()
             this.mygo_combo := 0
@@ -59,22 +60,29 @@ class RabbitInputTarget {
         }
         is_browser := this.IsBrowserWindow(descriptor)
         mygo_hwnd := this.IsMyGoSurface(descriptor) ? descriptor.focus_hwnd : 0
+        is_explorer_xaml := this.IsExplorerXamlHost(descriptor)
         if this.mygo_combo && this.mygo_combo.hwnd != mygo_hwnd {
             this.mygo_combo := 0
         }
-        if this.IsWpfWindow(descriptor) || is_browser || mygo_hwnd {
-            local uia_details := this.GetFocusedUIAutomationDetails(descriptor.process_id, is_browser, mygo_hwnd)
+        if this.IsWpfWindow(descriptor) || is_browser || mygo_hwnd || is_explorer_xaml {
+            local uia_details := this.GetFocusedUIAutomationDetails(
+                descriptor.process_id, is_browser, mygo_hwnd, is_explorer_xaml
+            )
             descriptor.uia_control_types := uia_details.control_types
             descriptor.uia_text_editability := uia_details.text_editability
             descriptor.mygo_focus := uia_details.mygo_focus
+            descriptor.explorer_editor := uia_details.explorer_editor
         }
         result := this.ClassifyDescriptor(descriptor)
         if mygo_hwnd {
             local focus := descriptor.mygo_focus
-            mygo_editor := result = this.YES && focus ? focus.element : 0
-            this.mygo_combo := mygo_editor && focus.control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID
-                ? { hwnd: mygo_hwnd, element: mygo_editor }
+            editor := result = this.YES && focus ? focus.element : 0
+            force_direct := !!editor
+            this.mygo_combo := editor && focus.control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID
+                ? { hwnd: mygo_hwnd, element: editor }
                 : 0
+        } else if is_explorer_xaml {
+            editor := descriptor.explorer_editor
         }
         if result != this.UNKNOWN {
             this.native_list_view_detector.Reset()
@@ -149,6 +157,9 @@ class RabbitInputTarget {
         }
         if this.IsMyGoSurface(descriptor) {
             return this.ClassifyMyGo(descriptor)
+        }
+        if descriptor.HasOwnProp("explorer_editor") && descriptor.explorer_editor {
+            return this.YES
         }
         if this.IsWpfTextTarget(descriptor) {
             return this.YES
@@ -232,6 +243,12 @@ class RabbitInputTarget {
             || this.ContainsClass(descriptor.focus_classes, "syslistview32")
     }
 
+    static IsExplorerXamlHost(descriptor) {
+        return descriptor.process_name = "explorer.exe"
+            && this.ContainsClass(descriptor.active_classes, "cabinetwclass")
+            && this.ContainsClass(descriptor.focus_classes, "microsoft.ui.content.desktopchildsitebridge")
+    }
+
     static IsProcessExplorer(descriptor) {
         local process_name := descriptor.process_name
         return (process_name = "procexp.exe"
@@ -290,11 +307,14 @@ class RabbitInputTarget {
         return descriptor.HasOwnProp("uia_control_types") ? descriptor.uia_control_types : []
     }
 
-    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability := false, mygo_hwnd := 0) {
+    static GetFocusedUIAutomationDetails(
+        expected_process_id, inspect_text_editability := false, mygo_hwnd := 0, is_explorer_xaml := false
+    ) {
         local details := {
             control_types: [],
             text_editability: this.UNKNOWN,
-            mygo_focus: 0
+            mygo_focus: 0,
+            explorer_editor: 0
         }
         local uia := this.GetUIAutomation()
         local focused_element, walker, current_element, parent_element
@@ -316,6 +336,10 @@ class RabbitInputTarget {
             }
             if mygo_hwnd {
                 details.mygo_focus := this.GetMyGoFocus(focused_element, uia)
+                return details
+            }
+            if is_explorer_xaml {
+                details.explorer_editor := this.GetExplorerEditor(focused_element)
                 return details
             }
             if inspect_text_editability {
@@ -359,10 +383,20 @@ class RabbitInputTarget {
         return details
     }
 
+    static GetExplorerEditor(element) {
+        local control_type := 0
+        local has_focus := 0
+        ComCall(21, element, "Int*", &control_type) ; CurrentControlType
+        if control_type != this.UIA_EDIT_CONTROL_TYPE_ID {
+            return 0
+        }
+        ComCall(26, element, "Int*", &has_focus) ; CurrentHasKeyboardFocus
+        return has_focus && this.GetEnabledValueEditability(element) = this.YES ? element : 0
+    }
+
     static GetMyGoFocus(element, uia) {
         local has_focus := 0
         local control_type := 0
-        local enabled := 0
         local text_editability := this.UNKNOWN
         local framework_id := Buffer(24, 0)
         try {
@@ -386,10 +420,15 @@ class RabbitInputTarget {
         ; MyGo also exposes selection-only dropdowns as ComboBox. ValuePattern
         ; distinguishes those from comboboxes backed by a text editor.
         if control_type = this.UIA_EDIT_CONTROL_TYPE_ID || control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID {
-            ComCall(28, element, "Int*", &enabled) ; CurrentIsEnabled
-            text_editability := enabled ? this.GetUIAutomationValueEditability(element) : this.NO
+            text_editability := this.GetEnabledValueEditability(element)
         }
         return { control_type: control_type, text_editability: text_editability, element: element }
+    }
+
+    static GetEnabledValueEditability(element) {
+        local enabled := 0
+        ComCall(28, element, "Int*", &enabled) ; CurrentIsEnabled
+        return enabled ? this.GetUIAutomationValueEditability(element) : this.NO
     }
 
     static IsMyGoComboSuggestion(element, uia) {

@@ -21,6 +21,7 @@
 
 RunTest("Explorer file view is a type-ahead target", TestExplorerFileViewIsTypeAhead.Bind())
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())
+RunTest("Explorer XAML editor supplies bounds with the standard commit method", TestExplorerXamlEditor.Bind())
 RunTest("Process Explorer process list is a type-ahead target", TestProcessExplorerListIsTypeAhead.Bind())
 RunTest("Process Explorer edit control remains a text target", TestProcessExplorerEditControlIsYes.Bind())
 RunTest("WPF list is a type-ahead target", TestWpfListIsTypeAhead.Bind())
@@ -78,6 +79,43 @@ TestExplorerEditControlIsYes() {
         )),
         "An Explorer edit control was classified as a non-text target."
     )
+}
+
+TestExplorerXamlEditor() {
+    local target := RabbitExplorerXamlTargetProbe
+    local editor := 0
+    local force_direct := true
+    target.focused_editor := {}
+    AssertEqual(RabbitInputTarget.YES, target.Classify(100, &editor, &force_direct),
+        "The focused Explorer XAML editor was not classified as text.")
+    AssertTrue(editor == target.focused_editor, "The Explorer editor was not returned for placement.")
+    AssertTrue(!force_direct, "An Explorer editor selected the MyGo commit method.")
+
+    target.focused_editor := 0
+    AssertEqual(RabbitInputTarget.UNKNOWN, target.Classify(100, &editor, &force_direct),
+        "An unconfirmed Explorer XAML editor did not retain its fallback classification.")
+    AssertTrue(!editor, "An unconfirmed Explorer target returned an editor for placement.")
+}
+
+class RabbitExplorerXamlTargetProbe extends RabbitInputTarget {
+    static focused_editor := 0
+
+    static Describe(foreground_hwnd) {
+        local descriptor := CreateTargetDescriptor(
+            "explorer.exe",
+            ["inputsitewindowclass", "microsoft.ui.content.desktopchildsitebridge", "cabinetwclass"],
+            ["cabinetwclass"]
+        )
+        descriptor.active_hwnd := foreground_hwnd
+        descriptor.focus_hwnd := foreground_hwnd
+        descriptor.process_id := 1
+        return descriptor
+    }
+
+    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability, mygo_hwnd, is_explorer_xaml) {
+        AssertTrue(is_explorer_xaml && !mygo_hwnd, "The Explorer target requested the wrong UI Automation probe.")
+        return { control_types: [], text_editability: this.UNKNOWN, mygo_focus: 0, explorer_editor: this.focused_editor }
+    }
 }
 
 TestProcessExplorerListIsTypeAhead() {
@@ -508,6 +546,7 @@ TestElectronAppIsUnknown() {
 TestMyGoFocusClassification() {
     local target := RabbitMyGoInputTargetProbe
     local editor := 0
+    local force_direct := false
     local cases := [
         [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID, RabbitInputTarget.YES, RabbitInputTarget.YES, true],
         [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID, RabbitInputTarget.NO, RabbitInputTarget.NO, false],
@@ -521,8 +560,9 @@ TestMyGoFocusClassification() {
     local item
     for item in cases {
         target.focus := { control_type: item[1], text_editability: item[2], element: {} }
-        AssertEqual(item[3], target.Classify(100, &editor), "Unexpected MyGo focus classification.")
+        AssertEqual(item[3], target.Classify(100, &editor, &force_direct), "Unexpected MyGo focus classification.")
         AssertEqual(item[4], !!editor, "Unexpected MyGo editor.")
+        AssertEqual(item[4], force_direct, "Unexpected MyGo commit method.")
     }
     target.focus := 0
     editor := {}
@@ -547,9 +587,9 @@ class RabbitMyGoInputTargetProbe extends RabbitInputTarget {
         return descriptor
     }
 
-    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability := false, mygo_hwnd := 0) {
+    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability, mygo_hwnd, is_explorer_xaml) {
         AssertEqual(100, mygo_hwnd, "The MyGo surface did not request a MyGo UI Automation probe.")
-        return { control_types: [], text_editability: this.UNKNOWN, mygo_focus: this.focus }
+        return { control_types: [], text_editability: this.UNKNOWN, mygo_focus: this.focus, explorer_editor: 0 }
     }
 }
 

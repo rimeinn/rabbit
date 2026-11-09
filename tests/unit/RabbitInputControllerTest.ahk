@@ -41,7 +41,7 @@ RunTest("non-text key-up without a replay mark is safe", TestNoTargetUpWithoutRe
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("candidate placement uses the floating preedit bottom", TestFloatingPreeditCandidatePlacement.Bind())
 RunTest("Start placement forwards upward flow anchoring", TestStartPlacementForwardsUpwardFlow.Bind())
-RunTest("MyGo editor bounds keep floating preedit outside the field", TestMyGoEditorFallbackPlacement.Bind())
+RunTest("editor bounds keep floating preedit outside the field", TestEditorFallbackPlacement.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
@@ -699,7 +699,7 @@ TestStartPlacementForwardsUpwardFlow() {
     AssertTrue(candidate_box.flow_anchor_bottom, "The above-Start popup did not flip flow expansion.")
 }
 
-TestMyGoEditorFallbackPlacement() {
+TestEditorFallbackPlacement() {
     local style := {
         floating_preedit_min_height: 24,
         font_point: 12,
