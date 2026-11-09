@@ -7,7 +7,7 @@ f1:: {
     }
 }
 */
-GetCaretPosEx(&left?, &top?, &right?, &bottom?, useHook := false) {
+GetCaretPosEx(&left?, &top?, &right?, &bottom?, useHook := false, uiaFieldBounds := 0) {
     if getCaretPosFromGui(&hwnd := 0)
         return true
     try
@@ -125,7 +125,7 @@ getRangeInfo:
             ComCall(10, range, "ptr*", &psa) ; range->GetBoundingRectangles(&psa);
             if psa {
                 rects := ComValue(0x2005, psa, 1) ; SafeArray<double>
-                if rects.MaxIndex() >= 3 {
+                if rects.MaxIndex() >= 3 && !isFieldRect(rects) {
                     rects[2] := 0
                     goto end
                 }
@@ -136,7 +136,7 @@ getRangeInfo:
             ComCall(10, range, "ptr*", &psa) ; range->GetBoundingRectangles(&psa);
             if psa {
                 rects := ComValue(0x2005, psa, 1) ; SafeArray<double>
-                if rects.MaxIndex() >= 3 {
+                if rects.MaxIndex() >= 3 && !isFieldRect(rects) {
                     ; Here rects is {x, y, w, h}, we take the end endpoint as the caret position.
                     rects[0] := rects[0] + rects[2]
                     rects[2] := 0
@@ -152,6 +152,16 @@ end:
             return true
         }
         return false
+    }
+
+    isFieldRect(rects) {
+        ; Some UIA providers report the entire editor even for one character.
+        ; Compare before the range rectangle is collapsed to a caret.
+        return uiaFieldBounds
+            && Abs(rects[0] - uiaFieldBounds.left) < 2
+            && Abs(rects[1] - uiaFieldBounds.top) < 2
+            && Abs(rects[0] + rects[2] - uiaFieldBounds.right) < 2
+            && Abs(rects[1] + rects[3] - uiaFieldBounds.bottom) < 2
     }
 
     getCaretPosFromWpfCaret() {

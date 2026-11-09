@@ -463,7 +463,7 @@ class RabbitInputController {
     ProcessKey(key, mask, pass_through := false, this_hotkey := "", requires_text_target := false) {
         local check_key, check_code, caps, status, processed, commit, context, good_old_caps_lock
         local candidate_revision, foreground_hwnd, hide_candidate := false
-        local input_target
+        local input_target, mygo_editor := 0
         local code := 0
         local previous_critical, rime_mask, commit_text := ""
         Loop 5 {
@@ -496,7 +496,7 @@ class RabbitInputController {
             return
         }
         foreground_hwnd := this.GetForegroundWindow()
-        input_target := this.input_target.Classify(foreground_hwnd)
+        input_target := this.input_target.Classify(foreground_hwnd, &mygo_editor)
         if input_target = RabbitInputTarget.NO {
             ; Serialize the Rime cleanup against other key sequences; the
             ; replay itself stays outside the critical section.
@@ -644,7 +644,7 @@ class RabbitInputController {
         ; Send committed text outside the critical section: SendText and the
         ; clipboard path block (ClipWait) and would hold up all input.
         if commit_text != "" {
-            this.SendCommittedText(commit_text, input_target)
+            this.SendCommittedText(commit_text, input_target, !!mygo_editor)
         }
         if this.suspend_hotkey && this.suspend_hotkey_mask
             && (key = this.suspend_hotkey || SubStr(key, 2) = this.suspend_hotkey)
@@ -662,7 +662,7 @@ class RabbitInputController {
                 try {
                     this.UpdateCompositionOwner(context, foreground_hwnd)
                     if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
-                        this.UpdateCandidate(context, candidate_revision, hide_candidate)
+                        this.UpdateCandidate(context, candidate_revision, hide_candidate, mygo_editor)
                     }
                 } finally {
                     this.rime.free_context(context)
@@ -918,12 +918,17 @@ class RabbitInputController {
         }
     }
 
-    UpdateCandidate(context, candidate_revision, hide_candidate) {
+    UpdateCandidate(context, candidate_revision, hide_candidate, mygo_editor := 0) {
         local info, caret_x, caret_y, caret_w, caret_h
         local backup_mouse_ref, mouse_x, mouse_y, placement, start_menu_info, start_menu_caret
+        local editor_bounds := 0
         if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
             placement := { mode: "hide" }
         } else {
+            if mygo_editor && HasMethod(this.candidate_box, "BuildFloatingPresentation")
+                && this.candidate_box.style.floating_preedit {
+                editor_bounds := RabbitGetEditorBounds(mygo_editor)
+            }
             start_menu_info := RabbitPopupPlacement.GetActiveStartMenuInfo()
             if start_menu_info {
                 info := start_menu_info.monitor_info
@@ -957,7 +962,8 @@ class RabbitInputController {
                 &caret_y,
                 &caret_w,
                 &caret_h,
-                this.config.use_caret_hook
+                this.config.use_caret_hook,
+                editor_bounds
             ) {
                 info := RabbitPopupPlacement.GetWorkAreaAt(caret_x, caret_y)
                 placement := {
@@ -968,6 +974,9 @@ class RabbitInputController {
                     caret_h: caret_h,
                     monitor_info: info
                 }
+            } else if editor_bounds {
+                info := RabbitPopupPlacement.GetWorkAreaAt(editor_bounds.left, editor_bounds.top)
+                placement := this.GetEditorFallbackPlacement(editor_bounds, info)
             } else {
                 backup_mouse_ref := A_CoordModeMouse
                 CoordMode("Mouse", "Screen")
@@ -986,6 +995,26 @@ class RabbitInputController {
             candidate_revision,
             () => this.ApplyCandidateUpdate(context, placement, hide_candidate)
         )
+    }
+
+    GetEditorFallbackPlacement(bounds, monitor_info) {
+        ; Keep the floating window outside the editor when only its UIA bounds are known.
+        local style := this.candidate_box.style
+        local gap := RabbitPopupPlacement.GAP
+        local height := Max(style.floating_preedit_min_height,
+            Ceil(style.font_point * A_ScreenDPI / 72) + 2 * (style.preedit_margin_y + style.preedit_border_width))
+        local y := bounds.bottom + gap
+        if monitor_info && y + height > monitor_info.work.bottom {
+            y := Max(monitor_info.work.top, bounds.top - gap - height)
+        }
+        return {
+            mode: "caret",
+            caret_x: bounds.left,
+            caret_y: y,
+            caret_w: 0,
+            caret_h: height,
+            monitor_info: monitor_info
+        }
     }
 
     ApplyCandidateUpdate(context, placement, hide_candidate) {
@@ -1112,9 +1141,9 @@ class RabbitInputController {
         this.candidate_box.BuildPresentation(presentation, &box_width, &box_height, max_width)
     }
 
-    SendCommittedText(text, input_target) {
-        ; Type-ahead controls interpret text input, not paste.
-        if input_target = RabbitInputTarget.TYPE_AHEAD {
+    SendCommittedText(text, input_target, force_direct := false) {
+        ; Type-ahead controls need text input. MyGo editors do not handle Shift+Insert.
+        if force_direct || input_target = RabbitInputTarget.TYPE_AHEAD {
             this.SendTextDirect(text)
         } else if StrLen(text) >= this.config.send_by_clipboard_length {
             this.SendTextByClipboard(text)

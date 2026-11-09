@@ -32,6 +32,8 @@ RunTest("WPF nested editor takes priority over its list", TestWpfNestedEditorIsY
 RunTest("WPF active window identifies a native child target", TestWpfActiveWindowIdentifiesNativeChild.Bind())
 RunTest("WPF unrecognized control remains unknown", TestWpfUnknownControl.Bind())
 RunTest("UIA list in a non-WPF window remains unknown", TestNonWpfUIAutomationListIsUnknown.Bind())
+RunTest("MyGo returns the editor only for writable text targets", TestMyGoFocusClassification.Bind())
+RunTest("MyGo host alone does not identify a native surface", TestMyGoHostIsUnknown.Bind())
 RunTest("Open With app list is a non-text target", TestOpenWithListIsNo.Bind())
 RunTest("Open With edit control remains a text target", TestOpenWithEditControlIsYes.Bind())
 RunTest("Open With class in another process remains unknown", TestOpenWithClassInAnotherProcessIsUnknown.Bind())
@@ -501,6 +503,54 @@ TestElectronAppIsUnknown() {
         )),
         "An Electron app using Chrome_WidgetWin_1 did not keep the previous behavior."
     )
+}
+
+TestMyGoFocusClassification() {
+    local target := RabbitMyGoInputTargetProbe
+    local editor := 0
+    local cases := [
+        [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID, RabbitInputTarget.YES, RabbitInputTarget.YES, true],
+        [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID, RabbitInputTarget.NO, RabbitInputTarget.NO, false],
+        [RabbitInputTarget.UIA_EDIT_CONTROL_TYPE_ID, RabbitInputTarget.UNKNOWN, RabbitInputTarget.UNKNOWN, false],
+        [RabbitInputTarget.UIA_COMBOBOX_CONTROL_TYPE_ID, RabbitInputTarget.YES, RabbitInputTarget.YES, true],
+        [RabbitInputTarget.UIA_COMBOBOX_CONTROL_TYPE_ID, RabbitInputTarget.NO, RabbitInputTarget.NO, false],
+        [RabbitInputTarget.UIA_BUTTON_CONTROL_TYPE_ID, RabbitInputTarget.UNKNOWN, RabbitInputTarget.NO, false],
+        [RabbitInputTarget.UIA_MENU_ITEM_CONTROL_TYPE_ID, RabbitInputTarget.UNKNOWN, RabbitInputTarget.NO, false],
+        [RabbitInputTarget.UIA_LIST_CONTROL_TYPE_ID, RabbitInputTarget.UNKNOWN, RabbitInputTarget.UNKNOWN, false]
+    ]
+    local item
+    for item in cases {
+        target.focus := { control_type: item[1], text_editability: item[2], element: {} }
+        AssertEqual(item[3], target.Classify(100, &editor), "Unexpected MyGo focus classification.")
+        AssertEqual(item[4], !!editor, "Unexpected MyGo editor.")
+    }
+    target.focus := 0
+    editor := {}
+    AssertEqual(RabbitInputTarget.UNKNOWN, target.Classify(100, &editor), "Missing MyGo focus must stay unknown.")
+    AssertTrue(!editor, "Missing MyGo focus unexpectedly returned an editor.")
+}
+
+TestMyGoHostIsUnknown() {
+    local descriptor := CreateTargetDescriptor("mygo-app.exe", ["chrome_widgetwin_1", "mygowindow"], ["mygowindow"])
+    AssertTrue(!RabbitInputTarget.IsMyGoSurface(descriptor), "A MyGo host was mistaken for a native surface.")
+    AssertEqual(RabbitInputTarget.UNKNOWN, RabbitInputTarget.ClassifyDescriptor(descriptor), "Host must stay unknown.")
+}
+
+class RabbitMyGoInputTargetProbe extends RabbitInputTarget {
+    static focus := 0
+
+    static Describe(foreground_hwnd) {
+        local descriptor := CreateTargetDescriptor("mygo-app.exe", ["mygosurface", "mygowindow"])
+        descriptor.active_hwnd := foreground_hwnd
+        descriptor.focus_hwnd := foreground_hwnd
+        descriptor.process_id := 1
+        return descriptor
+    }
+
+    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability := false, mygo_hwnd := 0) {
+        AssertEqual(100, mygo_hwnd, "The MyGo surface did not request a MyGo UI Automation probe.")
+        return { control_types: [], text_editability: this.UNKNOWN, mygo_focus: this.focus }
+    }
 }
 
 TestUnknownTarget() {

@@ -26,6 +26,7 @@ class RabbitInputTarget {
     static UNKNOWN := "unknown"
 
     static UIA_EDIT_CONTROL_TYPE_ID := 50004
+    static UIA_BUTTON_CONTROL_TYPE_ID := 50000
     static UIA_COMBOBOX_CONTROL_TYPE_ID := 50003
     static UIA_LIST_ITEM_CONTROL_TYPE_ID := 50007
     static UIA_LIST_CONTROL_TYPE_ID := 50008
@@ -35,26 +36,46 @@ class RabbitInputTarget {
     static UIA_DATA_GRID_CONTROL_TYPE_ID := 50028
     static UIA_DATA_ITEM_CONTROL_TYPE_ID := 50029
     static UIA_DOCUMENT_CONTROL_TYPE_ID := 50030
+    static UIA_VALUE_PATTERN_ID := 10002
     static UIA_TEXT_PATTERN_ID := 10014
     static UIA_IS_READONLY_ATTRIBUTE_ID := 40015
+    static UIA_FRAMEWORK_ID_PROPERTY_ID := 30024
     static UIA_VALUE_IS_READONLY_PROPERTY_ID := 30046
+    static UIA_EXPAND_COLLAPSE_STATE_PROPERTY_ID := 30070
+    static VT_I4 := 3
+    static VT_BSTR := 8
     static VT_BOOL := 11
 
     static native_list_view_detector := RabbitNativeListViewDetector()
+    static mygo_combo := 0
 
-    static Classify(foreground_hwnd) {
-        local result, is_browser
+    static Classify(foreground_hwnd, &mygo_editor := 0) {
+        local result, is_browser, mygo_hwnd
+        mygo_editor := 0
         if !(descriptor := this.Describe(foreground_hwnd)) {
             this.native_list_view_detector.Reset()
+            this.mygo_combo := 0
             return this.UNKNOWN
         }
         is_browser := this.IsBrowserWindow(descriptor)
-        if this.IsWpfWindow(descriptor) || is_browser {
-            local uia_details := this.GetFocusedUIAutomationDetails(descriptor.process_id, is_browser)
+        mygo_hwnd := this.IsMyGoSurface(descriptor) ? descriptor.focus_hwnd : 0
+        if this.mygo_combo && this.mygo_combo.hwnd != mygo_hwnd {
+            this.mygo_combo := 0
+        }
+        if this.IsWpfWindow(descriptor) || is_browser || mygo_hwnd {
+            local uia_details := this.GetFocusedUIAutomationDetails(descriptor.process_id, is_browser, mygo_hwnd)
             descriptor.uia_control_types := uia_details.control_types
             descriptor.uia_text_editability := uia_details.text_editability
+            descriptor.mygo_focus := uia_details.mygo_focus
         }
         result := this.ClassifyDescriptor(descriptor)
+        if mygo_hwnd {
+            local focus := descriptor.mygo_focus
+            mygo_editor := result = this.YES && focus ? focus.element : 0
+            this.mygo_combo := mygo_editor && focus.control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID
+                ? { hwnd: mygo_hwnd, element: mygo_editor }
+                : 0
+        }
         if result != this.UNKNOWN {
             this.native_list_view_detector.Reset()
             return result
@@ -125,6 +146,9 @@ class RabbitInputTarget {
     static ClassifyDescriptor(descriptor) {
         if this.ContainsEditableClass(descriptor.focus_classes) {
             return this.YES
+        }
+        if this.IsMyGoSurface(descriptor) {
+            return this.ClassifyMyGo(descriptor)
         }
         if this.IsWpfTextTarget(descriptor) {
             return this.YES
@@ -222,6 +246,24 @@ class RabbitInputTarget {
             || this.ContainsClassPrefix(descriptor.active_classes, "hwndwrapper[")
     }
 
+    static IsMyGoSurface(descriptor) {
+        return this.ContainsClass(descriptor.focus_classes, "mygosurface")
+    }
+
+    static ClassifyMyGo(descriptor) {
+        if !descriptor.HasOwnProp("mygo_focus") || !descriptor.mygo_focus {
+            return this.UNKNOWN
+        }
+        local focus := descriptor.mygo_focus
+        switch focus.control_type {
+            case this.UIA_EDIT_CONTROL_TYPE_ID, this.UIA_COMBOBOX_CONTROL_TYPE_ID:
+                return focus.text_editability
+            case this.UIA_BUTTON_CONTROL_TYPE_ID, this.UIA_MENU_ITEM_CONTROL_TYPE_ID:
+                return this.NO
+        }
+        return this.UNKNOWN
+    }
+
     static IsWpfTextTarget(descriptor) {
         if !this.IsWpfWindow(descriptor) {
             return false
@@ -248,10 +290,11 @@ class RabbitInputTarget {
         return descriptor.HasOwnProp("uia_control_types") ? descriptor.uia_control_types : []
     }
 
-    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability := false) {
+    static GetFocusedUIAutomationDetails(expected_process_id, inspect_text_editability := false, mygo_hwnd := 0) {
         local details := {
             control_types: [],
-            text_editability: this.UNKNOWN
+            text_editability: this.UNKNOWN,
+            mygo_focus: 0
         }
         local uia := this.GetUIAutomation()
         local focused_element, walker, current_element, parent_element
@@ -269,6 +312,10 @@ class RabbitInputTarget {
             process_id := 0
             ComCall(20, focused_element, "Int*", &process_id)
             if process_id != expected_process_id {
+                return details
+            }
+            if mygo_hwnd {
+                details.mygo_focus := this.GetMyGoFocus(focused_element, uia)
                 return details
             }
             if inspect_text_editability {
@@ -310,6 +357,90 @@ class RabbitInputTarget {
             return details
         }
         return details
+    }
+
+    static GetMyGoFocus(element, uia) {
+        local has_focus := 0
+        local control_type := 0
+        local enabled := 0
+        local text_editability := this.UNKNOWN
+        local framework_id := Buffer(24, 0)
+        try {
+            ComCall(10, element, "Int", this.UIA_FRAMEWORK_ID_PROPERTY_ID, "Ptr", framework_id)
+            if NumGet(framework_id, 0, "UShort") != this.VT_BSTR
+                || StrGet(NumGet(framework_id, 8, "Ptr"), "UTF-16") != "MyGo" {
+                return 0
+            }
+        } finally {
+            DllCall("OleAut32\VariantClear", "Ptr", framework_id)
+        }
+        ComCall(26, element, "Int*", &has_focus) ; CurrentHasKeyboardFocus
+        if !has_focus {
+            return 0
+        }
+        ComCall(21, element, "Int*", &control_type) ; CurrentControlType
+        if control_type = this.UIA_LIST_ITEM_CONTROL_TYPE_ID && this.IsMyGoComboSuggestion(element, uia) {
+            element := this.mygo_combo.element
+            control_type := this.UIA_COMBOBOX_CONTROL_TYPE_ID
+        }
+        ; MyGo also exposes selection-only dropdowns as ComboBox. ValuePattern
+        ; distinguishes those from comboboxes backed by a text editor.
+        if control_type = this.UIA_EDIT_CONTROL_TYPE_ID || control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID {
+            ComCall(28, element, "Int*", &enabled) ; CurrentIsEnabled
+            text_editability := enabled ? this.GetUIAutomationValueEditability(element) : this.NO
+        }
+        return { control_type: control_type, text_editability: text_editability, element: element }
+    }
+
+    static IsMyGoComboSuggestion(element, uia) {
+        ; MyGo moves UIA focus to the highlighted option while keyboard input
+        ; stays in the combo. Its provider does not expose an owner relation.
+        if !this.mygo_combo {
+            return false
+        }
+        local state := Buffer(24, 0)
+        try {
+            ComCall(11, this.mygo_combo.element, "Int", this.UIA_EXPAND_COLLAPSE_STATE_PROPERTY_ID,
+                "Int", true, "Ptr", state)
+            if NumGet(state, 0, "UShort") != this.VT_I4 || NumGet(state, 8, "Int") != 1 {
+                return false
+            }
+        } finally {
+            DllCall("OleAut32\VariantClear", "Ptr", state)
+        }
+        local walker := ComValue(13, 0)
+        local parent := ComValue(13, 0)
+        local control_type := 0
+        ComCall(16, uia, "Ptr*", walker) ; RawViewWalker
+        if walker.Ptr {
+            ComCall(3, walker, "Ptr", element, "Ptr*", parent)
+        }
+        if parent.Ptr {
+            ComCall(21, parent, "Int*", &control_type)
+        }
+        return control_type = this.UIA_LIST_CONTROL_TYPE_ID
+    }
+
+    static GetUIAutomationValueEditability(element) {
+        static iid := 0
+        if !iid {
+            iid := Buffer(16, 0)
+            DllCall(
+                "Ole32\CLSIDFromString",
+                "WStr",
+                "{A94CD8B1-0844-4CD6-9D2D-640537AB39E9}",
+                "Ptr",
+                iid
+            )
+        }
+        local value_pattern := ComValue(13, 0)
+        local read_only := 0
+        ComCall(14, element, "Int", this.UIA_VALUE_PATTERN_ID, "Ptr", iid, "Ptr*", value_pattern)
+        if !value_pattern.Ptr {
+            return this.UNKNOWN
+        }
+        ComCall(5, value_pattern, "Int*", &read_only) ; CurrentIsReadOnly
+        return read_only ? this.NO : this.YES
     }
 
     static GetUIAutomationTextEditability(element) {

@@ -41,11 +41,13 @@ RunTest("non-text key-up without a replay mark is safe", TestNoTargetUpWithoutRe
 RunTest("latest candidate update ordering", TestLatestCandidateUpdateOrdering.Bind())
 RunTest("candidate placement uses the floating preedit bottom", TestFloatingPreeditCandidatePlacement.Bind())
 RunTest("Start placement forwards upward flow anchoring", TestStartPlacementForwardsUpwardFlow.Bind())
+RunTest("MyGo editor bounds keep floating preedit outside the field", TestMyGoEditorFallbackPlacement.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
 RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
 RunTest("type-ahead target uses Rime input", TestTypeAheadTargetUsesRimeInput.Bind())
 RunTest("type-ahead commit always uses SendText", TestTypeAheadCommitAlwaysUsesSendText.Bind())
+RunTest("long MyGo editor commit uses SendText", TestLongMyGoCommitUsesSendText.Bind())
 RunTest("long editable commit uses clipboard", TestLongEditableCommitUsesClipboard.Bind())
 RunTest("switcher temporary schema preserves mode baseline", TestSwitcherTemporarySchemaPreservesModeBaseline.Bind())
 RunTest("switcher ASCII selection shows mode status", TestSwitcherAsciiSelectionShowsModeStatus.Bind())
@@ -697,6 +699,25 @@ TestStartPlacementForwardsUpwardFlow() {
     AssertTrue(candidate_box.flow_anchor_bottom, "The above-Start popup did not flip flow expansion.")
 }
 
+TestMyGoEditorFallbackPlacement() {
+    local style := {
+        floating_preedit_min_height: 24,
+        font_point: 12,
+        preedit_margin_y: 8,
+        preedit_border_width: 1
+    }
+    local input := RabbitInputController({}, 1, { style: style }, RabbitConfigSnapshot(), {}, {})
+    local gap := RabbitPopupPlacement.GAP
+    local bounds := { left: 100, top: 200, right: 500, bottom: 220 }
+    local height := Max(24, Ceil(12 * A_ScreenDPI / 72) + 18)
+    local placement := input.GetEditorFallbackPlacement(bounds, { work: { top: 0, bottom: 400 } })
+    AssertEqual(100, placement.caret_x, "Fallback must align to the field edge.")
+    AssertEqual(220 + gap, placement.caret_y, "Fallback must clear the field below.")
+    AssertEqual(height, placement.caret_h, "Fallback must reserve room for the font and margins.")
+    placement := input.GetEditorFallbackPlacement(bounds, { work: { top: 0, bottom: 230 } })
+    AssertEqual(200 - gap - height, placement.caret_y, "Fallback must clear the field above when space is limited.")
+}
+
 TestTypeAheadTargetUsesRimeInput() {
     local rime := RabbitKeyReplayRimeProbe([true])
     local candidate_box := RabbitInputCandidateProbe()
@@ -725,6 +746,17 @@ TestTypeAheadCommitAlwaysUsesSendText() {
     AssertEqual(1, input.direct_texts.Length, "A long type-ahead commit did not use SendText.")
     AssertEqual(text, input.direct_texts[1], "SendText received the wrong type-ahead commit.")
     AssertEqual(0, input.clipboard_texts.Length, "A type-ahead commit used the clipboard.")
+}
+
+TestLongMyGoCommitUsesSendText() {
+    local input := RabbitCommitSenderProbe(8)
+    local text := "123456789"
+
+    input.SendCommittedText(text, RabbitInputTarget.YES, true)
+
+    AssertEqual(1, input.direct_texts.Length, "A long MyGo commit did not use SendText.")
+    AssertEqual(text, input.direct_texts[1], "SendText received the wrong MyGo commit.")
+    AssertEqual(0, input.clipboard_texts.Length, "A MyGo commit used the clipboard.")
 }
 
 TestLongEditableCommitUsesClipboard() {

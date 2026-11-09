@@ -31,14 +31,14 @@
  * @param W Value is set to the width of the caret
  * @param H Value is set to the height of the caret
  */
-RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?, use_caret_hook := false) {
+RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?, use_caret_hook := false, uia_field_bounds := 0) {
     local left, top, right, bottom
     caret_x := 0
     caret_y := 0
     caret_w := 0
     caret_h := 0
 
-    if GetCaretPosEx(&left, &top, &right, &bottom, use_caret_hook) {
+    if GetCaretPosEx(&left, &top, &right, &bottom, use_caret_hook, uia_field_bounds) {
         if !IsSet(left) || !IsSet(top) || !IsSet(right) || !IsSet(bottom) {
             return RabbitGetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
         }
@@ -58,6 +58,27 @@ RabbitGetCaretPos(&caret_x?, &caret_y?, &caret_w?, &caret_h?, use_caret_hook := 
     }
 
     return RabbitGetBuiltInCaretPos(&caret_x, &caret_y, &caret_w, &caret_h)
+}
+
+RabbitGetEditorBounds(element) {
+    local rect := Buffer(16, 0)
+    local offscreen := 0
+    try {
+        ComCall(38, element, "Int*", &offscreen) ; CurrentIsOffscreen
+        if offscreen {
+            return 0
+        }
+        ComCall(43, element, "Ptr", rect) ; CurrentBoundingRectangle
+    } catch {
+        return 0
+    }
+    local bounds := {
+        left: NumGet(rect, 0, "Int"),
+        top: NumGet(rect, 4, "Int"),
+        right: NumGet(rect, 8, "Int"),
+        bottom: NumGet(rect, 12, "Int")
+    }
+    return bounds.right > bounds.left && bounds.bottom > bounds.top ? bounds : 0
 }
 
 RabbitGetBuiltInCaretPos(&x, &y, &w, &h) {
