@@ -280,7 +280,7 @@ RabbitInfo(text, location, limit := -1) {
 RabbitDebug(text, location, limit := -1) {
     local msg
     global RABBIT_VERSION
-    if !SubStr(RABBIT_VERSION, 1, 3) = "dev" {
+    if SubStr(RABBIT_VERSION, 1, 3) != "dev" {
         return
     }
     msg := Format("D{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
