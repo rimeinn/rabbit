@@ -86,6 +86,7 @@ class RabbitTrayAboutDialogProbe {
 }
 
 RunTest("tray tooltip localizes defaults and preserves schema labels", TestTranslatedTrayTip.Bind())
+RunTest("tray tooltip updates only when the visible text changes", TestTrayTipUpdatesOnTextChange.Bind())
 
 TestTranslatedTrayTip() {
     local directory := A_LineFile . "\..\..\..\Locales"
@@ -104,6 +105,36 @@ TestTranslatedTrayTip() {
         tray.UpdateTip()
         AssertTrue(InStr(A_IconTip, "左クリック"), "Tray instructions retained the previous language.")
     } finally {
+        A_IconTip := old_tip
+        RabbitI18n.Initialize(directory, "zh-CN")
+    }
+}
+
+TestTrayTipUpdatesOnTextChange() {
+    local directory := A_LineFile . "\..\..\..\Locales"
+    local old_tip := A_IconTip
+    local was_suspended := A_IsSuspended
+    try {
+        RabbitI18n.Initialize(directory, "en-US")
+        local runtime := RabbitRuntimeState(0, 0, RabbitConfigSnapshot())
+        local tray := RabbitTrayController(0, 0, 0, 0, runtime, (*) => 0, (*) => 0)
+        AssertTrue(tray.UpdateTip("Test"), "The initial tooltip was not written.")
+        AssertTrue(!tray.UpdateTip(), "The unchanged tooltip was rewritten.")
+        AssertTrue(tray.UpdateTip("test"), "A case-only schema rename did not refresh the tooltip.")
+
+        Suspend(!was_suspended)
+        AssertTrue(tray.UpdateTip(), "A suspend state change did not refresh the tooltip.")
+        AssertTrue(!tray.UpdateTip(), "The unchanged suspend state rewrote the tooltip.")
+
+        local long_schema := Format("{:130}", "Long schema")
+        AssertTrue(tray.UpdateTip(long_schema), "The long tooltip was not written.")
+        AssertEqual(127, StrLen(A_IconTip), "The tooltip did not fit the tray buffer.")
+        AssertTrue(!tray.UpdateTip(), "The truncated tooltip was rewritten.")
+
+        A_IconTip := "Maintenance"
+        AssertTrue(tray.UpdateTip(), "The frontend tooltip was not restored after an external write.")
+    } finally {
+        Suspend(was_suspended)
         A_IconTip := old_tip
         RabbitI18n.Initialize(directory, "zh-CN")
     }
