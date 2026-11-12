@@ -631,6 +631,7 @@ class CandidateBox {
             local candidate := presentation.candidates[A_Index]
             local column := Mod(A_Index - 1, page_size) + 1
             local label_box := this.GetLabelTextMetrics(candidate.label, this.labFont)
+            cards.Push({label_box: label_box, column: column})
             label_widths[column] := Max(label_widths[column], label_box.w)
         }
         column_count := Min(page_size, this.num_candidates)
@@ -644,30 +645,23 @@ class CandidateBox {
 
         Loop this.num_candidates {
             local candidate := presentation.candidates[A_Index]
-            local column := Mod(A_Index - 1, page_size) + 1
+            local card := cards[A_Index]
+            local column := card.column
             local row := Ceil(A_Index / page_size)
-            local label_box := this.GetLabelTextMetrics(candidate.label, this.labFont)
             local label_width := label_widths[column]
             local candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
             local comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
             local card_width := label_width + candidate_box.w + comment_box.w + this.candidatePaddingX * 2
             if card_max_width && card_width > card_max_width {
-                this.TruncateFlowCandidate(candidate, label_width, card_max_width)
-                candidate_box := this.GetTextMetrics(candidate.text, this.mainFont)
-                comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
+                this.TruncateFlowCandidate(candidate, label_width, card_max_width, &candidate_box, &comment_box)
                 card_width := label_width + candidate_box.w + comment_box.w + this.candidatePaddingX * 2
             }
-            cards.Push({
-                label_box: label_box,
-                candidate_box: candidate_box,
-                comment_box: comment_box,
-                column: column,
-                row: row,
-                width: card_width,
-                height: Max(label_box.h, candidate_box.h, comment_box.h) + this.candidatePaddingY * 2
-            })
+            card.row := row
+            card.candidate_box := candidate_box
+            card.comment_box := comment_box
+            local card_height := Max(card.label_box.h, candidate_box.h, comment_box.h) + this.candidatePaddingY * 2
             column_widths[column] := Max(column_widths[column], card_width)
-            row_heights[row] := Max(row_heights[row], cards[A_Index].height)
+            row_heights[row] := Max(row_heights[row], card_height)
         }
 
         Loop column_count {
@@ -741,36 +735,44 @@ class CandidateBox {
         return row_y
     }
 
-    TruncateFlowCandidate(candidate, label_width, available_width) {
+    TruncateFlowCandidate(candidate, label_width, available_width, &candidate_box, &comment_box) {
         local content_width := Max(0, available_width - label_width - this.candidatePaddingX * 2)
-        local candidate_width := this.GetTextMetrics(candidate.text, this.mainFont).w
-        if candidate_width > content_width {
+        if candidate_box.w > content_width {
             candidate.comment := ""
-            candidate.text := this.TruncateText(candidate.text, content_width, this.mainFont)
+            comment_box := {w: 0, h: 0}
+            candidate.text := this.TruncateText(candidate.text, content_width, this.mainFont, &candidate_box)
             return
         }
         if candidate.comment {
-            local comment_width := Max(0, content_width - candidate_width)
-            candidate.comment := this.TruncateText(candidate.comment, comment_width, this.commentFont)
+            local comment_width := Max(0, content_width - candidate_box.w)
+            candidate.comment := this.TruncateText(candidate.comment, comment_width, this.commentFont, &comment_box)
         }
     }
 
-    TruncateText(text, max_width, font) {
-        local ellipsis := "…"
-        local truncated := text
+    TruncateText(text, max_width, font, &metrics) {
         if max_width <= 0 {
+            metrics := {w: 0, h: 0}
             return ""
         }
-        if this.GetTextMetrics(text, font).w <= max_width {
+        if metrics.w <= max_width {
             return text
         }
-        if this.GetTextMetrics(ellipsis, font).w > max_width {
+        local ellipsis := "…"
+        local ellipsis_metrics := this.GetTextMetrics(ellipsis, font)
+        if ellipsis_metrics.w > max_width {
+            metrics := {w: 0, h: 0}
             return ""
         }
-        while truncated && this.GetTextMetrics(truncated . ellipsis, font).w > max_width {
-            truncated := SubStr(truncated, 1, -1)
+        while text {
+            local shortened := text . ellipsis
+            metrics := this.GetTextMetrics(shortened, font)
+            if metrics.w <= max_width {
+                return shortened
+            }
+            text := SubStr(text, 1, -1)
         }
-        return truncated ? truncated . ellipsis : ellipsis
+        metrics := ellipsis_metrics
+        return ellipsis
     }
 
     Show(x, y) {
@@ -1003,7 +1005,9 @@ class CandidateBox {
                 }
 
                 label := candidates_layout.labels[A_Index]
-                this.DrawLayoutText(label, this.labFont, label_color)
+                if label.text !== "" || frame_style.layout_type != "flow" {
+                    this.DrawLayoutText(label, this.labFont, label_color)
+                }
 
                 cand := candidates_layout.cands[A_Index]
                 this.DrawLayoutText(cand, this.mainFont, candidate_color)

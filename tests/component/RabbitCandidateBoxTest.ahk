@@ -92,6 +92,7 @@ RunTest(
 RunTest("modern candidate text alignment", TestModernCandidateTextAlignment.Bind(candidate_style))
 RunTest("modern candidate rows use candidate background colors", TestModernCandidateBackgroundColors.Bind(candidate_style))
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
+RunTest("modern flow reuses text metrics and draws visible text", TestModernFlowTextWork.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
 RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLayout.Bind(candidate_style))
 RunTest("floating preedit hides an empty candidate box", TestFloatingPreeditWithoutCandidates.Bind(candidate_style))
@@ -953,6 +954,50 @@ TestModernFlowCandidateLayout(style) {
     }
 }
 
+TestModernFlowTextWork(style) {
+    local render_probe := RabbitFlowRenderProbe()
+    local candidate_box := CandidateBox(style.With(Map(
+        "layout_type", "flow",
+        "border_width", 2,
+        "margin_x", 3,
+        "candidate_padding_x", 2,
+        "candidate_spacing", 6
+    )), ReturnCandidateRenderProbe.Bind(render_probe))
+    local presentation := {
+        preedit: {before_selection: "", selected: "", after_selection: "", cursor: 0},
+        flow_page_size: 2,
+        candidates: [
+            {label: "1 ", text: "abcdef", comment: "removed", highlighted: true, preview: false},
+            {label: "2 ", text: "xy", comment: "details", highlighted: false, preview: false},
+            {label: "", text: "next", comment: "", highlighted: false, preview: true}
+        ]
+    }
+    local width, height, layout, index, text
+
+    try {
+        candidate_box.BuildPresentation(presentation, &width, &height, 144)
+        layout := candidate_box.candidatesLayout
+        AssertEqual(144, width, "Truncating flow text changed the width of the two columns.")
+        AssertEqual("abc…", layout.cands[1].text, "An oversized candidate must keep the longest fitting prefix.")
+        AssertEqual(40, layout.cands[1].w, "The truncated candidate must keep its measured width.")
+        AssertEqual("", layout.comments[1].text, "An oversized candidate must take priority over its comment.")
+        AssertEqual("xy", layout.cands[2].text, "A fitting candidate must survive comment truncation.")
+        AssertEqual("d…", layout.comments[2].text, "The comment must be truncated to the remaining width.")
+        AssertEqual(20, layout.comments[2].w, "The truncated comment must keep its measured width.")
+        for text in ["1 ", "2 ", "abcdef", "xy", "details", "abc…", "d…"] {
+            AssertEqual(1, render_probe.measurements.Get(text, 0), Format('Expected one measurement for "{}".', text))
+        }
+
+        candidate_box.RenderFrame(height, false)
+        AssertEqual(6, render_probe.drawn_text.Length, "Flow drew empty text or missed a visible run.")
+        for index, text in ["1 ", "abc…", "2 ", "xy", "d…", "next"] {
+            AssertTrue(text == render_probe.drawn_text[index], "Flow drew an unexpected text run.")
+        }
+    } finally {
+        candidate_box.Dispose()
+    }
+}
+
 TestModernCandidateBackgroundColors(style) {
     local render_probe := RabbitCandidateRenderProbe()
     local candidate_box := CandidateBox(style.With(Map(
@@ -1629,6 +1674,20 @@ class RabbitCandidateRenderProbe {
     }
 
     DrawTextWithLayout(parameters*) {
+    }
+}
+
+class RabbitFlowRenderProbe extends RabbitCandidateRenderProbe {
+    measurements := Map()
+    drawn_text := []
+
+    GetMetrics(text, parameters*) {
+        this.measurements[text] := this.measurements.Get(text, 0) + 1
+        return {w: StrLen(text) * 10, h: 10}
+    }
+
+    DrawText(text, parameters*) {
+        this.drawn_text.Push(text)
     }
 }
 
