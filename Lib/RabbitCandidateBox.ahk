@@ -31,6 +31,8 @@ class CandidateBox {
     render_shadow_shapes := []
     render_style := 0
     gui := 0
+    input_frame := 0
+    input_frame_epoch := 0
     static FLOW_ANIMATION_DURATION := 160
     static FLOW_ANIMATION_INTERVAL := 15
     ; Track WIC render target recreations to detect size oscillation.
@@ -114,6 +116,7 @@ class CandidateBox {
 
     UpdateStyle(style) {
         this.AssertNotDisposed()
+        this.InvalidateInputFrame()
         if !HasProp(this, "style") || RabbitShadowRenderer.StyleKey(this.style) != RabbitShadowRenderer.StyleKey(style) {
             if this.d2d && HasProp(this.d2d, "shadow_renderer") {
                 this.d2d.shadow_renderer := 0
@@ -193,6 +196,7 @@ class CandidateBox {
     }
 
     BuildPresentation(presentation, &win_w, &win_h, max_width := 0) {
+        this.input_frame := 0
         this.floating_preedit_active := false
         if this.floating_preedit {
             this.floating_preedit.Hide()
@@ -202,6 +206,7 @@ class CandidateBox {
 
     BuildFloatingPresentation(presentation, caret_x, caret_y, caret_w, caret_h, &win_w, &win_h, max_width := 0) {
         this.AssertNotDisposed()
+        this.input_frame := 0
         this.floating_preedit_active := false
         if !this.style.floating_preedit || this.floating_preedit_failed {
             if this.floating_preedit {
@@ -240,6 +245,66 @@ class CandidateBox {
         }
         this.floating_preedit_active := true
         this.BuildPresentationLayout(presentation, &win_w, &win_h, max_width, false)
+    }
+
+    BuildInputPresentation(presentation, &win_w, &win_h, max_width, caret) {
+        this.AssertNotDisposed()
+        local frame := this.input_frame
+        local epoch := this.input_frame_epoch
+        local screen_width := A_ScreenWidth, screen_height := A_ScreenHeight
+        if !this.style.floating_preedit || !caret || caret.caret_h <= 0 {
+            caret := 0
+        }
+        if frame && this.CanReuseInputFrame() && frame.max_width = max_width
+            && frame.screen_width = screen_width && frame.screen_height = screen_height
+            && this.SameInputCaret(frame.caret, caret) && presentation.HasSameContent(frame.presentation)
+            && this.input_frame == frame {
+            ; Placement may choose a new anchor after building the layout.
+            this.flow_animation_anchor_bottom := false
+            win_w := this.boxWidth
+            win_h := this.boxHeight
+            return
+        }
+        if caret {
+            this.BuildFloatingPresentation(presentation, caret.caret_x, caret.caret_y, caret.caret_w, caret.caret_h,
+                &win_w, &win_h, max_width)
+        } else {
+            this.BuildPresentation(presentation, &win_w, &win_h, max_width)
+        }
+        ; The input controller supplies fresh, owned presentation and placement data.
+        if epoch = this.input_frame_epoch {
+            this.input_frame := { epoch: epoch, presentation: presentation, max_width: max_width, caret: caret,
+                screen_width: screen_width, screen_height: screen_height, presented: false }
+        }
+    }
+
+    SameInputCaret(previous, current) {
+        if !previous || !current {
+            return !previous && !current
+        }
+        return previous.caret_x = current.caret_x && previous.caret_y = current.caret_y
+            && previous.caret_w = current.caret_w && previous.caret_h = current.caret_h
+    }
+
+    CanReuseInputFrame() {
+        local frame := this.input_frame
+        if !frame || !frame.presented || this.rendering || this.render_pending
+            || this.flow_animation_pending || this.flow_animation_active || this.flow_animation_finish_pending {
+            return false
+        }
+        local shadow := this.shadow_surface
+        local floating := this.floating_preedit_active ? this.floating_preedit : 0
+        local floating_shadow := floating ? floating.shadow_surface : 0
+        return (!shadow || !shadow.update_failed)
+            && (!floating || (floating.visible && (!floating_shadow || !floating_shadow.update_failed)))
+            && (this.visible || (floating && !this.num_candidates))
+            && this.input_frame == frame && frame.epoch = this.input_frame_epoch
+    }
+
+    InvalidateInputFrame() {
+        ; Window messages can change the style while an input layout is being built.
+        this.input_frame_epoch++
+        this.input_frame := 0
     }
 
     BuildPresentationLayout(presentation, &win_w, &win_h, max_width, include_preedit) {
@@ -651,9 +716,11 @@ class CandidateBox {
             local comment_box := this.GetTextMetrics(candidate.comment, this.commentFont)
             local card_width := label_width + candidate_box.w + comment_box.w + this.candidatePaddingX * 2
             if card_max_width && card_width > card_max_width {
+                candidate := candidate.Clone()
                 this.TruncateFlowCandidate(candidate, label_width, card_max_width, &candidate_box, &comment_box)
                 card_width := label_width + candidate_box.w + comment_box.w + this.candidatePaddingX * 2
             }
+            card.candidate := candidate
             card.row := row
             card.candidate_box := candidate_box
             card.comment_box := comment_box
@@ -679,8 +746,8 @@ class CandidateBox {
         }
 
         Loop this.num_candidates {
-            local candidate := presentation.candidates[A_Index]
             local card_info := cards[A_Index]
+            local candidate := card_info.candidate
             local label_width := label_widths[card_info.column]
             local card_x := column_x[card_info.column]
             local card_y := row_y[card_info.row]
@@ -774,10 +841,17 @@ class CandidateBox {
     }
 
     Show(x, y) {
-        local collapse
+        local collapse, frame := this.input_frame
         this.AssertNotDisposed()
         if !this.built {
             throw Error("Candidate box must be built before it is shown.")
+        }
+        if this.CanReuseInputFrame() && (!this.visible || (this.display_x = x && this.display_render_y = y
+            && this.display_anchor_bottom = this.flow_animation_anchor_bottom)) && this.input_frame == frame {
+            return
+        }
+        if frame {
+            frame.presented := false
         }
         if this.floating_preedit_active {
             this.floating_preedit.Show()
@@ -793,6 +867,9 @@ class CandidateBox {
                     this.shadow_surface.Hide()
                 }
                 this.visible := false
+            }
+            if frame && this.input_frame == frame {
+                frame.presented := true
             }
             return
         }
@@ -887,6 +964,9 @@ class CandidateBox {
             return
         }
         try {
+            if this.input_frame {
+                this.input_frame.presented := false
+            }
             height := Min(this.render_height, Max(1, height))
             source_y := this.flow_animation_anchor_bottom ? this.render_height - height : 0
             display_y := this.flow_animation_anchor_bottom ? this.flow_animation_anchor_y - height : this.flow_animation_anchor_y
@@ -914,11 +994,15 @@ class CandidateBox {
         local label_color, candidate_color, comment_color, label, cand, comment
         local segment, selected_box, source_y, display_y
         local num_candidates, preedit_layout, candidates_layout, candidate_highlights
-        local shadow_shapes, shape, frame_style
+        local shadow_shapes, shape, frame_style, input_frame
         if !this.BeginRender() {
             return
         }
         try {
+            input_frame := this.input_frame
+            if input_frame {
+                input_frame.presented := false
+            }
             ; A new input thread can build the next layout while this frame is drawing.
             ; Keep this frame internally consistent; the queued render will draw the newer layout.
             num_candidates := this.num_candidates
@@ -1040,6 +1124,9 @@ class CandidateBox {
             this.display_height := height
             this.display_render_y := display_y
             this.display_anchor_bottom := this.flow_animation_anchor_bottom
+            if input_frame && this.input_frame == input_frame && height = this.boxHeight && !this.render_pending {
+                input_frame.presented := true
+            }
         } finally {
             this.EndRender()
         }
@@ -1109,6 +1196,7 @@ class CandidateBox {
         if this.disposed {
             return
         }
+        this.InvalidateInputFrame()
         this.StopFlowAnimation()
         this.CancelFlowAnimationFinish()
         this.flow_animation_pending := false

@@ -93,9 +93,11 @@ RunTest("modern candidate text alignment", TestModernCandidateTextAlignment.Bind
 RunTest("modern candidate rows use candidate background colors", TestModernCandidateBackgroundColors.Bind(candidate_style))
 RunTest("modern flow candidate layout", TestModernFlowCandidateLayout.Bind(candidate_style))
 RunTest("modern flow reuses text metrics and draws visible text", TestModernFlowTextWork.Bind(candidate_style))
+RunTest("modern input frame reuses layout and presentation", TestModernInputFrameReuse.Bind(candidate_style))
 RunTest("modern flow animation state", TestModernFlowAnimationState.Bind(candidate_style))
 RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLayout.Bind(candidate_style))
 RunTest("floating preedit hides an empty candidate box", TestFloatingPreeditWithoutCandidates.Bind(candidate_style))
+RunTest("floating input frame reuses stationary preedit", TestFloatingInputFrameReuse.Bind(candidate_style))
 RunTest("floating preedit adapts small corner radii", TestFloatingPreeditCornerRadius.Bind(candidate_style))
 RunTest("floating preedit applies its minimum height", TestFloatingPreeditMinimumHeight.Bind(candidate_style))
 RunTest("floating preedit reuses font calibration", TestFloatingPreeditFontCalibration.Bind(candidate_style))
@@ -985,6 +987,9 @@ TestModernFlowTextWork(style) {
         AssertEqual("xy", layout.cands[2].text, "A fitting candidate must survive comment truncation.")
         AssertEqual("d…", layout.comments[2].text, "The comment must be truncated to the remaining width.")
         AssertEqual(20, layout.comments[2].w, "The truncated comment must keep its measured width.")
+        AssertEqual("abcdef", presentation.candidates[1].text, "Flow truncation changed the input candidate.")
+        AssertEqual("removed", presentation.candidates[1].comment, "Flow truncation cleared an input comment.")
+        AssertEqual("details", presentation.candidates[2].comment, "Flow truncation shortened an input comment.")
         for text in ["1 ", "2 ", "abcdef", "xy", "details", "abc…", "d…"] {
             AssertEqual(1, render_probe.measurements.Get(text, 0), Format('Expected one measurement for "{}".', text))
         }
@@ -996,6 +1001,79 @@ TestModernFlowTextWork(style) {
         }
     } finally {
         candidate_box.Dispose()
+    }
+}
+
+TestModernInputFrameReuse(style) {
+    local render_probe := RabbitFlowRenderProbe()
+    local layer_probe := RabbitCandidateLayeredWindowProbe()
+    local box := CandidateBox(style, ReturnCandidateRenderProbe.Bind(render_probe))
+    local context := CreateCandidateContext()
+    local width := 0, height := 0, first_width, first_height, measured, drawn
+    box.layered_window := layer_probe
+
+    try {
+        BuildAndShow(100, 150)
+        first_width := width
+        first_height := height
+        measured := render_probe.measurement_count
+        drawn := render_probe.drawn_text.Length
+        AssertTrue(measured > 0 && drawn > 0, "The first frame did not measure and draw text.")
+        AssertEqual(1, layer_probe.updates.Length, "The first frame was not presented.")
+
+        width := 0
+        height := 0
+        BuildAndShow(100, 150)
+        AssertEqual(first_width, width, "The reused layout did not return its width.")
+        AssertEqual(first_height, height, "The reused layout did not return its height.")
+        AssertEqual(measured, render_probe.measurement_count, "The unchanged input was measured again.")
+        AssertEqual(drawn, render_probe.drawn_text.Length, "The unchanged frame was drawn again.")
+        AssertEqual(1, layer_probe.updates.Length, "The unchanged frame was presented again.")
+
+        BuildAndShow(120, 160)
+        AssertEqual(measured, render_probe.measurement_count, "Moving the candidate window rebuilt the layout.")
+        AssertEqual(2, layer_probe.updates.Length, "Moving the candidate window did not submit its new position.")
+        AssertEqual(120, layer_probe.updates[-1].x, "The moved frame used the previous X coordinate.")
+        AssertEqual(160, layer_probe.updates[-1].y, "The moved frame used the previous Y coordinate.")
+
+        context.menu.candidates[1].text := "新候选"
+        BuildAndShow(120, 160)
+        AssertEqual(1, render_probe.measurements.Get("新候选", 0), "The changed candidate was not measured.")
+        AssertEqual(3, layer_probe.updates.Length, "Changed content was not presented.")
+
+        box.UpdateStyle(style.With(Map("back_color", 0xff336699)))
+        BuildAndShow(120, 160)
+        AssertEqual(1, CountCandidateRenderColor(render_probe, 0xff336699), "The frame ignored its new style.")
+        AssertEqual(4, layer_probe.updates.Length, "The new style was not presented.")
+
+        box.Hide()
+        BuildAndShow(120, 160)
+        AssertTrue(box.visible, "An identical frame stayed hidden after Hide.")
+        AssertEqual(5, layer_probe.updates.Length, "The hidden frame was not presented again.")
+
+        layer_probe.fail_next_update := true
+        AssertThrows(BuildAndShow.Bind(140, 160), "The injected presentation failure was not reported.")
+        AssertTrue(!layer_probe.fail_next_update, "The frame failed before reaching the layer probe.")
+        AssertEqual(5, layer_probe.updates.Length, "A failed presentation was recorded as successful.")
+        BuildAndShow(140, 160)
+        AssertEqual(6, layer_probe.updates.Length, "The same frame was not retried after presentation failed.")
+        AssertEqual(140, layer_probe.updates[-1].x, "The retried frame used the wrong position.")
+
+        box.UpdateStyle(style)
+        render_probe.on_next_measure := () => box.UpdateStyle(style.With(Map("margin_x", 40)))
+        BuildAndShow(140, 160)
+        measured := render_probe.measurement_count
+        BuildAndShow(140, 160)
+        AssertTrue(render_probe.measurement_count > measured, "The layout built during a style change was reused.")
+        AssertEqual(8, layer_probe.updates.Length, "The layout did not refresh after a style change during building.")
+    } finally {
+        box.Dispose()
+    }
+
+    BuildAndShow(x, y) {
+        local presentation := RabbitCandidatePresentation(context, "{}")
+        box.BuildInputPresentation(presentation, &width, &height, 0, 0)
+        box.Show(x, y)
     }
 }
 
@@ -1203,14 +1281,15 @@ TestModernFlowAnimationState(style) {
         })
     }
     try {
-        candidate_box.BuildPresentation(collapsed, &collapsed_width, &collapsed_height)
+        candidate_box.BuildInputPresentation(collapsed, &collapsed_width, &collapsed_height, 0, 0)
         AssertTrue(!candidate_box.flow_expanded, "A single flow page was treated as expanded.")
         candidate_box.Show(100, 100)
-        candidate_box.BuildPresentation(expanded, &expanded_width, &expanded_height)
+        candidate_box.BuildInputPresentation(expanded, &expanded_width, &expanded_height, 0, 0)
         AssertTrue(candidate_box.flow_expanded, "Preloaded flow pages did not mark the layout as expanded.")
         candidate_box.SetFlowAnimationAnchor(true)
         candidate_box.Show(100, 70)
         AssertTrue(candidate_box.flow_animation_active, "Flow expansion did not start an animation.")
+        AssertTrue(!candidate_box.CanReuseInputFrame(), "A partial Flow frame was marked reusable.")
         AssertEqual(
             collapsed_height,
             candidate_box.display_height,
@@ -1222,7 +1301,7 @@ TestModernFlowAnimationState(style) {
         AssertEqual(70, candidate_box.display_render_y, "Flow expansion reached the wrong above-caret position.")
         expanded_target := ObjPtr(candidate_box.d2d.ID2D1RenderTarget)
 
-        candidate_box.BuildPresentation(collapsed, &collapsed_width, &collapsed_height)
+        candidate_box.BuildInputPresentation(collapsed, &collapsed_width, &collapsed_height, 0, 0)
         AssertTrue(!candidate_box.flow_expanded, "Returning to one flow page did not mark the layout as collapsed.")
         candidate_box.SetFlowAnimationAnchor(false)
         candidate_box.Show(100, 100)
@@ -1411,6 +1490,48 @@ TestFloatingPreeditWithoutCandidates(style) {
         AssertTrue(!candidate_box.visible, "Composition-only input showed an empty candidate box.")
     } finally {
         candidate_box.Dispose()
+    }
+}
+
+TestFloatingInputFrameReuse(style) {
+    local render_probe := RabbitFlowRenderProbe()
+    local layer_probe := RabbitCandidateLayeredWindowProbe()
+    local body_probe := RabbitCandidateLayeredWindowProbe()
+    local box := CandidateBox(style.With(Map("floating_preedit", true)), ReturnCandidateRenderProbe.Bind(render_probe))
+    local context := CreateCandidateContext()
+    local width := 0, height := 0, measured, drawn
+    context.menu.num_candidates := 0
+    box.layered_window := body_probe
+
+    try {
+        BuildAtCaret(100)
+        box.floating_preedit.layered_window := layer_probe
+        box.Show(102, 228)
+        AssertTrue(box.floating_preedit.visible, "The first input frame did not show its floating preedit.")
+        AssertEqual(1, layer_probe.updates.Length, "The floating preedit was not presented.")
+        measured := render_probe.measurement_count
+        drawn := render_probe.drawn_text.Length
+
+        BuildAtCaret(100)
+        box.Show(102, 228)
+        AssertEqual(measured, render_probe.measurement_count, "The unchanged floating preedit was measured again.")
+        AssertEqual(drawn, render_probe.drawn_text.Length, "The unchanged floating preedit was drawn again.")
+        AssertEqual(1, layer_probe.updates.Length, "The unchanged floating preedit was presented again.")
+
+        BuildAtCaret(130)
+        box.Show(132, 228)
+        AssertEqual(2, layer_probe.updates.Length, "Moving the caret did not update the floating preedit.")
+        AssertEqual(132, layer_probe.updates[-1].x, "The floating preedit did not follow the moved caret.")
+        AssertTrue(!box.visible, "The composition-only frame showed an empty candidate box.")
+        AssertEqual(0, body_probe.updates.Length, "The composition-only frame was presented in the candidate window.")
+    } finally {
+        box.Dispose()
+    }
+
+    BuildAtCaret(caret_x) {
+        local presentation := RabbitCandidatePresentation(context, "{}")
+        local caret := {caret_x: caret_x, caret_y: 200, caret_w: 2, caret_h: 24}
+        box.BuildInputPresentation(presentation, &width, &height, 0, caret)
     }
 }
 
@@ -1736,9 +1857,17 @@ class RabbitCandidateRenderProbe {
 
 class RabbitFlowRenderProbe extends RabbitCandidateRenderProbe {
     measurements := Map()
+    measurement_count := 0
+    on_next_measure := 0
     drawn_text := []
 
     GetMetrics(text, parameters*) {
+        local callback
+        if (callback := this.on_next_measure) {
+            this.on_next_measure := 0
+            callback.Call()
+        }
+        this.measurement_count++
         this.measurements[text] := this.measurements.Get(text, 0) + 1
         return {w: StrLen(text) * 10, h: 10}
     }
@@ -1755,7 +1884,15 @@ class RabbitCandidateRenderTargetProbe {
 }
 
 class RabbitCandidateLayeredWindowProbe {
-    Update(parameters*) {
+    updates := []
+    fail_next_update := false
+
+    Update(bitmap, width, height, x, y, source_y := 0, opacity := 255) {
+        if this.fail_next_update {
+            this.fail_next_update := false
+            throw Error("Injected layered window update failure.")
+        }
+        this.updates.Push({x: x, y: y})
     }
 }
 

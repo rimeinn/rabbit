@@ -17,6 +17,7 @@ class RabbitShadowSurface {
         this.width := 0
         this.height := 0
         this.visible := false
+        this.update_failed := false
         this.style_key := ""
     }
 
@@ -146,6 +147,7 @@ class RabbitShadowSurface {
 
     Update(width, height, x, y, source_y, style, corner, shapes, opacity := 255) {
         local visible_shapes, bounds, style_key
+        this.update_failed := false
         if !style.shadow_radius {
             this.Hide()
             return
@@ -192,9 +194,10 @@ class RabbitShadowSurface {
                 this.visible := true
             }
             ; Position directly behind the body without activation or a new taskbar entry.
-            DllCall("user32\SetWindowPos", "ptr", this.gui.Hwnd, "ptr", this.owner_hwnd,
-                "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x13)
+            this.update_failed := !DllCall("user32\SetWindowPos", "ptr", this.gui.Hwnd, "ptr", this.owner_hwnd,
+                "int", 0, "int", 0, "int", 0, "int", 0, "uint", 0x13, "int")
         } catch as err {
+            this.update_failed := true
             this.Hide()
             RabbitDebug("Shadow surface disabled: " . err.Message . "`n" . err.Stack, A_LineFile)
         }

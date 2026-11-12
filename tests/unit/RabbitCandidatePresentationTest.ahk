@@ -25,6 +25,7 @@ RunTest("empty candidate preview falls back to composition", TestEmptyCandidateP
 RunTest("candidate label fallback presentation", TestCandidateLabelFallbackPresentation.Bind())
 RunTest("candidate labels reuse page metadata", TestCandidateLabelsReusePageMetadata.Bind())
 RunTest("empty candidate presentation", TestEmptyCandidatePresentation.Bind())
+RunTest("candidate presentation content comparison", TestCandidatePresentationContentComparison.Bind())
 
 TestUtf8CandidatePresentation() {
     local context := CreatePresentationContext()
@@ -139,6 +140,64 @@ TestEmptyCandidatePresentation() {
     AssertEqual("", presentation.preedit.after_selection, "Empty post-selection text is incorrect.")
     AssertEqual(0, presentation.preedit.cursor, "Empty preedit text must not create a cursor segment.")
     AssertEqual(0, presentation.candidates.Length, "An empty menu must produce no candidate rows.")
+}
+
+TestCandidatePresentationContentComparison() {
+    local context := CreatePresentationContext()
+    context.composition := {length: 9, preedit: "abcDefghi", cursor_pos: 5, sel_start: 3, sel_end: 6}
+    context.menu.select_keys := "ab"
+    context.menu.candidates[1] := {text: "Alpha", comment: "Note"}
+    local presentation := RabbitCandidatePresentation(context, "{}")
+    local other := RabbitCandidatePresentation(context, "{}")
+
+    AssertTrue(presentation.HasSameContent(other), "Equal presentation data compared differently.")
+    AssertTrue(!presentation.HasSameContent(0), "A missing previous presentation compared equal.")
+    local first := other.candidates[1]
+    local changes := [
+        [other.preedit, "before_selection", "Abc"],
+        [other.preedit, "selected", "def"],
+        [other.preedit, "after_selection", "Ghi"],
+        [other.preedit.cursor, "text", "|"],
+        [other.preedit.cursor, "segment", "after_selection"],
+        [other.preedit.cursor, "offset", 1],
+        [other.preedit, "cursor", 0],
+        [other, "highlighted_index", 1],
+        [first, "label", "A"],
+        [first, "text", "alpha"],
+        [first, "comment", "note"],
+        [first, "highlighted", true]
+    ]
+    local change
+    for change in changes {
+        local target := change[1]
+        local property := change[2]
+        local previous := target.%property%
+        target.%property% := change[3]
+        AssertTrue(!presentation.HasSameContent(other), "The comparison ignored a change in " . property . ".")
+        target.%property% := previous
+    }
+
+    presentation.preedit.cursor := 0
+    other.preedit.cursor := 0
+    first.preview := false
+    AssertTrue(presentation.HasSameContent(other), "A default preview flag or absent cursor compared differently.")
+    first.preview := true
+    AssertTrue(!presentation.HasSameContent(other), "The comparison ignored a preview row.")
+    first.preview := false
+
+    other.flow_page_size := 0
+    AssertTrue(!presentation.HasSameContent(other), "An explicit flow page size compared equal to a missing one.")
+    presentation.flow_page_size := 2
+    other.flow_page_size := 2
+    AssertTrue(presentation.HasSameContent(other), "Matching flow page sizes compared differently.")
+    other.flow_page_size := 3
+    AssertTrue(!presentation.HasSameContent(other), "The comparison ignored a flow page size change.")
+    other.flow_page_size := 2
+
+    other.candidates := [other.candidates[2], first]
+    AssertTrue(!presentation.HasSameContent(other), "The comparison ignored a candidate order change.")
+    other.candidates := [first]
+    AssertTrue(!presentation.HasSameContent(other), "The comparison ignored a candidate count change.")
 }
 
 CreatePresentationContext() {

@@ -43,6 +43,50 @@ class RabbitCandidatePresentation {
             })
         }
     }
+
+    HasSameContent(other) {
+        if !(other is RabbitCandidatePresentation) {
+            return false
+        }
+        local preedit := this.preedit
+        local other_preedit := other.preedit
+        if preedit.before_selection !== other_preedit.before_selection
+            || preedit.selected !== other_preedit.selected
+            || preedit.after_selection !== other_preedit.after_selection
+            || this.highlighted_index !== other.highlighted_index
+            || this.candidates.Length != other.candidates.Length {
+            return false
+        }
+        local cursor := preedit.cursor
+        local other_cursor := other_preedit.cursor
+        if !!cursor != !!other_cursor
+            || (cursor && (cursor.text !== other_cursor.text
+                || cursor.segment !== other_cursor.segment
+                || cursor.offset !== other_cursor.offset)) {
+            return false
+        }
+        local has_flow_page_size := HasProp(this, "flow_page_size")
+        if has_flow_page_size != HasProp(other, "flow_page_size")
+            || (has_flow_page_size && this.flow_page_size !== other.flow_page_size) {
+            return false
+        }
+        local index, candidate
+        for index, candidate in this.candidates {
+            local other_candidate := other.candidates[index]
+            if candidate.label !== other_candidate.label
+                || candidate.text !== other_candidate.text
+                || candidate.comment !== other_candidate.comment
+                || candidate.highlighted !== other_candidate.highlighted {
+                return false
+            }
+            local preview := HasProp(candidate, "preview") ? candidate.preview : false
+            local other_preview := HasProp(other_candidate, "preview") ? other_candidate.preview : false
+            if preview !== other_preview {
+                return false
+            }
+        }
+        return true
+    }
 }
 
 class RabbitCandidatePage {
