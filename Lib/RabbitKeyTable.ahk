@@ -220,6 +220,48 @@ class KeyDef {
         "CapsLock",     0x00ffe5,
     )
 
+    static keycode_tables := [
+        KeyDef.modifier_code,
+        KeyDef.plain_keycode,
+        KeyDef.shifted_keycode,
+        KeyDef.other_keycode,
+        KeyDef.lock_keycode
+    ]
+    static keycode_index := KeyDef.BuildKeyCodeIndex()
+
+    static BuildKeyCodeIndex() {
+        local index := Map()
+        index.CaseSense := "On"
+        local table, name, code
+        for table in this.keycode_tables {
+            for name, code in table {
+                if code && !index.Has(name) {
+                    index[name] := code
+                }
+            }
+        }
+        return index
+    }
+
+    static GetKeyCode(key) {
+        if Type(key) = "String" {
+            return this.keycode_index.Get(key, 0)
+        }
+        ; Direct callers can pass numbers that compare equal to string keys.
+        local table, name, code
+        for table in this.keycode_tables {
+            for name, code in table {
+                if key == name {
+                    if code {
+                        return code
+                    }
+                    break
+                }
+            }
+        }
+        return 0
+    }
+
     static rime_to_ahk := Map(
         "apostrophe",   "'",
         "quoteright",   "'",

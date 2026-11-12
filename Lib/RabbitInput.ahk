@@ -461,37 +461,11 @@ class RabbitInputController {
     }
 
     ProcessKey(key, mask, pass_through := false, this_hotkey := "", requires_text_target := false) {
-        local check_key, check_code, caps, status, processed, commit, context, good_old_caps_lock
+        local caps, status, processed, commit, context, good_old_caps_lock
         local candidate_revision, foreground_hwnd, hide_candidate := false
         local input_target, editor := 0, force_direct := false
-        local code := 0
+        local code := KeyDef.GetKeyCode(key)
         local previous_critical, rime_mask, commit_text := ""
-        Loop 5 {
-            local key_map
-            switch A_Index {
-                case 1:
-                    key_map := KeyDef.modifier_code
-                case 2:
-                    key_map := KeyDef.plain_keycode
-                case 3:
-                    key_map := KeyDef.shifted_keycode
-                case 4:
-                    key_map := KeyDef.other_keycode
-                case 5:
-                    key_map := KeyDef.lock_keycode
-                default:
-                    return
-            }
-            for check_key, check_code in key_map {
-                if key == check_key {
-                    code := check_code
-                    break
-                }
-            }
-            if code {
-                break
-            }
-        }
         if !code {
             return
         }

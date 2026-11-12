@@ -31,6 +31,7 @@ RunTest("configured input hotkey selection", TestConfiguredInputHotkeySelection.
 RunTest("noop ASCII switch key is ignored", TestNoopAsciiSwitchKeyIsIgnored.Bind())
 RunTest("Caps Lock ASCII switch registration", TestCapsLockAsciiSwitchRegistration.Bind())
 RunTest("Caps Lock forwards its lock state", TestCapsLockRimeMask.Bind())
+RunTest("input forwards exact key codes", TestInputKeyCodes.Bind())
 RunTest("release fallback replays key-up", TestReleaseFallbackReplaysKeyUp.Bind())
 RunTest("ASCII character replay closes the system IME", TestAsciiCharacterReplayClosesSystemIme.Bind())
 RunTest("up replay pairs with a replayed down", TestUpReplayPairsWithReplayedDown.Bind())
@@ -430,6 +431,40 @@ TestCapsLockRimeMask() {
         input.BuildRimeMask("a", 0, true, false, false),
         "An ordinary key did not forward the current Caps Lock state."
     )
+}
+
+TestInputKeyCodes() {
+    local rime := RabbitKeyReplayRimeProbe([])
+    local input := RabbitKeyReplayControllerProbe(
+        rime, RabbitInputCandidateProbe(), RabbitSwitcherStatusRuntimeProbe(), RabbitSwitcherStatusTrayProbe()
+    )
+    local cases := [
+        {key: "a", code: GetKeyState("CapsLock", "T") ? 0x41 : 0x61},
+        {key: "A", code: 0x41},
+        {key: "LShift", code: 0xffe1},
+        {key: "CapsLock", code: 0xffe5},
+        {key: "F4", code: 0xffc1},
+        {key: "1", code: 0x31},
+        {key: 1, code: 0x31},
+        {key: 1.0, code: 0x31},
+        {key: "1.0", code: 0},
+        {key: "lshift", code: 0},
+        {key: "capslock", code: 0},
+        {key: "f4", code: 0},
+        {key: "UnknownKey", code: 0},
+        {key: "", code: 0}
+    ]
+    local entry, expected_calls, label
+
+    for entry in cases {
+        label := Format('{} key "{}"', Type(entry.key), entry.key)
+        expected_calls := rime.process_index + !!entry.code
+        rime.process_results.Push(true)
+        rime.last_keycode := 0
+        input.ProcessConfiguredKey(entry.key, 0)
+        AssertEqual(expected_calls, rime.process_index, "Unexpected Rime call count for " . label . ".")
+        AssertEqual(entry.code, rime.last_keycode, "Wrong Rime key code for " . label . ".")
+    }
 }
 
 FindInputRegistration(registrations, hotkey) {
@@ -1280,6 +1315,7 @@ class RabbitKeyReplayRimeProbe {
 
     process_key(session_id, keycode, mask) {
         this.process_index++
+        this.last_keycode := keycode
         return this.process_results[this.process_index]
     }
 
