@@ -32,9 +32,10 @@ class RabbitCandidateViewport {
 
     Build(context, label_format, layout_type, flow_rows, rime_api := 0, session_id := 0,
         preedit_type := "composition") {
-        local presentation := RabbitCandidatePresentation(context, label_format, preedit_type)
-        local page_no := context.menu.page_no
-        local page_size := context.menu.page_size
+        local page := RabbitCandidatePage(context)
+        local presentation := RabbitCandidatePresentation(context, label_format, preedit_type, page)
+        local page_no := page.menu.page_no
+        local page_size := page.menu.page_size
 
         if layout_type != "flow" || page_size <= 0 {
             this.last_page_no := page_no
@@ -53,7 +54,7 @@ class RabbitCandidateViewport {
             return presentation
         }
         return this.BuildExpanded(
-            context,
+            page,
             label_format,
             Min(9, Max(1, flow_rows)),
             page_size,
@@ -71,8 +72,8 @@ class RabbitCandidateViewport {
             && rime_api.api_available("candidate_list_from_index")
     }
 
-    BuildExpanded(context, label_format, flow_rows, page_size, rime_api, session_id, fallback) {
-        local menu := context.menu
+    BuildExpanded(page, label_format, flow_rows, page_size, rime_api, session_id, fallback) {
+        local menu := page.menu
         local target_row := Ceil(flow_rows / 2)
         local start_page := Max(0, menu.page_no - target_row + 1)
         local candidates := this.LoadPages(rime_api, session_id, start_page, page_size, flow_rows)
@@ -93,7 +94,7 @@ class RabbitCandidateViewport {
             local is_current_page := 1 <= local_index && local_index <= page_size
             fallback.candidates.Push({
                 label: is_current_page
-                    ? Format(label_format, RabbitCandidatePresentation.GetLabel(context, local_index))
+                    ? Format(label_format, page.GetLabel(local_index))
                     : "",
                 text: candidate.text,
                 comment: candidate.comment,
@@ -122,10 +123,11 @@ class RabbitCandidateViewport {
                 if !rime_api.candidate_list_next(iterator) {
                     break
                 }
+                local candidate := iterator.candidate
                 result.Push({
                     index: iterator.index,
-                    text: iterator.candidate.text,
-                    comment: iterator.candidate.comment
+                    text: candidate.text,
+                    comment: candidate.comment
                 })
             }
         } finally {

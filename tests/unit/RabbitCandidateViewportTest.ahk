@@ -56,12 +56,37 @@ TestFlowViewportCollapse() {
 TestFlowViewportFinalPage() {
     local rime := RabbitCandidateViewportRimeProbe(18)
     local viewport := RabbitCandidateViewport()
+    local context := CreateViewportContext(5)
+    local menu := context.menu
+    local menu_reads := 0, select_keys_reads := 0
+    context.DefineProp("menu", {Get: ReadMenu})
+    menu.DefineProp("select_keys", {Get: ReadSelectKeys})
     viewport.Build(CreateViewportContext(0), "{}", "flow", 5, rime, 1)
-    local presentation := viewport.Build(CreateViewportContext(5), "{}", "flow", 5, rime, 1)
+    local presentation := viewport.Build(context, "[{}]", "flow", 5, rime, 1)
 
     AssertEqual(15, presentation.candidates.Length, "The tail viewport did not backfill five pages.")
     AssertEqual("候选 4", presentation.candidates[1].text, "The tail viewport started on the wrong page.")
-    AssertEqual("1", presentation.candidates[13].label, "The final current page was not positioned in the last row.")
+    AssertEqual("注释 4", presentation.candidates[1].comment, "The preview candidate lost its comment.")
+    AssertEqual("", presentation.candidates[1].label, "A preview page retained a label.")
+    AssertTrue(presentation.candidates[1].preview, "The earlier page was not marked as a preview.")
+    AssertEqual("[a]", presentation.candidates[13].label, "The final current page was not positioned in the last row.")
+    AssertTrue(presentation.candidates[13].highlighted, "The final current page lost its highlight.")
+    AssertTrue(!presentation.candidates[13].preview, "The current page was marked as a preview.")
+    AssertEqual(2, rime.end_calls, "Both the initial and backfill iterators must be ended.")
+    AssertEqual(1, menu_reads, "The viewport must read the context menu once per build.")
+    AssertEqual(1, select_keys_reads, "The viewport must read the select keys once per build.")
+    AssertEqual(
+        rime.successful_next_calls, rime.candidate_reads, "Each successful iteration must read the candidate once.")
+
+    ReadMenu(*) {
+        menu_reads++
+        return menu
+    }
+
+    ReadSelectKeys(*) {
+        select_keys_reads++
+        return "abc"
+    }
 }
 
 TestFlowViewportFallback() {
@@ -115,6 +140,8 @@ class RabbitCandidateViewportRimeProbe {
             this.candidates.Push({ text: "候选 " . A_Index, comment: "注释 " . A_Index })
         }
         this.end_calls := 0
+        this.successful_next_calls := 0
+        this.candidate_reads := 0
     }
 
     api_available(func) {
@@ -125,7 +152,14 @@ class RabbitCandidateViewportRimeProbe {
     }
 
     candidate_list_begin(session_id) {
-        return { index: 0, candidate: 0 }
+        local iterator := { index: 0, candidate_value: 0 }
+        iterator.DefineProp("candidate", {Get: ReadCandidate})
+        return iterator
+
+        ReadCandidate(current_iterator) {
+            this.candidate_reads++
+            return current_iterator.candidate_value
+        }
     }
 
     candidate_list_from_index(session_id, iterator, index) {
@@ -133,7 +167,7 @@ class RabbitCandidateViewportRimeProbe {
             return false
         }
         iterator.index := index - 1
-        iterator.candidate := 0
+        iterator.candidate_value := 0
         return true
     }
 
@@ -143,7 +177,8 @@ class RabbitCandidateViewportRimeProbe {
             return false
         }
         iterator.index := index
-        iterator.candidate := this.candidates[index + 1]
+        iterator.candidate_value := this.candidates[index + 1]
+        this.successful_next_calls++
         return true
     }
 

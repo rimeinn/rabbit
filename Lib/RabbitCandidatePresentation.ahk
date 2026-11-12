@@ -17,9 +17,10 @@
  */
 
 class RabbitCandidatePresentation {
-    __New(context, label_format, preedit_type := "composition") {
+    __New(context, label_format, preedit_type := "composition", page?) {
         local before_selection, selected, after_selection, cursor
-        local menu := context.menu
+        page := page ?? RabbitCandidatePage(context)
+        local menu := page.menu
         local candidates := menu.candidates
         RabbitGetPreeditText(
             context, preedit_type, &before_selection, &selected, &after_selection, &cursor)
@@ -33,7 +34,7 @@ class RabbitCandidatePresentation {
         this.candidates := []
 
         loop menu.num_candidates {
-            local label := RabbitCandidatePresentation.GetLabel(context, A_Index)
+            local label := page.GetLabel(A_Index)
             this.candidates.Push({
                 label: Format(label_format, label),
                 text: candidates[A_Index].text,
@@ -42,18 +43,31 @@ class RabbitCandidatePresentation {
             })
         }
     }
+}
 
-    static GetLabel(context, index) {
-        local menu := context.menu
-        local has_custom_labels := !!context.select_labels[0]
-        local select_keys := menu.select_keys
-        local select_key_count := StrLen(select_keys)
-        local label := String(index)
-        if index <= menu.page_size && has_custom_labels {
-            return context.select_labels[index] || label
+class RabbitCandidatePage {
+    ; The copied menu still holds pointers owned by the current Rime context.
+    __New(context) {
+        this.context := context
+        this.menu := context.menu
+        this.labels_loaded := false
+    }
+
+    GetLabel(index) {
+        ; A preedit-only presentation has no labels to read.
+        if !this.labels_loaded {
+            this.has_custom_labels := !!this.context.select_labels[0]
+            this.select_keys := this.menu.select_keys
+            this.select_key_count := StrLen(this.select_keys)
+            this.page_size := this.menu.page_size
+            this.labels_loaded := true
         }
-        if index <= select_key_count {
-            return SubStr(select_keys, index, 1)
+        local label := String(index)
+        if index <= this.page_size && this.has_custom_labels {
+            return this.context.select_labels[index] || label
+        }
+        if index <= this.select_key_count {
+            return SubStr(this.select_keys, index, 1)
         }
         return label
     }

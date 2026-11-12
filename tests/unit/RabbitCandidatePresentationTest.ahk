@@ -23,6 +23,7 @@ RunTest("UTF-8 candidate presentation", TestUtf8CandidatePresentation.Bind())
 RunTest("candidate preview preedit presentation", TestCandidatePreviewPreeditPresentation.Bind())
 RunTest("empty candidate preview falls back to composition", TestEmptyCandidatePreviewFallback.Bind())
 RunTest("candidate label fallback presentation", TestCandidateLabelFallbackPresentation.Bind())
+RunTest("candidate labels reuse page metadata", TestCandidateLabelsReusePageMetadata.Bind())
 RunTest("empty candidate presentation", TestEmptyCandidatePresentation.Bind())
 
 TestUtf8CandidatePresentation() {
@@ -84,11 +85,53 @@ TestCandidateLabelFallbackPresentation() {
     AssertEqual("b", presentation.candidates[2].label, "The second select-key label is incorrect.")
 }
 
+TestCandidateLabelsReusePageMetadata() {
+    local context := CreatePresentationContext()
+    local menu := context.menu
+    local labels := Map(0, true, 1, "甲", 2, "")
+    local menu_reads := 0, select_key_reads := 0, label_checks := 0
+    menu.candidates.Push({text: "候选三", comment: ""}, {text: "候选四", comment: ""})
+    menu.num_candidates := menu.candidates.Length
+    menu.page_size := 2
+    context.DefineProp("menu", {Get: ReadMenu})
+    menu.DefineProp("select_keys", {Get: ReadSelectKeys})
+    context.DefineProp("select_labels", {Get: ReadLabel})
+
+    local presentation := RabbitCandidatePresentation(context, "[{}]")
+
+    AssertEqual("[甲]", presentation.candidates[1].label, "The custom label is incorrect.")
+    AssertEqual("[2]", presentation.candidates[2].label, "An empty custom label must fall back to its ordinal.")
+    AssertEqual("[c]", presentation.candidates[3].label, "A label beyond the page size must use the select key.")
+    AssertEqual("[4]", presentation.candidates[4].label, "A missing select key must fall back to its ordinal.")
+    AssertEqual(1, menu_reads, "The candidate menu must be read once per presentation.")
+    AssertEqual(1, select_key_reads, "Select keys must be read once per candidate page.")
+    AssertEqual(1, label_checks, "Custom label availability must be checked once per candidate page.")
+
+    ReadMenu(*) {
+        menu_reads++
+        return menu
+    }
+
+    ReadSelectKeys(*) {
+        select_key_reads++
+        return "abc"
+    }
+
+    ReadLabel(_, index) {
+        if index == 0 {
+            label_checks++
+        }
+        return labels[index]
+    }
+}
+
 TestEmptyCandidatePresentation() {
     local context := CreatePresentationContext()
     context.composition.preedit := ""
     context.menu.candidates := []
     context.menu.num_candidates := 0
+    context.menu.DeleteProp("select_keys")
+    context.DeleteProp("select_labels")
     local presentation := RabbitCandidatePresentation(context, "{}")
 
     AssertEqual("", presentation.preedit.before_selection, "Empty preedit text is incorrect.")
