@@ -24,6 +24,7 @@ class RabbitI18n {
     static messages := Map()
     static diagnostics := []
     static directory := ""
+    static catalog_revision := 0
 
     static LoadStartupConfig(rime_api, path, directory := A_ScriptDir . "\Locales") {
         local config := 0, preference := "auto", diagnostic := ""
@@ -83,6 +84,7 @@ class RabbitI18n {
         this.locale := this.ResolveLocale(preference, system_locale)
         this.messages := this.locale = "zh-CN" ? this.fallback.Clone()
             : this.ReadOptionalCatalog(directory . "\" . this.locale . ".ini")
+        this.catalog_revision++
     }
 
     static ResolveLocale(preference, system_locale := "") {

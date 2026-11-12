@@ -96,6 +96,7 @@ class RabbitTrayController {
         this.runtime_state := runtime_state
         this.status_tip := status_tip
         this.last_icon_key := ""
+        this.tip_cache := 0
     }
 
     UnbindRuntime() {
@@ -105,6 +106,7 @@ class RabbitTrayController {
         this.config := 0
         this.runtime_state := 0
         this.status_tip := 0
+        this.tip_cache := 0
     }
 
     SetupMenu() {
@@ -291,29 +293,47 @@ class RabbitTrayController {
         this.ascii_mode := !!ascii_mode
         this.full_shape := !!full_shape
         this.ascii_punct := !!ascii_punct
-        local suspended := A_IsSuspended ? RabbitI18n.Text("frontend.suspended") : ""
-        local tip := RabbitI18n.Text("frontend.icon_tip", Map(
-            "suspended", suspended,
-            "schema", this.schema_name,
-            "ascii", this.ascii_mode
-                ? this.runtime_state.ascii_mode_true_label
-                : this.runtime_state.ascii_mode_false_label,
-            "shape", this.full_shape
-                ? this.runtime_state.full_shape_true_label
-                : this.runtime_state.full_shape_false_label,
-            "punct", this.ascii_punct
-                ? this.runtime_state.ascii_punct_true_label
-                : this.runtime_state.ascii_punct_false_label
-        ))
-        ; AutoHotkey stores at most 127 UTF-16 code units in A_IconTip.
-        if StrLen(tip) > 127 {
-            tip := SubStr(tip, 1, 127)
+        schema_name := this.schema_name
+        local suspended := A_IsSuspended
+        local runtime_state := this.runtime_state
+        local ascii_label := this.ascii_mode
+            ? runtime_state.ascii_mode_true_label : runtime_state.ascii_mode_false_label
+        local shape_label := this.full_shape
+            ? runtime_state.full_shape_true_label : runtime_state.full_shape_false_label
+        local punct_label := this.ascii_punct
+            ? runtime_state.ascii_punct_true_label : runtime_state.ascii_punct_false_label
+        local catalog_revision := RabbitI18n.catalog_revision
+        local cache := this.tip_cache
+        if !cache || cache.schema_name !== schema_name || cache.suspended != suspended
+            || cache.ascii_label !== ascii_label || cache.shape_label !== shape_label
+            || cache.punct_label !== punct_label || cache.catalog_revision != catalog_revision {
+            this.tip_cache := cache := {
+                schema_name: schema_name,
+                suspended: suspended,
+                ascii_label: ascii_label,
+                shape_label: shape_label,
+                punct_label: punct_label,
+                catalog_revision: catalog_revision,
+                text: this.FormatTip(schema_name, ascii_label, shape_label, punct_label, suspended)
+            }
         }
-        if tip !== A_IconTip {
-            A_IconTip := tip
+        if cache.text !== A_IconTip {
+            A_IconTip := cache.text
             return true
         }
         return false
+    }
+
+    FormatTip(schema_name, ascii_label, shape_label, punct_label, suspended) {
+        local tip := RabbitI18n.Text("frontend.icon_tip", Map(
+            "suspended", suspended ? RabbitI18n.Text("frontend.suspended") : "",
+            "schema", schema_name,
+            "ascii", ascii_label,
+            "shape", shape_label,
+            "punct", punct_label
+        ))
+        ; AutoHotkey stores at most 127 UTF-16 code units in A_IconTip.
+        return StrLen(tip) > 127 ? SubStr(tip, 1, 127) : tip
     }
 
     UpdateSchemaIcon(schema_id) {
