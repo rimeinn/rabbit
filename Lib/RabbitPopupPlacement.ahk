@@ -47,24 +47,25 @@ class RabbitPopupPlacement {
     }
 
     static GetActiveStartMenuInfo() {
-        local start_menu
-        local previous_detect_hidden_windows := A_DetectHiddenWindows
-        local hmon, monitor_info, anchor_rect
-        try {
-            DetectHiddenWindows True
-            start_menu := WinActive(
-                "ahk_class Windows.UI.Core.CoreWindow ahk_exe StartMenuExperienceHost.exe"
-            )
-            if !start_menu {
-                start_menu := WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchHost.exe")
-            }
-            if !start_menu {
-                start_menu := WinActive("ahk_class Windows.UI.Core.CoreWindow ahk_exe SearchApp.exe")
-            }
-        } finally {
-            DetectHiddenWindows previous_detect_hidden_windows
+        local start_menu := DllCall("GetForegroundWindow", "Ptr")
+        local process_name, hmon, monitor_info, anchor_rect
+        if !start_menu {
+            return 0
         }
-        if !start_menu || !(hmon := MonitorManage.MonitorFromWindow(start_menu))
+        try {
+            if WinGetClass(start_menu) !== "Windows.UI.Core.CoreWindow" {
+                return 0
+            }
+            process_name := WinGetProcessName(start_menu)
+        } catch TargetError, OSError {
+            ; The window may disappear or its process may be inaccessible.
+            return 0
+        }
+        if process_name != "StartMenuExperienceHost.exe" && process_name != "SearchHost.exe"
+            && process_name != "SearchApp.exe" {
+            return 0
+        }
+        if !WinActive(start_menu) || !(hmon := MonitorManage.MonitorFromWindow(start_menu))
             || !(monitor_info := MonitorManage.GetMonitorInfo(hmon)) {
             return 0
         }

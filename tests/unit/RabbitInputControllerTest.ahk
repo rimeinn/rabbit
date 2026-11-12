@@ -44,6 +44,7 @@ RunTest("candidate placement uses the floating preedit bottom", TestFloatingPree
 RunTest("Start placement forwards upward flow anchoring", TestStartPlacementForwardsUpwardFlow.Bind())
 RunTest("editor bounds keep floating preedit outside the field", TestEditorFallbackPlacement.Bind())
 RunTest("focus change clears composition", TestFocusChangeClearsComposition.Bind())
+RunTest("empty Rime context is checked once before hiding", TestEmptyContextReadsCompositionStateOnce.Bind())
 RunTest("password field bypass controls input hotkeys", TestPasswordFieldBypassControlsInputHotkeys.Bind())
 RunTest("non-text target bypasses Rime input", TestNonTextTargetBypassesRimeInput.Bind())
 RunTest("type-ahead target uses Rime input", TestTypeAheadTargetUsesRimeInput.Bind())
@@ -647,6 +648,43 @@ TestFocusChangeClearsComposition() {
     input.UpdateCompositionOwner(composing_context, 300)
     input.UpdateCompositionOwner(empty_context, 300)
     AssertEqual(0, input.composition_owner_hwnd, "An empty context retained a composition owner.")
+}
+
+TestEmptyContextReadsCompositionStateOnce() {
+    local context := {}
+    local composition_reads := 0, menu_reads := 0
+    context.DefineProp("composition", { Get: ReadComposition })
+    context.DefineProp("menu", { Get: ReadMenu })
+
+    local rime := RabbitKeyReplayRimeProbe([true], context)
+    local candidate_box := RabbitInputCandidateProbe()
+    local input := RabbitKeyReplayControllerProbe(
+        rime,
+        candidate_box,
+        RabbitSwitcherStatusRuntimeProbe(),
+        RabbitSwitcherStatusTrayProbe()
+    )
+    input.composition_owner_hwnd := 100
+    input.prev_show := true
+
+    input.ProcessTextKey("h", 0)
+
+    AssertEqual(1, composition_reads, "The context composition must be read once.")
+    AssertEqual(1, menu_reads, "The context menu must be read once.")
+    AssertEqual(0, input.composition_owner_hwnd, "An empty context retained its composition owner.")
+    AssertEqual(1, candidate_box.hide_calls, "An empty context did not hide the candidate box.")
+    AssertEqual(1, rime.freed_contexts.Length, "The Rime context must be freed once.")
+    AssertTrue(context == rime.freed_contexts[1], "The wrong Rime context was freed.")
+
+    ReadComposition(*) {
+        composition_reads++
+        return { length: 0 }
+    }
+
+    ReadMenu(*) {
+        menu_reads++
+        return { num_candidates: 0 }
+    }
 }
 
 TestPasswordFieldBypassControlsInputHotkeys() {
@@ -1294,9 +1332,11 @@ class RabbitKeyReplayControllerProbe extends RabbitInputController {
 }
 
 class RabbitKeyReplayRimeProbe {
-    __New(process_results) {
+    __New(process_results, context := 0) {
         this.process_results := process_results
         this.process_index := 0
+        this.context := context
+        this.freed_contexts := []
         this.status := {
             schema_id: "probe",
             schema_name: "probe",
@@ -1324,6 +1364,10 @@ class RabbitKeyReplayRimeProbe {
     }
 
     get_context(session_id) {
-        return 0
+        return this.context
+    }
+
+    free_context(context) {
+        this.freed_contexts.Push(context)
     }
 }

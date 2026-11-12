@@ -634,9 +634,9 @@ class RabbitInputController {
         try {
             if (context := this.rime.get_context(this.session_id)) {
                 try {
-                    this.UpdateCompositionOwner(context, foreground_hwnd)
+                    local has_content := this.UpdateCompositionOwner(context, foreground_hwnd)
                     if !this.CancelCompositionIfFocusChanged(this.GetForegroundWindow()) {
-                        this.UpdateCandidate(context, candidate_revision, hide_candidate, editor)
+                        this.UpdateCandidate(context, has_content, candidate_revision, hide_candidate, editor)
                     }
                 } finally {
                     this.rime.free_context(context)
@@ -864,13 +864,15 @@ class RabbitInputController {
     }
 
     UpdateCompositionOwner(context, foreground_hwnd) {
-        if context.composition.length > 0 || context.menu.num_candidates > 0 {
+        local has_content := context.composition.length > 0 || context.menu.num_candidates > 0
+        if has_content {
             if foreground_hwnd {
                 this.composition_owner_hwnd := foreground_hwnd
             }
         } else {
             this.composition_owner_hwnd := 0
         }
+        return has_content
     }
 
     HideCandidate() {
@@ -892,11 +894,11 @@ class RabbitInputController {
         }
     }
 
-    UpdateCandidate(context, candidate_revision, hide_candidate, editor := 0) {
+    UpdateCandidate(context, has_content, candidate_revision, hide_candidate, editor := 0) {
         local info, caret_x, caret_y, caret_w, caret_h
         local backup_mouse_ref, mouse_x, mouse_y, placement, start_menu_info, start_menu_caret
         local editor_bounds := 0
-        if context.composition.length <= 0 && context.menu.num_candidates <= 0 {
+        if !has_content {
             placement := { mode: "hide" }
         } else {
             if editor && HasMethod(this.candidate_box, "BuildFloatingPresentation")
