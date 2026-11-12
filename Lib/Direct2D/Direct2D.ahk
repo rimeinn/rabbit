@@ -52,21 +52,29 @@ class Direct2D {
     __Delete() {
         this.UnregisterEraseBackgroundHandler()
 
-        for _, pBrush in this.solidBrushes
-            Direct2D.release(pBrush)
-        for _, pTextFormat in this.textFormats
-            Direct2D.release(pTextFormat)
-        for _, pStrokeStyle in this.strokeStyles
-            Direct2D.release(pStrokeStyle)
-        for _, pGradientStops in this.gradientStops
-            Direct2D.release(pGradientStops)
-        for _, pBitmap in this.d2dBitmaps
-            if pBitmap
-                Direct2D.release(pBitmap)
+        this.ReleaseRenderTargetResources()
+        this.ReleaseResourceMap(this.textFormats)
+        this.ReleaseResourceMap(this.strokeStyles)
 
         this.IDWriteFactory := ""
         this.ID2D1Factory := ""
         this.GdipShutdown(this.gdipToken)
+    }
+
+    ReleaseRenderTargetResources() {
+        this.ReleaseResourceMap(this.solidBrushes)
+        this.ReleaseResourceMap(this.gradientStops)
+        this.ReleaseResourceMap(this.d2dBitmaps)
+    }
+
+    ReleaseResourceMap(resources) {
+        local resource
+        for , resource in resources {
+            if resource {
+                Direct2D.release(resource)
+            }
+        }
+        resources.Clear()
     }
 
     static isX64 := A_PtrSize == 8
@@ -79,6 +87,7 @@ class Direct2D {
     static DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT := 2
     static DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT := 3
     static D2DERR_RECREATE_TARGET := 0x8899000C
+    static WIC_TEXT_FORMAT_CACHE_LIMIT := 128
     static vTable(p, i) => (v := NumGet(p + 0, 0, "ptr")) ? NumGet(v + 0, i * A_PtrSize, "Ptr") : 0
     static release(p) => (r := this.vTable(p, 2)) ? DllCall(r, "ptr", p) : 0
     static str2guid(guid) => (clsid := Buffer(16, 0), DllCall("ole32\CLSIDFromString", "WStr", guid, "Ptr", clsid), clsid)
@@ -212,8 +221,15 @@ class Direct2D {
         CreateStrokeStyle(styleProps) =>
             (DllCall(this.VT_CreateStrokeStyle, "ptr", this.pF, "ptr", styleProps, "ptr", 0, "uint", 0, "ptr*", &pStrokeStyle := 0), pStrokeStyle)
 
-        CreateWicBitmapRenderTarget(pWICBitmap, rtProps) =>
-            (DllCall(this.VT_CreateWicBitmapRenderTarget, "Ptr", this.pF, "Ptr", pWICBitmap, "ptr", rtProps, "Ptr*", &pRenderTarget := 0), pRenderTarget)
+        CreateWicBitmapRenderTarget(pWICBitmap, rtProps) {
+            local render_target := 0
+            local hr := DllCall(this.VT_CreateWicBitmapRenderTarget, "Ptr", this.pF, "Ptr", pWICBitmap,
+                "Ptr", rtProps, "Ptr*", &render_target, "Int")
+            if hr < 0 {
+                Direct2D.ThrowHResult("CreateWicBitmapRenderTarget", hr)
+            }
+            return render_target
+        }
 
         CreateHwndRenderTarget(rtProps, hRtProps) =>
             (DllCall(this.VT_CreateHwndRenderTarget, "Ptr", this.pF, "Ptr", rtProps, "ptr", hRtProps, "Ptr*", &pRenderTarget := 0), pRenderTarget)
@@ -988,6 +1004,7 @@ class Direct2D {
     class ID2D1WicBitmapRenderTarget extends Direct2D.ID2D1RenderTarget {
         __New(imgW, imgH, d2d1Factory?) {
             this.width := imgW, this.height := imgH
+            this.pWICBitmap := 0
 
             ; Initialize Windows Imaging Component.
             static CLSID_WICImagingFactory := "{CACAF262-9370-4615-A13B-9F5539DA4C0A}"
@@ -1010,8 +1027,7 @@ class Direct2D {
             NumPut("uint", 87, renderTargetPrps, 4) ; DXGI_FORMAT_B8G8R8A8_UNORM
             NumPut("uint", 1, renderTargetPrps, 8) ; AlphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED
             if !this.pRT := d2d1Factory.CreateWicBitmapRenderTarget(pWicBitmap, renderTargetPrps) {
-                MsgBox("ID2D1WicBitmapRenderTarget init failed")
-                return 0
+                throw Error("CreateWicBitmapRenderTarget returned no render target.")
             }
 
             super.__InitCommonVT()
@@ -1379,6 +1395,41 @@ class Direct2D {
         if hr = 0
             this.width := w, this.height := h
         return hr
+    }
+
+    ResizeWicRenderTarget(width, height) {
+        if !IsInteger(width) || width <= 0 || width > 0xffffffff
+            || !IsInteger(height) || height <= 0 || height > 0xffffffff {
+            throw ValueError("WIC render target dimensions must be positive 32-bit unsigned integers.")
+        }
+        if !HasProp(this, "ID2D1RenderTarget")
+            || !(this.ID2D1RenderTarget is Direct2D.ID2D1WicBitmapRenderTarget) {
+            throw Error("The current render target is not a WIC bitmap render target.")
+        }
+        if this.isDrawing || this.clipDepth {
+            throw Error("Cannot replace a WIC render target while drawing.")
+        }
+
+        ; Prepare the replacement before releasing resources used by the current target.
+        local render_target := Direct2D.ID2D1WicBitmapRenderTarget(width, height, this.ID2D1Factory)
+        render_target.SetAntiAliasMode(0) ; D2D1_ANTIALIAS_MODE_PER_PRIMITIVE
+        render_target.SetTextAntiAliasMode(1) ; D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE
+        render_target.BeginDraw()
+        render_target.Clear()
+        local hr := render_target.EndDraw()
+        if hr != 0 {
+            Direct2D.ThrowHResult("Initialize WIC render target", hr)
+        }
+
+        this.ReleaseRenderTargetResources()
+        ; Text formats survive a target change. Bound growth across caret heights and styles.
+        if this.textFormats.Count > Direct2D.WIC_TEXT_FORMAT_CACHE_LIMIT {
+            this.ReleaseResourceMap(this.textFormats)
+        }
+        this.ID2D1RenderTarget := render_target
+        this.width := width
+        this.height := height
+        return render_target
     }
 
     GetRenderTargetSize() {

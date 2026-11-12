@@ -21,6 +21,7 @@
 
 class RabbitDirect2D extends Direct2D {
     shadow_renderer := 0
+    static FONT_SPEC_CACHE_LIMIT := 32
 
     DrawShadow(rect, corner, style, color) {
         if !RabbitShadowRenderer.Enabled(style, color) {
@@ -32,9 +33,9 @@ class RabbitDirect2D extends Direct2D {
         this.shadow_renderer.Draw(this, rect, corner, style, color)
     }
 
-    __Delete() {
+    ReleaseRenderTargetResources() {
         this.shadow_renderer := 0
-        super.__Delete()
+        super.ReleaseRenderTargetResources()
     }
 
     static INVALID_FALLBACK_FAMILY := "_RabbitInvalidFallbackFont_"
@@ -81,7 +82,11 @@ class RabbitDirect2D extends Direct2D {
     GetFontSpec(font_name) {
         local key := String(font_name)
         if !this.font_specs.Has(key) {
-            this.font_specs[key] := RabbitFontSpec.Parse(key)
+            local spec := RabbitFontSpec.Parse(key)
+            if this.font_specs.Count >= RabbitDirect2D.FONT_SPEC_CACHE_LIMIT {
+                this.font_specs.Clear()
+            }
+            this.font_specs[key] := spec
         }
         return this.font_specs[key]
     }

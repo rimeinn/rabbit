@@ -26,8 +26,7 @@ class RabbitFloatingPreedit {
     shadow_surface := 0
     static FONT_HEIGHT_CALIBRATION_TEXT := "中M"
     static DEBUG_OUTPUT := true
-    ; Track render target recreations: the preedit box resizes with the text,
-    ; and each change rebuilds the whole Direct2D stack.
+    ; Track WIC render target recreations as the preedit text changes size.
     static render_target_recreate_count := 0
 
     __New(style, d2d_constructor := RabbitDirect2D) {
@@ -350,8 +349,11 @@ class RabbitFloatingPreedit {
                 Format("RabbitFloatingPreedit.ahk:{}", A_LineNumber)
             )
         }
-        this.d2d := 0
-        this.d2d := this.CreateRenderTarget(this.box_width, this.box_height)
+        if HasMethod(this.d2d, "ResizeWicRenderTarget") {
+            this.d2d.ResizeWicRenderTarget(this.box_width, this.box_height)
+        } else {
+            this.d2d := this.CreateRenderTarget(this.box_width, this.box_height)
+        }
         this.render_width := this.box_width
         this.render_height := this.box_height
     }

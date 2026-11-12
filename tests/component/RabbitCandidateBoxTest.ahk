@@ -1189,7 +1189,7 @@ TestModernFlowAnimationState(style) {
     local candidate_box := CandidateBox(style.With(Map("layout_type", "flow")))
     local collapsed := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
     local expanded := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
-    local collapsed_width, collapsed_height, expanded_width, expanded_height
+    local collapsed_width, collapsed_height, expanded_width, expanded_height, expanded_target
 
     collapsed.flow_page_size := 2
     expanded.flow_page_size := 2
@@ -1220,12 +1220,15 @@ TestModernFlowAnimationState(style) {
         AssertTrue(!candidate_box.flow_animation_active, "Flow expansion animation did not finish.")
         AssertEqual(expanded_height, candidate_box.display_height, "Flow expansion reached the wrong height.")
         AssertEqual(70, candidate_box.display_render_y, "Flow expansion reached the wrong above-caret position.")
+        expanded_target := ObjPtr(candidate_box.d2d.ID2D1RenderTarget)
 
         candidate_box.BuildPresentation(collapsed, &collapsed_width, &collapsed_height)
         AssertTrue(!candidate_box.flow_expanded, "Returning to one flow page did not mark the layout as collapsed.")
         candidate_box.SetFlowAnimationAnchor(false)
         candidate_box.Show(100, 100)
         AssertTrue(candidate_box.flow_animation_active, "Flow collapse did not start an animation.")
+        AssertEqual(expanded_target, ObjPtr(candidate_box.d2d.ID2D1RenderTarget),
+            "Flow collapse replaced the WIC target before animating the previous frame.")
         AssertEqual(
             0,
             candidate_box.flow_animation_target_height,
@@ -1243,6 +1246,8 @@ TestModernFlowAnimationState(style) {
         )
         Sleep(CandidateBox.FLOW_ANIMATION_DURATION + 60)
         AssertTrue(!candidate_box.flow_animation_active, "Flow collapse animation did not finish.")
+        AssertTrue(expanded_target != ObjPtr(candidate_box.d2d.ID2D1RenderTarget),
+            "Flow collapse kept the expanded WIC target after the animation.")
         AssertEqual(collapsed_height, candidate_box.display_height, "Flow collapse reached the wrong height.")
         AssertEqual(100, candidate_box.display_render_y, "Flow collapse did not move after its shrink animation.")
         AssertEqual(

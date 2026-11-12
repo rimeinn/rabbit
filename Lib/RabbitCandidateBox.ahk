@@ -33,9 +33,7 @@ class CandidateBox {
     gui := 0
     static FLOW_ANIMATION_DURATION := 160
     static FLOW_ANIMATION_INTERVAL := 15
-    ; Each recreation builds a new Direct2D stack (GDI+ token, D2D1/DWrite
-    ; factories, WIC bitmap render target). Track the count to watch for
-    ; size oscillation and for old instances not being released.
+    ; Track WIC render target recreations to detect size oscillation.
     static render_target_recreate_count := 0
 
     __New(style, d2d_constructor := RabbitDirect2D) {
@@ -1159,8 +1157,11 @@ class CandidateBox {
                 Format("RabbitCandidateBox.ahk:{}", A_LineNumber)
             )
         }
-        this.d2d := 0
-        this.d2d := this.CreateRenderTarget(this.boxWidth, this.boxHeight)
+        if HasMethod(this.d2d, "ResizeWicRenderTarget") {
+            this.d2d.ResizeWicRenderTarget(this.boxWidth, this.boxHeight)
+        } else {
+            this.d2d := this.CreateRenderTarget(this.boxWidth, this.boxHeight)
+        }
         this.render_width := this.boxWidth
         this.render_height := this.boxHeight
     }
