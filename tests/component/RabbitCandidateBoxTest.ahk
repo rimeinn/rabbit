@@ -98,6 +98,7 @@ RunTest("floating preedit splits modern candidate layout", TestFloatingPreeditLa
 RunTest("floating preedit hides an empty candidate box", TestFloatingPreeditWithoutCandidates.Bind(candidate_style))
 RunTest("floating preedit adapts small corner radii", TestFloatingPreeditCornerRadius.Bind(candidate_style))
 RunTest("floating preedit applies its minimum height", TestFloatingPreeditMinimumHeight.Bind(candidate_style))
+RunTest("floating preedit reuses font calibration", TestFloatingPreeditFontCalibration.Bind(candidate_style))
 RunTest("floating preedit failure falls back to docked layout", TestFloatingPreeditFallback.Bind(candidate_style))
 RunTest("modern vertical text candidate layout", TestModernVerticalTextCandidateLayout.Bind(candidate_style))
 RunTest(
@@ -1359,6 +1360,40 @@ TestFloatingPreeditMinimumHeight(style) {
     }
 }
 
+TestFloatingPreeditFontCalibration(style) {
+    local configured_style := style.With(Map("preedit_font_face", "Segoe UI", "font_point", 12))
+    local box := RabbitFloatingPreedit(configured_style, RabbitFloatingPreeditMetricsProbe)
+    local metrics_probe := box.d2d
+    local preedit := {before_selection: "text", selected: "", after_selection: "", cursor: 0}
+    local first_size, new_font_style
+
+    try {
+        box.Build(preedit, 100, 200, 2, 24)
+        first_size := box.font_size
+        box.Build(preedit, 100, 200, 2, 32)
+        AssertEqual(1, metrics_probe.calibrations.Length, "Changing caret height repeated the font calibration.")
+        AssertEqual(2, metrics_probe.font_faces.Length, "Each build must measure its preedit text.")
+        AssertTrue(box.font_size > first_size, "A taller caret did not increase the preedit font size.")
+        AssertEqual(box.content_height, box.font_size, "The preedit must scale to the current inner height.")
+
+        new_font_style := configured_style.With(Map("preedit_font_face", "Consolas"))
+        box.UpdateStyle(new_font_style)
+        box.Build(preedit, 100, 200, 2, 32)
+        AssertEqual(2, metrics_probe.calibrations.Length, "Changing the preedit font must recalibrate it.")
+        AssertEqual("Consolas", metrics_probe.calibrations[2].face, "Calibration used the previous font.")
+
+        box.UpdateStyle(new_font_style.With(Map("font_point", 18)))
+        metrics_probe.calibration_height := 0
+        AssertThrows(box.Build.Bind(box, preedit, 100, 200, 2, 32), "Invalid calibration must still fail.")
+        metrics_probe.calibration_height := 20
+        box.Build(preedit, 100, 200, 2, 32)
+        AssertEqual(4, metrics_probe.calibrations.Length, "A failed calibration must be retried.")
+        AssertEqual(30, metrics_probe.calibrations[4].size, "Calibration must use the DPI-adjusted base font size.")
+    } finally {
+        box.Dispose()
+    }
+}
+
 TestFloatingPreeditWithoutCandidates(style) {
     local candidate_box := CandidateBox(style.With(Map("floating_preedit", true)))
     local presentation := RabbitCandidatePresentation(CreateCandidateContext(), "{}")
@@ -1638,6 +1673,23 @@ class RabbitTextMetricsProbe {
     GetMetrics(text, font_face, font_size, options*) {
         this.font_faces.Push(font_face)
         return { w: StrLen(text) * font_size, h: font_size }
+    }
+}
+
+class RabbitFloatingPreeditMetricsProbe extends RabbitTextMetricsProbe {
+    calibrations := []
+    calibration_height := 20
+
+    GetDesktopDpiScale() {
+        return 1.25
+    }
+
+    GetMetrics(text, font_face, font_size, options*) {
+        if text == RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT {
+            this.calibrations.Push({face: font_face, size: font_size})
+            return {w: 20, h: this.calibration_height}
+        }
+        return super.GetMetrics(text, font_face, font_size, options*)
     }
 }
 

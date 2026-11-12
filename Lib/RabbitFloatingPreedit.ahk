@@ -37,6 +37,7 @@ class RabbitFloatingPreedit {
         this.layered_window := 0
         this.render_width := 0
         this.render_height := 0
+        this.font_calibration := 0
         this.segments := []
         this.box_width := 0
         this.box_height := 0
@@ -108,8 +109,36 @@ class RabbitFloatingPreedit {
         this.min_height := style.floating_preedit_min_height
     }
 
+    GetFontCalibrationHeight() {
+        local calibration := this.font_calibration
+        local font_face := this.font_face
+        local base_font_size := this.base_font_size
+        ; DirectWrite measurement uses the primary screen dimensions as layout bounds.
+        local screen_width := A_ScreenWidth
+        local screen_height := A_ScreenHeight
+        if !calibration || calibration.font_face !== font_face || calibration.base_font_size != base_font_size
+            || calibration.screen_width != screen_width || calibration.screen_height != screen_height {
+            local metrics := this.d2d.GetMetrics(
+                RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT,
+                font_face,
+                base_font_size
+            )
+            if metrics.h <= 0 {
+                throw Error("Floating preedit font calibration returned an invalid height.")
+            }
+            this.font_calibration := calibration := {
+                font_face: font_face,
+                base_font_size: base_font_size,
+                screen_width: screen_width,
+                screen_height: screen_height,
+                height: metrics.h
+            }
+        }
+        return calibration.height
+    }
+
     Build(preedit, caret_x, caret_y, caret_w, caret_h) {
-        local groups, group, segment, metrics, calibration_metrics
+        local groups, group, segment, metrics
         local x, height := 0, text_y, selected_x := 0, selected_width := 0, selected_height := 0
         this.AssertNotDisposed()
         if caret_h <= 0 {
@@ -125,15 +154,7 @@ class RabbitFloatingPreedit {
             1,
             this.box_height - this.draw_border_width * 2 - this.margin_y * 2
         )
-        calibration_metrics := this.d2d.GetMetrics(
-            RabbitFloatingPreedit.FONT_HEIGHT_CALIBRATION_TEXT,
-            this.font_face,
-            this.base_font_size
-        )
-        if calibration_metrics.h <= 0 {
-            throw Error("Floating preedit font calibration returned an invalid height.")
-        }
-        this.font_size := this.base_font_size * this.content_height / calibration_metrics.h
+        this.font_size := this.base_font_size * this.content_height / this.GetFontCalibrationHeight()
         x := this.content_x
         this.segments := []
         for group_index, group in groups {
@@ -317,8 +338,8 @@ class RabbitFloatingPreedit {
             return
         }
         RabbitFloatingPreedit.render_target_recreate_count++
-        if RabbitFloatingPreedit.render_target_recreate_count <= 3
-            || Mod(RabbitFloatingPreedit.render_target_recreate_count, 100) == 0 {
+        if RabbitDebugEnabled() && (RabbitFloatingPreedit.render_target_recreate_count <= 3
+            || Mod(RabbitFloatingPreedit.render_target_recreate_count, 100) == 0) {
             RabbitDebug(
                 Format(
                     "floating preedit recreated Direct2D render target to {}x{} (total {})",
@@ -351,7 +372,7 @@ class RabbitFloatingPreedit {
 
     WriteDebugInfo(caret_x, caret_y, caret_w, caret_h) {
         local hwnd, window_dpi := 0
-        if !RabbitFloatingPreedit.DEBUG_OUTPUT {
+        if !RabbitFloatingPreedit.DEBUG_OUTPUT || !RabbitDebugEnabled() {
             return
         }
         if hwnd := DllCall("GetForegroundWindow", "ptr") {

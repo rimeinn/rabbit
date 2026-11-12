@@ -619,8 +619,9 @@ class RabbitInputTarget {
     }
 
     static ClassifyBrowser(descriptor) {
+        static debug_location := "RabbitInputTarget.ahk:" . A_LineNumber
         local control_types := []
-        local control_type, result, focus_text, uia_text
+        local control_type, result
         if this.ContainsEditableClass(descriptor.focus_classes) {
             return this.YES
         }
@@ -658,19 +659,19 @@ class RabbitInputTarget {
                 result := this.NO
             }
         }
-        focus_text := RabbitJoinList(descriptor.focus_classes)
-        uia_text := RabbitJoinList(control_types)
-        RabbitDebug(
-            Format(
-                "browser target {} -> {} focus=[{}] uia=[{}]",
-                descriptor.process_name,
-                result,
-                focus_text,
-                uia_text
-            ),
-            Format("RabbitInputTarget.ahk:{}", A_LineNumber),
-            1
-        )
+        if RabbitDebugEnabled(debug_location, 1) {
+            RabbitDebug(
+                Format(
+                    "browser target {} -> {} focus=[{}] uia=[{}]",
+                    descriptor.process_name,
+                    result,
+                    RabbitJoinList(descriptor.focus_classes),
+                    RabbitJoinList(control_types)
+                ),
+                debug_location,
+                1
+            )
+        }
         return result
     }
 

@@ -252,14 +252,15 @@ RabbitLog(text) {
         FileAppend(text, "*", "UTF-8")
     }
 }
-RabbitLogLimit(text, label, limit := 1) {
+RabbitLogCounts() {
     static labels := Map()
-    if !labels.Has(label) {
-        labels[label] := 0
-    }
-    if limit < 0 || labels[label] < limit {
+    return labels
+}
+RabbitLogLimit(text, label, limit := 1) {
+    local labels := RabbitLogCounts()
+    if limit < 0 || labels.Get(label, 0) < limit {
         RabbitLog(text)
-        labels[label] := labels[label] + 1
+        labels[label] := labels.Get(label, 0) + 1
     }
 }
 RabbitError(text, location, limit := -1) {
@@ -277,10 +278,14 @@ RabbitInfo(text, location, limit := -1) {
     msg := Format("I{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
     RabbitLogLimit(msg, location, limit)
 }
+RabbitDebugEnabled(location := "", limit := -1) {
+    global RABBIT_VERSION
+    return SubStr(RABBIT_VERSION, 1, 3) = "dev"
+        && (limit < 0 || RabbitLogCounts().Get(location, 0) < limit)
+}
 RabbitDebug(text, location, limit := -1) {
     local msg
-    global RABBIT_VERSION
-    if SubStr(RABBIT_VERSION, 1, 3) != "dev" {
+    if !RabbitDebugEnabled(location, limit) {
         return
     }
     msg := Format("D{} {:5} {}] {}`r`n", FormatTime(, "yyyyMMdd HH:mm:ss       "), ProcessExist(), location, text)
