@@ -128,13 +128,16 @@ class RabbitInputTarget {
             return 0
         }
 
+        local focus_classes := this.GetClassChain(target_hwnd)
         return {
             active_hwnd: active_hwnd,
             focus_hwnd: focus_hwnd,
             process_id: process_id,
             process_name: StrLower(process_name),
-            focus_classes: this.GetClassChain(target_hwnd),
-            active_classes: active_hwnd ? this.GetClassChain(active_hwnd) : []
+            focus_classes: focus_classes,
+            active_classes: active_hwnd == target_hwnd
+                ? focus_classes
+                : (active_hwnd ? this.GetClassChain(active_hwnd) : [])
         }
     }
 
@@ -342,10 +345,6 @@ class RabbitInputTarget {
                 details.explorer_editor := this.GetExplorerEditor(focused_element)
                 return details
             }
-            if inspect_text_editability {
-                details.text_editability := this.GetUIAutomationTextEditability(focused_element)
-            }
-
             walker := ComValue(13, 0)
             ComCall(14, uia, "Ptr*", walker)
             if !walker.Ptr {
@@ -363,6 +362,9 @@ class RabbitInputTarget {
                 control_type := 0
                 ComCall(21, current_element, "Int*", &control_type)
                 details.control_types.Push(control_type)
+                if A_Index = 1 && inspect_text_editability && !this.IsBrowserTextTargetType(control_type) {
+                    details.text_editability := this.GetUIAutomationTextEditability(focused_element)
+                }
                 if this.IsUIAutomationTextControlType(control_type)
                     || this.IsUIAutomationSelectionControlType(control_type) {
                     break
@@ -607,6 +609,15 @@ class RabbitInputTarget {
         return false
     }
 
+    static IsBrowserTextTargetType(control_type) {
+        ; Chrome reports IsReadOnly unreliably for combo boxes such as search
+        ; fields with suggestions. A dropdown can also keep UIA focus on the
+        ; highlighted list item (aria-activedescendant) while its filter accepts keys.
+        return control_type = this.UIA_EDIT_CONTROL_TYPE_ID
+            || control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID
+            || control_type = this.UIA_LIST_ITEM_CONTROL_TYPE_ID
+    }
+
     static ClassifyBrowser(descriptor) {
         local control_types := []
         local control_type, result, focus_text, uia_text
@@ -632,19 +643,7 @@ class RabbitInputTarget {
         } else {
             ; The first entry is the focused element itself.
             control_type := control_types[1]
-            if control_type = this.UIA_EDIT_CONTROL_TYPE_ID
-                || control_type = this.UIA_COMBOBOX_CONTROL_TYPE_ID {
-                ; Plain text fields and search boxes with a suggestion dropdown
-                ; (e.g. GitHub, exposed as a UIA combo box) accept input. Chrome
-                ; reports the combo box IsReadOnly property unreliably, so the
-                ; writable/read-only distinction is deliberately not consulted.
-                result := this.YES
-            } else if control_type = this.UIA_LIST_ITEM_CONTROL_TYPE_ID {
-                ; Dropdown pickers keep the keyboard focus on their highlighted
-                ; list item (aria-activedescendant) while the real input target
-                ; is the filter box on top, e.g. the GitHub repo switcher.
-                ; Accepting input here matches the pre-browser behavior, so it
-                ; does not regress plain page lists.
+            if this.IsBrowserTextTargetType(control_type) {
                 result := this.YES
             } else if control_type = this.UIA_DOCUMENT_CONTROL_TYPE_ID {
                 if descriptor.HasOwnProp("uia_text_editability")

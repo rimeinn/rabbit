@@ -19,6 +19,7 @@
 #Include ..\support\RabbitTestCommon.ahk
 #Include ..\..\Lib\RabbitInputTarget.ahk
 
+RunTest("input target reuses a class chain for the same HWND", TestDescribeClassChains.Bind())
 RunTest("Explorer file view is a type-ahead target", TestExplorerFileViewIsTypeAhead.Bind())
 RunTest("Explorer edit control remains a text target", TestExplorerEditControlIsYes.Bind())
 RunTest("Explorer XAML editor supplies bounds with the standard commit method", TestExplorerXamlEditor.Bind())
@@ -58,6 +59,46 @@ RunTest("Chrome page without UIA focus remains unknown", TestChromePageWithoutUI
 RunTest("Edge non-editable page area is a non-text target", TestEdgePageAreaIsNo.Bind())
 RunTest("Electron app keeps the previous behavior", TestElectronAppIsUnknown.Bind())
 RunTest("Unrecognized target remains unknown", TestUnknownTarget.Bind())
+
+TestDescribeClassChains() {
+    local target := RabbitInputTargetClassChainProbe
+    local test_gui := Gui()
+    local previous_detect_hidden := A_DetectHiddenWindows
+    try {
+        DetectHiddenWindows(true)
+        local active_hwnd := test_gui.Hwnd
+        local child_hwnd := test_gui.Add("Edit").Hwnd
+        for focus_hwnd in [active_hwnd, 0, child_hwnd] {
+            target.windows := {active_hwnd: active_hwnd, focus_hwnd: focus_hwnd}
+            target.class_queries := 0
+            local descriptor := target.Describe(active_hwnd)
+            local target_hwnd := focus_hwnd ? focus_hwnd : active_hwnd
+            local expected_queries := target_hwnd == active_hwnd ? 1 : 2
+            AssertTrue(IsObject(descriptor), "The test target did not produce a descriptor.")
+            AssertEqual(focus_hwnd, descriptor.focus_hwnd, "The descriptor lost the original focus handle.")
+            AssertEqual(expected_queries, target.class_queries, "Unexpected class chain query count.")
+            AssertEqual(String(target_hwnd), descriptor.focus_classes[1], "The focus class chain is incorrect.")
+            AssertEqual(String(active_hwnd), descriptor.active_classes[1], "The active class chain is incorrect.")
+        }
+    } finally {
+        DetectHiddenWindows(previous_detect_hidden)
+        test_gui.Destroy()
+    }
+}
+
+class RabbitInputTargetClassChainProbe extends RabbitInputTarget {
+    static windows := 0
+    static class_queries := 0
+
+    static GetThreadWindows(thread_id) {
+        return this.windows
+    }
+
+    static GetClassChain(hwnd) {
+        this.class_queries++
+        return [String(hwnd)]
+    }
+}
 
 TestExplorerFileViewIsTypeAhead() {
     AssertEqual(
