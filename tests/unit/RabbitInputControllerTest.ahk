@@ -90,6 +90,11 @@ TestInputHotkeyOwnership() {
         "An ordinary text hotkey was not marked as password-field input."
     )
     AssertTrue(
+        ArrayContains(input.registered_input_hotkeys, "$*w Up")
+            && ArrayContains(input.registered_input_hotkeys, "$*Space Up"),
+        "Native shortcut releases were not protected alongside the ordinary input hotkeys."
+    )
+    AssertTrue(
         !ArrayContains(input.registered_input_hotkeys, "$^!Space"),
         "The suspend hotkey was disabled together with password-field input."
     )
@@ -108,11 +113,12 @@ TestReplacementInputOwnerEnablesHotkeys() {
     first.Dispose()
     replacement.RegisterHotKey("$A", callback, "S0")
 
-    AssertEqual(1, first.hotkey_options.Length, "The initial input owner did not register its hotkey.")
+    AssertEqual(2, first.hotkey_options.Length, "The initial input owner did not register and release its hotkey.")
     AssertTrue(
         RegExMatch(first.hotkey_options[1], "i)(^|\s)On($|\s)"),
         "The initial input owner did not explicitly enable its hotkey."
     )
+    AssertEqual("Off", first.hotkey_options[2], "The initial input owner did not disable its hotkey.")
     AssertEqual(1, replacement.hotkey_options.Length, "The replacement input owner did not register its hotkey.")
     AssertTrue(
         RegExMatch(replacement.hotkey_options[1], "i)(^|\s)On($|\s)"),
@@ -131,7 +137,7 @@ class RabbitHotKeyRegistrationProbe extends RabbitInputController {
         this.replayed_down := Map()
     }
 
-    ApplyHotKey(name, callback, options) {
+    ApplyHotKey(name, callback?, options := "") {
         this.hotkey_options.Push(options)
     }
 

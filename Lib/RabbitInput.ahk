@@ -113,6 +113,7 @@ class RabbitInputController {
         ; example ascii_composer switches) rely on receiving the release event;
         ; without it a key that librime reports as handled on release would
         ; stay swallowed and never reach the application.
+        local unused_release := (*) => 0
         Loop 2 {
             local key_map := A_Index = 1 ? KeyDef.plain_keycode : KeyDef.other_keycode
             for key, _ in key_map {
@@ -126,6 +127,7 @@ class RabbitInputController {
                     this.ProcessTextKey.Bind(this, key, up),
                     "S0"
                 )
+                this.RegisterInputHotKey("$*" . key . " Up", unused_release, "S0")
             }
         }
 
@@ -242,7 +244,6 @@ class RabbitInputController {
             this.ProcessTextKey.Bind(this, "Space", up),
             "S0"
         )
-
     }
 
     RegisterSuspendHotKey(shift, ctrl, alt, up) {
@@ -323,8 +324,22 @@ class RabbitInputController {
         return true
     }
 
-    ApplyHotKey(name, callback, options) {
-        Hotkey(name, callback, options)
+    ApplyHotKey(name, callback?, options := "") {
+        if SubStr(name, 1, 2) != "$*" {
+            Hotkey(name, callback?, options)
+            return
+        }
+        ; AutoHotkey pairs the wildcard release at key-down even when its
+        ; condition cannot match. On release it uses the hook's down-event
+        ; suppression flag instead of matching a plain Up after a modifier
+        ; has been released. A tilde release would also pass through the
+        ; release of a configured shortcut whose down event was suppressed.
+        HotIfWinActive("ahk_id 0")
+        try {
+            Hotkey(name, callback?, options)
+        } finally {
+            HotIfWinActive()
+        }
     }
 
     RegisterInputHotKey(name, callback, options) {
@@ -430,7 +445,7 @@ class RabbitInputController {
     }
 
     SetInputHotKeyEnabled(name, enabled) {
-        Hotkey(name, , enabled ? "On" : "Off")
+        this.ApplyHotKey(name, , enabled ? "On" : "Off")
     }
 
     Dispose() {
@@ -442,7 +457,7 @@ class RabbitInputController {
         this.UnregisterFocusEventHook()
         for name in this.registered_hotkeys {
             try {
-                Hotkey(name, , "Off")
+                this.ApplyHotKey(name, , "Off")
             }
         }
         this.registered_hotkeys := []

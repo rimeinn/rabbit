@@ -16,6 +16,7 @@
  *
  */
 
+#Include RabbitCommon.ahk
 #Include RabbitLocaleFallback.ahk
 
 class RabbitI18n {
@@ -206,7 +207,9 @@ class RabbitI18n {
 
     static Report(message) {
         this.diagnostics.Push(message)
-        OutputDebug(message)
+        if RabbitDebugEnabled() {
+            OutputDebug(message)
+        }
     }
 
     static ReadCatalog(path) {
@@ -265,7 +268,9 @@ class RabbitI18n {
         } else if this.fallback.Has(key) {
             template := this.fallback[key]
         } else {
-            OutputDebug("Missing translation: " . key)
+            if RabbitDebugEnabled() {
+                OutputDebug("Missing translation: " . key)
+            }
             return key
         }
         ; Substitute once so placeholder-looking user data stays literal.
